@@ -16,37 +16,14 @@ from gi.repository import Gtk, Adw, GLib
 
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
 
-
-def get_drive_label(uuid):
-    """Probeer een leesbare naam te krijgen voor een schijf via UUID."""
-    try:
-        result = subprocess.run(
-            ["lsblk", "-o", "UUID,LABEL,SIZE,FSTYPE", "-J"],
-            capture_output=True, text=True
-        )
-        import json as _json
-        data = _json.loads(result.stdout)
-        for device in data.get("blockdevices", []):
-            for child in device.get("children", [device]):
-                if child.get("uuid") == uuid:
-                    label = child.get("label") or ""
-                    size = child.get("size") or ""
-                    fstype = child.get("fstype") or ""
-                    if label:
-                        return f"{label} ({size})"
-                    else:
-                        return f"Schijf {size} {fstype}".strip()
-    except Exception:
-        pass
-    return uuid[:8] + "..."
+# Schijven die we nooit als backup willen tonen
+SYSTEM_MOUNTPOINTS = {"/", "/boot", "/boot/efi", "/efi", "/home", "[SWAP]", ""}
+SYSTEM_LABELS = {"boot", "efi", "swap", "system", "ubuntu", "root"}
 
 
 def get_available_drives():
-    """Geef lijst van (uuid, leesbare naam) tuples terug."""
+    """Geef lijst van (uuid, leesbare naam) tuples terug, zonder systeem schijven."""
     drives = []
-    uuid_dir = "/dev/disk/by-uuid"
-    if not os.path.exists(uuid_dir):
-        return drives
     try:
         result = subprocess.run(
             ["lsblk", "-o", "UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT", "-J"],
@@ -60,20 +37,31 @@ def get_available_drives():
                 uuid = child.get("uuid")
                 if not uuid:
                     continue
-                label = child.get("label") or ""
+
+                label = (child.get("label") or "").strip()
                 size = child.get("size") or ""
                 fstype = child.get("fstype") or ""
-                mountpoint = child.get("mountpoint") or ""
+                mountpoint = (child.get("mountpoint") or "").strip()
+
+                # Filter systeem schijven
+                if mountpoint in SYSTEM_MOUNTPOINTS:
+                    continue
+                if label.lower() in SYSTEM_LABELS:
+                    continue
+                if fstype in {"swap", "vfat", ""}:
+                    continue
+
+                # Leesbare naam
                 if label:
                     display = f"💾  {label}  ({size})"
                 elif mountpoint:
                     display = f"💾  {mountpoint}  ({size})"
                 else:
-                    display = f"💾  Schijf {size} {fstype}".strip()
+                    display = f"💾  Externe schijf  ({size} {fstype})".strip()
+
                 drives.append((uuid, display))
     except Exception:
-        for uuid in os.listdir(uuid_dir):
-            drives.append((uuid, uuid[:8] + "..."))
+        pass
     return drives
 
 
@@ -82,10 +70,12 @@ class SetupWizard(Adw.Window):
         super().__init__(application=app)
         self.app = app
         self.set_title("Pixora — Setup")
-        self.set_default_size(560, 540)
+        self.set_default_size(560, 560)
         self.set_resizable(False)
 
         self.drives = []
+        self.style_manager = Adw.StyleManager.get_default()
+        self.style_manager.connect("notify::dark", self.on_dark_mode_changed)
 
         # Stack voor pagina's
         self.stack = Gtk.Stack()
@@ -101,6 +91,7 @@ class SetupWizard(Adw.Window):
         # Hoofd layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
+        # Header met sluitknop
         header = Adw.HeaderBar()
         header.set_show_end_title_buttons(False)
         header.add_css_class("flat")
@@ -109,6 +100,13 @@ class SetupWizard(Adw.Window):
         self.back_btn.connect("clicked", self.go_back)
         self.back_btn.set_visible(False)
         header.pack_start(self.back_btn)
+
+        # Sluitknop
+        close_btn = Gtk.Button(icon_name="window-close-symbolic")
+        close_btn.add_css_class("flat")
+        close_btn.set_tooltip_text("Sluiten")
+        close_btn.connect("clicked", lambda b: self.close())
+        header.pack_end(close_btn)
 
         self.next_btn = Gtk.Button(label="Volgende")
         self.next_btn.add_css_class("suggested-action")
@@ -123,6 +121,14 @@ class SetupWizard(Adw.Window):
         self.pages = ["welcome", "folder", "structure", "backup", "duplicate"]
         self.current = 0
 
+    # ── Dark mode ────────────────────────────────────────────────────
+    def on_dark_mode_changed(self, manager, _):
+        dark = manager.get_dark()
+        logo_name = "pixora-logo-dark.png" if dark else "pixora-logo-light.png"
+        logo_path = os.path.join(os.path.dirname(__file__), "..", "docs", logo_name)
+        if os.path.exists(logo_path) and hasattr(self, "welcome_logo"):
+            self.welcome_logo.set_filename(logo_path)
+
     # ── Pagina: Welkom ──────────────────────────────────────────────
     def build_welcome(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
@@ -131,16 +137,18 @@ class SetupWizard(Adw.Window):
         page.set_margin_start(48)
         page.set_margin_end(48)
 
-        # Logo
-        style_manager = Adw.StyleManager.get_default()
-        dark = style_manager.get_dark()
+        # Logo gecentreerd
+        dark = self.style_manager.get_dark()
         logo_name = "pixora-logo-dark.png" if dark else "pixora-logo-light.png"
         logo_path = os.path.join(os.path.dirname(__file__), "..", "docs", logo_name)
+
+        self.welcome_logo = Gtk.Picture()
         if os.path.exists(logo_path):
-            logo = Gtk.Picture.new_for_filename(logo_path)
-            logo.set_size_request(260, 64)
-            logo.set_content_fit(Gtk.ContentFit.CONTAIN)
-            page.append(logo)
+            self.welcome_logo.set_filename(logo_path)
+        self.welcome_logo.set_size_request(260, 64)
+        self.welcome_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self.welcome_logo.set_halign(Gtk.Align.CENTER)
+        page.append(self.welcome_logo)
 
         title = Gtk.Label(label="Welkom bij Pixora!")
         title.add_css_class("title-1")
@@ -151,7 +159,8 @@ class SetupWizard(Adw.Window):
             label="Pixora helpt je foto's en video's importeren\n"
                   "vanaf je iPhone, duplicaten detecteren en\n"
                   "automatisch een backup maken.\n\n"
-                  "Deze wizard helpt je Pixora instellen.\nDit duurt maar een paar minuten."
+                  "Deze wizard helpt je Pixora instellen.\n"
+                  "Dit duurt maar een paar minuten."
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.CENTER)
@@ -174,7 +183,8 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label="Kies een map op je computer waar Pixora\nje foto's en video's naartoe kopieert."
+            label="Kies een map op je computer waar Pixora\n"
+                  "je foto's en video's naartoe kopieert."
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -211,41 +221,26 @@ class SetupWizard(Adw.Window):
 
         group = Adw.PreferencesGroup()
 
-        # Plat
         self.radio_flat = Gtk.CheckButton()
-        flat_icon = Gtk.Image.new_from_icon_name("folder-symbolic")
-        flat_row = Adw.ActionRow(
-            title="Plat",
-            subtitle="Alles in één map"
-        )
-        flat_row.add_prefix(flat_icon)
+        flat_row = Adw.ActionRow(title="Plat", subtitle="Alles in één map")
+        flat_row.add_prefix(Gtk.Image.new_from_icon_name("folder-symbolic"))
         flat_row.add_prefix(self.radio_flat)
         flat_row.set_activatable_widget(self.radio_flat)
         group.add(flat_row)
 
-        # Per jaar
         self.radio_year = Gtk.CheckButton()
         self.radio_year.set_group(self.radio_flat)
-        year_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
-        year_row = Adw.ActionRow(
-            title="Per jaar",
-            subtitle="2024/   2025/"
-        )
-        year_row.add_prefix(year_icon)
+        year_row = Adw.ActionRow(title="Per jaar", subtitle="2024/   2025/")
+        year_row.add_prefix(Gtk.Image.new_from_icon_name("folder-open-symbolic"))
         year_row.add_prefix(self.radio_year)
         year_row.set_activatable_widget(self.radio_year)
         group.add(year_row)
 
-        # Per jaar/maand
         self.radio_month = Gtk.CheckButton()
         self.radio_month.set_group(self.radio_flat)
         self.radio_month.set_active(True)
-        month_icon = Gtk.Image.new_from_icon_name("view-list-symbolic")
-        month_row = Adw.ActionRow(
-            title="Per jaar/maand",
-            subtitle="2024/2024-03/   2024/2024-04/"
-        )
-        month_row.add_prefix(month_icon)
+        month_row = Adw.ActionRow(title="Per jaar/maand", subtitle="2024/2024-03/   2024/2024-04/")
+        month_row.add_prefix(Gtk.Image.new_from_icon_name("view-list-symbolic"))
         month_row.add_prefix(self.radio_month)
         month_row.set_activatable_widget(self.radio_month)
         group.add(month_row)
@@ -276,7 +271,6 @@ class SetupWizard(Adw.Window):
 
         group = Adw.PreferencesGroup()
 
-        # Backup schakelaar
         self.backup_switch = Gtk.Switch()
         self.backup_switch.set_valign(Gtk.Align.CENTER)
         self.backup_switch.connect("notify::active", self.on_backup_toggle)
@@ -297,7 +291,7 @@ class SetupWizard(Adw.Window):
             for uuid, label in self.drives:
                 self.drive_model.append(label)
         else:
-            self.drive_model.append("Geen schijven gevonden — sluit je schijf aan")
+            self.drive_model.append("Geen externe schijven gevonden")
 
         self.drive_combo = Gtk.DropDown(model=self.drive_model)
         self.drive_combo.set_sensitive(False)
@@ -311,7 +305,7 @@ class SetupWizard(Adw.Window):
 
         self.drive_row = Adw.ActionRow(
             title="Backup schijf",
-            subtitle="Selecteer je externe USB schijf of HDD"
+            subtitle="Alleen externe schijven worden getoond"
         )
         self.drive_row.add_suffix(refresh_btn)
         self.drive_row.add_suffix(self.drive_combo)
@@ -345,12 +339,8 @@ class SetupWizard(Adw.Window):
         group = Adw.PreferencesGroup()
 
         self.radio_strict = Gtk.CheckButton()
-        strict_icon = Gtk.Image.new_from_icon_name("security-high-symbolic")
-        strict_row = Adw.ActionRow(
-            title="Streng",
-            subtitle="Alleen exact dezelfde foto's"
-        )
-        strict_row.add_prefix(strict_icon)
+        strict_row = Adw.ActionRow(title="Streng", subtitle="Alleen exact dezelfde foto's")
+        strict_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
         strict_row.add_prefix(self.radio_strict)
         strict_row.set_activatable_widget(self.radio_strict)
         group.add(strict_row)
@@ -358,24 +348,16 @@ class SetupWizard(Adw.Window):
         self.radio_normal = Gtk.CheckButton()
         self.radio_normal.set_group(self.radio_strict)
         self.radio_normal.set_active(True)
-        normal_icon = Gtk.Image.new_from_icon_name("security-medium-symbolic")
-        normal_row = Adw.ActionRow(
-            title="Normaal",
-            subtitle="Bijna identieke foto's worden gedetecteerd"
-        )
-        normal_row.add_prefix(normal_icon)
+        normal_row = Adw.ActionRow(title="Normaal", subtitle="Bijna identieke foto's worden gedetecteerd")
+        normal_row.add_prefix(Gtk.Image.new_from_icon_name("security-medium-symbolic"))
         normal_row.add_prefix(self.radio_normal)
         normal_row.set_activatable_widget(self.radio_normal)
         group.add(normal_row)
 
         self.radio_loose = Gtk.CheckButton()
         self.radio_loose.set_group(self.radio_strict)
-        loose_icon = Gtk.Image.new_from_icon_name("security-low-symbolic")
-        loose_row = Adw.ActionRow(
-            title="Soepel",
-            subtitle="Ook licht bewerkte foto's worden gedetecteerd"
-        )
-        loose_row.add_prefix(loose_icon)
+        loose_row = Adw.ActionRow(title="Soepel", subtitle="Ook licht bewerkte foto's worden gedetecteerd")
+        loose_row.add_prefix(Gtk.Image.new_from_icon_name("security-low-symbolic"))
         loose_row.add_prefix(self.radio_loose)
         loose_row.set_activatable_widget(self.radio_loose)
         group.add(loose_row)
@@ -431,7 +413,7 @@ class SetupWizard(Adw.Window):
             for uuid, label in self.drives:
                 self.drive_model.append(label)
         else:
-            self.drive_model.append("Geen schijven gevonden — sluit je schijf aan")
+            self.drive_model.append("Geen externe schijven gevonden")
 
     def get_structure(self):
         if self.radio_flat.get_active():
