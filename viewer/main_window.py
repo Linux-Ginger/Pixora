@@ -150,157 +150,68 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
 
 # ── Tijdlijn scrollbar ───────────────────────────────────────────────
-class TimelineBar(Gtk.DrawingArea):
-    """Smalle tijdlijn balk rechts — klik/sleep om te navigeren."""
+class TimelineBar(Gtk.ScrolledWindow):
+    """Tijdlijn balk rechts met jaar/maand labels."""
 
     def __init__(self, scroll_callback):
         super().__init__()
         self.scroll_callback = scroll_callback
-        self.entries   = []   # lijst van (label, fractie) — fractie 0.0-1.0
-        self.hover_idx = -1
-        self._dragging = False
+        self.entries = []
 
-        self.set_size_request(52, -1)
+        self.set_size_request(60, -1)
         self.set_vexpand(True)
+        self.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
 
-        # Tekenen
-        self.set_draw_func(self._draw)
+        css = Gtk.CssProvider()
+        css.load_from_string("scrolledwindow { background-color: alpha(@window_bg_color, 0.8); }")
+        self.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
-        # Muis events
-        motion = Gtk.EventControllerMotion()
-        motion.connect("motion", self._on_motion)
-        motion.connect("leave",  self._on_leave)
-        self.add_controller(motion)
-
-        click = Gtk.GestureClick()
-        click.connect("pressed",  self._on_press)
-        click.connect("released", self._on_release)
-        self.add_controller(click)
-
-        drag = Gtk.GestureDrag()
-        drag.connect("drag-update", self._on_drag)
-        self.add_controller(drag)
+        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.box.set_valign(Gtk.Align.FILL)
+        self.box.set_vexpand(True)
+        self.set_child(self.box)
 
     def set_entries(self, entries):
-        """entries = lijst van (label_str, fractie 0.0-1.0)"""
-        self.entries = entries
-        self.queue_draw()
+        while True:
+            child = self.box.get_first_child()
+            if child is None:
+                break
+            self.box.remove(child)
 
-    def _fraction_at_y(self, y):
-        h = self.get_height()
-        return max(0.0, min(1.0, y / h if h > 0 else 0))
+        for label_str, frac in entries:
+            is_year = label_str.isdigit() and len(label_str) == 4
 
-    def _on_press(self, gesture, n, x, y):
-        self._dragging = True
-        frac = self._fraction_at_y(y)
-        self.scroll_callback(frac)
+            btn = Gtk.Button(label=label_str)
+            btn.add_css_class("flat")
 
-    def _on_release(self, gesture, n, x, y):
-        self._dragging = False
-
-    def _on_drag(self, gesture, dx, dy):
-        ok, start_x, start_y = gesture.get_start_point()
-        if ok:
-            frac = self._fraction_at_y(start_y + dy)
-            self.scroll_callback(frac)
-
-    def _on_motion(self, controller, x, y):
-        h = self.get_height()
-        if not self.entries or h == 0:
-            return
-        frac = y / h
-        # Zoek dichtstbijzijnde entry
-        closest = min(range(len(self.entries)), key=lambda i: abs(self.entries[i][1] - frac))
-        if closest != self.hover_idx:
-            self.hover_idx = closest
-            self.queue_draw()
-
-    def _on_leave(self, controller):
-        self.hover_idx = -1
-        self.queue_draw()
-
-    def _draw(self, area, cr, width, height):
-        if not self.entries:
-            return
-
-        # Achtergrond
-        cr.set_source_rgba(0.15, 0.15, 0.15, 0.85)
-        cr.rectangle(0, 0, width, height)
-        cr.fill()
-
-        # Lijn in het midden
-        cr.set_source_rgba(0.4, 0.4, 0.4, 0.5)
-        cr.set_line_width(1)
-        cr.move_to(width / 2, 0)
-        cr.line_to(width / 2, height)
-        cr.stroke()
-
-        # Entries tekenen
-        last_year = None
-        for i, (label, frac) in enumerate(self.entries):
-            y = frac * height
-
-            is_year  = label.isdigit() and len(label) == 4
-            is_hover = i == self.hover_idx
-
+            btn_css = Gtk.CssProvider()
             if is_year:
-                # Jaar — dik streepje + tekst
-                cr.set_source_rgba(0.9, 0.9, 0.9, 1.0)
-                cr.set_line_width(2)
-                cr.move_to(width / 2 - 10, y)
-                cr.line_to(width / 2 + 10, y)
-                cr.stroke()
-
-                cr.set_source_rgba(0.9, 0.9, 0.9, 1.0)
-                cr.select_font_face("Sans", 0, 1)
-                cr.set_font_size(10)
-                te = cr.text_extents(label)
-                cr.move_to(width / 2 - te.width / 2, y - 4)
-                cr.show_text(label)
+                btn_css.load_from_string("""
+                    button {
+                        font-size: 10px;
+                        font-weight: bold;
+                        color: @window_fg_color;
+                        padding: 2px 4px;
+                        min-height: 0;
+                    }
+                """)
             else:
-                # Maand — klein streepje
-                cr.set_source_rgba(0.6, 0.6, 0.6, 0.8)
-                cr.set_line_width(1)
-                cr.move_to(width / 2 - 5, y)
-                cr.line_to(width / 2 + 5, y)
-                cr.stroke()
+                btn_css.load_from_string("""
+                    button {
+                        font-size: 9px;
+                        color: alpha(@window_fg_color, 0.6);
+                        padding: 1px 4px;
+                        min-height: 0;
+                    }
+                """)
+            btn.get_style_context().add_provider(btn_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
-            # Hover tooltip
-            if is_hover:
-                # Oranje stip
-                cr.set_source_rgb(0.914, 0.329, 0.125)  # #e95420
-                cr.arc(width / 2, y, 5, 0, 2 * 3.14159)
-                cr.fill()
+            f = frac
+            btn.connect("clicked", lambda b, fr=f: self.scroll_callback(fr))
+            self.box.append(btn)
 
-                # Label achtergrond
-                cr.select_font_face("Sans", 0, 0)
-                cr.set_font_size(11)
-                te = cr.text_extents(label)
-                pad = 6
-                bx  = width / 2 - te.width - pad * 2 - 12
-                by  = y - te.height / 2 - pad
-                bw  = te.width + pad * 2
-                bh  = te.height + pad * 2
-
-                cr.set_source_rgba(0.1, 0.1, 0.1, 0.92)
-                self._rounded_rect(cr, bx, by, bw, bh, 6)
-                cr.fill()
-
-                cr.set_source_rgba(1, 1, 1, 1)
-                cr.move_to(bx + pad, by + pad + te.height)
-                cr.show_text(label)
-
-    def _rounded_rect(self, cr, x, y, w, h, r):
-        cr.move_to(x + r, y)
-        cr.line_to(x + w - r, y)
-        cr.arc(x + w - r, y + r, r, -1.5708, 0)
-        cr.line_to(x + w, y + h - r)
-        cr.arc(x + w - r, y + h - r, r, 0, 1.5708)
-        cr.line_to(x + r, y + h)
-        cr.arc(x + r, y + h - r, r, 1.5708, 3.14159)
-        cr.line_to(x, y + r)
-        cr.arc(x + r, y + r, r, 3.14159, 4.71239)
-        cr.close_path()
+    def update_position(self, frac):
+        pass
 
 
 class MainWindow(Adw.ApplicationWindow):
