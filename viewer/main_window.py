@@ -21,6 +21,8 @@ IMPORTER_PATH = os.path.join(os.path.dirname(__file__), "..", "importer", "main.
 DOCS_DIR = os.path.join(os.path.dirname(__file__), "..", "docs")
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
 
+BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
+
 
 def importer_installed():
     return os.path.exists(IMPORTER_PATH)
@@ -39,12 +41,67 @@ def save_settings(settings):
         json.dump(settings, f, indent=2)
 
 
+def get_available_drives():
+    drives = []
+    try:
+        result = subprocess.run(
+            ["lsblk", "-o", "NAME,UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT,HOTPLUG", "-J"],
+            capture_output=True, text=True
+        )
+        data = json.loads(result.stdout)
+
+        def process_device(device):
+            hotplug = device.get("hotplug", False)
+            if not hotplug:
+                return
+            uuid = device.get("uuid")
+            fstype = (device.get("fstype") or "").lower()
+            label = (device.get("label") or "").strip()
+            size = device.get("size") or ""
+            mountpoint = (device.get("mountpoint") or "").strip()
+            if uuid and fstype in BACKUP_FSTYPES:
+                if label:
+                    display = f"💾  {label}  ({size})"
+                elif mountpoint:
+                    display = f"💾  {mountpoint}  ({size})"
+                else:
+                    display = f"💾  Externe schijf  ({size})"
+                drives.append((uuid, display))
+            for child in device.get("children", []):
+                child["hotplug"] = hotplug
+                process_device(child)
+
+        for device in data.get("blockdevices", []):
+            process_device(device)
+    except Exception as e:
+        print(f"Drive detectie fout: {e}")
+    return drives
+
+
+def get_mountpoint_for_uuid(uuid):
+    try:
+        result = subprocess.run(
+            ["lsblk", "-o", "UUID,MOUNTPOINT", "-J"],
+            capture_output=True, text=True
+        )
+        data = json.loads(result.stdout)
+        for device in data.get("blockdevices", []):
+            for child in device.get("children", [device]):
+                if child.get("uuid") == uuid:
+                    return child.get("mountpoint")
+    except Exception:
+        pass
+    return None
+
+
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
         self.settings = settings
         self.photos = []
         self.current_index = 0
+        self.settings_drives = []
+        self.settings_selected_backup_path = None
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -116,8 +173,36 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Foto grid pagina ─────────────────────────────────────────────
     def build_grid_page(self):
-        self.grid_overlay = Gtk.Overlay()
+        # Outer box vult het hele scherm
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        outer.set_vexpand(True)
+        outer.set_hexpand(True)
 
+        # Stack: laadscherm / grid / leeg
+        self.content_stack = Gtk.Stack()
+        self.content_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.content_stack.set_transition_duration(150)
+        self.content_stack.set_vexpand(True)
+        self.content_stack.set_hexpand(True)
+
+        # Pagina 0 — laadscherm
+        spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        spinner_box.set_halign(Gtk.Align.CENTER)
+        spinner_box.set_valign(Gtk.Align.CENTER)
+        spinner_box.set_vexpand(True)
+
+        self.spinner = Gtk.Spinner()
+        self.spinner.set_size_request(48, 48)
+        self.spinner.start()
+
+        self.spinner_label = Gtk.Label(label="Foto's laden...")
+        self.spinner_label.add_css_class("dim-label")
+
+        spinner_box.append(self.spinner)
+        spinner_box.append(self.spinner_label)
+        self.content_stack.add_named(spinner_box, "loading")
+
+        # Pagina 1 — foto grid
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scroll.set_vexpand(True)
@@ -135,25 +220,20 @@ class MainWindow(Adw.ApplicationWindow):
         self.flow_box.set_margin_end(12)
 
         scroll.set_child(self.flow_box)
-        self.grid_overlay.set_child(scroll)
+        self.content_stack.add_named(scroll, "grid")
 
-        # Laadspinner overlay
-        self.spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        self.spinner_box.set_halign(Gtk.Align.CENTER)
-        self.spinner_box.set_valign(Gtk.Align.CENTER)
+        # Pagina 2 — lege staat gecentreerd
+        self.status_page = Adw.StatusPage()
+        self.status_page.set_icon_name("image-missing-symbolic")
+        self.status_page.set_title("Geen foto's gevonden")
+        self.status_page.set_description("Sluit je iPhone aan om foto's te importeren")
+        self.status_page.set_vexpand(True)
+        self.status_page.set_hexpand(True)
+        self.content_stack.add_named(self.status_page, "empty")
 
-        self.spinner = Gtk.Spinner()
-        self.spinner.set_size_request(48, 48)
-        self.spinner.start()
-
-        self.spinner_label = Gtk.Label(label="Foto's laden...")
-        self.spinner_label.add_css_class("dim-label")
-
-        self.spinner_box.append(self.spinner)
-        self.spinner_box.append(self.spinner_label)
-        self.grid_overlay.add_overlay(self.spinner_box)
-
-        return self.grid_overlay
+        self.content_stack.set_visible_child_name("loading")
+        outer.append(self.content_stack)
+        return outer
 
     # ── Foto viewer pagina ───────────────────────────────────────────
     def build_viewer_page(self):
@@ -250,7 +330,7 @@ class MainWindow(Adw.ApplicationWindow):
             return False
 
         self.apply_sort()
-        self.spinner_box.set_visible(True)
+        self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
 
         thread = threading.Thread(target=self.load_thumbnails, daemon=True)
@@ -289,32 +369,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_loading_done(self, total):
         self.spinner.stop()
-        self.spinner_box.set_visible(False)
+        self.content_stack.set_visible_child_name("grid")
         self.photo_count_label.set_text(f"{total} foto's")
         return False
 
     def show_empty_state(self):
         self.spinner.stop()
-        self.spinner_box.set_visible(False)
-
-        # Gecentreerde lege staat
-        center_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        center_box.set_halign(Gtk.Align.FILL)
-        center_box.set_valign(Gtk.Align.FILL)
-        center_box.set_vexpand(True)
-        center_box.set_hexpand(True)
-
-        status = Adw.StatusPage()
-        status.set_icon_name("image-missing-symbolic")
-        status.set_title("Geen foto's gevonden")
-        status.set_description("Sluit je iPhone aan om foto's te importeren")
-        status.set_halign(Gtk.Align.CENTER)
-        status.set_valign(Gtk.Align.CENTER)
-        status.set_vexpand(True)
-        status.set_hexpand(True)
-
-        center_box.append(status)
-        self.flow_box.append(center_box)
+        self.content_stack.set_visible_child_name("empty")
         self.photo_count_label.set_text("0 foto's")
 
     # ── Sorteren ─────────────────────────────────────────────────────
@@ -338,7 +399,7 @@ class MainWindow(Adw.ApplicationWindow):
             if child is None:
                 break
             self.flow_box.remove(child)
-        self.spinner_box.set_visible(True)
+        self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
         thread = threading.Thread(target=self.load_thumbnails, daemon=True)
         thread.start()
@@ -474,27 +535,84 @@ class MainWindow(Adw.ApplicationWindow):
 
         page.add(dup_group)
 
-        # ── Setup opnieuw ──
-        reset_group = Adw.PreferencesGroup()
-        reset_group.set_title("Setup opnieuw uitvoeren")
-        reset_group.set_description("Verwijdert alle instellingen en herstart de wizard")
+        # ── Backup ──
+        backup_group = Adw.PreferencesGroup()
+        backup_group.set_title("Automatische backup")
+        backup_group.set_description("Backup naar externe USB schijf na elke import")
 
-        reset_row = Adw.ActionRow()
-        reset_row.set_title("Reset Pixora")
-        reset_row.set_subtitle("Alle instellingen worden verwijderd")
+        # Backup aan/uit
+        self.settings_backup_switch = Gtk.Switch()
+        self.settings_backup_switch.set_valign(Gtk.Align.CENTER)
+        self.settings_backup_switch.set_active(bool(self.settings.get("backup_uuid")))
+        self.settings_backup_switch.connect("notify::active", self.on_settings_backup_toggle)
 
-        reset_btn = Gtk.Button(label="Reset")
-        reset_btn.add_css_class("destructive-action")
-        reset_btn.add_css_class("flat")
-        reset_btn.set_valign(Gtk.Align.CENTER)
-        reset_btn.connect("clicked", lambda b: self.reset_settings(dialog))
-        reset_row.add_suffix(reset_btn)
-        reset_group.add(reset_row)
-        page.add(reset_group)
+        backup_toggle_row = Adw.ActionRow(
+            title="Automatische backup",
+            subtitle="Synchroniseert na elke import"
+        )
+        backup_toggle_row.add_suffix(self.settings_backup_switch)
+        backup_toggle_row.set_activatable_widget(self.settings_backup_switch)
+        backup_group.add(backup_toggle_row)
+
+        # Schijf selectie
+        self.settings_drive_model = Gtk.StringList()
+        self.settings_drives = get_available_drives()
+
+        if self.settings_drives:
+            for uuid, label in self.settings_drives:
+                self.settings_drive_model.append(label)
+        else:
+            self.settings_drive_model.append("Geen externe schijven gevonden")
+
+        self.settings_drive_combo = Gtk.DropDown(model=self.settings_drive_model)
+        self.settings_drive_combo.set_size_request(220, -1)
+        self.settings_drive_combo.set_sensitive(bool(self.settings.get("backup_uuid")))
+        self.settings_drive_combo.connect("notify::selected", self.on_settings_drive_selected)
+
+        # Selecteer huidige schijf
+        current_uuid = self.settings.get("backup_uuid")
+        if current_uuid and self.settings_drives:
+            for i, (uuid, label) in enumerate(self.settings_drives):
+                if uuid == current_uuid:
+                    self.settings_drive_combo.set_selected(i)
+                    break
+
+        settings_refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
+        settings_refresh_btn.add_css_class("flat")
+        settings_refresh_btn.set_valign(Gtk.Align.CENTER)
+        settings_refresh_btn.set_tooltip_text("Vernieuwen")
+        settings_refresh_btn.connect("clicked", self.on_settings_refresh_drives)
+
+        self.settings_drive_row = Adw.ActionRow(
+            title="Backup schijf",
+            subtitle="Alleen externe schijven worden getoond"
+        )
+        self.settings_drive_row.add_suffix(settings_refresh_btn)
+        self.settings_drive_row.add_suffix(self.settings_drive_combo)
+        self.settings_drive_row.set_sensitive(bool(self.settings.get("backup_uuid")))
+        backup_group.add(self.settings_drive_row)
+
+        # Backup map
+        current_backup_path = self.settings.get("backup_path", "Niet ingesteld")
+        self.settings_backup_folder_row = Adw.ActionRow(
+            title="Map op backup schijf",
+            subtitle=current_backup_path or "Niet ingesteld"
+        )
+        self.settings_backup_folder_row.set_sensitive(bool(self.settings.get("backup_uuid")))
+
+        change_backup_folder_btn = Gtk.Button(label="Wijzigen")
+        change_backup_folder_btn.add_css_class("flat")
+        change_backup_folder_btn.set_valign(Gtk.Align.CENTER)
+        change_backup_folder_btn.connect("clicked", self.on_settings_change_backup_folder)
+        self.settings_backup_folder_row.add_suffix(change_backup_folder_btn)
+        backup_group.add(self.settings_backup_folder_row)
+
+        page.add(backup_group)
 
         dialog.add(page)
         dialog.present(self)
 
+    # ── Instellingen acties ──────────────────────────────────────────
     def on_structure_changed(self, value, btn):
         if btn.get_active():
             self.settings["structure"] = value
@@ -504,6 +622,62 @@ class MainWindow(Adw.ApplicationWindow):
         if btn.get_active():
             self.settings["duplicate_threshold"] = value
             save_settings(self.settings)
+
+    def on_settings_backup_toggle(self, switch, _):
+        active = switch.get_active()
+        self.settings_drive_row.set_sensitive(active)
+        self.settings_drive_combo.set_sensitive(active)
+        self.settings_backup_folder_row.set_sensitive(active)
+        if not active:
+            self.settings["backup_uuid"] = None
+            self.settings["backup_path"] = None
+            save_settings(self.settings)
+
+    def on_settings_drive_selected(self, combo, _):
+        selected = combo.get_selected()
+        if self.settings_drives and selected < len(self.settings_drives):
+            uuid = self.settings_drives[selected][0]
+            self.settings["backup_uuid"] = uuid
+            save_settings(self.settings)
+
+    def on_settings_refresh_drives(self, btn):
+        while self.settings_drive_model.get_n_items() > 0:
+            self.settings_drive_model.remove(0)
+        self.settings_drives = get_available_drives()
+        if self.settings_drives:
+            for uuid, label in self.settings_drives:
+                self.settings_drive_model.append(label)
+            self.settings_drive_combo.set_sensitive(True)
+        else:
+            self.settings_drive_model.append("Geen externe schijven gevonden")
+            self.settings_drive_combo.set_sensitive(False)
+
+    def on_settings_change_backup_folder(self, btn):
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Kies map op backup schijf")
+        current_uuid = self.settings.get("backup_uuid")
+        if current_uuid:
+            mountpoint = get_mountpoint_for_uuid(current_uuid)
+            if mountpoint:
+                folder = Gio.File.new_for_path(mountpoint)
+                dialog.set_initial_folder(folder)
+        dialog.select_folder(self, None, self.on_settings_backup_folder_selected)
+
+    def on_settings_backup_folder_selected(self, dialog, result):
+        try:
+            folder = dialog.select_folder_finish(result)
+            if folder:
+                chosen = folder.get_path()
+                current_uuid = self.settings.get("backup_uuid")
+                if current_uuid:
+                    mountpoint = get_mountpoint_for_uuid(current_uuid)
+                    if mountpoint and not chosen.startswith(mountpoint):
+                        return
+                self.settings["backup_path"] = chosen
+                save_settings(self.settings)
+                self.settings_backup_folder_row.set_subtitle(chosen)
+        except Exception:
+            pass
 
     def change_folder(self, parent_dialog):
         file_dialog = Gtk.FileDialog()
@@ -519,15 +693,6 @@ class MainWindow(Adw.ApplicationWindow):
                 self.folder_row.set_subtitle(folder.get_path())
         except Exception:
             pass
-
-    def reset_settings(self, dialog):
-        if os.path.exists(CONFIG_PATH):
-            os.remove(CONFIG_PATH)
-        dialog.close()
-        from setup_wizard import SetupWizard
-        wizard = SetupWizard(self.get_application())
-        wizard.present()
-        self.close()
 
     # ── Importer ─────────────────────────────────────────────────────
     def open_importer(self, btn):
