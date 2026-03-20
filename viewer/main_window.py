@@ -299,13 +299,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Viewer pagina ────────────────────────────────────────────────
     def build_viewer_page(self):
-        # Zwarte achtergrond via CSS
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        box.set_vexpand(True)
-        box.set_hexpand(True)
-
         viewer_area = Gtk.Overlay()
         viewer_area.set_vexpand(True)
+        viewer_area.set_hexpand(True)
 
         # Zwarte achtergrond
         bg = Gtk.Box()
@@ -378,14 +374,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_counter.set_margin_bottom(20)
         viewer_area.add_overlay(self.viewer_counter)
 
-        box.append(viewer_area)
-
         # Keyboard navigatie
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self.on_viewer_key)
         self.add_controller(key_ctrl)
 
-        return box
+        return viewer_area
 
     # ── Onderste balk ────────────────────────────────────────────────
     def build_bottombar(self):
@@ -542,9 +536,15 @@ class MainWindow(Adw.ApplicationWindow):
     def on_sort_changed(self, combo, _):
         if not self.photos:
             return
+        if hasattr(self, "_sort_timer") and self._sort_timer:
+            GLib.source_remove(self._sort_timer)
+        self._sort_timer = GLib.timeout_add(400, self._do_sort)
+
+    def _do_sort(self):
+        self._sort_timer = None
         self.apply_sort()
-        # Herlaad grid met nieuwe volgorde
         self.start_load()
+        return False
 
     # ── Foto viewer ──────────────────────────────────────────────────
     def open_photo(self, index):
@@ -567,7 +567,10 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_full_photo(self, pixbuf, path):
         if pixbuf:
             self.photo_picture.set_pixbuf(pixbuf)
-        self.viewer_title.set_text(os.path.basename(path))
+        import datetime
+        mtime = os.path.getmtime(path)
+        datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y")
+        self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
