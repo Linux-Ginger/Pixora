@@ -502,7 +502,10 @@ class MainWindow(Adw.ApplicationWindow):
 
             # Afgeronde hoeken via CSS
             css = Gtk.CssProvider()
-            css.load_from_string("button { border-radius: 12px; }")
+            css.load_from_string("""
+                button { border-radius: 16px; }
+                button picture { border-radius: 16px; }
+            """)
             btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
             idx = index
