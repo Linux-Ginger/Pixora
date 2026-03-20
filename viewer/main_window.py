@@ -7,11 +7,29 @@
 
 import os
 import threading
+import subprocess
+import sys
 
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk
+
+
+IMPORTER_PATH = os.path.join(os.path.dirname(__file__), "..", "importer", "main.py")
+DOCS_DIR = os.path.join(os.path.dirname(__file__), "..", "docs")
+
+
+def importer_installed():
+    return os.path.exists(IMPORTER_PATH)
+
+
+def get_logo_path(dark_mode):
+    """Geef het juiste logo pad terug op basis van dark/light modus."""
+    if dark_mode:
+        return os.path.join(DOCS_DIR, "pixora-logo-dark.png")
+    else:
+        return os.path.join(DOCS_DIR, "pixora-logo-light.png")
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -24,7 +42,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
 
-        # Hoofd stack — grid / viewer
+        # Dark mode detectie
+        self.style_manager = Adw.StyleManager.get_default()
+        self.style_manager.connect("notify::dark", self.on_dark_mode_changed)
+
+        # Hoofd stack
         self.main_stack = Gtk.Stack()
         self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.main_stack.set_transition_duration(200)
@@ -32,7 +54,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.add_named(self.build_grid_page(), "grid")
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
 
-        # Toolbar view
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(self.build_header())
         toolbar_view.set_content(self.main_stack)
@@ -41,24 +62,34 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_content(toolbar_view)
         GLib.idle_add(self.load_photos)
 
+    # ── Dark mode ────────────────────────────────────────────────────
+    def is_dark(self):
+        return self.style_manager.get_dark()
+
+    def on_dark_mode_changed(self, manager, _):
+        # Logo updaten
+        logo_path = get_logo_path(self.is_dark())
+        if os.path.exists(logo_path):
+            self.logo_picture.set_filename(logo_path)
+
     # ── Header ──────────────────────────────────────────────────────
     def build_header(self):
         header = Adw.HeaderBar()
         header.add_css_class("flat")
 
-        # Logo
-        logo_path = os.path.join(
-            os.path.dirname(__file__), "..", "docs", "pixora-logo-dark.png"
-        )
+        # Logo links
+        logo_path = get_logo_path(self.is_dark())
+        self.logo_picture = Gtk.Picture()
         if os.path.exists(logo_path):
-            logo = Gtk.Picture.new_for_filename(logo_path)
-            logo.set_size_request(160, 40)
-            logo.set_content_fit(Gtk.ContentFit.CONTAIN)
-            header.set_title_widget(logo)
-        else:
-            header.set_title_widget(Gtk.Label(label="Pixora"))
+            self.logo_picture.set_filename(logo_path)
+        self.logo_picture.set_size_request(140, 36)
+        self.logo_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
 
-        # Sorteer dropdown
+        logo_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        logo_box.append(self.logo_picture)
+        header.pack_start(logo_box)
+
+        # Sorteer dropdown naast logo
         self.sort_model = Gtk.StringList()
         for item in [
             "Datum (nieuwste eerst)",
@@ -69,12 +100,12 @@ class MainWindow(Adw.ApplicationWindow):
             self.sort_model.append(item)
 
         self.sort_combo = Gtk.DropDown(model=self.sort_model)
-        self.sort_combo.set_size_request(200, -1)
+        self.sort_combo.set_size_request(180, -1)
         self.sort_combo.connect("notify::selected", self.on_sort_changed)
         header.pack_start(self.sort_combo)
 
-        # Instellingen knop
-        settings_btn = Gtk.Button(icon_name="open-menu-symbolic")
+        # Instellingen icoon knop
+        settings_btn = Gtk.Button(icon_name="preferences-system-symbolic")
         settings_btn.add_css_class("flat")
         settings_btn.set_tooltip_text("Instellingen")
         settings_btn.connect("clicked", self.on_settings_clicked)
@@ -129,7 +160,6 @@ class MainWindow(Adw.ApplicationWindow):
     def build_viewer_page(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
-        # Viewer header
         viewer_header = Adw.HeaderBar()
         viewer_header.add_css_class("flat")
 
@@ -145,7 +175,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         box.append(viewer_header)
 
-        # Foto met pijltjes
         viewer_area = Gtk.Overlay()
         viewer_area.set_vexpand(True)
 
@@ -155,7 +184,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_picture.set_hexpand(True)
         viewer_area.set_child(self.photo_picture)
 
-        # Pijl links
         self.prev_btn = Gtk.Button(icon_name="go-previous-symbolic")
         self.prev_btn.add_css_class("osd")
         self.prev_btn.add_css_class("circular")
@@ -166,7 +194,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.prev_btn.connect("clicked", self.prev_photo)
         viewer_area.add_overlay(self.prev_btn)
 
-        # Pijl rechts
         self.next_btn = Gtk.Button(icon_name="go-next-symbolic")
         self.next_btn.add_css_class("osd")
         self.next_btn.add_css_class("circular")
@@ -177,7 +204,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.connect("clicked", self.next_photo)
         viewer_area.add_overlay(self.next_btn)
 
-        # Counter
         self.viewer_counter = Gtk.Label(label="")
         self.viewer_counter.add_css_class("osd")
         self.viewer_counter.set_halign(Gtk.Align.CENTER)
@@ -193,14 +219,15 @@ class MainWindow(Adw.ApplicationWindow):
         bar = Gtk.ActionBar()
 
         self.photo_count_label = Gtk.Label(label="0 foto's")
-        self.photo_count_label.add_css_class("dim-label")
         bar.pack_start(self.photo_count_label)
 
-        import_btn = Gtk.Button(label="📱  Importeer van iPhone")
-        import_btn.add_css_class("suggested-action")
-        import_btn.add_css_class("pill")
-        import_btn.connect("clicked", self.open_importer)
-        bar.pack_end(import_btn)
+        # Importeer knop alleen tonen als importer geïnstalleerd is
+        if importer_installed():
+            import_btn = Gtk.Button(label="📱  Importeer van iPhone")
+            import_btn.add_css_class("suggested-action")
+            import_btn.add_css_class("pill")
+            import_btn.connect("clicked", self.open_importer)
+            bar.pack_end(import_btn)
 
         return bar
 
@@ -275,7 +302,10 @@ class MainWindow(Adw.ApplicationWindow):
         status.set_icon_name("image-missing-symbolic")
         status.set_title("Geen foto's gevonden")
         status.set_description("Sluit je iPhone aan om foto's te importeren")
+        status.set_halign(Gtk.Align.CENTER)
+        status.set_valign(Gtk.Align.CENTER)
         status.set_vexpand(True)
+        status.set_hexpand(True)
 
         self.flow_box.append(status)
         self.photo_count_label.set_text("0 foto's")
@@ -337,28 +367,108 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Instellingen ─────────────────────────────────────────────────
     def on_settings_clicked(self, btn):
-        dialog = Adw.MessageDialog(
-            transient_for=self,
-            heading="Instellingen",
-            body="Instellingen komen in een volgende versie."
-        )
-        dialog.add_response("ok", "OK")
-        dialog.present()
+        dialog = Adw.PreferencesDialog()
+        dialog.set_title("Instellingen")
+
+        page = Adw.PreferencesPage()
+        page.set_title("Algemeen")
+        page.set_icon_name("preferences-system-symbolic")
+
+        # Foto map groep
+        folder_group = Adw.PreferencesGroup()
+        folder_group.set_title("Foto map")
+        folder_group.set_description("Waar worden je foto's opgeslagen")
+
+        folder_row = Adw.ActionRow()
+        folder_row.set_title("Huidige map")
+        folder_row.set_subtitle(self.settings.get("photo_path", "Niet ingesteld"))
+
+        change_btn = Gtk.Button(label="Wijzigen")
+        change_btn.add_css_class("flat")
+        change_btn.set_valign(Gtk.Align.CENTER)
+        change_btn.connect("clicked", lambda b: self.change_folder(dialog))
+        folder_row.add_suffix(change_btn)
+        folder_group.add(folder_row)
+        page.add(folder_group)
+
+        # Mapstructuur groep
+        structure_group = Adw.PreferencesGroup()
+        structure_group.set_title("Mapstructuur")
+
+        current = self.settings.get("structure", "year_month")
+        structures = {
+            "flat":       "Plat — alles in één map",
+            "year":       "Per jaar — 2024/",
+            "year_month": "Per jaar/maand — 2024/2024-03/",
+        }
+
+        structure_row = Adw.ActionRow()
+        structure_row.set_title("Huidige structuur")
+        structure_row.set_subtitle(structures.get(current, "Onbekend"))
+        structure_group.add(structure_row)
+        page.add(structure_group)
+
+        # Duplicate groep
+        dup_group = Adw.PreferencesGroup()
+        dup_group.set_title("Duplicate detectie")
+
+        threshold = self.settings.get("duplicate_threshold", 2)
+        thresholds = {1: "Streng", 2: "Normaal", 3: "Soepel"}
+
+        dup_row = Adw.ActionRow()
+        dup_row.set_title("Drempelwaarde")
+        dup_row.set_subtitle(thresholds.get(threshold, "Normaal"))
+        dup_group.add(dup_row)
+        page.add(dup_group)
+
+        # Reset groep
+        reset_group = Adw.PreferencesGroup()
+        reset_group.set_title("Geavanceerd")
+
+        reset_row = Adw.ActionRow()
+        reset_row.set_title("Setup opnieuw uitvoeren")
+        reset_row.set_subtitle("Verwijdert instellingen en herstart de wizard")
+
+        reset_btn = Gtk.Button(label="Reset")
+        reset_btn.add_css_class("destructive-action")
+        reset_btn.add_css_class("flat")
+        reset_btn.set_valign(Gtk.Align.CENTER)
+        reset_btn.connect("clicked", lambda b: self.reset_settings(dialog))
+        reset_row.add_suffix(reset_btn)
+        reset_group.add(reset_row)
+        page.add(reset_group)
+
+        dialog.add(page)
+        dialog.present(self)
+
+    def change_folder(self, parent_dialog):
+        file_dialog = Gtk.FileDialog()
+        file_dialog.set_title("Kies foto map")
+        file_dialog.select_folder(self, None, self.on_folder_changed)
+
+    def on_folder_changed(self, dialog, result):
+        try:
+            folder = dialog.select_folder_finish(result)
+            if folder:
+                import json
+                self.settings["photo_path"] = folder.get_path()
+                config_path = os.path.expanduser("~/.config/pixora/settings.json")
+                with open(config_path, "w") as f:
+                    json.dump(self.settings, f, indent=2)
+        except Exception:
+            pass
+
+    def reset_settings(self, dialog):
+        import json
+        config_path = os.path.expanduser("~/.config/pixora/settings.json")
+        if os.path.exists(config_path):
+            os.remove(config_path)
+        dialog.close()
+        from setup_wizard import SetupWizard
+        wizard = SetupWizard(self.get_application())
+        wizard.present()
+        self.close()
 
     # ── Importer ─────────────────────────────────────────────────────
     def open_importer(self, btn):
-        import subprocess
-        import sys
-        importer_path = os.path.join(
-            os.path.dirname(__file__), "..", "importer", "main.py"
-        )
-        if os.path.exists(importer_path):
-            subprocess.Popen([sys.executable, importer_path])
-        else:
-            dialog = Adw.MessageDialog(
-                transient_for=self,
-                heading="Importer niet gevonden",
-                body="De Pixora Importer is niet geïnstalleerd.\nInstalleer hem via de instellingen."
-            )
-            dialog.add_response("ok", "OK")
-            dialog.present()
+        subprocess.Popen([sys.executable, IMPORTER_PATH])
