@@ -551,20 +551,23 @@ class MainWindow(Adw.ApplicationWindow):
     def open_photo(self, index):
         self.current_index = index
         self.header.set_visible(False)
+        self.photo_picture.set_pixbuf(None)
         self.main_stack.set_visible_child_name("viewer")
-        # Laad foto op achtergrond thread om UI niet te blokkeren
+        self._viewer_load_id = getattr(self, "_viewer_load_id", 0) + 1
+        load_id = self._viewer_load_id
         threading.Thread(
             target=self._load_full_photo,
-            args=(self.photos[index],),
+            args=(self.photos[index], load_id),
             daemon=True
         ).start()
 
-    def _load_full_photo(self, path):
+    def _load_full_photo(self, path, load_id):
         try:
             pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
-            GLib.idle_add(self._show_full_photo, pixbuf, path)
         except Exception:
-            GLib.idle_add(self._show_full_photo, None, path)
+            pixbuf = None
+        if load_id == self._viewer_load_id:
+            GLib.idle_add(self._show_full_photo, pixbuf, path)
 
     def _show_full_photo(self, pixbuf, path):
         if pixbuf:
@@ -581,22 +584,27 @@ class MainWindow(Adw.ApplicationWindow):
     def prev_photo(self, btn=None):
         if self.current_index > 0:
             self.current_index -= 1
+            self._viewer_load_id = getattr(self, "_viewer_load_id", 0) + 1
+            load_id = self._viewer_load_id
             threading.Thread(
                 target=self._load_full_photo,
-                args=(self.photos[self.current_index],),
+                args=(self.photos[self.current_index], load_id),
                 daemon=True
             ).start()
 
     def next_photo(self, btn=None):
         if self.current_index < len(self.photos) - 1:
             self.current_index += 1
+            self._viewer_load_id = getattr(self, "_viewer_load_id", 0) + 1
+            load_id = self._viewer_load_id
             threading.Thread(
                 target=self._load_full_photo,
-                args=(self.photos[self.current_index],),
+                args=(self.photos[self.current_index], load_id),
                 daemon=True
             ).start()
 
     def close_viewer(self, btn=None):
+        self._viewer_load_id = getattr(self, "_viewer_load_id", 0) + 1
         self.photo_picture.set_pixbuf(None)
         self.header.set_visible(True)
         self.main_stack.set_visible_child_name("grid")
