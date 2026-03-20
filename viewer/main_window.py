@@ -13,6 +13,7 @@ import json
 import hashlib
 import time
 import datetime
+from collections import defaultdict
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -90,6 +91,14 @@ def get_mountpoint_for_uuid(uuid):
         pass
     return None
 
+def format_date_header(dt):
+    """Formatteer datum als '23 maart 2026'."""
+    months = [
+        "", "januari", "februari", "maart", "april", "mei", "juni",
+        "juli", "augustus", "september", "oktober", "november", "december"
+    ]
+    return f"{dt.day} {months[dt.month]} {dt.year}"
+
 # ── Thumbnail cache ──────────────────────────────────────────────────
 def get_cache_path(photo_path):
     mtime = str(os.path.getmtime(photo_path))
@@ -141,7 +150,7 @@ class MainWindow(Adw.ApplicationWindow):
         super().__init__(application=app)
         self.settings        = settings
         self.photos          = []
-        self.thumb_widgets   = {}
+        self.thumb_widgets   = {}   # global_index → (btn, check_box)
         self.current_index   = 0
         self.settings_drives = []
         self.observer        = None
@@ -149,8 +158,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._load_id        = 0
         self._viewer_load_id = 0
         self._sort_timer     = None
-
-        # Selectie modus
         self._select_mode    = False
         self._selected       = set()
 
@@ -234,7 +241,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.sort_combo.connect("notify::selected", self.on_sort_changed)
         self.header.pack_start(self.sort_combo)
 
-        # Selecteer knop
         self.select_btn = Gtk.Button(label="Selecteren")
         self.select_btn.add_css_class("flat")
         self.select_btn.connect("clicked", self.toggle_select_mode)
@@ -276,25 +282,20 @@ class MainWindow(Adw.ApplicationWindow):
         spinner_box.append(self.spinner_label)
         self.content_stack.add_named(spinner_box, "loading")
 
-        # Foto grid
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroll.set_vexpand(True)
+        # Scroll + grid container
+        self.scroll = Gtk.ScrolledWindow()
+        self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.scroll.set_vexpand(True)
 
-        self.flow_box = Gtk.FlowBox()
-        self.flow_box.set_valign(Gtk.Align.START)
-        self.flow_box.set_max_children_per_line(12)
-        self.flow_box.set_min_children_per_line(2)
-        self.flow_box.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.flow_box.set_row_spacing(4)
-        self.flow_box.set_column_spacing(4)
-        self.flow_box.set_margin_top(8)
-        self.flow_box.set_margin_bottom(8)
-        self.flow_box.set_margin_start(8)
-        self.flow_box.set_margin_end(8)
+        # Verticale box voor datum groepen
+        self.grid_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.grid_box.set_margin_top(8)
+        self.grid_box.set_margin_bottom(8)
+        self.grid_box.set_margin_start(8)
+        self.grid_box.set_margin_end(8)
 
-        scroll.set_child(self.flow_box)
-        self.content_stack.add_named(scroll, "grid")
+        self.scroll.set_child(self.grid_box)
+        self.content_stack.add_named(self.scroll, "grid")
 
         # Lege staat
         status_page = Adw.StatusPage()
@@ -315,7 +316,6 @@ class MainWindow(Adw.ApplicationWindow):
         viewer_area.set_vexpand(True)
         viewer_area.set_hexpand(True)
 
-        # Zwarte achtergrond
         bg = Gtk.Box()
         bg.set_vexpand(True)
         bg.set_hexpand(True)
@@ -324,14 +324,12 @@ class MainWindow(Adw.ApplicationWindow):
         bg.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         viewer_area.set_child(bg)
 
-        # Foto
         self.photo_picture = Gtk.Picture()
         self.photo_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
         self.photo_picture.set_vexpand(True)
         self.photo_picture.set_hexpand(True)
         viewer_area.add_overlay(self.photo_picture)
 
-        # Sluiten knop rechtsboven
         close_btn = Gtk.Button(icon_name="window-close-symbolic")
         close_btn.add_css_class("osd")
         close_btn.add_css_class("circular")
@@ -343,7 +341,6 @@ class MainWindow(Adw.ApplicationWindow):
         close_btn.connect("clicked", self.close_viewer)
         viewer_area.add_overlay(close_btn)
 
-        # Prullenbak knop naast sluitknop
         delete_btn = Gtk.Button(icon_name="user-trash-symbolic")
         delete_btn.add_css_class("osd")
         delete_btn.add_css_class("circular")
@@ -355,7 +352,6 @@ class MainWindow(Adw.ApplicationWindow):
         delete_btn.connect("clicked", self.on_delete_current)
         viewer_area.add_overlay(delete_btn)
 
-        # Bestandsnaam + datum linksboven
         self.viewer_title = Gtk.Label(label="")
         self.viewer_title.add_css_class("osd")
         self.viewer_title.set_halign(Gtk.Align.START)
@@ -364,7 +360,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_title.set_margin_start(16)
         viewer_area.add_overlay(self.viewer_title)
 
-        # Pijl links
         self.prev_btn = Gtk.Button(icon_name="go-previous-symbolic")
         self.prev_btn.add_css_class("osd")
         self.prev_btn.add_css_class("circular")
@@ -376,7 +371,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.prev_btn.connect("clicked", self.prev_photo)
         viewer_area.add_overlay(self.prev_btn)
 
-        # Pijl rechts
         self.next_btn = Gtk.Button(icon_name="go-next-symbolic")
         self.next_btn.add_css_class("osd")
         self.next_btn.add_css_class("circular")
@@ -388,7 +382,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.connect("clicked", self.next_photo)
         viewer_area.add_overlay(self.next_btn)
 
-        # Counter onderaan
         self.viewer_counter = Gtk.Label(label="")
         self.viewer_counter.add_css_class("osd")
         self.viewer_counter.set_halign(Gtk.Align.CENTER)
@@ -396,7 +389,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_counter.set_margin_bottom(20)
         viewer_area.add_overlay(self.viewer_counter)
 
-        # Keyboard navigatie
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self.on_viewer_key)
         self.add_controller(key_ctrl)
@@ -409,7 +401,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.bottom_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.bottom_stack.set_transition_duration(150)
 
-        # Normale balk
         normal_bar = Gtk.ActionBar()
         self.photo_count_label = Gtk.Label(label="0 foto's")
         self.photo_count_label.add_css_class("dim-label")
@@ -424,7 +415,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.bottom_stack.add_named(normal_bar, "normal")
 
-        # Selectie balk
         select_bar = Gtk.ActionBar()
         self.select_count_label = Gtk.Label(label="0 geselecteerd")
         self.select_count_label.add_css_class("dim-label")
@@ -455,7 +445,6 @@ class MainWindow(Adw.ApplicationWindow):
             self.select_btn.set_label("Selecteren")
             self.select_btn.remove_css_class("suggested-action")
             self.bottom_stack.set_visible_child_name("normal")
-            # Alle selecties visueel wissen
             self._update_all_selection_visuals()
 
     def _update_all_selection_visuals(self):
@@ -496,11 +485,12 @@ class MainWindow(Adw.ApplicationWindow):
         load_id = self._load_id
         self._loading = True
 
+        # Grid leegmaken
         while True:
-            child = self.flow_box.get_first_child()
+            child = self.grid_box.get_first_child()
             if child is None:
                 break
-            self.flow_box.remove(child)
+            self.grid_box.remove(child)
 
         self.thumb_widgets = {}
         self._selected.clear()
@@ -515,33 +505,91 @@ class MainWindow(Adw.ApplicationWindow):
         )
         thread.start()
 
-    def _load_thread(self, load_id, photos):
-        total = len(photos)
-        batch = []
-
+    def _group_by_date(self, photos):
+        """Groepeer foto's op datum, geef lijst van (datum_str, datum_obj, [indices]) terug."""
+        groups = defaultdict(list)
         for i, path in enumerate(photos):
+            try:
+                mtime = os.path.getmtime(path)
+                dt    = datetime.datetime.fromtimestamp(mtime).date()
+            except Exception:
+                dt = datetime.date(1970, 1, 1)
+            groups[dt].append(i)
+
+        # Sorteer op datum (zelfde richting als gesorteerde foto's)
+        sorted_dates = sorted(groups.keys(), reverse=True)
+        return [(format_date_header(dt), dt, groups[dt]) for dt in sorted_dates]
+
+    def _load_thread(self, load_id, photos):
+        """Laad thumbnails per datum groep."""
+        total  = len(photos)
+        groups = self._group_by_date(photos)
+        loaded = 0
+
+        for date_str, date_obj, indices in groups:
             if load_id != self._load_id:
                 return
-            pixbuf = load_thumbnail(path)
-            batch.append((i, path, pixbuf))
 
-            if len(batch) >= BATCH_SIZE:
-                GLib.idle_add(self._apply_batch, load_id, list(batch), i + 1, total)
-                batch = []
-                time.sleep(0.005)
+            # Maak datum header + flowbox aan op UI thread
+            GLib.idle_add(self._add_date_group, load_id, date_str)
 
-        if batch and load_id == self._load_id:
-            GLib.idle_add(self._apply_batch, load_id, list(batch), total, total)
+            # Laad thumbnails voor deze groep in batches
+            batch = []
+            for idx in indices:
+                if load_id != self._load_id:
+                    return
+                pixbuf = load_thumbnail(photos[idx])
+                batch.append((idx, photos[idx], pixbuf))
+                loaded += 1
+
+                if len(batch) >= BATCH_SIZE:
+                    GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
+                    batch = []
+                    time.sleep(0.005)
+
+            if batch and load_id == self._load_id:
+                GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
 
         GLib.idle_add(self._load_done, load_id, total)
+
+    def _add_date_group(self, load_id, date_str):
+        """Voeg een datum header en bijbehorende FlowBox toe aan de grid."""
+        if load_id != self._load_id:
+            return False
+
+        # Datum label
+        label = Gtk.Label(label=date_str)
+        label.add_css_class("title-4")
+        label.set_halign(Gtk.Align.START)
+        label.set_margin_top(16)
+        label.set_margin_bottom(8)
+        label.set_margin_start(4)
+        self.grid_box.append(label)
+
+        # FlowBox voor deze datum
+        flow = Gtk.FlowBox()
+        flow.set_valign(Gtk.Align.START)
+        flow.set_max_children_per_line(12)
+        flow.set_min_children_per_line(1)
+        flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        flow.set_row_spacing(4)
+        flow.set_column_spacing(4)
+        flow.set_homogeneous(True)
+
+        # Sla huidige FlowBox op zodat batches erin kunnen worden gezet
+        self._current_flow = flow
+        self.grid_box.append(flow)
+
+        # Toon grid al zodra eerste groep aangemaakt is
+        if self.content_stack.get_visible_child_name() == "loading":
+            self.spinner.stop()
+            self.content_stack.set_visible_child_name("grid")
+
+        return False
 
     def _apply_batch(self, load_id, batch, loaded, total):
         if load_id != self._load_id:
             return False
-
-        if self.content_stack.get_visible_child_name() == "loading":
-            self.spinner.stop()
-            self.content_stack.set_visible_child_name("grid")
 
         self.spinner_label.set_text(f"Foto's laden... {loaded} / {total}")
 
@@ -558,7 +606,6 @@ class MainWindow(Adw.ApplicationWindow):
             overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
             overlay.set_child(picture)
 
-            # Vinkje — standaard verborgen
             check_box = Gtk.Box()
             check_box.set_size_request(22, 22)
             check_box.set_halign(Gtk.Align.END)
@@ -607,7 +654,8 @@ class MainWindow(Adw.ApplicationWindow):
 
             idx = index
             btn.connect("clicked", lambda b, i=idx: self.on_thumb_clicked(i))
-            self.flow_box.append(btn)
+
+            self._current_flow.append(btn)
             self.thumb_widgets[index] = (btn, check_box)
 
         return False
@@ -741,7 +789,6 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Verwijderen ──────────────────────────────────────────────────
     def on_delete_current(self, btn):
-        """Verwijder huidige foto vanuit de viewer."""
         path = self.photos[self.current_index]
         dialog = Adw.MessageDialog(
             transient_for=self,
@@ -761,7 +808,6 @@ class MainWindow(Adw.ApplicationWindow):
             return
         try:
             os.remove(path)
-            # Cache verwijderen
             cache_path = get_cache_path(path)
             if os.path.exists(cache_path):
                 os.remove(cache_path)
@@ -776,7 +822,6 @@ class MainWindow(Adw.ApplicationWindow):
             self.show_empty_state()
             return
 
-        # Naar volgende of vorige foto
         if self.current_index >= len(self.photos):
             self.current_index = len(self.photos) - 1
 
@@ -788,11 +833,9 @@ class MainWindow(Adw.ApplicationWindow):
             daemon=True
         ).start()
 
-        # Grid herladen op achtergrond
         GLib.timeout_add(500, self.start_load)
 
     def on_delete_selected(self, btn):
-        """Verwijder alle geselecteerde foto's."""
         if not self._selected:
             return
 
@@ -825,7 +868,6 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception as e:
                 print(f"Verwijderen mislukt: {e}")
 
-        # Selectiemodus uitzetten en herladen
         self.toggle_select_mode()
         self.load_photos()
 
@@ -838,7 +880,6 @@ class MainWindow(Adw.ApplicationWindow):
         page.set_title("Algemeen")
         page.set_icon_name("preferences-system-symbolic")
 
-        # Foto map
         folder_group = Adw.PreferencesGroup()
         folder_group.set_title("Foto map")
         folder_group.set_description("Waar worden je foto's opgeslagen")
@@ -855,7 +896,6 @@ class MainWindow(Adw.ApplicationWindow):
         folder_group.add(self.folder_row)
         page.add(folder_group)
 
-        # Mapstructuur
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title("Mapstructuur")
         structure_group.set_description("Hoe worden je foto's georganiseerd")
@@ -891,7 +931,6 @@ class MainWindow(Adw.ApplicationWindow):
         structure_group.add(month_row)
         page.add(structure_group)
 
-        # Duplicate detectie
         dup_group = Adw.PreferencesGroup()
         dup_group.set_title("Duplicate detectie")
         dup_group.set_description("Hoe streng worden duplicaten gedetecteerd")
@@ -927,7 +966,6 @@ class MainWindow(Adw.ApplicationWindow):
         dup_group.add(loose_row)
         page.add(dup_group)
 
-        # Backup
         backup_group = Adw.PreferencesGroup()
         backup_group.set_title("Automatische backup")
         backup_group.set_description("Backup naar externe USB schijf na elke import")
