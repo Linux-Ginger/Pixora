@@ -8,6 +8,7 @@
 import os
 import json
 import subprocess
+import threading
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -16,52 +17,52 @@ from gi.repository import Gtk, Adw, GLib
 
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
 
-# Schijven die we nooit als backup willen tonen
-SYSTEM_MOUNTPOINTS = {"/", "/boot", "/boot/efi", "/efi", "/home", "[SWAP]", ""}
-SYSTEM_LABELS = {"boot", "efi", "swap", "system", "ubuntu", "root"}
+# Alleen deze bestandssystemen zijn bruikbaar als backup schijf
+BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs"}
 
 
 def get_available_drives():
-    """Geef lijst van (uuid, leesbare naam) tuples terug, zonder systeem schijven."""
+    """Geef lijst van (uuid, leesbare naam) tuples terug.
+    Alleen hotplug schijven met bruikbaar bestandssysteem."""
     drives = []
     try:
         result = subprocess.run(
-            ["lsblk", "-o", "UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT", "-J"],
+            ["lsblk", "-o", "NAME,UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT,HOTPLUG", "-J"],
             capture_output=True, text=True
         )
-        import json as _json
-        data = _json.loads(result.stdout)
-        for device in data.get("blockdevices", []):
-            children = device.get("children", [device])
-            for child in children:
-                uuid = child.get("uuid")
-                if not uuid:
-                    continue
+        data = json.loads(result.stdout)
 
-                label = (child.get("label") or "").strip()
-                size = child.get("size") or ""
-                fstype = child.get("fstype") or ""
-                mountpoint = (child.get("mountpoint") or "").strip()
+        def process_device(device):
+            hotplug = device.get("hotplug", False)
+            if not hotplug:
+                return
 
-                # Filter systeem schijven
-                if mountpoint in SYSTEM_MOUNTPOINTS:
-                    continue
-                if label.lower() in SYSTEM_LABELS:
-                    continue
-                if fstype in {"swap", "vfat", ""}:
-                    continue
+            uuid = device.get("uuid")
+            fstype = (device.get("fstype") or "").lower()
+            label = (device.get("label") or "").strip()
+            size = device.get("size") or ""
+            mountpoint = (device.get("mountpoint") or "").strip()
 
-                # Leesbare naam
+            if uuid and fstype in BACKUP_FSTYPES:
                 if label:
                     display = f"💾  {label}  ({size})"
                 elif mountpoint:
                     display = f"💾  {mountpoint}  ({size})"
                 else:
-                    display = f"💾  Externe schijf  ({size} {fstype})".strip()
-
+                    display = f"💾  Externe schijf  ({size})"
                 drives.append((uuid, display))
-    except Exception:
-        pass
+
+            # Kinderen ook checken
+            for child in device.get("children", []):
+                child["hotplug"] = hotplug
+                process_device(child)
+
+        for device in data.get("blockdevices", []):
+            process_device(device)
+
+    except Exception as e:
+        print(f"Drive detectie fout: {e}")
+
     return drives
 
 
@@ -74,6 +75,7 @@ class SetupWizard(Adw.Window):
         self.set_resizable(False)
 
         self.drives = []
+        self.selected_backup_path = None
         self.style_manager = Adw.StyleManager.get_default()
         self.style_manager.connect("notify::dark", self.on_dark_mode_changed)
 
@@ -91,7 +93,7 @@ class SetupWizard(Adw.Window):
         # Hoofd layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
-        # Header met sluitknop
+        # Header
         header = Adw.HeaderBar()
         header.set_show_end_title_buttons(False)
         header.add_css_class("flat")
@@ -136,6 +138,7 @@ class SetupWizard(Adw.Window):
         page.set_margin_bottom(40)
         page.set_margin_start(48)
         page.set_margin_end(48)
+        page.set_halign(Gtk.Align.FILL)
 
         # Logo gecentreerd
         dark = self.style_manager.get_dark()
@@ -148,11 +151,13 @@ class SetupWizard(Adw.Window):
         self.welcome_logo.set_size_request(260, 64)
         self.welcome_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
         self.welcome_logo.set_halign(Gtk.Align.CENTER)
+        self.welcome_logo.set_hexpand(True)
         page.append(self.welcome_logo)
 
         title = Gtk.Label(label="Welkom bij Pixora!")
         title.add_css_class("title-1")
         title.set_halign(Gtk.Align.CENTER)
+        title.set_hexpand(True)
         page.append(title)
 
         subtitle = Gtk.Label(
@@ -164,6 +169,7 @@ class SetupWizard(Adw.Window):
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.CENTER)
+        subtitle.set_hexpand(True)
         subtitle.set_justify(Gtk.Justification.CENTER)
         page.append(subtitle)
 
@@ -271,6 +277,7 @@ class SetupWizard(Adw.Window):
 
         group = Adw.PreferencesGroup()
 
+        # Backup schakelaar
         self.backup_switch = Gtk.Switch()
         self.backup_switch.set_valign(Gtk.Align.CENTER)
         self.backup_switch.connect("notify::active", self.on_backup_toggle)
@@ -283,36 +290,64 @@ class SetupWizard(Adw.Window):
         backup_row.set_activatable_widget(self.backup_switch)
         group.add(backup_row)
 
-        # Schijf selectie
+        # Schijf selectie met refresh spinner
         self.drive_model = Gtk.StringList()
-        self.drives = get_available_drives()
-
-        if self.drives:
-            for uuid, label in self.drives:
-                self.drive_model.append(label)
-        else:
-            self.drive_model.append("Geen externe schijven gevonden")
+        self.drives = []
+        self.drive_model.append("Geen externe schijven gevonden")
 
         self.drive_combo = Gtk.DropDown(model=self.drive_model)
         self.drive_combo.set_sensitive(False)
         self.drive_combo.set_size_request(220, -1)
+        self.drive_combo.connect("notify::selected", self.on_drive_selected)
 
-        refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
-        refresh_btn.add_css_class("flat")
-        refresh_btn.set_valign(Gtk.Align.CENTER)
-        refresh_btn.set_tooltip_text("Vernieuwen")
-        refresh_btn.connect("clicked", self.on_refresh_drives)
+        # Refresh knop met spinner
+        self.refresh_stack = Gtk.Stack()
+        self.refresh_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.refresh_stack.set_transition_duration(150)
+
+        self.refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
+        self.refresh_btn.add_css_class("flat")
+        self.refresh_btn.set_valign(Gtk.Align.CENTER)
+        self.refresh_btn.set_tooltip_text("Vernieuwen")
+        self.refresh_btn.connect("clicked", self.on_refresh_drives)
+
+        self.refresh_spinner = Gtk.Spinner()
+        self.refresh_spinner.set_size_request(24, 24)
+
+        self.refresh_stack.add_named(self.refresh_btn, "btn")
+        self.refresh_stack.add_named(self.refresh_spinner, "spinner")
+        self.refresh_stack.set_visible_child_name("btn")
 
         self.drive_row = Adw.ActionRow(
             title="Backup schijf",
-            subtitle="Alleen externe schijven worden getoond"
+            subtitle="Alleen externe schijven met ext4/ntfs/exfat worden getoond"
         )
-        self.drive_row.add_suffix(refresh_btn)
+        self.drive_row.add_suffix(self.refresh_stack)
         self.drive_row.add_suffix(self.drive_combo)
         self.drive_row.set_sensitive(False)
         group.add(self.drive_row)
 
+        # Map op backup schijf
+        self.backup_folder_row = Adw.ActionRow(
+            title="Map op backup schijf",
+            subtitle="Nog geen schijf geselecteerd"
+        )
+        self.backup_folder_btn = Gtk.Button(label="Kiezen...")
+        self.backup_folder_btn.add_css_class("flat")
+        self.backup_folder_btn.set_valign(Gtk.Align.CENTER)
+        self.backup_folder_btn.connect("clicked", self.on_browse_backup_folder)
+        self.backup_folder_row.add_suffix(self.backup_folder_btn)
+        self.backup_folder_row.set_sensitive(False)
+        group.add(self.backup_folder_row)
+
+        # Foutmelding als geen schijf gekozen
+        self.backup_error = Gtk.Label(label="⚠️  Kies een backup schijf om door te gaan")
+        self.backup_error.add_css_class("error")
+        self.backup_error.set_halign(Gtk.Align.START)
+        self.backup_error.set_visible(False)
+
         page.append(group)
+        page.append(self.backup_error)
         return page
 
     # ── Pagina: Duplicate detectie ──────────────────────────────────
@@ -367,6 +402,18 @@ class SetupWizard(Adw.Window):
 
     # ── Navigatie ───────────────────────────────────────────────────
     def go_next(self, btn):
+        # Validatie backup pagina
+        if self.pages[self.current] == "backup":
+            if self.backup_switch.get_active():
+                if not self.drives or self.drive_combo.get_selected() >= len(self.drives):
+                    self.backup_error.set_visible(True)
+                    return
+                if not self.selected_backup_path:
+                    self.backup_error.set_label("⚠️  Kies ook een map op de backup schijf")
+                    self.backup_error.set_visible(True)
+                    return
+            self.backup_error.set_visible(False)
+
         if self.current < len(self.pages) - 1:
             self.current += 1
             self.stack.set_visible_child_name(self.pages[self.current])
@@ -385,6 +432,7 @@ class SetupWizard(Adw.Window):
             if self.current == 0:
                 self.back_btn.set_visible(False)
             self.next_btn.set_label("Volgende")
+            self.backup_error.set_visible(False)
 
     # ── Acties ──────────────────────────────────────────────────────
     def on_browse_folder(self, btn):
@@ -403,17 +451,63 @@ class SetupWizard(Adw.Window):
     def on_backup_toggle(self, switch, _):
         active = switch.get_active()
         self.drive_row.set_sensitive(active)
-        self.drive_combo.set_sensitive(active)
+        self.drive_combo.set_sensitive(active and bool(self.drives))
+        if active and not self.drives:
+            self.on_refresh_drives(None)
+
+    def on_drive_selected(self, combo, _):
+        selected = combo.get_selected()
+        if self.drives and selected < len(self.drives):
+            self.backup_folder_row.set_sensitive(True)
+            self.backup_folder_row.set_subtitle("Nog geen map gekozen")
+            self.selected_backup_path = None
+            self.backup_error.set_visible(False)
+
+    def on_browse_backup_folder(self, btn):
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Kies map op backup schijf")
+        dialog.select_folder(self, None, self.on_backup_folder_selected)
+
+    def on_backup_folder_selected(self, dialog, result):
+        try:
+            folder = dialog.select_folder_finish(result)
+            if folder:
+                self.selected_backup_path = folder.get_path()
+                self.backup_folder_row.set_subtitle(self.selected_backup_path)
+                self.backup_error.set_visible(False)
+        except Exception:
+            pass
 
     def on_refresh_drives(self, btn):
+        # Spinner tonen
+        self.refresh_stack.set_visible_child_name("spinner")
+        self.refresh_spinner.start()
+
+        def do_refresh():
+            drives = get_available_drives()
+            GLib.idle_add(self.update_drives, drives)
+
+        threading.Thread(target=do_refresh, daemon=True).start()
+
+    def update_drives(self, drives):
+        # Spinner stoppen
+        self.refresh_spinner.stop()
+        self.refresh_stack.set_visible_child_name("btn")
+
+        # Model updaten
         while self.drive_model.get_n_items() > 0:
             self.drive_model.remove(0)
-        self.drives = get_available_drives()
-        if self.drives:
-            for uuid, label in self.drives:
+
+        self.drives = drives
+        if drives:
+            for uuid, label in drives:
                 self.drive_model.append(label)
+            self.drive_combo.set_sensitive(True)
         else:
             self.drive_model.append("Geen externe schijven gevonden")
+            self.drive_combo.set_sensitive(False)
+
+        return False
 
     def get_structure(self):
         if self.radio_flat.get_active():
@@ -442,6 +536,7 @@ class SetupWizard(Adw.Window):
             "photo_path":          self.folder_entry.get_text(),
             "structure":           self.get_structure(),
             "backup_uuid":         self.get_backup_uuid(),
+            "backup_path":         self.selected_backup_path,
             "duplicate_threshold": self.get_threshold()
         }
 
