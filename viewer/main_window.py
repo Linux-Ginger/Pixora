@@ -495,7 +495,7 @@ class MainWindow(Adw.ApplicationWindow):
             picture.set_content_fit(Gtk.ContentFit.COVER)
 
             pic_css = Gtk.CssProvider()
-            pic_css.load_from_string("picture { border-radius: 16px; overflow: hidden; }")
+            pic_css.load_from_string("picture { border-radius: 8px; overflow: hidden; }")
             picture.get_style_context().add_provider(pic_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
             btn = Gtk.Button()
