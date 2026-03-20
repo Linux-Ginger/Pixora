@@ -300,29 +300,18 @@ class SetupWizard(Adw.Window):
         self.drive_combo.set_size_request(220, -1)
         self.drive_combo.connect("notify::selected", self.on_drive_selected)
 
-        # Refresh knop met spinner
-        self.refresh_stack = Gtk.Stack()
-        self.refresh_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-        self.refresh_stack.set_transition_duration(150)
-
+        # Refresh knop
         self.refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
         self.refresh_btn.add_css_class("flat")
         self.refresh_btn.set_valign(Gtk.Align.CENTER)
         self.refresh_btn.set_tooltip_text("Vernieuwen")
         self.refresh_btn.connect("clicked", self.on_refresh_drives)
 
-        self.refresh_spinner = Gtk.Spinner()
-        self.refresh_spinner.set_size_request(24, 24)
-
-        self.refresh_stack.add_named(self.refresh_btn, "btn")
-        self.refresh_stack.add_named(self.refresh_spinner, "spinner")
-        self.refresh_stack.set_visible_child_name("btn")
-
         self.drive_row = Adw.ActionRow(
             title="Backup schijf",
             subtitle="Alleen externe schijven met ext4/ntfs/exfat worden getoond"
         )
-        self.drive_row.add_suffix(self.refresh_stack)
+        self.drive_row.add_suffix(self.refresh_btn)
         self.drive_row.add_suffix(self.drive_combo)
         self.drive_row.set_sensitive(False)
         group.add(self.drive_row)
@@ -479,9 +468,8 @@ class SetupWizard(Adw.Window):
             pass
 
     def on_refresh_drives(self, btn):
-        # Spinner tonen
-        self.refresh_stack.set_visible_child_name("spinner")
-        self.refresh_spinner.start()
+        self.refresh_btn.set_sensitive(False)
+        self.refresh_btn.set_icon_name("content-loading-symbolic")
 
         def do_refresh():
             drives = get_available_drives()
@@ -491,8 +479,8 @@ class SetupWizard(Adw.Window):
 
     def update_drives(self, drives):
         # Spinner stoppen
-        self.refresh_spinner.stop()
-        self.refresh_stack.set_visible_child_name("btn")
+        self.refresh_btn.set_icon_name("view-refresh-symbolic")
+        self.refresh_btn.set_sensitive(True)
 
         # Model updaten
         while self.drive_model.get_n_items() > 0:
