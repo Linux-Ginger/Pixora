@@ -7,6 +7,7 @@
 
 import os
 import json
+import subprocess
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -16,36 +17,90 @@ from gi.repository import Gtk, Adw, GLib
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
 
 
+def get_drive_label(uuid):
+    """Probeer een leesbare naam te krijgen voor een schijf via UUID."""
+    try:
+        result = subprocess.run(
+            ["lsblk", "-o", "UUID,LABEL,SIZE,FSTYPE", "-J"],
+            capture_output=True, text=True
+        )
+        import json as _json
+        data = _json.loads(result.stdout)
+        for device in data.get("blockdevices", []):
+            for child in device.get("children", [device]):
+                if child.get("uuid") == uuid:
+                    label = child.get("label") or ""
+                    size = child.get("size") or ""
+                    fstype = child.get("fstype") or ""
+                    if label:
+                        return f"{label} ({size})"
+                    else:
+                        return f"Schijf {size} {fstype}".strip()
+    except Exception:
+        pass
+    return uuid[:8] + "..."
+
+
+def get_available_drives():
+    """Geef lijst van (uuid, leesbare naam) tuples terug."""
+    drives = []
+    uuid_dir = "/dev/disk/by-uuid"
+    if not os.path.exists(uuid_dir):
+        return drives
+    try:
+        result = subprocess.run(
+            ["lsblk", "-o", "UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT", "-J"],
+            capture_output=True, text=True
+        )
+        import json as _json
+        data = _json.loads(result.stdout)
+        for device in data.get("blockdevices", []):
+            children = device.get("children", [device])
+            for child in children:
+                uuid = child.get("uuid")
+                if not uuid:
+                    continue
+                label = child.get("label") or ""
+                size = child.get("size") or ""
+                fstype = child.get("fstype") or ""
+                mountpoint = child.get("mountpoint") or ""
+                if label:
+                    display = f"💾  {label}  ({size})"
+                elif mountpoint:
+                    display = f"💾  {mountpoint}  ({size})"
+                else:
+                    display = f"💾  Schijf {size} {fstype}".strip()
+                drives.append((uuid, display))
+    except Exception:
+        for uuid in os.listdir(uuid_dir):
+            drives.append((uuid, uuid[:8] + "..."))
+    return drives
+
+
 class SetupWizard(Adw.Window):
     def __init__(self, app):
         super().__init__(application=app)
         self.app = app
-        self.set_title("Pixora — Eerste installatie")
-        self.set_default_size(560, 500)
+        self.set_title("Pixora — Setup")
+        self.set_default_size(560, 540)
         self.set_resizable(False)
+
+        self.drives = []
 
         # Stack voor pagina's
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
         self.stack.set_transition_duration(250)
 
-        # Pagina's aanmaken
-        self.page_welcome  = self.build_welcome()
-        self.page_folder   = self.build_folder()
-        self.page_structure = self.build_structure()
-        self.page_backup   = self.build_backup()
-        self.page_duplicate = self.build_duplicate()
-
-        self.stack.add_named(self.page_welcome,   "welcome")
-        self.stack.add_named(self.page_folder,    "folder")
-        self.stack.add_named(self.page_structure, "structure")
-        self.stack.add_named(self.page_backup,    "backup")
-        self.stack.add_named(self.page_duplicate, "duplicate")
+        self.stack.add_named(self.build_welcome(),   "welcome")
+        self.stack.add_named(self.build_folder(),    "folder")
+        self.stack.add_named(self.build_structure(), "structure")
+        self.stack.add_named(self.build_backup(),    "backup")
+        self.stack.add_named(self.build_duplicate(), "duplicate")
 
         # Hoofd layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
-        # Header
         header = Adw.HeaderBar()
         header.set_show_end_title_buttons(False)
         header.add_css_class("flat")
@@ -70,21 +125,23 @@ class SetupWizard(Adw.Window):
 
     # ── Pagina: Welkom ──────────────────────────────────────────────
     def build_welcome(self):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
-        page.set_margin_top(48)
-        page.set_margin_bottom(48)
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        page.set_margin_top(40)
+        page.set_margin_bottom(40)
         page.set_margin_start(48)
         page.set_margin_end(48)
 
         # Logo
-        logo_path = os.path.join(os.path.dirname(__file__), "..", "docs", "pixora-logo-dark.png")
+        style_manager = Adw.StyleManager.get_default()
+        dark = style_manager.get_dark()
+        logo_name = "pixora-logo-dark.png" if dark else "pixora-logo-light.png"
+        logo_path = os.path.join(os.path.dirname(__file__), "..", "docs", logo_name)
         if os.path.exists(logo_path):
             logo = Gtk.Picture.new_for_filename(logo_path)
-            logo.set_size_request(280, 70)
+            logo.set_size_request(260, 64)
             logo.set_content_fit(Gtk.ContentFit.CONTAIN)
             page.append(logo)
 
-        # Welkom tekst
         title = Gtk.Label(label="Welkom bij Pixora!")
         title.add_css_class("title-1")
         title.set_halign(Gtk.Align.CENTER)
@@ -105,9 +162,9 @@ class SetupWizard(Adw.Window):
 
     # ── Pagina: Foto map ────────────────────────────────────────────
     def build_folder(self):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
-        page.set_margin_top(48)
-        page.set_margin_bottom(48)
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        page.set_margin_top(40)
+        page.set_margin_bottom(40)
         page.set_margin_start(48)
         page.set_margin_end(48)
 
@@ -116,12 +173,13 @@ class SetupWizard(Adw.Window):
         title.set_halign(Gtk.Align.START)
         page.append(title)
 
-        subtitle = Gtk.Label(label="Kies een map op je computer waar Pixora\nje foto's en video's naartoe kopieert.")
+        subtitle = Gtk.Label(
+            label="Kies een map op je computer waar Pixora\nje foto's en video's naartoe kopieert."
+        )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
         page.append(subtitle)
 
-        # Map kiezen
         folder_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
         self.folder_entry = Gtk.Entry()
@@ -140,9 +198,9 @@ class SetupWizard(Adw.Window):
 
     # ── Pagina: Mapstructuur ────────────────────────────────────────
     def build_structure(self):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
-        page.set_margin_top(48)
-        page.set_margin_bottom(48)
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        page.set_margin_top(40)
+        page.set_margin_bottom(40)
         page.set_margin_start(48)
         page.set_margin_end(48)
 
@@ -151,26 +209,43 @@ class SetupWizard(Adw.Window):
         title.set_halign(Gtk.Align.START)
         page.append(title)
 
-        # Radio knoppen in Adwaita stijl
         group = Adw.PreferencesGroup()
 
-        self.radio_flat = Gtk.CheckButton(label="Plat — alles in één map")
-        flat_row = Adw.ActionRow(title="Plat", subtitle="Alles in één map")
+        # Plat
+        self.radio_flat = Gtk.CheckButton()
+        flat_icon = Gtk.Image.new_from_icon_name("folder-symbolic")
+        flat_row = Adw.ActionRow(
+            title="Plat",
+            subtitle="Alles in één map"
+        )
+        flat_row.add_prefix(flat_icon)
         flat_row.add_prefix(self.radio_flat)
         flat_row.set_activatable_widget(self.radio_flat)
         group.add(flat_row)
 
-        self.radio_year = Gtk.CheckButton(label="Per jaar")
+        # Per jaar
+        self.radio_year = Gtk.CheckButton()
         self.radio_year.set_group(self.radio_flat)
-        year_row = Adw.ActionRow(title="Per jaar", subtitle="2024/  2025/")
+        year_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
+        year_row = Adw.ActionRow(
+            title="Per jaar",
+            subtitle="2024/   2025/"
+        )
+        year_row.add_prefix(year_icon)
         year_row.add_prefix(self.radio_year)
         year_row.set_activatable_widget(self.radio_year)
         group.add(year_row)
 
-        self.radio_month = Gtk.CheckButton(label="Per jaar/maand")
+        # Per jaar/maand
+        self.radio_month = Gtk.CheckButton()
         self.radio_month.set_group(self.radio_flat)
         self.radio_month.set_active(True)
-        month_row = Adw.ActionRow(title="Per jaar/maand", subtitle="2024/2024-03/  2024/2024-04/")
+        month_icon = Gtk.Image.new_from_icon_name("view-list-symbolic")
+        month_row = Adw.ActionRow(
+            title="Per jaar/maand",
+            subtitle="2024/2024-03/   2024/2024-04/"
+        )
+        month_row.add_prefix(month_icon)
         month_row.add_prefix(self.radio_month)
         month_row.set_activatable_widget(self.radio_month)
         group.add(month_row)
@@ -180,9 +255,9 @@ class SetupWizard(Adw.Window):
 
     # ── Pagina: Backup ──────────────────────────────────────────────
     def build_backup(self):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
-        page.set_margin_top(48)
-        page.set_margin_bottom(48)
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        page.set_margin_top(40)
+        page.set_margin_bottom(40)
         page.set_margin_start(48)
         page.set_margin_end(48)
 
@@ -201,7 +276,7 @@ class SetupWizard(Adw.Window):
 
         group = Adw.PreferencesGroup()
 
-        # Backup aan/uit schakelaar
+        # Backup schakelaar
         self.backup_switch = Gtk.Switch()
         self.backup_switch.set_valign(Gtk.Align.CENTER)
         self.backup_switch.connect("notify::active", self.on_backup_toggle)
@@ -215,19 +290,28 @@ class SetupWizard(Adw.Window):
         group.add(backup_row)
 
         # Schijf selectie
-        self.drive_combo = Gtk.DropDown()
         self.drive_model = Gtk.StringList()
-        self.drive_model.append("Geen schijven gevonden — sluit je schijf aan")
-        self.drive_combo.set_model(self.drive_model)
-        self.drive_combo.set_sensitive(False)
+        self.drives = get_available_drives()
 
-        refresh_btn = Gtk.Button(label="↻")
-        refresh_btn.connect("clicked", self.on_refresh_drives)
+        if self.drives:
+            for uuid, label in self.drives:
+                self.drive_model.append(label)
+        else:
+            self.drive_model.append("Geen schijven gevonden — sluit je schijf aan")
+
+        self.drive_combo = Gtk.DropDown(model=self.drive_model)
+        self.drive_combo.set_sensitive(False)
+        self.drive_combo.set_size_request(220, -1)
+
+        refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
+        refresh_btn.add_css_class("flat")
         refresh_btn.set_valign(Gtk.Align.CENTER)
+        refresh_btn.set_tooltip_text("Vernieuwen")
+        refresh_btn.connect("clicked", self.on_refresh_drives)
 
         self.drive_row = Adw.ActionRow(
             title="Backup schijf",
-            subtitle="Selecteer je externe schijf"
+            subtitle="Selecteer je externe USB schijf of HDD"
         )
         self.drive_row.add_suffix(refresh_btn)
         self.drive_row.add_suffix(self.drive_combo)
@@ -235,14 +319,13 @@ class SetupWizard(Adw.Window):
         group.add(self.drive_row)
 
         page.append(group)
-        self.load_drives()
         return page
 
     # ── Pagina: Duplicate detectie ──────────────────────────────────
     def build_duplicate(self):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
-        page.set_margin_top(48)
-        page.set_margin_bottom(48)
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        page.set_margin_top(40)
+        page.set_margin_bottom(40)
         page.set_margin_start(48)
         page.set_margin_end(48)
 
@@ -261,35 +344,38 @@ class SetupWizard(Adw.Window):
 
         group = Adw.PreferencesGroup()
 
-        # Streng
         self.radio_strict = Gtk.CheckButton()
+        strict_icon = Gtk.Image.new_from_icon_name("security-high-symbolic")
         strict_row = Adw.ActionRow(
             title="Streng",
             subtitle="Alleen exact dezelfde foto's"
         )
+        strict_row.add_prefix(strict_icon)
         strict_row.add_prefix(self.radio_strict)
         strict_row.set_activatable_widget(self.radio_strict)
         group.add(strict_row)
 
-        # Normaal
         self.radio_normal = Gtk.CheckButton()
         self.radio_normal.set_group(self.radio_strict)
         self.radio_normal.set_active(True)
+        normal_icon = Gtk.Image.new_from_icon_name("security-medium-symbolic")
         normal_row = Adw.ActionRow(
             title="Normaal",
             subtitle="Bijna identieke foto's worden gedetecteerd"
         )
+        normal_row.add_prefix(normal_icon)
         normal_row.add_prefix(self.radio_normal)
         normal_row.set_activatable_widget(self.radio_normal)
         group.add(normal_row)
 
-        # Soepel
         self.radio_loose = Gtk.CheckButton()
         self.radio_loose.set_group(self.radio_strict)
+        loose_icon = Gtk.Image.new_from_icon_name("security-low-symbolic")
         loose_row = Adw.ActionRow(
             title="Soepel",
             subtitle="Ook licht bewerkte foto's worden gedetecteerd"
         )
+        loose_row.add_prefix(loose_icon)
         loose_row.add_prefix(self.radio_loose)
         loose_row.set_activatable_widget(self.radio_loose)
         group.add(loose_row)
@@ -303,7 +389,6 @@ class SetupWizard(Adw.Window):
             self.current += 1
             self.stack.set_visible_child_name(self.pages[self.current])
             self.back_btn.set_visible(True)
-
             if self.current == len(self.pages) - 1:
                 self.next_btn.set_label("Voltooien")
         else:
@@ -315,7 +400,6 @@ class SetupWizard(Adw.Window):
             self.current -= 1
             self.stack.set_visible_child_name(self.pages[self.current])
             self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
-
             if self.current == 0:
                 self.back_btn.set_visible(False)
             self.next_btn.set_label("Volgende")
@@ -340,21 +424,12 @@ class SetupWizard(Adw.Window):
         self.drive_combo.set_sensitive(active)
 
     def on_refresh_drives(self, btn):
-        self.load_drives()
-
-    def load_drives(self):
         while self.drive_model.get_n_items() > 0:
             self.drive_model.remove(0)
-
-        drives = []
-        uuid_dir = "/dev/disk/by-uuid"
-        if os.path.exists(uuid_dir):
-            for uuid in os.listdir(uuid_dir):
-                drives.append(uuid)
-
-        if drives:
-            for d in drives:
-                self.drive_model.append(d)
+        self.drives = get_available_drives()
+        if self.drives:
+            for uuid, label in self.drives:
+                self.drive_model.append(label)
         else:
             self.drive_model.append("Geen schijven gevonden — sluit je schijf aan")
 
@@ -376,9 +451,8 @@ class SetupWizard(Adw.Window):
         if not self.backup_switch.get_active():
             return None
         selected = self.drive_combo.get_selected()
-        item = self.drive_model.get_item(selected)
-        if item:
-            return item.get_string()
+        if self.drives and selected < len(self.drives):
+            return self.drives[selected][0]
         return None
 
     def save_and_finish(self):
@@ -393,7 +467,6 @@ class SetupWizard(Adw.Window):
         with open(CONFIG_PATH, "w") as f:
             json.dump(settings, f, indent=2)
 
-        # Open hoofdscherm
         from main_window import MainWindow
         win = MainWindow(self.app, settings)
         win.present()
