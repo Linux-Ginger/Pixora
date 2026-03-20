@@ -199,9 +199,10 @@ class TimelineBar(Gtk.DrawingArea):
         self._dragging = False
 
     def _on_drag(self, gesture, dx, dy):
-        start_x, start_y = gesture.get_start_point()
-        frac = self._fraction_at_y(start_y + dy)
-        self.scroll_callback(frac)
+        ok, start_x, start_y = gesture.get_start_point()
+        if ok:
+            frac = self._fraction_at_y(start_y + dy)
+            self.scroll_callback(frac)
 
     def _on_motion(self, controller, x, y):
         h = self.get_height()
