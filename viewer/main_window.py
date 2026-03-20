@@ -459,24 +459,12 @@ class MainWindow(Adw.ApplicationWindow):
             self._update_all_selection_visuals()
 
     def _update_all_selection_visuals(self):
-        for index, btn in self.thumb_widgets.items():
-            self._update_thumb_visual(index, btn)
+        for index, widget in self.thumb_widgets.items():
+            self._update_thumb_visual(index, widget)
 
-    def _update_thumb_visual(self, index, btn):
-        if index in self._selected:
-            css = Gtk.CssProvider()
-            css.load_from_string("""
-                button { border-radius: 8px; padding: 0; outline: 3px solid #e95420; outline-offset: -3px; }
-                button picture { border-radius: 8px; }
-            """)
-        else:
-            css = Gtk.CssProvider()
-            css.load_from_string("""
-                button { border-radius: 8px; padding: 0; }
-                button picture { border-radius: 8px; }
-                button:hover { outline: 2px solid #e95420; outline-offset: -2px; border-radius: 8px; }
-            """)
-        btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+    def _update_thumb_visual(self, index, widget):
+        btn, check_box = widget
+        check_box.set_visible(index in self._selected)
 
     # ── Foto's laden ─────────────────────────────────────────────────
     def load_photos(self):
@@ -565,8 +553,47 @@ class MainWindow(Adw.ApplicationWindow):
             picture.set_size_request(THUMB_SIZE, THUMB_SIZE)
             picture.set_content_fit(Gtk.ContentFit.COVER)
 
+            # Overlay voor vinkje
+            overlay = Gtk.Overlay()
+            overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
+            overlay.set_child(picture)
+
+            # Vinkje — standaard verborgen
+            check_box = Gtk.Box()
+            check_box.set_size_request(22, 22)
+            check_box.set_halign(Gtk.Align.END)
+            check_box.set_valign(Gtk.Align.END)
+            check_box.set_margin_end(6)
+            check_box.set_margin_bottom(6)
+            check_box.set_visible(False)
+
+            check_css = Gtk.CssProvider()
+            check_css.load_from_string("""
+                box {
+                    background-color: #e95420;
+                    border-radius: 6px;
+                    min-width: 22px;
+                    min-height: 22px;
+                }
+            """)
+            check_box.get_style_context().add_provider(check_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+            check_icon = Gtk.Image.new_from_icon_name("object-select-symbolic")
+            check_icon.set_pixel_size(14)
+            check_icon.set_halign(Gtk.Align.CENTER)
+            check_icon.set_valign(Gtk.Align.CENTER)
+            check_icon.set_hexpand(True)
+            check_icon.set_vexpand(True)
+
+            check_icon_css = Gtk.CssProvider()
+            check_icon_css.load_from_string("image { color: white; }")
+            check_icon.get_style_context().add_provider(check_icon_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+            check_box.append(check_icon)
+            overlay.add_overlay(check_box)
+
             btn = Gtk.Button()
-            btn.set_child(picture)
+            btn.set_child(overlay)
             btn.set_overflow(Gtk.Overflow.HIDDEN)
             btn.set_size_request(THUMB_SIZE, THUMB_SIZE)
 
@@ -581,7 +608,7 @@ class MainWindow(Adw.ApplicationWindow):
             idx = index
             btn.connect("clicked", lambda b, i=idx: self.on_thumb_clicked(i))
             self.flow_box.append(btn)
-            self.thumb_widgets[index] = btn
+            self.thumb_widgets[index] = (btn, check_box)
 
         return False
 
