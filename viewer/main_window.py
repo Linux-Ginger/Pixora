@@ -495,7 +495,7 @@ class MainWindow(Adw.ApplicationWindow):
             picture.set_content_fit(Gtk.ContentFit.COVER)
 
             pic_css = Gtk.CssProvider()
-            pic_css.load_from_string("picture { border-radius: 8px; overflow: hidden; }")
+            pic_css.load_from_string("picture { border-radius: 8px; }")
             picture.get_style_context().add_provider(pic_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
             btn = Gtk.Button()
@@ -507,8 +507,8 @@ class MainWindow(Adw.ApplicationWindow):
             # Afgeronde hoeken via CSS
             css = Gtk.CssProvider()
             css.load_from_string("""
-                button { border-radius: 16px; }
-                button picture { border-radius: 16px; }
+                button { border-radius: 8px; }
+                button:hover { border: 2px solid #e95420; border-radius: 8px; }
             """)
             btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
