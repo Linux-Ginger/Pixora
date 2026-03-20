@@ -10,6 +10,7 @@ import threading
 import subprocess
 import sys
 import json
+import hashlib
 import time
 
 import gi
@@ -23,30 +24,29 @@ try:
     WATCHDOG_AVAILABLE = True
 except ImportError:
     WATCHDOG_AVAILABLE = False
-    print("Watchdog niet beschikbaar — automatisch verversen uitgeschakeld")
-
 
 IMPORTER_PATH = os.path.join(os.path.dirname(__file__), "..", "importer", "main.py")
-DOCS_DIR = os.path.join(os.path.dirname(__file__), "..", "docs")
-CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
-BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
+DOCS_DIR      = os.path.join(os.path.dirname(__file__), "..", "docs")
+CONFIG_PATH   = os.path.expanduser("~/.config/pixora/settings.json")
+CACHE_DIR     = os.path.expanduser("~/.cache/pixora/thumbnails")
+THUMB_SIZE    = 180
+BATCH_SIZE    = 20   # Aantal thumbnails per batch
+
+BACKUP_FSTYPES   = {"ext4","ext3","ext2","ntfs","exfat","fuseblk","btrfs","xfs","vfat"}
+IMAGE_EXTENSIONS = {".jpg",".jpeg",".png",".heic",".mp4",".mov"}
 
 
 def importer_installed():
     return os.path.exists(IMPORTER_PATH)
 
-
 def get_logo_path(dark_mode):
     suffix = "dark" if dark_mode else "light"
     return os.path.join(DOCS_DIR, f"pixora-logo-{suffix}.png")
-
 
 def save_settings(settings):
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         json.dump(settings, f, indent=2)
-
 
 def get_available_drives():
     drives = []
@@ -56,34 +56,28 @@ def get_available_drives():
             capture_output=True, text=True
         )
         data = json.loads(result.stdout)
-
         def process_device(device):
             hotplug = device.get("hotplug", False)
             if not hotplug:
                 return
-            uuid = device.get("uuid")
-            fstype = (device.get("fstype") or "").lower()
-            label = (device.get("label") or "").strip()
-            size = device.get("size") or ""
+            uuid     = device.get("uuid")
+            fstype   = (device.get("fstype") or "").lower()
+            label    = (device.get("label") or "").strip()
+            size     = device.get("size") or ""
             mountpoint = (device.get("mountpoint") or "").strip()
             if uuid and fstype in BACKUP_FSTYPES:
-                if label:
-                    display = f"💾  {label}  ({size})"
-                elif mountpoint:
-                    display = f"💾  {mountpoint}  ({size})"
-                else:
-                    display = f"💾  Externe schijf  ({size})"
+                display = f"💾  {label}  ({size})" if label else (
+                          f"💾  {mountpoint}  ({size})" if mountpoint else
+                          f"💾  Externe schijf  ({size})")
                 drives.append((uuid, display))
             for child in device.get("children", []):
                 child["hotplug"] = hotplug
                 process_device(child)
-
         for device in data.get("blockdevices", []):
             process_device(device)
     except Exception as e:
         print(f"Drive detectie fout: {e}")
     return drives
-
 
 def get_mountpoint_for_uuid(uuid):
     try:
@@ -100,18 +94,44 @@ def get_mountpoint_for_uuid(uuid):
         pass
     return None
 
+# ── Thumbnail cache ──────────────────────────────────────────────────
+def get_cache_path(photo_path):
+    """Geef het cache pad terug voor een foto."""
+    mtime = str(os.path.getmtime(photo_path))
+    key   = hashlib.md5((photo_path + mtime).encode()).hexdigest()
+    return os.path.join(CACHE_DIR, key + ".png")
+
+def load_thumbnail(photo_path):
+    """Laad thumbnail uit cache of genereer hem."""
+    cache_path = get_cache_path(photo_path)
+
+    # Uit cache laden
+    if os.path.exists(cache_path):
+        try:
+            return GdkPixbuf.Pixbuf.new_from_file(cache_path)
+        except Exception:
+            pass
+
+    # Nieuw genereren
+    try:
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+            photo_path, THUMB_SIZE, THUMB_SIZE, True
+        )
+        # Opslaan in cache
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        pixbuf.savev(cache_path, "png", [], [])
+        return pixbuf
+    except Exception:
+        return None
 
 # ── File watcher ─────────────────────────────────────────────────────
 class PhotoFolderHandler(FileSystemEventHandler):
-    """Luistert naar wijzigingen in de foto map."""
-
     def __init__(self, callback):
         super().__init__()
         self.callback = callback
-        self._timer = None
+        self._timer  = None
 
     def _schedule_reload(self):
-        # Debounce — wacht 1.5 seconden na laatste wijziging
         if self._timer:
             self._timer.cancel()
         self._timer = threading.Timer(1.5, lambda: GLib.idle_add(self.callback))
@@ -119,14 +139,12 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
     def on_created(self, event):
         if not event.is_directory:
-            ext = os.path.splitext(event.src_path)[1].lower()
-            if ext in IMAGE_EXTENSIONS:
+            if os.path.splitext(event.src_path)[1].lower() in IMAGE_EXTENSIONS:
                 self._schedule_reload()
 
     def on_deleted(self, event):
         if not event.is_directory:
-            ext = os.path.splitext(event.src_path)[1].lower()
-            if ext in IMAGE_EXTENSIONS:
+            if os.path.splitext(event.src_path)[1].lower() in IMAGE_EXTENSIONS:
                 self._schedule_reload()
 
     def on_moved(self, event):
@@ -136,11 +154,12 @@ class PhotoFolderHandler(FileSystemEventHandler):
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
-        self.settings = settings
-        self.photos = []
+        self.settings      = settings
+        self.photos        = []
         self.current_index = 0
         self.settings_drives = []
-        self.observer = None
+        self.observer      = None
+        self._loading      = False
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -151,25 +170,20 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack = Gtk.Stack()
         self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.main_stack.set_transition_duration(200)
-
-        self.main_stack.add_named(self.build_grid_page(), "grid")
+        self.main_stack.add_named(self.build_grid_page(),   "grid")
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(self.build_header())
         toolbar_view.set_content(self.main_stack)
         toolbar_view.add_bottom_bar(self.build_bottombar())
-
         self.set_content(toolbar_view)
 
-        # Map aanmaken als hij niet bestaat
         photo_path = self.settings.get("photo_path", "")
         if photo_path:
             os.makedirs(photo_path, exist_ok=True)
 
         GLib.idle_add(self.load_photos)
-
-        # Sluit observer netjes af als venster sluit
         self.connect("close-request", self.on_close)
 
     # ── Dark mode ────────────────────────────────────────────────────
@@ -186,7 +200,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not WATCHDOG_AVAILABLE or not os.path.exists(path):
             return
         self.stop_watcher()
-        handler = PhotoFolderHandler(self.reload_photos)
+        handler      = PhotoFolderHandler(self.reload_photos)
         self.observer = Observer()
         self.observer.schedule(handler, path, recursive=True)
         self.observer.start()
@@ -198,7 +212,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.observer = None
 
     def reload_photos(self):
-        """Wordt aangeroepen door de file watcher."""
+        if self._loading:
+            return False
         while True:
             child = self.flow_box.get_first_child()
             if child is None:
@@ -225,12 +240,7 @@ class MainWindow(Adw.ApplicationWindow):
         header.pack_start(self.logo_picture)
 
         self.sort_model = Gtk.StringList()
-        for item in [
-            "Datum (nieuwste eerst)",
-            "Datum (oudste eerst)",
-            "Naam (A-Z)",
-            "Naam (Z-A)",
-        ]:
+        for item in ["Datum (nieuwste eerst)", "Datum (oudste eerst)", "Naam (A-Z)", "Naam (Z-A)"]:
             self.sort_model.append(item)
 
         self.sort_combo = Gtk.DropDown(model=self.sort_model)
@@ -266,7 +276,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.spinner = Gtk.Spinner()
         self.spinner.set_size_request(48, 48)
-        self.spinner.start()
 
         self.spinner_label = Gtk.Label(label="Foto's laden...")
         self.spinner_label.add_css_class("dim-label")
@@ -285,24 +294,24 @@ class MainWindow(Adw.ApplicationWindow):
         self.flow_box.set_max_children_per_line(10)
         self.flow_box.set_min_children_per_line(2)
         self.flow_box.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.flow_box.set_row_spacing(6)
-        self.flow_box.set_column_spacing(6)
-        self.flow_box.set_margin_top(12)
-        self.flow_box.set_margin_bottom(12)
-        self.flow_box.set_margin_start(12)
-        self.flow_box.set_margin_end(12)
+        self.flow_box.set_row_spacing(4)
+        self.flow_box.set_column_spacing(4)
+        self.flow_box.set_margin_top(8)
+        self.flow_box.set_margin_bottom(8)
+        self.flow_box.set_margin_start(8)
+        self.flow_box.set_margin_end(8)
 
         scroll.set_child(self.flow_box)
         self.content_stack.add_named(scroll, "grid")
 
         # Lege staat
-        self.status_page = Adw.StatusPage()
-        self.status_page.set_icon_name("image-missing-symbolic")
-        self.status_page.set_title("Geen foto's gevonden")
-        self.status_page.set_description("Sluit je iPhone aan om foto's te importeren")
-        self.status_page.set_vexpand(True)
-        self.status_page.set_hexpand(True)
-        self.content_stack.add_named(self.status_page, "empty")
+        status_page = Adw.StatusPage()
+        status_page.set_icon_name("image-missing-symbolic")
+        status_page.set_title("Geen foto's gevonden")
+        status_page.set_description("Sluit je iPhone aan om foto's te importeren")
+        status_page.set_vexpand(True)
+        status_page.set_hexpand(True)
+        self.content_stack.add_named(status_page, "empty")
 
         self.content_stack.set_visible_child_name("loading")
         outer.append(self.content_stack)
@@ -311,20 +320,6 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Foto viewer pagina ───────────────────────────────────────────
     def build_viewer_page(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-
-        viewer_header = Adw.HeaderBar()
-        viewer_header.add_css_class("flat")
-
-        back_btn = Gtk.Button(icon_name="go-previous-symbolic")
-        back_btn.add_css_class("flat")
-        back_btn.connect("clicked", self.close_viewer)
-        viewer_header.pack_start(back_btn)
-
-        self.viewer_title = Gtk.Label(label="")
-        self.viewer_title.add_css_class("title")
-        viewer_header.set_title_widget(self.viewer_title)
-
-        box.append(viewer_header)
 
         viewer_area = Gtk.Overlay()
         viewer_area.set_vexpand(True)
@@ -335,6 +330,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_picture.set_hexpand(True)
         viewer_area.set_child(self.photo_picture)
 
+        # Sluit knop rechtsboven
+        close_btn = Gtk.Button(icon_name="window-close-symbolic")
+        close_btn.add_css_class("osd")
+        close_btn.add_css_class("circular")
+        close_btn.set_halign(Gtk.Align.END)
+        close_btn.set_valign(Gtk.Align.START)
+        close_btn.set_margin_top(12)
+        close_btn.set_margin_end(12)
+        close_btn.set_size_request(40, 40)
+        close_btn.connect("clicked", self.close_viewer)
+        viewer_area.add_overlay(close_btn)
+
+        # Pijl links
         self.prev_btn = Gtk.Button(icon_name="go-previous-symbolic")
         self.prev_btn.add_css_class("osd")
         self.prev_btn.add_css_class("circular")
@@ -345,6 +353,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.prev_btn.connect("clicked", self.prev_photo)
         viewer_area.add_overlay(self.prev_btn)
 
+        # Pijl rechts
         self.next_btn = Gtk.Button(icon_name="go-next-symbolic")
         self.next_btn.add_css_class("osd")
         self.next_btn.add_css_class("circular")
@@ -355,6 +364,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.connect("clicked", self.next_photo)
         viewer_area.add_overlay(self.next_btn)
 
+        # Counter onderaan
         self.viewer_counter = Gtk.Label(label="")
         self.viewer_counter.add_css_class("osd")
         self.viewer_counter.set_halign(Gtk.Align.CENTER)
@@ -362,7 +372,22 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_counter.set_margin_bottom(12)
         viewer_area.add_overlay(self.viewer_counter)
 
+        # Bestandsnaam
+        self.viewer_title = Gtk.Label(label="")
+        self.viewer_title.add_css_class("osd")
+        self.viewer_title.set_halign(Gtk.Align.START)
+        self.viewer_title.set_valign(Gtk.Align.START)
+        self.viewer_title.set_margin_top(16)
+        self.viewer_title.set_margin_start(16)
+        viewer_area.add_overlay(self.viewer_title)
+
         box.append(viewer_area)
+
+        # Keyboard navigatie
+        key_ctrl = Gtk.EventControllerKey()
+        key_ctrl.connect("key-pressed", self.on_viewer_key)
+        self.add_controller(key_ctrl)
+
         return box
 
     # ── Onderste balk ────────────────────────────────────────────────
@@ -385,7 +410,6 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Foto's laden ─────────────────────────────────────────────────
     def load_photos(self):
         photo_path = self.settings.get("photo_path", "")
-
         if not photo_path or not os.path.exists(photo_path):
             self.show_empty_state()
             return False
@@ -398,61 +422,83 @@ class MainWindow(Adw.ApplicationWindow):
 
         if not self.photos:
             self.show_empty_state()
-            # Start watcher ook als map leeg is — zodat nieuwe foto's automatisch verschijnen
             self.start_watcher(photo_path)
             return False
 
         self.apply_sort()
+
+        # Toon laadscherm en start spinner
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
+        self._loading = True
 
-        thread = threading.Thread(target=self.load_thumbnails, daemon=True)
+        thread = threading.Thread(target=self.load_thumbnails_batched, daemon=True)
         thread.start()
-
-        # Start file watcher
         self.start_watcher(photo_path)
         return False
 
-    def load_thumbnails(self):
-        total = len(self.photos)
+    def load_thumbnails_batched(self):
+        """Laad thumbnails in batches zodat de UI niet vastloopt."""
+        total   = len(self.photos)
+        batch   = []
+
         for i, path in enumerate(self.photos):
-            GLib.idle_add(
-                self.spinner_label.set_text,
-                f"Foto's laden... {i + 1} / {total}"
-            )
-            GLib.idle_add(self.add_thumbnail, i, path)
+            pixbuf = load_thumbnail(path)
+            batch.append((i, path, pixbuf))
+
+            # Stuur batch naar UI thread
+            if len(batch) >= BATCH_SIZE:
+                GLib.idle_add(self.process_batch, list(batch), i + 1, total)
+                batch = []
+                time.sleep(0.01)  # Kort pauze zodat UI kan ademen
+
+        # Laatste batch
+        if batch:
+            GLib.idle_add(self.process_batch, list(batch), total, total)
+
         GLib.idle_add(self.on_loading_done, total)
 
-    def add_thumbnail(self, index, path):
-        try:
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 160, 160, True)
-            picture = Gtk.Picture.new_for_pixbuf(pixbuf)
-            picture.set_size_request(160, 160)
+    def process_batch(self, batch, loaded, total):
+        """Verwerk een batch thumbnails op de UI thread."""
+        # Na eerste batch: toon grid al zodat gebruiker iets ziet
+        if self.content_stack.get_visible_child_name() == "loading" and loaded >= BATCH_SIZE:
+            self.spinner.stop()
+            self.content_stack.set_visible_child_name("grid")
+
+        self.spinner_label.set_text(f"Foto's laden... {loaded} / {total}")
+
+        for index, path, pixbuf in batch:
+            if pixbuf:
+                picture = Gtk.Picture.new_for_pixbuf(pixbuf)
+            else:
+                picture = Gtk.Picture()
+            picture.set_size_request(THUMB_SIZE, THUMB_SIZE)
             picture.set_content_fit(Gtk.ContentFit.COVER)
-        except Exception:
-            picture = Gtk.Picture()
-            picture.set_size_request(160, 160)
 
-        btn = Gtk.Button()
-        btn.set_child(picture)
-        btn.add_css_class("flat")
-        btn.set_overflow(Gtk.Overflow.HIDDEN)
+            btn = Gtk.Button()
+            btn.set_child(picture)
+            btn.add_css_class("flat")
+            btn.set_overflow(Gtk.Overflow.HIDDEN)
+            btn.set_size_request(THUMB_SIZE, THUMB_SIZE)
 
-        idx = index
-        btn.connect("clicked", lambda b: self.open_photo(idx))
-        self.flow_box.append(btn)
+            idx = index
+            btn.connect("clicked", lambda b, i=idx: self.open_photo(i))
+            self.flow_box.append(btn)
+
         return False
 
     def on_loading_done(self, total):
         self.spinner.stop()
         self.content_stack.set_visible_child_name("grid")
         self.photo_count_label.set_text(f"{total} foto's")
+        self._loading = False
         return False
 
     def show_empty_state(self):
         self.spinner.stop()
         self.content_stack.set_visible_child_name("empty")
         self.photo_count_label.set_text("0 foto's")
+        self._loading = False
 
     # ── Sorteren ─────────────────────────────────────────────────────
     def apply_sort(self):
@@ -467,7 +513,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.photos.sort(key=lambda p: os.path.basename(p).lower(), reverse=True)
 
     def on_sort_changed(self, combo, _):
-        if not self.photos:
+        if not self.photos or self._loading:
             return
         self.apply_sort()
         while True:
@@ -477,7 +523,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.flow_box.remove(child)
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
-        thread = threading.Thread(target=self.load_thumbnails, daemon=True)
+        self._loading = True
+        thread = threading.Thread(target=self.load_thumbnails_batched, daemon=True)
         thread.start()
 
     # ── Foto viewer ──────────────────────────────────────────────────
@@ -494,18 +541,32 @@ class MainWindow(Adw.ApplicationWindow):
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
 
-    def prev_photo(self, btn):
+    def prev_photo(self, btn=None):
         if self.current_index > 0:
             self.current_index -= 1
             self.update_viewer()
 
-    def next_photo(self, btn):
+    def next_photo(self, btn=None):
         if self.current_index < len(self.photos) - 1:
             self.current_index += 1
             self.update_viewer()
 
-    def close_viewer(self, btn):
+    def close_viewer(self, btn=None):
         self.main_stack.set_visible_child_name("grid")
+
+    def on_viewer_key(self, controller, keyval, keycode, state):
+        if self.main_stack.get_visible_child_name() != "viewer":
+            return False
+        if keyval == 65361:   # Pijl links
+            self.prev_photo()
+            return True
+        elif keyval == 65363: # Pijl rechts
+            self.next_photo()
+            return True
+        elif keyval == 65307: # Escape
+            self.close_viewer()
+            return True
+        return False
 
     # ── Instellingen ─────────────────────────────────────────────────
     def on_settings_clicked(self, btn):
@@ -537,7 +598,6 @@ class MainWindow(Adw.ApplicationWindow):
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title("Mapstructuur")
         structure_group.set_description("Hoe worden je foto's georganiseerd")
-
         current_structure = self.settings.get("structure", "year_month")
 
         self.radio_flat = Gtk.CheckButton()
@@ -568,14 +628,12 @@ class MainWindow(Adw.ApplicationWindow):
         month_row.add_prefix(self.radio_month)
         month_row.set_activatable_widget(self.radio_month)
         structure_group.add(month_row)
-
         page.add(structure_group)
 
         # Duplicate detectie
         dup_group = Adw.PreferencesGroup()
         dup_group.set_title("Duplicate detectie")
         dup_group.set_description("Hoe streng worden duplicaten gedetecteerd")
-
         current_threshold = self.settings.get("duplicate_threshold", 2)
 
         self.radio_strict = Gtk.CheckButton()
@@ -606,7 +664,6 @@ class MainWindow(Adw.ApplicationWindow):
         loose_row.add_prefix(self.radio_loose)
         loose_row.set_activatable_widget(self.radio_loose)
         dup_group.add(loose_row)
-
         page.add(dup_group)
 
         # Backup
@@ -619,17 +676,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_backup_switch.set_active(bool(self.settings.get("backup_uuid")))
         self.settings_backup_switch.connect("notify::active", self.on_settings_backup_toggle)
 
-        backup_toggle_row = Adw.ActionRow(
-            title="Automatische backup",
-            subtitle="Synchroniseert na elke import"
-        )
+        backup_toggle_row = Adw.ActionRow(title="Automatische backup", subtitle="Synchroniseert na elke import")
         backup_toggle_row.add_suffix(self.settings_backup_switch)
         backup_toggle_row.set_activatable_widget(self.settings_backup_switch)
         backup_group.add(backup_toggle_row)
 
         self.settings_drive_model = Gtk.StringList()
         self.settings_drives = get_available_drives()
-
         if self.settings_drives:
             for uuid, label in self.settings_drives:
                 self.settings_drive_model.append(label)
@@ -654,10 +707,7 @@ class MainWindow(Adw.ApplicationWindow):
         settings_refresh_btn.set_tooltip_text("Vernieuwen")
         settings_refresh_btn.connect("clicked", self.on_settings_refresh_drives)
 
-        self.settings_drive_row = Adw.ActionRow(
-            title="Backup schijf",
-            subtitle="Alleen externe schijven worden getoond"
-        )
+        self.settings_drive_row = Adw.ActionRow(title="Backup schijf", subtitle="Alleen externe schijven worden getoond")
         self.settings_drive_row.add_suffix(settings_refresh_btn)
         self.settings_drive_row.add_suffix(self.settings_drive_combo)
         self.settings_drive_row.set_sensitive(bool(self.settings.get("backup_uuid")))
@@ -676,8 +726,8 @@ class MainWindow(Adw.ApplicationWindow):
         change_backup_folder_btn.connect("clicked", self.on_settings_change_backup_folder)
         self.settings_backup_folder_row.add_suffix(change_backup_folder_btn)
         backup_group.add(self.settings_backup_folder_row)
-
         page.add(backup_group)
+
         dialog.add(page)
         dialog.present(self)
 
@@ -704,8 +754,7 @@ class MainWindow(Adw.ApplicationWindow):
     def on_settings_drive_selected(self, combo, _):
         selected = combo.get_selected()
         if self.settings_drives and selected < len(self.settings_drives):
-            uuid = self.settings_drives[selected][0]
-            self.settings["backup_uuid"] = uuid
+            self.settings["backup_uuid"] = self.settings_drives[selected][0]
             save_settings(self.settings)
 
     def on_settings_refresh_drives(self, btn):
@@ -760,7 +809,6 @@ class MainWindow(Adw.ApplicationWindow):
                 save_settings(self.settings)
                 self.folder_row.set_subtitle(new_path)
                 os.makedirs(new_path, exist_ok=True)
-                # Herlaad foto's en start nieuwe watcher
                 while True:
                     child = self.flow_box.get_first_child()
                     if child is None:
