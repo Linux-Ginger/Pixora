@@ -496,6 +496,10 @@ class SetupWizard(Adw.Window):
                     if mountpoint and not chosen_path.startswith(mountpoint):
                         self.backup_error.set_label("⚠️  Kies een map op de backup schijf, niet op je computer")
                         self.backup_error.set_visible(True)
+                        self.selected_backup_path = None
+                        self.backup_folder_row.set_subtitle("Nog geen map gekozen")
+                        self.backup_error.set_label("⚠️  Kies een map op de backup schijf, niet op je computer")
+                        self.backup_error.set_visible(True)
                         return
 
                 self.selected_backup_path = chosen_path
