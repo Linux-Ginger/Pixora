@@ -18,7 +18,7 @@ from collections import defaultdict
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk
 
 try:
     from watchdog.observers import Observer
@@ -35,6 +35,15 @@ THUMB_SIZE       = 180
 BATCH_SIZE       = 30
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
 BACKUP_FSTYPES   = {"ext4","ext3","ext2","ntfs","exfat","fuseblk","btrfs","xfs","vfat"}
+
+MONTHS_NL = [
+    "", "jan", "feb", "mrt", "apr", "mei", "jun",
+    "jul", "aug", "sep", "okt", "nov", "dec"
+]
+MONTHS_NL_FULL = [
+    "", "januari", "februari", "maart", "april", "mei", "juni",
+    "juli", "augustus", "september", "oktober", "november", "december"
+]
 
 
 def importer_installed():
@@ -92,12 +101,7 @@ def get_mountpoint_for_uuid(uuid):
     return None
 
 def format_date_header(dt):
-    """Formatteer datum als '23 maart 2026'."""
-    months = [
-        "", "januari", "februari", "maart", "april", "mei", "juni",
-        "juli", "augustus", "september", "oktober", "november", "december"
-    ]
-    return f"{dt.day} {months[dt.month]} {dt.year}"
+    return f"{dt.day} {MONTHS_NL_FULL[dt.month]} {dt.year}"
 
 # ── Thumbnail cache ──────────────────────────────────────────────────
 def get_cache_path(photo_path):
@@ -145,12 +149,166 @@ class PhotoFolderHandler(FileSystemEventHandler):
         self._schedule_reload()
 
 
+# ── Tijdlijn scrollbar ───────────────────────────────────────────────
+class TimelineBar(Gtk.DrawingArea):
+    """Smalle tijdlijn balk rechts — klik/sleep om te navigeren."""
+
+    def __init__(self, scroll_callback):
+        super().__init__()
+        self.scroll_callback = scroll_callback
+        self.entries   = []   # lijst van (label, fractie) — fractie 0.0-1.0
+        self.hover_idx = -1
+        self._dragging = False
+
+        self.set_size_request(52, -1)
+        self.set_vexpand(True)
+
+        # Tekenen
+        self.set_draw_func(self._draw)
+
+        # Muis events
+        motion = Gtk.EventControllerMotion()
+        motion.connect("motion", self._on_motion)
+        motion.connect("leave",  self._on_leave)
+        self.add_controller(motion)
+
+        click = Gtk.GestureClick()
+        click.connect("pressed",  self._on_press)
+        click.connect("released", self._on_release)
+        self.add_controller(click)
+
+        drag = Gtk.GestureDrag()
+        drag.connect("drag-update", self._on_drag)
+        self.add_controller(drag)
+
+    def set_entries(self, entries):
+        """entries = lijst van (label_str, fractie 0.0-1.0)"""
+        self.entries = entries
+        self.queue_draw()
+
+    def _fraction_at_y(self, y):
+        h = self.get_height()
+        return max(0.0, min(1.0, y / h if h > 0 else 0))
+
+    def _on_press(self, gesture, n, x, y):
+        self._dragging = True
+        frac = self._fraction_at_y(y)
+        self.scroll_callback(frac)
+
+    def _on_release(self, gesture, n, x, y):
+        self._dragging = False
+
+    def _on_drag(self, gesture, dx, dy):
+        start_x, start_y = gesture.get_start_point()
+        frac = self._fraction_at_y(start_y + dy)
+        self.scroll_callback(frac)
+
+    def _on_motion(self, controller, x, y):
+        h = self.get_height()
+        if not self.entries or h == 0:
+            return
+        frac = y / h
+        # Zoek dichtstbijzijnde entry
+        closest = min(range(len(self.entries)), key=lambda i: abs(self.entries[i][1] - frac))
+        if closest != self.hover_idx:
+            self.hover_idx = closest
+            self.queue_draw()
+
+    def _on_leave(self, controller):
+        self.hover_idx = -1
+        self.queue_draw()
+
+    def _draw(self, area, cr, width, height):
+        if not self.entries:
+            return
+
+        # Achtergrond
+        cr.set_source_rgba(0.15, 0.15, 0.15, 0.85)
+        cr.rectangle(0, 0, width, height)
+        cr.fill()
+
+        # Lijn in het midden
+        cr.set_source_rgba(0.4, 0.4, 0.4, 0.5)
+        cr.set_line_width(1)
+        cr.move_to(width / 2, 0)
+        cr.line_to(width / 2, height)
+        cr.stroke()
+
+        # Entries tekenen
+        last_year = None
+        for i, (label, frac) in enumerate(self.entries):
+            y = frac * height
+
+            is_year  = label.isdigit() and len(label) == 4
+            is_hover = i == self.hover_idx
+
+            if is_year:
+                # Jaar — dik streepje + tekst
+                cr.set_source_rgba(0.9, 0.9, 0.9, 1.0)
+                cr.set_line_width(2)
+                cr.move_to(width / 2 - 10, y)
+                cr.line_to(width / 2 + 10, y)
+                cr.stroke()
+
+                cr.set_source_rgba(0.9, 0.9, 0.9, 1.0)
+                cr.select_font_face("Sans", 0, 1)
+                cr.set_font_size(10)
+                te = cr.text_extents(label)
+                cr.move_to(width / 2 - te.width / 2, y - 4)
+                cr.show_text(label)
+            else:
+                # Maand — klein streepje
+                cr.set_source_rgba(0.6, 0.6, 0.6, 0.8)
+                cr.set_line_width(1)
+                cr.move_to(width / 2 - 5, y)
+                cr.line_to(width / 2 + 5, y)
+                cr.stroke()
+
+            # Hover tooltip
+            if is_hover:
+                # Oranje stip
+                cr.set_source_rgb(0.914, 0.329, 0.125)  # #e95420
+                cr.arc(width / 2, y, 5, 0, 2 * 3.14159)
+                cr.fill()
+
+                # Label achtergrond
+                cr.select_font_face("Sans", 0, 0)
+                cr.set_font_size(11)
+                te = cr.text_extents(label)
+                pad = 6
+                bx  = width / 2 - te.width - pad * 2 - 12
+                by  = y - te.height / 2 - pad
+                bw  = te.width + pad * 2
+                bh  = te.height + pad * 2
+
+                cr.set_source_rgba(0.1, 0.1, 0.1, 0.92)
+                self._rounded_rect(cr, bx, by, bw, bh, 6)
+                cr.fill()
+
+                cr.set_source_rgba(1, 1, 1, 1)
+                cr.move_to(bx + pad, by + pad + te.height)
+                cr.show_text(label)
+
+    def _rounded_rect(self, cr, x, y, w, h, r):
+        cr.move_to(x + r, y)
+        cr.line_to(x + w - r, y)
+        cr.arc(x + w - r, y + r, r, -1.5708, 0)
+        cr.line_to(x + w, y + h - r)
+        cr.arc(x + w - r, y + h - r, r, 0, 1.5708)
+        cr.line_to(x + r, y + h)
+        cr.arc(x + r, y + h - r, r, 1.5708, 3.14159)
+        cr.line_to(x, y + r)
+        cr.arc(x + r, y + r, r, 3.14159, 4.71239)
+        cr.close_path()
+
+
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
         self.settings        = settings
         self.photos          = []
-        self.thumb_widgets   = {}   # global_index → (btn, check_box)
+        self.thumb_widgets   = {}
+        self.date_widgets    = {}   # datum_str → Gtk.Label widget
         self.current_index   = 0
         self.settings_drives = []
         self.observer        = None
@@ -282,12 +440,17 @@ class MainWindow(Adw.ApplicationWindow):
         spinner_box.append(self.spinner_label)
         self.content_stack.add_named(spinner_box, "loading")
 
-        # Scroll + grid container
+        # Grid + tijdlijn naast elkaar
+        grid_with_timeline = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        grid_with_timeline.set_vexpand(True)
+        grid_with_timeline.set_hexpand(True)
+
+        # Scroll + grid
         self.scroll = Gtk.ScrolledWindow()
         self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.scroll.set_vexpand(True)
+        self.scroll.set_hexpand(True)
 
-        # Verticale box voor datum groepen
         self.grid_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.grid_box.set_margin_top(8)
         self.grid_box.set_margin_bottom(8)
@@ -295,7 +458,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.grid_box.set_margin_end(8)
 
         self.scroll.set_child(self.grid_box)
-        self.content_stack.add_named(self.scroll, "grid")
+        grid_with_timeline.append(self.scroll)
+
+        # Tijdlijn balk
+        self.timeline = TimelineBar(self._on_timeline_scroll)
+        grid_with_timeline.append(self.timeline)
+
+        self.content_stack.add_named(grid_with_timeline, "grid")
 
         # Lege staat
         status_page = Adw.StatusPage()
@@ -309,6 +478,42 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_stack.set_visible_child_name("loading")
         outer.append(self.content_stack)
         return outer
+
+    def _on_timeline_scroll(self, fraction):
+        """Spring naar de positie in de scroll bij fractie 0.0-1.0."""
+        adj = self.scroll.get_vadjustment()
+        total = adj.get_upper() - adj.get_lower() - adj.get_page_size()
+        if total > 0:
+            adj.set_value(adj.get_lower() + fraction * total)
+
+    def _build_timeline_entries(self, groups):
+        """Bouw tijdlijn entries op basis van datum groepen."""
+        if not groups:
+            return []
+
+        # Bepaal totale hoogte op basis van aantal foto's per groep
+        total_photos = sum(len(indices) for _, _, indices in groups)
+        if total_photos == 0:
+            return []
+
+        entries = []
+        cumulative = 0
+        last_year  = None
+
+        for date_str, date_obj, indices in groups:
+            frac = cumulative / total_photos
+
+            year_str = str(date_obj.year)
+            if year_str != last_year:
+                entries.append((year_str, frac))
+                last_year = year_str
+
+            month_str = MONTHS_NL[date_obj.month]
+            entries.append((month_str, frac))
+
+            cumulative += len(indices)
+
+        return entries
 
     # ── Viewer pagina ────────────────────────────────────────────────
     def build_viewer_page(self):
@@ -485,7 +690,6 @@ class MainWindow(Adw.ApplicationWindow):
         load_id = self._load_id
         self._loading = True
 
-        # Grid leegmaken
         while True:
             child = self.grid_box.get_first_child()
             if child is None:
@@ -493,6 +697,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.grid_box.remove(child)
 
         self.thumb_widgets = {}
+        self.date_widgets  = {}
         self._selected.clear()
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
@@ -506,7 +711,6 @@ class MainWindow(Adw.ApplicationWindow):
         thread.start()
 
     def _group_by_date(self, photos):
-        """Groepeer foto's op datum, geef lijst van (datum_str, datum_obj, [indices]) terug."""
         groups = defaultdict(list)
         for i, path in enumerate(photos):
             try:
@@ -516,24 +720,24 @@ class MainWindow(Adw.ApplicationWindow):
                 dt = datetime.date(1970, 1, 1)
             groups[dt].append(i)
 
-        # Sorteer op datum (zelfde richting als gesorteerde foto's)
         sorted_dates = sorted(groups.keys(), reverse=True)
         return [(format_date_header(dt), dt, groups[dt]) for dt in sorted_dates]
 
     def _load_thread(self, load_id, photos):
-        """Laad thumbnails per datum groep."""
         total  = len(photos)
         groups = self._group_by_date(photos)
-        loaded = 0
 
+        # Tijdlijn entries berekenen
+        timeline_entries = self._build_timeline_entries(groups)
+        GLib.idle_add(self.timeline.set_entries, timeline_entries)
+
+        loaded = 0
         for date_str, date_obj, indices in groups:
             if load_id != self._load_id:
                 return
 
-            # Maak datum header + flowbox aan op UI thread
             GLib.idle_add(self._add_date_group, load_id, date_str)
 
-            # Laad thumbnails voor deze groep in batches
             batch = []
             for idx in indices:
                 if load_id != self._load_id:
@@ -553,11 +757,9 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._load_done, load_id, total)
 
     def _add_date_group(self, load_id, date_str):
-        """Voeg een datum header en bijbehorende FlowBox toe aan de grid."""
         if load_id != self._load_id:
             return False
 
-        # Datum label
         label = Gtk.Label(label=date_str)
         label.add_css_class("title-4")
         label.set_halign(Gtk.Align.START)
@@ -565,8 +767,8 @@ class MainWindow(Adw.ApplicationWindow):
         label.set_margin_bottom(8)
         label.set_margin_start(4)
         self.grid_box.append(label)
+        self.date_widgets[date_str] = label
 
-        # FlowBox voor deze datum
         flow = Gtk.FlowBox()
         flow.set_valign(Gtk.Align.START)
         flow.set_max_children_per_line(12)
@@ -576,11 +778,9 @@ class MainWindow(Adw.ApplicationWindow):
         flow.set_column_spacing(4)
         flow.set_homogeneous(True)
 
-        # Sla huidige FlowBox op zodat batches erin kunnen worden gezet
         self._current_flow = flow
         self.grid_box.append(flow)
 
-        # Toon grid al zodra eerste groep aangemaakt is
         if self.content_stack.get_visible_child_name() == "loading":
             self.spinner.stop()
             self.content_stack.set_visible_child_name("grid")
@@ -601,7 +801,6 @@ class MainWindow(Adw.ApplicationWindow):
             picture.set_size_request(THUMB_SIZE, THUMB_SIZE)
             picture.set_content_fit(Gtk.ContentFit.COVER)
 
-            # Overlay voor vinkje
             overlay = Gtk.Overlay()
             overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
             overlay.set_child(picture)
