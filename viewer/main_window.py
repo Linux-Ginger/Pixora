@@ -10,18 +10,27 @@ import threading
 import subprocess
 import sys
 import json
+import time
 
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio
 
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+    WATCHDOG_AVAILABLE = True
+except ImportError:
+    WATCHDOG_AVAILABLE = False
+    print("Watchdog niet beschikbaar — automatisch verversen uitgeschakeld")
+
 
 IMPORTER_PATH = os.path.join(os.path.dirname(__file__), "..", "importer", "main.py")
 DOCS_DIR = os.path.join(os.path.dirname(__file__), "..", "docs")
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
-
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
 
 
 def importer_installed():
@@ -29,10 +38,8 @@ def importer_installed():
 
 
 def get_logo_path(dark_mode):
-    if dark_mode:
-        return os.path.join(DOCS_DIR, "pixora-logo-dark.png")
-    else:
-        return os.path.join(DOCS_DIR, "pixora-logo-light.png")
+    suffix = "dark" if dark_mode else "light"
+    return os.path.join(DOCS_DIR, f"pixora-logo-{suffix}.png")
 
 
 def save_settings(settings):
@@ -94,6 +101,38 @@ def get_mountpoint_for_uuid(uuid):
     return None
 
 
+# ── File watcher ─────────────────────────────────────────────────────
+class PhotoFolderHandler(FileSystemEventHandler):
+    """Luistert naar wijzigingen in de foto map."""
+
+    def __init__(self, callback):
+        super().__init__()
+        self.callback = callback
+        self._timer = None
+
+    def _schedule_reload(self):
+        # Debounce — wacht 1.5 seconden na laatste wijziging
+        if self._timer:
+            self._timer.cancel()
+        self._timer = threading.Timer(1.5, lambda: GLib.idle_add(self.callback))
+        self._timer.start()
+
+    def on_created(self, event):
+        if not event.is_directory:
+            ext = os.path.splitext(event.src_path)[1].lower()
+            if ext in IMAGE_EXTENSIONS:
+                self._schedule_reload()
+
+    def on_deleted(self, event):
+        if not event.is_directory:
+            ext = os.path.splitext(event.src_path)[1].lower()
+            if ext in IMAGE_EXTENSIONS:
+                self._schedule_reload()
+
+    def on_moved(self, event):
+        self._schedule_reload()
+
+
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
@@ -101,7 +140,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.photos = []
         self.current_index = 0
         self.settings_drives = []
-        self.settings_selected_backup_path = None
+        self.observer = None
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -122,7 +161,16 @@ class MainWindow(Adw.ApplicationWindow):
         toolbar_view.add_bottom_bar(self.build_bottombar())
 
         self.set_content(toolbar_view)
+
+        # Map aanmaken als hij niet bestaat
+        photo_path = self.settings.get("photo_path", "")
+        if photo_path:
+            os.makedirs(photo_path, exist_ok=True)
+
         GLib.idle_add(self.load_photos)
+
+        # Sluit observer netjes af als venster sluit
+        self.connect("close-request", self.on_close)
 
     # ── Dark mode ────────────────────────────────────────────────────
     def is_dark(self):
@@ -132,6 +180,36 @@ class MainWindow(Adw.ApplicationWindow):
         logo_path = get_logo_path(self.is_dark())
         if os.path.exists(logo_path):
             self.logo_picture.set_filename(logo_path)
+
+    # ── File watcher ─────────────────────────────────────────────────
+    def start_watcher(self, path):
+        if not WATCHDOG_AVAILABLE or not os.path.exists(path):
+            return
+        self.stop_watcher()
+        handler = PhotoFolderHandler(self.reload_photos)
+        self.observer = Observer()
+        self.observer.schedule(handler, path, recursive=True)
+        self.observer.start()
+
+    def stop_watcher(self):
+        if self.observer:
+            self.observer.stop()
+            self.observer.join()
+            self.observer = None
+
+    def reload_photos(self):
+        """Wordt aangeroepen door de file watcher."""
+        while True:
+            child = self.flow_box.get_first_child()
+            if child is None:
+                break
+            self.flow_box.remove(child)
+        self.load_photos()
+        return False
+
+    def on_close(self, window):
+        self.stop_watcher()
+        return False
 
     # ── Header ──────────────────────────────────────────────────────
     def build_header(self):
@@ -144,10 +222,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.logo_picture.set_filename(logo_path)
         self.logo_picture.set_size_request(140, 36)
         self.logo_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
-
-        logo_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        logo_box.append(self.logo_picture)
-        header.pack_start(logo_box)
+        header.pack_start(self.logo_picture)
 
         self.sort_model = Gtk.StringList()
         for item in [
@@ -173,19 +248,17 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Foto grid pagina ─────────────────────────────────────────────
     def build_grid_page(self):
-        # Outer box vult het hele scherm
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         outer.set_vexpand(True)
         outer.set_hexpand(True)
 
-        # Stack: laadscherm / grid / leeg
         self.content_stack = Gtk.Stack()
         self.content_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.content_stack.set_transition_duration(150)
         self.content_stack.set_vexpand(True)
         self.content_stack.set_hexpand(True)
 
-        # Pagina 0 — laadscherm
+        # Laadscherm
         spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         spinner_box.set_halign(Gtk.Align.CENTER)
         spinner_box.set_valign(Gtk.Align.CENTER)
@@ -202,7 +275,7 @@ class MainWindow(Adw.ApplicationWindow):
         spinner_box.append(self.spinner_label)
         self.content_stack.add_named(spinner_box, "loading")
 
-        # Pagina 1 — foto grid
+        # Foto grid
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scroll.set_vexpand(True)
@@ -222,7 +295,7 @@ class MainWindow(Adw.ApplicationWindow):
         scroll.set_child(self.flow_box)
         self.content_stack.add_named(scroll, "grid")
 
-        # Pagina 2 — lege staat gecentreerd
+        # Lege staat
         self.status_page = Adw.StatusPage()
         self.status_page.set_icon_name("image-missing-symbolic")
         self.status_page.set_title("Geen foto's gevonden")
@@ -244,7 +317,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         back_btn = Gtk.Button(icon_name="go-previous-symbolic")
         back_btn.add_css_class("flat")
-        back_btn.set_tooltip_text("Terug naar overzicht")
         back_btn.connect("clicked", self.close_viewer)
         viewer_header.pack_start(back_btn)
 
@@ -313,20 +385,21 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Foto's laden ─────────────────────────────────────────────────
     def load_photos(self):
         photo_path = self.settings.get("photo_path", "")
-        if not os.path.exists(photo_path):
+
+        if not photo_path or not os.path.exists(photo_path):
             self.show_empty_state()
             return False
 
-        extensions = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
         self.photos = []
-
         for root, dirs, files in os.walk(photo_path):
             for file in files:
-                if os.path.splitext(file)[1].lower() in extensions:
+                if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
                     self.photos.append(os.path.join(root, file))
 
         if not self.photos:
             self.show_empty_state()
+            # Start watcher ook als map leeg is — zodat nieuwe foto's automatisch verschijnen
+            self.start_watcher(photo_path)
             return False
 
         self.apply_sort()
@@ -335,6 +408,9 @@ class MainWindow(Adw.ApplicationWindow):
 
         thread = threading.Thread(target=self.load_thumbnails, daemon=True)
         thread.start()
+
+        # Start file watcher
+        self.start_watcher(photo_path)
         return False
 
     def load_thumbnails(self):
@@ -414,9 +490,7 @@ class MainWindow(Adw.ApplicationWindow):
         path = self.photos[self.current_index]
         self.photo_picture.set_filename(path)
         self.viewer_title.set_text(os.path.basename(path))
-        self.viewer_counter.set_text(
-            f"{self.current_index + 1} / {len(self.photos)}"
-        )
+        self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
 
@@ -442,7 +516,7 @@ class MainWindow(Adw.ApplicationWindow):
         page.set_title("Algemeen")
         page.set_icon_name("preferences-system-symbolic")
 
-        # ── Foto map ──
+        # Foto map
         folder_group = Adw.PreferencesGroup()
         folder_group.set_title("Foto map")
         folder_group.set_description("Waar worden je foto's opgeslagen")
@@ -459,7 +533,7 @@ class MainWindow(Adw.ApplicationWindow):
         folder_group.add(self.folder_row)
         page.add(folder_group)
 
-        # ── Mapstructuur ──
+        # Mapstructuur
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title("Mapstructuur")
         structure_group.set_description("Hoe worden je foto's georganiseerd")
@@ -497,7 +571,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         page.add(structure_group)
 
-        # ── Duplicate detectie ──
+        # Duplicate detectie
         dup_group = Adw.PreferencesGroup()
         dup_group.set_title("Duplicate detectie")
         dup_group.set_description("Hoe streng worden duplicaten gedetecteerd")
@@ -535,12 +609,11 @@ class MainWindow(Adw.ApplicationWindow):
 
         page.add(dup_group)
 
-        # ── Backup ──
+        # Backup
         backup_group = Adw.PreferencesGroup()
         backup_group.set_title("Automatische backup")
         backup_group.set_description("Backup naar externe USB schijf na elke import")
 
-        # Backup aan/uit
         self.settings_backup_switch = Gtk.Switch()
         self.settings_backup_switch.set_valign(Gtk.Align.CENTER)
         self.settings_backup_switch.set_active(bool(self.settings.get("backup_uuid")))
@@ -554,7 +627,6 @@ class MainWindow(Adw.ApplicationWindow):
         backup_toggle_row.set_activatable_widget(self.settings_backup_switch)
         backup_group.add(backup_toggle_row)
 
-        # Schijf selectie
         self.settings_drive_model = Gtk.StringList()
         self.settings_drives = get_available_drives()
 
@@ -569,7 +641,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_drive_combo.set_sensitive(bool(self.settings.get("backup_uuid")))
         self.settings_drive_combo.connect("notify::selected", self.on_settings_drive_selected)
 
-        # Selecteer huidige schijf
         current_uuid = self.settings.get("backup_uuid")
         if current_uuid and self.settings_drives:
             for i, (uuid, label) in enumerate(self.settings_drives):
@@ -592,7 +663,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_drive_row.set_sensitive(bool(self.settings.get("backup_uuid")))
         backup_group.add(self.settings_drive_row)
 
-        # Backup map
         current_backup_path = self.settings.get("backup_path", "Niet ingesteld")
         self.settings_backup_folder_row = Adw.ActionRow(
             title="Map op backup schijf",
@@ -608,11 +678,9 @@ class MainWindow(Adw.ApplicationWindow):
         backup_group.add(self.settings_backup_folder_row)
 
         page.add(backup_group)
-
         dialog.add(page)
         dialog.present(self)
 
-    # ── Instellingen acties ──────────────────────────────────────────
     def on_structure_changed(self, value, btn):
         if btn.get_active():
             self.settings["structure"] = value
@@ -659,8 +727,7 @@ class MainWindow(Adw.ApplicationWindow):
         if current_uuid:
             mountpoint = get_mountpoint_for_uuid(current_uuid)
             if mountpoint:
-                folder = Gio.File.new_for_path(mountpoint)
-                dialog.set_initial_folder(folder)
+                dialog.set_initial_folder(Gio.File.new_for_path(mountpoint))
         dialog.select_folder(self, None, self.on_settings_backup_folder_selected)
 
     def on_settings_backup_folder_selected(self, dialog, result):
@@ -688,12 +755,20 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             folder = dialog.select_folder_finish(result)
             if folder:
-                self.settings["photo_path"] = folder.get_path()
+                new_path = folder.get_path()
+                self.settings["photo_path"] = new_path
                 save_settings(self.settings)
-                self.folder_row.set_subtitle(folder.get_path())
+                self.folder_row.set_subtitle(new_path)
+                os.makedirs(new_path, exist_ok=True)
+                # Herlaad foto's en start nieuwe watcher
+                while True:
+                    child = self.flow_box.get_first_child()
+                    if child is None:
+                        break
+                    self.flow_box.remove(child)
+                self.load_photos()
         except Exception:
             pass
 
-    # ── Importer ─────────────────────────────────────────────────────
     def open_importer(self, btn):
         subprocess.Popen([sys.executable, IMPORTER_PATH])
