@@ -500,6 +500,11 @@ class MainWindow(Adw.ApplicationWindow):
             btn.set_overflow(Gtk.Overflow.HIDDEN)
             btn.set_size_request(THUMB_SIZE, THUMB_SIZE)
 
+            # Afgeronde hoeken via CSS
+            css = Gtk.CssProvider()
+            css.load_from_string("button { border-radius: 12px; }")
+            btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
             idx = index
             btn.connect("clicked", lambda b, i=idx: self.open_photo(i))
             self.flow_box.append(btn)
