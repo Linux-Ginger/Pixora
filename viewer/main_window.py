@@ -13,12 +13,14 @@ import json
 import hashlib
 import time
 import datetime
+import struct
 from collections import defaultdict
 
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk
+gi.require_version("WebKit", "6.0")
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk, WebKit
 
 try:
     from watchdog.observers import Observer
@@ -36,13 +38,13 @@ BATCH_SIZE       = 30
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
 BACKUP_FSTYPES   = {"ext4","ext3","ext2","ntfs","exfat","fuseblk","btrfs","xfs","vfat"}
 
-MONTHS_NL = [
-    "", "jan", "feb", "mrt", "apr", "mei", "jun",
-    "jul", "aug", "sep", "okt", "nov", "dec"
-]
 MONTHS_NL_FULL = [
     "", "januari", "februari", "maart", "april", "mei", "juni",
     "juli", "augustus", "september", "oktober", "november", "december"
+]
+MONTHS_NL = [
+    "", "jan", "feb", "mrt", "apr", "mei", "jun",
+    "jul", "aug", "sep", "okt", "nov", "dec"
 ]
 
 
@@ -103,6 +105,88 @@ def get_mountpoint_for_uuid(uuid):
 def format_date_header(dt):
     return f"{dt.day} {MONTHS_NL_FULL[dt.month]} {dt.year}"
 
+# ── GPS EXIF uitlezen ────────────────────────────────────────────────
+def get_gps_coords(photo_path):
+    """Lees GPS coördinaten uit EXIF data. Geeft (lat, lon) of None terug."""
+    try:
+        from PIL import Image
+        from PIL.ExifTags import TAGS, GPSTAGS
+
+        img  = Image.open(photo_path)
+        exif = img._getexif()
+        if not exif:
+            return None
+
+        gps_info = {}
+        for tag, value in exif.items():
+            tag_name = TAGS.get(tag, tag)
+            if tag_name == "GPSInfo":
+                for gps_tag, gps_value in value.items():
+                    gps_info[GPSTAGS.get(gps_tag, gps_tag)] = gps_value
+
+        if not gps_info:
+            return None
+
+        def to_decimal(coords, ref):
+            d, m, s = coords
+            decimal = float(d) + float(m) / 60 + float(s) / 3600
+            if ref in ["S", "W"]:
+                decimal = -decimal
+            return decimal
+
+        lat = to_decimal(gps_info["GPSLatitude"],  gps_info.get("GPSLatitudeRef",  "N"))
+        lon = to_decimal(gps_info["GPSLongitude"], gps_info.get("GPSLongitudeRef", "E"))
+        return (lat, lon)
+    except Exception:
+        return None
+
+# ── Kaart HTML ───────────────────────────────────────────────────────
+def build_map_html(markers):
+    """Bouw Leaflet kaart HTML met markers."""
+    markers_js = ""
+    for lat, lon, filename, datum in markers:
+        safe_filename = filename.replace("'", "\\'")
+        safe_datum    = datum.replace("'", "\\'")
+        markers_js += f"""
+        L.marker([{lat}, {lon}])
+            .addTo(map)
+            .bindPopup('<b>{safe_filename}</b><br>{safe_datum}');
+        """
+
+    # Centreer op eerste marker of Nederland als fallback
+    if markers:
+        center_lat, center_lon = markers[0][0], markers[0][1]
+        zoom = 10
+    else:
+        center_lat, center_lon = 52.3, 5.3
+        zoom = 7
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ background: #1a1a1a; }}
+        #map {{ width: 100vw; height: 100vh; }}
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        var map = L.map('map').setView([{center_lat}, {center_lon}], {zoom});
+        L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+            attribution: '© OpenStreetMap bijdragers',
+            maxZoom: 19
+        }}).addTo(map);
+        {markers_js}
+    </script>
+</body>
+</html>"""
+
 # ── Thumbnail cache ──────────────────────────────────────────────────
 def get_cache_path(photo_path):
     mtime = str(os.path.getmtime(photo_path))
@@ -151,21 +235,15 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
 # ── Tijdlijn scrollbar ───────────────────────────────────────────────
 class TimelineBar(Gtk.ScrolledWindow):
-    """Tijdlijn balk rechts met jaar/maand labels."""
-
     def __init__(self, scroll_callback):
         super().__init__()
         self.scroll_callback = scroll_callback
-        self.entries = []
+        self.entries  = []
         self._buttons = []
 
         self.set_size_request(60, -1)
         self.set_vexpand(True)
         self.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
-
-        css = Gtk.CssProvider()
-        css.load_from_string("scrolledwindow { background-color: alpha(@window_bg_color, 0.8); }")
-        self.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
         self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.box.set_valign(Gtk.Align.FILL)
@@ -193,22 +271,13 @@ class TimelineBar(Gtk.ScrolledWindow):
             btn_css = Gtk.CssProvider()
             if is_year:
                 btn_css.load_from_string("""
-                    button {
-                        font-size: 10px;
-                        font-weight: bold;
-                        color: @window_fg_color;
-                        padding: 2px 4px;
-                        min-height: 0;
-                    }
+                    button { font-size: 10px; font-weight: bold;
+                             color: @window_fg_color; padding: 2px 4px; min-height: 0; }
                 """)
             else:
                 btn_css.load_from_string("""
-                    button {
-                        font-size: 9px;
-                        color: alpha(@window_fg_color, 0.5);
-                        padding: 1px 4px;
-                        min-height: 0;
-                    }
+                    button { font-size: 9px; color: alpha(@window_fg_color, 0.5);
+                             padding: 1px 4px; min-height: 0; }
                 """)
             btn.get_style_context().add_provider(btn_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
@@ -218,44 +287,27 @@ class TimelineBar(Gtk.ScrolledWindow):
             self._buttons.append(btn)
 
     def highlight(self, frac):
-        """Highlight de entry die het dichtst bij de huidige scroll positie zit."""
         if not self.entries or not self._buttons:
             return
-        closest = min(range(len(self.entries)),
-                      key=lambda i: abs(self.entries[i][1] - frac))
-
+        closest = min(range(len(self.entries)), key=lambda i: abs(self.entries[i][1] - frac))
         for i, btn in enumerate(self._buttons):
             css = Gtk.CssProvider()
             if i == closest:
                 css.load_from_string("""
-                    button {
-                        color: #e95420;
-                        font-weight: bold;
-                        font-size: 10px;
-                        padding: 2px 4px;
-                        min-height: 0;
-                    }
+                    button { color: #e95420; font-weight: bold;
+                             font-size: 10px; padding: 2px 4px; min-height: 0; }
                 """)
             else:
                 is_year = self.entries[i][0].isdigit() and len(self.entries[i][0]) == 4
                 if is_year:
                     css.load_from_string("""
-                        button {
-                            font-size: 10px;
-                            font-weight: bold;
-                            color: @window_fg_color;
-                            padding: 2px 4px;
-                            min-height: 0;
-                        }
+                        button { font-size: 10px; font-weight: bold;
+                                 color: @window_fg_color; padding: 2px 4px; min-height: 0; }
                     """)
                 else:
                     css.load_from_string("""
-                        button {
-                            font-size: 9px;
-                            color: alpha(@window_fg_color, 0.5);
-                            padding: 1px 4px;
-                            min-height: 0;
-                        }
+                        button { font-size: 9px; color: alpha(@window_fg_color, 0.5);
+                                 padding: 1px 4px; min-height: 0; }
                     """)
             btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
@@ -288,6 +340,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.set_transition_duration(200)
         self.main_stack.add_named(self.build_grid_page(),   "grid")
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
+        self.main_stack.add_named(self.build_map_page(),    "map")
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(self.build_header())
@@ -357,6 +410,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.sort_combo.connect("notify::selected", self.on_sort_changed)
         self.header.pack_start(self.sort_combo)
 
+        # Kaart knop
+        self.map_btn = Gtk.Button(icon_name="map-symbolic")
+        self.map_btn.add_css_class("flat")
+        self.map_btn.set_tooltip_text("Kaartweergave")
+        self.map_btn.connect("clicked", self.open_map)
+        self.header.pack_end(self.map_btn)
+
         self.select_btn = Gtk.Button(label="Selecteren")
         self.select_btn.add_css_class("flat")
         self.select_btn.connect("clicked", self.toggle_select_mode)
@@ -382,7 +442,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_stack.set_vexpand(True)
         self.content_stack.set_hexpand(True)
 
-        # Laadscherm
         spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         spinner_box.set_halign(Gtk.Align.CENTER)
         spinner_box.set_valign(Gtk.Align.CENTER)
@@ -398,12 +457,10 @@ class MainWindow(Adw.ApplicationWindow):
         spinner_box.append(self.spinner_label)
         self.content_stack.add_named(spinner_box, "loading")
 
-        # Grid + tijdlijn naast elkaar
         grid_with_timeline = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         grid_with_timeline.set_vexpand(True)
         grid_with_timeline.set_hexpand(True)
 
-        # Scroll + grid
         self.scroll = Gtk.ScrolledWindow()
         self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.scroll.set_vexpand(True)
@@ -416,19 +473,14 @@ class MainWindow(Adw.ApplicationWindow):
         self.grid_box.set_margin_end(8)
 
         self.scroll.set_child(self.grid_box)
-
-        # Verbind scroll met tijdlijn highlight
         self.scroll.get_vadjustment().connect("value-changed", self._on_scroll_changed)
-
         grid_with_timeline.append(self.scroll)
 
-        # Tijdlijn balk
         self.timeline = TimelineBar(self._on_timeline_scroll)
         grid_with_timeline.append(self.timeline)
 
         self.content_stack.add_named(grid_with_timeline, "grid")
 
-        # Lege staat
         status_page = Adw.StatusPage()
         status_page.set_icon_name("image-missing-symbolic")
         status_page.set_title("Geen foto's gevonden")
@@ -441,58 +493,75 @@ class MainWindow(Adw.ApplicationWindow):
         outer.append(self.content_stack)
         return outer
 
-    def _on_timeline_scroll(self, fraction):
-        adj   = self.scroll.get_vadjustment()
-        total = adj.get_upper() - adj.get_lower() - adj.get_page_size()
-        if total > 0:
-            adj.set_value(adj.get_lower() + fraction * total)
+    # ── Kaart pagina ─────────────────────────────────────────────────
+    def build_map_page(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.set_vexpand(True)
+        box.set_hexpand(True)
 
-    def _on_scroll_changed(self, adj):
-        total = adj.get_upper() - adj.get_lower() - adj.get_page_size()
-        if total > 0:
-            frac = (adj.get_value() - adj.get_lower()) / total
-            self.timeline.highlight(frac)
+        # Kaart header
+        map_header = Adw.HeaderBar()
+        map_header.add_css_class("flat")
 
-    def _update_timeline_from_positions(self):
-        if not self.date_widgets:
-            return False
-        adj   = self.scroll.get_vadjustment()
-        total = adj.get_upper()
-        if total == 0:
-            return False
+        back_btn = Gtk.Button(icon_name="go-previous-symbolic")
+        back_btn.add_css_class("flat")
+        back_btn.set_tooltip_text("Terug naar overzicht")
+        back_btn.connect("clicked", self.close_map)
+        map_header.pack_start(back_btn)
 
-        entries = []
-        for date_str, label in self.date_widgets.items():
-            success, x, y = label.translate_coordinates(self.grid_box, 0, 0)
-            if success:
-                frac = max(0.0, min(1.0, y / total))
-                entries.append((date_str, frac))
+        self.map_title = Gtk.Label(label="Kaart")
+        self.map_title.add_css_class("title")
+        map_header.set_title_widget(self.map_title)
 
-        entries.sort(key=lambda e: e[1])
-        self.timeline.set_entries(entries)
+        box.append(map_header)
+
+        # WebKit view voor Leaflet kaart
+        self.webview = WebKit.WebView()
+        self.webview.set_vexpand(True)
+        self.webview.set_hexpand(True)
+
+        # Laad lege kaart
+        html = build_map_html([])
+        self.webview.load_html(html, "about:blank")
+
+        box.append(self.webview)
+        return box
+
+    def open_map(self, btn=None):
+        """Open kaartweergave en laad GPS markers."""
+        self.header.set_visible(False)
+        self.main_stack.set_visible_child_name("map")
+        self.map_title.set_text(f"Kaart — foto's laden...")
+
+        # GPS data ophalen op achtergrond thread
+        threading.Thread(target=self._load_gps_data, daemon=True).start()
+
+    def _load_gps_data(self):
+        markers = []
+        for path in self.photos:
+            coords = get_gps_coords(path)
+            if coords:
+                lat, lon  = coords
+                filename  = os.path.basename(path)
+                try:
+                    mtime = os.path.getmtime(path)
+                    datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y")
+                except Exception:
+                    datum = ""
+                markers.append((lat, lon, filename, datum))
+
+        GLib.idle_add(self._show_map, markers)
+
+    def _show_map(self, markers):
+        html = build_map_html(markers)
+        self.webview.load_html(html, "about:blank")
+        count = len(markers)
+        self.map_title.set_text(f"Kaart — {count} foto's met locatie")
         return False
 
-    def _build_timeline_entries(self, groups):
-        if not groups:
-            return []
-        total_photos = sum(len(indices) for _, _, indices in groups)
-        if total_photos == 0:
-            return []
-
-        entries    = []
-        cumulative = 0
-        last_year  = None
-
-        for date_str, date_obj, indices in groups:
-            frac     = cumulative / total_photos
-            year_str = str(date_obj.year)
-            if year_str != last_year:
-                entries.append((year_str, frac))
-                last_year = year_str
-            entries.append((MONTHS_NL[date_obj.month], frac))
-            cumulative += len(indices)
-
-        return entries
+    def close_map(self, btn=None):
+        self.header.set_visible(True)
+        self.main_stack.set_visible_child_name("grid")
 
     # ── Viewer pagina ────────────────────────────────────────────────
     def build_viewer_page(self):
@@ -615,6 +684,60 @@ class MainWindow(Adw.ApplicationWindow):
 
         return self.bottom_stack
 
+    # ── Tijdlijn ─────────────────────────────────────────────────────
+    def _on_timeline_scroll(self, fraction):
+        adj   = self.scroll.get_vadjustment()
+        total = adj.get_upper() - adj.get_lower() - adj.get_page_size()
+        if total > 0:
+            adj.set_value(adj.get_lower() + fraction * total)
+
+    def _on_scroll_changed(self, adj):
+        total = adj.get_upper() - adj.get_lower() - adj.get_page_size()
+        if total > 0:
+            frac = (adj.get_value() - adj.get_lower()) / total
+            self.timeline.highlight(frac)
+
+    def _update_timeline_from_positions(self):
+        if not self.date_widgets:
+            return False
+        adj   = self.scroll.get_vadjustment()
+        total = adj.get_upper()
+        if total == 0:
+            return False
+
+        entries = []
+        for date_str, label in self.date_widgets.items():
+            success, x, y = label.translate_coordinates(self.grid_box, 0, 0)
+            if success:
+                frac = max(0.0, min(1.0, y / total))
+                entries.append((date_str, frac))
+
+        entries.sort(key=lambda e: e[1])
+        self.timeline.set_entries(entries)
+        return False
+
+    def _build_timeline_entries(self, groups):
+        if not groups:
+            return []
+        total_photos = sum(len(indices) for _, _, indices in groups)
+        if total_photos == 0:
+            return []
+
+        entries    = []
+        cumulative = 0
+        last_year  = None
+
+        for date_str, date_obj, indices in groups:
+            frac     = cumulative / total_photos
+            year_str = str(date_obj.year)
+            if year_str != last_year:
+                entries.append((year_str, frac))
+                last_year = year_str
+            entries.append((MONTHS_NL[date_obj.month], frac))
+            cumulative += len(indices)
+
+        return entries
+
     # ── Selectie modus ───────────────────────────────────────────────
     def toggle_select_mode(self, btn=None):
         self._select_mode = not self._select_mode
@@ -705,7 +828,6 @@ class MainWindow(Adw.ApplicationWindow):
         total  = len(photos)
         groups = self._group_by_date(photos)
 
-        # Voorlopige tijdlijn op basis van fotoverdeling
         timeline_entries = self._build_timeline_entries(groups)
         GLib.idle_add(self.timeline.set_entries, timeline_entries)
 
@@ -793,12 +915,8 @@ class MainWindow(Adw.ApplicationWindow):
 
             check_css = Gtk.CssProvider()
             check_css.load_from_string("""
-                box {
-                    background-color: #e95420;
-                    border-radius: 6px;
-                    min-width: 22px;
-                    min-height: 22px;
-                }
+                box { background-color: #e95420; border-radius: 6px;
+                      min-width: 22px; min-height: 22px; }
             """)
             check_box.get_style_context().add_provider(check_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
@@ -844,7 +962,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_stack.set_visible_child_name("grid")
         self.photo_count_label.set_text(f"{total} foto's")
         self._loading = False
-        # Update tijdlijn op basis van echte posities na laden
         GLib.timeout_add(300, self._update_timeline_from_positions)
         return False
 
