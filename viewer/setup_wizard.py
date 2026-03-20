@@ -199,7 +199,8 @@ class SetupWizard(Adw.Window):
         folder_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
         self.folder_entry = Gtk.Entry()
-        self.folder_entry.set_text(os.path.expanduser("~/Pictures/Pixora"))
+        self.folder_entry.set_text("")
+        self.folder_entry.set_placeholder_text("Kies een map via de knop hieronder...")
         self.folder_entry.set_hexpand(True)
         self.folder_entry.set_placeholder_text("Kies een map...")
 
@@ -391,6 +392,18 @@ class SetupWizard(Adw.Window):
 
     # ── Navigatie ───────────────────────────────────────────────────
     def go_next(self, btn):
+        # Validatie folder pagina
+        if self.pages[self.current] == "folder":
+            if not self.folder_entry.get_text().strip():
+                dialog = Adw.MessageDialog(
+                    transient_for=self,
+                    heading="Geen map gekozen",
+                    body="Kies een map waar je foto's opgeslagen worden."
+                )
+                dialog.add_response("ok", "OK")
+                dialog.present()
+                return
+
         # Validatie backup pagina
         if self.pages[self.current] == "backup":
             if self.backup_switch.get_active():
