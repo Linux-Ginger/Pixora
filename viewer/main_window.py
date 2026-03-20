@@ -494,6 +494,10 @@ class MainWindow(Adw.ApplicationWindow):
             picture.set_size_request(THUMB_SIZE, THUMB_SIZE)
             picture.set_content_fit(Gtk.ContentFit.COVER)
 
+            pic_css = Gtk.CssProvider()
+            pic_css.load_from_string("picture { border-radius: 16px; overflow: hidden; }")
+            picture.get_style_context().add_provider(pic_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
             btn = Gtk.Button()
             btn.set_child(picture)
             btn.add_css_class("flat")
