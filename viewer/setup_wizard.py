@@ -18,7 +18,7 @@ from gi.repository import Gtk, Adw, GLib
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
 
 # Alleen deze bestandssystemen zijn bruikbaar als backup schijf
-BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs"}
+BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
 
 
 def get_available_drives():
