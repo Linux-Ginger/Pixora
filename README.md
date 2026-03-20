@@ -1,7 +1,7 @@
 # Pixora
 ### by LinuxGinger
 
-![Pixora Logo](docs/pixora-logo-dark.svg)
+![Pixora Logo](docs/pixora-logo-light.svg)
 
 **Pixora** is an open source photo and video manager for Linux. Import from your iPhone, automatically detect duplicates by actually comparing the images, back up to an external drive, and browse your collection — all in one app.
 
