@@ -208,7 +208,8 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Header ──────────────────────────────────────────────────────
     def build_header(self):
-        header = Adw.HeaderBar()
+        self.header = Adw.HeaderBar()
+        header = self.header
         header.add_css_class("flat")
 
         logo_path = get_logo_path(self.is_dark())
@@ -549,6 +550,7 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Foto viewer ──────────────────────────────────────────────────
     def open_photo(self, index):
         self.current_index = index
+        self.header.set_visible(False)
         self.main_stack.set_visible_child_name("viewer")
         # Laad foto op achtergrond thread om UI niet te blokkeren
         threading.Thread(
@@ -569,7 +571,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.photo_picture.set_pixbuf(pixbuf)
         import datetime
         mtime = os.path.getmtime(path)
-        datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y")
+        datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y  %H:%M")
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         self.prev_btn.set_sensitive(self.current_index > 0)
@@ -596,6 +598,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def close_viewer(self, btn=None):
         self.photo_picture.set_pixbuf(None)
+        self.header.set_visible(True)
         self.main_stack.set_visible_child_name("grid")
 
     def on_viewer_key(self, controller, keyval, keycode, state):
