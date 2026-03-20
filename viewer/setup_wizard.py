@@ -486,8 +486,20 @@ class SetupWizard(Adw.Window):
         try:
             folder = dialog.select_folder_finish(result)
             if folder:
-                self.selected_backup_path = folder.get_path()
-                self.backup_folder_row.set_subtitle(self.selected_backup_path)
+                chosen_path = folder.get_path()
+
+                # Controleer of het pad binnen de backup schijf valt
+                selected = self.drive_combo.get_selected()
+                if self.drives and selected < len(self.drives):
+                    uuid = self.drives[selected][0]
+                    mountpoint = self.get_mountpoint_for_uuid(uuid)
+                    if mountpoint and not chosen_path.startswith(mountpoint):
+                        self.backup_error.set_label("⚠️  Kies een map op de backup schijf, niet op je computer")
+                        self.backup_error.set_visible(True)
+                        return
+
+                self.selected_backup_path = chosen_path
+                self.backup_folder_row.set_subtitle(chosen_path)
                 self.backup_error.set_visible(False)
         except Exception:
             pass
