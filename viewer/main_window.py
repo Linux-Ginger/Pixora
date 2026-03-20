@@ -516,7 +516,16 @@ class MainWindow(Adw.ApplicationWindow):
         box.append(map_header)
 
         # WebKit view voor Leaflet kaart
-        self.webview = WebKit.WebView()
+        wk_settings = WebKit.Settings()
+        wk_settings.set_enable_javascript(True)
+
+        network_session = WebKit.NetworkSession.new_ephemeral()
+
+        self.webview = WebKit.WebView.new_with_settings(wk_settings)
+
+        # Sandbox uitzetten — nodig op sommige Ubuntu configuraties
+        self.webview.get_website_policies()
+        manager = self.webview.get_network_session()
         self.webview.set_vexpand(True)
         self.webview.set_hexpand(True)
 
