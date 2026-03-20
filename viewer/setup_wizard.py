@@ -13,7 +13,7 @@ import threading
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib
+from gi.repository import Gtk, Adw, GLib, Gio
 
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
 
@@ -455,7 +455,32 @@ class SetupWizard(Adw.Window):
     def on_browse_backup_folder(self, btn):
         dialog = Gtk.FileDialog()
         dialog.set_title("Kies map op backup schijf")
+
+        # Start in de map van de geselecteerde schijf
+        selected = self.drive_combo.get_selected()
+        if self.drives and selected < len(self.drives):
+            uuid = self.drives[selected][0]
+            mountpoint = self.get_mountpoint_for_uuid(uuid)
+            if mountpoint:
+                folder = Gio.File.new_for_path(mountpoint)
+                dialog.set_initial_folder(folder)
+
         dialog.select_folder(self, None, self.on_backup_folder_selected)
+
+    def get_mountpoint_for_uuid(self, uuid):
+        try:
+            result = subprocess.run(
+                ["lsblk", "-o", "UUID,MOUNTPOINT", "-J"],
+                capture_output=True, text=True
+            )
+            data = json.loads(result.stdout)
+            for device in data.get("blockdevices", []):
+                for child in device.get("children", [device]):
+                    if child.get("uuid") == uuid:
+                        return child.get("mountpoint")
+        except Exception:
+            pass
+        return None
 
     def on_backup_folder_selected(self, dialog, result):
         try:
