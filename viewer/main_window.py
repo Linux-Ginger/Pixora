@@ -12,6 +12,7 @@ import sys
 import json
 import hashlib
 import time
+import datetime
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -139,14 +140,19 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
         self.settings        = settings
-        self.photos          = []       # Gesorteerde lijst van paden
-        self.thumb_cache     = {}       # index → GdkPixbuf
-        self.thumb_widgets   = {}       # index → Gtk.Button widget in grid
+        self.photos          = []
+        self.thumb_widgets   = {}
         self.current_index   = 0
         self.settings_drives = []
         self.observer        = None
         self._loading        = False
-        self._load_id        = 0        # Versie ID om oude loads te negeren
+        self._load_id        = 0
+        self._viewer_load_id = 0
+        self._sort_timer     = None
+
+        # Selectie modus
+        self._select_mode    = False
+        self._selected       = set()
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -209,8 +215,7 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Header ──────────────────────────────────────────────────────
     def build_header(self):
         self.header = Adw.HeaderBar()
-        header = self.header
-        header.add_css_class("flat")
+        self.header.add_css_class("flat")
 
         logo_path = get_logo_path(self.is_dark())
         self.logo_picture = Gtk.Picture()
@@ -218,7 +223,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.logo_picture.set_filename(logo_path)
         self.logo_picture.set_size_request(140, 36)
         self.logo_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
-        header.pack_start(self.logo_picture)
+        self.header.pack_start(self.logo_picture)
 
         self.sort_model = Gtk.StringList()
         for item in ["Datum (nieuwste eerst)", "Datum (oudste eerst)", "Naam (A-Z)", "Naam (Z-A)"]:
@@ -227,15 +232,21 @@ class MainWindow(Adw.ApplicationWindow):
         self.sort_combo = Gtk.DropDown(model=self.sort_model)
         self.sort_combo.set_size_request(180, -1)
         self.sort_combo.connect("notify::selected", self.on_sort_changed)
-        header.pack_start(self.sort_combo)
+        self.header.pack_start(self.sort_combo)
+
+        # Selecteer knop
+        self.select_btn = Gtk.Button(label="Selecteren")
+        self.select_btn.add_css_class("flat")
+        self.select_btn.connect("clicked", self.toggle_select_mode)
+        self.header.pack_end(self.select_btn)
 
         settings_btn = Gtk.Button(icon_name="preferences-system-symbolic")
         settings_btn.add_css_class("flat")
         settings_btn.set_tooltip_text("Instellingen")
         settings_btn.connect("clicked", self.on_settings_clicked)
-        header.pack_end(settings_btn)
+        self.header.pack_end(settings_btn)
 
-        return header
+        return self.header
 
     # ── Grid pagina ──────────────────────────────────────────────────
     def build_grid_page(self):
@@ -308,14 +319,12 @@ class MainWindow(Adw.ApplicationWindow):
         bg = Gtk.Box()
         bg.set_vexpand(True)
         bg.set_hexpand(True)
-        bg.set_css_classes(["pixora-viewer-bg"])
-
         css = Gtk.CssProvider()
-        css.load_from_string(".pixora-viewer-bg { background-color: black; }")
+        css.load_from_string("box { background-color: black; }")
         bg.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         viewer_area.set_child(bg)
 
-        # Foto — geladen op achtergrond thread
+        # Foto
         self.photo_picture = Gtk.Picture()
         self.photo_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
         self.photo_picture.set_vexpand(True)
@@ -334,7 +343,19 @@ class MainWindow(Adw.ApplicationWindow):
         close_btn.connect("clicked", self.close_viewer)
         viewer_area.add_overlay(close_btn)
 
-        # Bestandsnaam linksboven
+        # Prullenbak knop naast sluitknop
+        delete_btn = Gtk.Button(icon_name="user-trash-symbolic")
+        delete_btn.add_css_class("osd")
+        delete_btn.add_css_class("circular")
+        delete_btn.set_halign(Gtk.Align.END)
+        delete_btn.set_valign(Gtk.Align.START)
+        delete_btn.set_margin_top(16)
+        delete_btn.set_margin_end(68)
+        delete_btn.set_size_request(40, 40)
+        delete_btn.connect("clicked", self.on_delete_current)
+        viewer_area.add_overlay(delete_btn)
+
+        # Bestandsnaam + datum linksboven
         self.viewer_title = Gtk.Label(label="")
         self.viewer_title.add_css_class("osd")
         self.viewer_title.set_halign(Gtk.Align.START)
@@ -343,7 +364,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_title.set_margin_start(16)
         viewer_area.add_overlay(self.viewer_title)
 
-        # Pijl links — iets hoger dan midden
+        # Pijl links
         self.prev_btn = Gtk.Button(icon_name="go-previous-symbolic")
         self.prev_btn.add_css_class("osd")
         self.prev_btn.add_css_class("circular")
@@ -367,7 +388,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.connect("clicked", self.next_photo)
         viewer_area.add_overlay(self.next_btn)
 
-        # Counter onderaan midden
+        # Counter onderaan
         self.viewer_counter = Gtk.Label(label="")
         self.viewer_counter.add_css_class("osd")
         self.viewer_counter.set_halign(Gtk.Align.CENTER)
@@ -384,20 +405,78 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Onderste balk ────────────────────────────────────────────────
     def build_bottombar(self):
-        bar = Gtk.ActionBar()
+        self.bottom_stack = Gtk.Stack()
+        self.bottom_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.bottom_stack.set_transition_duration(150)
 
+        # Normale balk
+        normal_bar = Gtk.ActionBar()
         self.photo_count_label = Gtk.Label(label="0 foto's")
         self.photo_count_label.add_css_class("dim-label")
-        bar.pack_start(self.photo_count_label)
+        normal_bar.pack_start(self.photo_count_label)
 
         if importer_installed():
             import_btn = Gtk.Button(label="📱  Importeer van iPhone")
             import_btn.add_css_class("suggested-action")
             import_btn.add_css_class("pill")
             import_btn.connect("clicked", self.open_importer)
-            bar.pack_end(import_btn)
+            normal_bar.pack_end(import_btn)
 
-        return bar
+        self.bottom_stack.add_named(normal_bar, "normal")
+
+        # Selectie balk
+        select_bar = Gtk.ActionBar()
+        self.select_count_label = Gtk.Label(label="0 geselecteerd")
+        self.select_count_label.add_css_class("dim-label")
+        select_bar.pack_start(self.select_count_label)
+
+        delete_selected_btn = Gtk.Button(label="Verwijderen")
+        delete_selected_btn.add_css_class("destructive-action")
+        delete_selected_btn.add_css_class("pill")
+        delete_selected_btn.connect("clicked", self.on_delete_selected)
+        select_bar.pack_end(delete_selected_btn)
+
+        self.bottom_stack.add_named(select_bar, "select")
+        self.bottom_stack.set_visible_child_name("normal")
+
+        return self.bottom_stack
+
+    # ── Selectie modus ───────────────────────────────────────────────
+    def toggle_select_mode(self, btn=None):
+        self._select_mode = not self._select_mode
+        self._selected.clear()
+
+        if self._select_mode:
+            self.select_btn.set_label("Annuleren")
+            self.select_btn.add_css_class("suggested-action")
+            self.bottom_stack.set_visible_child_name("select")
+            self.select_count_label.set_text("0 geselecteerd")
+        else:
+            self.select_btn.set_label("Selecteren")
+            self.select_btn.remove_css_class("suggested-action")
+            self.bottom_stack.set_visible_child_name("normal")
+            # Alle selecties visueel wissen
+            self._update_all_selection_visuals()
+
+    def _update_all_selection_visuals(self):
+        for index, btn in self.thumb_widgets.items():
+            self._update_thumb_visual(index, btn)
+
+    def _update_thumb_visual(self, index, btn):
+        if index in self._selected:
+            css = Gtk.CssProvider()
+            css.load_from_string("""
+                button { border-radius: 8px; padding: 0; outline: 3px solid #e95420; outline-offset: -3px; }
+                button picture { border-radius: 8px; }
+            """)
+        else:
+            css = Gtk.CssProvider()
+            css.load_from_string("""
+                button { border-radius: 8px; padding: 0; }
+                button picture { border-radius: 8px; }
+                button:hover { outline: 2px solid #e95420; outline-offset: -2px; border-radius: 8px; }
+            """)
+        btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     # ── Foto's laden ─────────────────────────────────────────────────
     def load_photos(self):
@@ -406,7 +485,6 @@ class MainWindow(Adw.ApplicationWindow):
             self.show_empty_state()
             return False
 
-        # Scan bestanden
         photos = []
         for root, dirs, files in os.walk(photo_path):
             for file in files:
@@ -420,21 +498,16 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.photos = photos
         self.apply_sort()
-
-        # Direct teller zetten
         self.photo_count_label.set_text(f"{len(self.photos)} foto's")
-
         self.start_load()
         self.start_watcher(photo_path)
         return False
 
     def start_load(self):
-        """Start een nieuwe laadoperatie — annuleert eventuele vorige."""
         self._load_id += 1
         load_id = self._load_id
         self._loading = True
 
-        # Grid leegmaken
         while True:
             child = self.flow_box.get_first_child()
             if child is None:
@@ -442,6 +515,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.flow_box.remove(child)
 
         self.thumb_widgets = {}
+        self._selected.clear()
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
         self.spinner_label.set_text(f"Foto's laden... 0 / {len(self.photos)}")
@@ -454,14 +528,12 @@ class MainWindow(Adw.ApplicationWindow):
         thread.start()
 
     def _load_thread(self, load_id, photos):
-        """Achtergrond thread — laadt thumbnails en stuurt batches naar UI."""
         total = len(photos)
         batch = []
 
         for i, path in enumerate(photos):
             if load_id != self._load_id:
-                return  # Geannuleerd
-
+                return
             pixbuf = load_thumbnail(path)
             batch.append((i, path, pixbuf))
 
@@ -479,7 +551,6 @@ class MainWindow(Adw.ApplicationWindow):
         if load_id != self._load_id:
             return False
 
-        # Na eerste batch: toon grid
         if self.content_stack.get_visible_child_name() == "loading":
             self.spinner.stop()
             self.content_stack.set_visible_child_name("grid")
@@ -494,17 +565,11 @@ class MainWindow(Adw.ApplicationWindow):
             picture.set_size_request(THUMB_SIZE, THUMB_SIZE)
             picture.set_content_fit(Gtk.ContentFit.COVER)
 
-            pic_css = Gtk.CssProvider()
-            pic_css.load_from_string("picture { border-radius: 8px; }")
-            picture.get_style_context().add_provider(pic_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
             btn = Gtk.Button()
             btn.set_child(picture)
-            btn.add_css_class("flat")
             btn.set_overflow(Gtk.Overflow.HIDDEN)
             btn.set_size_request(THUMB_SIZE, THUMB_SIZE)
 
-            # Afgeronde hoeken via CSS
             css = Gtk.CssProvider()
             css.load_from_string("""
                 button { border-radius: 8px; padding: 0; }
@@ -514,7 +579,7 @@ class MainWindow(Adw.ApplicationWindow):
             btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
             idx = index
-            btn.connect("clicked", lambda b, i=idx: self.open_photo(i))
+            btn.connect("clicked", lambda b, i=idx: self.on_thumb_clicked(i))
             self.flow_box.append(btn)
             self.thumb_widgets[index] = btn
 
@@ -535,6 +600,18 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label.set_text("0 foto's")
         self._loading = False
 
+    # ── Thumbnail klik ───────────────────────────────────────────────
+    def on_thumb_clicked(self, index):
+        if self._select_mode:
+            if index in self._selected:
+                self._selected.discard(index)
+            else:
+                self._selected.add(index)
+            self._update_thumb_visual(index, self.thumb_widgets[index])
+            self.select_count_label.set_text(f"{len(self._selected)} geselecteerd")
+        else:
+            self.open_photo(index)
+
     # ── Sorteren ─────────────────────────────────────────────────────
     def apply_sort(self):
         index = self.sort_combo.get_selected()
@@ -550,7 +627,7 @@ class MainWindow(Adw.ApplicationWindow):
     def on_sort_changed(self, combo, _):
         if not self.photos:
             return
-        if hasattr(self, "_sort_timer") and self._sort_timer:
+        if self._sort_timer:
             GLib.source_remove(self._sort_timer)
         self._sort_timer = GLib.timeout_add(400, self._do_sort)
 
@@ -566,7 +643,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.header.set_visible(False)
         self.photo_picture.set_pixbuf(None)
         self.main_stack.set_visible_child_name("viewer")
-        self._viewer_load_id = getattr(self, "_viewer_load_id", 0) + 1
+        self._viewer_load_id += 1
         load_id = self._viewer_load_id
         threading.Thread(
             target=self._load_full_photo,
@@ -585,7 +662,6 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_full_photo(self, pixbuf, path):
         if pixbuf:
             self.photo_picture.set_pixbuf(pixbuf)
-        import datetime
         mtime = os.path.getmtime(path)
         datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y  %H:%M")
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
@@ -597,7 +673,7 @@ class MainWindow(Adw.ApplicationWindow):
     def prev_photo(self, btn=None):
         if self.current_index > 0:
             self.current_index -= 1
-            self._viewer_load_id = getattr(self, "_viewer_load_id", 0) + 1
+            self._viewer_load_id += 1
             load_id = self._viewer_load_id
             threading.Thread(
                 target=self._load_full_photo,
@@ -608,7 +684,7 @@ class MainWindow(Adw.ApplicationWindow):
     def next_photo(self, btn=None):
         if self.current_index < len(self.photos) - 1:
             self.current_index += 1
-            self._viewer_load_id = getattr(self, "_viewer_load_id", 0) + 1
+            self._viewer_load_id += 1
             load_id = self._viewer_load_id
             threading.Thread(
                 target=self._load_full_photo,
@@ -617,7 +693,7 @@ class MainWindow(Adw.ApplicationWindow):
             ).start()
 
     def close_viewer(self, btn=None):
-        self._viewer_load_id = getattr(self, "_viewer_load_id", 0) + 1
+        self._viewer_load_id += 1
         self.photo_picture.set_pixbuf(None)
         self.header.set_visible(True)
         self.main_stack.set_visible_child_name("grid")
@@ -635,6 +711,96 @@ class MainWindow(Adw.ApplicationWindow):
             self.close_viewer()
             return True
         return False
+
+    # ── Verwijderen ──────────────────────────────────────────────────
+    def on_delete_current(self, btn):
+        """Verwijder huidige foto vanuit de viewer."""
+        path = self.photos[self.current_index]
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading="Foto verwijderen?",
+            body=f"Weet je zeker dat je '{os.path.basename(path)}' wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+        )
+        dialog.add_response("cancel", "Annuleren")
+        dialog.add_response("delete", "Verwijderen")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_delete_current_response, path)
+        dialog.present()
+
+    def _on_delete_current_response(self, dialog, response, path):
+        if response != "delete":
+            return
+        try:
+            os.remove(path)
+            # Cache verwijderen
+            cache_path = get_cache_path(path)
+            if os.path.exists(cache_path):
+                os.remove(cache_path)
+        except Exception as e:
+            print(f"Verwijderen mislukt: {e}")
+            return
+
+        self.photos.remove(path)
+
+        if not self.photos:
+            self.close_viewer()
+            self.show_empty_state()
+            return
+
+        # Naar volgende of vorige foto
+        if self.current_index >= len(self.photos):
+            self.current_index = len(self.photos) - 1
+
+        self._viewer_load_id += 1
+        load_id = self._viewer_load_id
+        threading.Thread(
+            target=self._load_full_photo,
+            args=(self.photos[self.current_index], load_id),
+            daemon=True
+        ).start()
+
+        # Grid herladen op achtergrond
+        GLib.timeout_add(500, self.start_load)
+
+    def on_delete_selected(self, btn):
+        """Verwijder alle geselecteerde foto's."""
+        if not self._selected:
+            return
+
+        count = len(self._selected)
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading=f"{count} foto's verwijderen?",
+            body=f"Weet je zeker dat je {count} foto's wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+        )
+        dialog.add_response("cancel", "Annuleren")
+        dialog.add_response("delete", f"{count} verwijderen")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_delete_selected_response)
+        dialog.present()
+
+    def _on_delete_selected_response(self, dialog, response):
+        if response != "delete":
+            return
+
+        paths_to_delete = [self.photos[i] for i in self._selected if i < len(self.photos)]
+
+        for path in paths_to_delete:
+            try:
+                os.remove(path)
+                cache_path = get_cache_path(path)
+                if os.path.exists(cache_path):
+                    os.remove(cache_path)
+            except Exception as e:
+                print(f"Verwijderen mislukt: {e}")
+
+        # Selectiemodus uitzetten en herladen
+        self.toggle_select_mode()
+        self.load_photos()
 
     # ── Instellingen ─────────────────────────────────────────────────
     def on_settings_clicked(self, btn):
