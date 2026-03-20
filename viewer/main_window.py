@@ -157,6 +157,7 @@ class TimelineBar(Gtk.ScrolledWindow):
         super().__init__()
         self.scroll_callback = scroll_callback
         self.entries = []
+        self._buttons = []
 
         self.set_size_request(60, -1)
         self.set_vexpand(True)
@@ -172,6 +173,9 @@ class TimelineBar(Gtk.ScrolledWindow):
         self.set_child(self.box)
 
     def set_entries(self, entries):
+        self.entries  = entries
+        self._buttons = []
+
         while True:
             child = self.box.get_first_child()
             if child is None:
@@ -183,6 +187,8 @@ class TimelineBar(Gtk.ScrolledWindow):
 
             btn = Gtk.Button(label=label_str)
             btn.add_css_class("flat")
+            btn.set_vexpand(True)
+            btn.set_valign(Gtk.Align.CENTER)
 
             btn_css = Gtk.CssProvider()
             if is_year:
@@ -199,7 +205,7 @@ class TimelineBar(Gtk.ScrolledWindow):
                 btn_css.load_from_string("""
                     button {
                         font-size: 9px;
-                        color: alpha(@window_fg_color, 0.6);
+                        color: alpha(@window_fg_color, 0.5);
                         padding: 1px 4px;
                         min-height: 0;
                     }
@@ -209,9 +215,49 @@ class TimelineBar(Gtk.ScrolledWindow):
             f = frac
             btn.connect("clicked", lambda b, fr=f: self.scroll_callback(fr))
             self.box.append(btn)
+            self._buttons.append(btn)
 
-    def update_position(self, frac):
-        pass
+    def highlight(self, frac):
+        """Highlight de entry die het dichtst bij de huidige scroll positie zit."""
+        if not self.entries or not self._buttons:
+            return
+        closest = min(range(len(self.entries)),
+                      key=lambda i: abs(self.entries[i][1] - frac))
+
+        for i, btn in enumerate(self._buttons):
+            css = Gtk.CssProvider()
+            if i == closest:
+                css.load_from_string("""
+                    button {
+                        color: #e95420;
+                        font-weight: bold;
+                        font-size: 10px;
+                        padding: 2px 4px;
+                        min-height: 0;
+                    }
+                """)
+            else:
+                is_year = self.entries[i][0].isdigit() and len(self.entries[i][0]) == 4
+                if is_year:
+                    css.load_from_string("""
+                        button {
+                            font-size: 10px;
+                            font-weight: bold;
+                            color: @window_fg_color;
+                            padding: 2px 4px;
+                            min-height: 0;
+                        }
+                    """)
+                else:
+                    css.load_from_string("""
+                        button {
+                            font-size: 9px;
+                            color: alpha(@window_fg_color, 0.5);
+                            padding: 1px 4px;
+                            min-height: 0;
+                        }
+                    """)
+            btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -220,7 +266,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings        = settings
         self.photos          = []
         self.thumb_widgets   = {}
-        self.date_widgets    = {}   # datum_str → Gtk.Label widget
+        self.date_widgets    = {}
         self.current_index   = 0
         self.settings_drives = []
         self.observer        = None
@@ -370,6 +416,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.grid_box.set_margin_end(8)
 
         self.scroll.set_child(self.grid_box)
+
+        # Verbind scroll met tijdlijn highlight
+        self.scroll.get_vadjustment().connect("value-changed", self._on_scroll_changed)
+
         grid_with_timeline.append(self.scroll)
 
         # Tijdlijn balk
@@ -392,37 +442,54 @@ class MainWindow(Adw.ApplicationWindow):
         return outer
 
     def _on_timeline_scroll(self, fraction):
-        """Spring naar de positie in de scroll bij fractie 0.0-1.0."""
-        adj = self.scroll.get_vadjustment()
+        adj   = self.scroll.get_vadjustment()
         total = adj.get_upper() - adj.get_lower() - adj.get_page_size()
         if total > 0:
             adj.set_value(adj.get_lower() + fraction * total)
 
+    def _on_scroll_changed(self, adj):
+        total = adj.get_upper() - adj.get_lower() - adj.get_page_size()
+        if total > 0:
+            frac = (adj.get_value() - adj.get_lower()) / total
+            self.timeline.highlight(frac)
+
+    def _update_timeline_from_positions(self):
+        if not self.date_widgets:
+            return False
+        adj   = self.scroll.get_vadjustment()
+        total = adj.get_upper()
+        if total == 0:
+            return False
+
+        entries = []
+        for date_str, label in self.date_widgets.items():
+            success, x, y = label.translate_coordinates(self.grid_box, 0, 0)
+            if success:
+                frac = max(0.0, min(1.0, y / total))
+                entries.append((date_str, frac))
+
+        entries.sort(key=lambda e: e[1])
+        self.timeline.set_entries(entries)
+        return False
+
     def _build_timeline_entries(self, groups):
-        """Bouw tijdlijn entries op basis van datum groepen."""
         if not groups:
             return []
-
-        # Bepaal totale hoogte op basis van aantal foto's per groep
         total_photos = sum(len(indices) for _, _, indices in groups)
         if total_photos == 0:
             return []
 
-        entries = []
+        entries    = []
         cumulative = 0
         last_year  = None
 
         for date_str, date_obj, indices in groups:
-            frac = cumulative / total_photos
-
+            frac     = cumulative / total_photos
             year_str = str(date_obj.year)
             if year_str != last_year:
                 entries.append((year_str, frac))
                 last_year = year_str
-
-            month_str = MONTHS_NL[date_obj.month]
-            entries.append((month_str, frac))
-
+            entries.append((MONTHS_NL[date_obj.month], frac))
             cumulative += len(indices)
 
         return entries
@@ -631,7 +698,6 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 dt = datetime.date(1970, 1, 1)
             groups[dt].append(i)
-
         sorted_dates = sorted(groups.keys(), reverse=True)
         return [(format_date_header(dt), dt, groups[dt]) for dt in sorted_dates]
 
@@ -639,7 +705,7 @@ class MainWindow(Adw.ApplicationWindow):
         total  = len(photos)
         groups = self._group_by_date(photos)
 
-        # Tijdlijn entries berekenen
+        # Voorlopige tijdlijn op basis van fotoverdeling
         timeline_entries = self._build_timeline_entries(groups)
         GLib.idle_add(self.timeline.set_entries, timeline_entries)
 
@@ -778,6 +844,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_stack.set_visible_child_name("grid")
         self.photo_count_label.set_text(f"{total} foto's")
         self._loading = False
+        # Update tijdlijn op basis van echte posities na laden
+        GLib.timeout_add(300, self._update_timeline_from_positions)
         return False
 
     def show_empty_state(self):
