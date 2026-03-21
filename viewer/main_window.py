@@ -483,7 +483,8 @@ class MapWindow(Adw.Window):
 
     def on_drag_end(self, gesture, dx, dy):
         self._drag_start = None
-        def on_mouse_motion(self, ctrl, x, y):
+
+    def on_mouse_motion(self, ctrl, x, y):
         self._mouse_x = x
         self._mouse_y = y
 
