@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" width="520" height="120">
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Aperture icon centered at 60,60 -->
+  <g transform="translate(60,60)" filter="url(#glow)">
+    <!-- Blade 1 - Red -->
+    <g transform="rotate(0)">
+      <ellipse cx="0" cy="-30" rx="18" ry="28" fill="#ef4444" opacity="0.95"/>
+    </g>
+    <!-- Blade 2 - Orange -->
+    <g transform="rotate(60)">
+      <ellipse cx="0" cy="-30" rx="18" ry="28" fill="#f97316" opacity="0.95"/>
+    </g>
+    <!-- Blade 3 - Yellow -->
+    <g transform="rotate(120)">
+      <ellipse cx="0" cy="-30" rx="18" ry="28" fill="#eab308" opacity="0.95"/>
+    </g>
+    <!-- Blade 4 - Green -->
+    <g transform="rotate(180)">
+      <ellipse cx="0" cy="-30" rx="18" ry="28" fill="#22c55e" opacity="0.95"/>
+    </g>
+    <!-- Blade 5 - Blue -->
+    <g transform="rotate(240)">
+      <ellipse cx="0" cy="-30" rx="18" ry="28" fill="#3b82f6" opacity="0.95"/>
+    </g>
+    <!-- Blade 6 - Purple -->
+    <g transform="rotate(300)">
+      <ellipse cx="0" cy="-30" rx="18" ry="28" fill="#a855f7" opacity="0.95"/>
+    </g>
+    <!-- Center dark circle -->
+    <circle cx="0" cy="0" r="13" fill="#0f0a1e"/>
+    <!-- Center inner ring -->
+    <circle cx="0" cy="0" r="8" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.3"/>
+    <!-- Center dot -->
+    <circle cx="0" cy="0" r="3" fill="#ffffff" opacity="0.6"/>
+  </g>
+
+  <!-- Pixora text -->
+  <text x="130" y="72"
+        font-family="'Georgia', 'Times New Roman', serif"
+        font-size="52"
+        font-weight="700"
+        letter-spacing="-1"
+        fill="#f1f5f9">Pixora</text>
+
+  <!-- by LinuxGinger subtitle -->
+  <text x="132" y="95"
+        font-family="'Georgia', 'Times New Roman', serif"
+        font-size="14"
+        font-weight="400"
+        letter-spacing="2"
+        fill="#94a3b8"
+        opacity="0.85">by LinuxGinger</text>
+</svg>
