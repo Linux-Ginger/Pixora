@@ -319,6 +319,12 @@ class MapWindow(Adw.Window):
         drag.connect("drag-end",    self.on_drag_end)
         self.draw_area.add_controller(drag)
 
+        self._mouse_x = 450
+        self._mouse_y = 325
+        motion = Gtk.EventControllerMotion.new()
+        motion.connect("motion", self.on_mouse_motion)
+        self.draw_area.add_controller(motion)
+
         header = Adw.HeaderBar()
 
         zoom_in_btn = Gtk.Button(icon_name="zoom-in-symbolic")
@@ -442,16 +448,18 @@ class MapWindow(Adw.Window):
 
         GLib.idle_add(self._request_visible_tiles)
 
-    def zoom_by(self, delta):
-        w  = self.draw_area.get_width() or 900
-        h  = self.draw_area.get_height() or 650
-        cx = self.offset_x + w / 2
-        cy = self.offset_y + h / 2
+    def zoom_by(self, delta, cx=None, cy=None):
+        w = self.draw_area.get_width() or 900
+        h = self.draw_area.get_height() or 650
+        if cx is None:
+            cx = getattr(self, "_mouse_x", w / 2)
+        if cy is None:
+            cy = getattr(self, "_mouse_y", h / 2)
         new_zoom = max(3, min(19, self.zoom + delta))
         if new_zoom != self.zoom:
             scale         = 2 ** (new_zoom - self.zoom)
-            self.offset_x = cx * scale - w / 2
-            self.offset_y = cy * scale - h / 2
+            self.offset_x = (self.offset_x + cx) * scale - cx
+            self.offset_y = (self.offset_y + cy) * scale - cy
             self.zoom     = new_zoom
             self.draw_area.queue_draw()
 
@@ -464,12 +472,20 @@ class MapWindow(Adw.Window):
 
     def on_drag_update(self, gesture, dx, dy):
         if self._drag_start:
-            self.offset_x = self._drag_start[0] - dx
-            self.offset_y = self._drag_start[1] - dy
+            w = self.draw_area.get_width() or 900
+            h = self.draw_area.get_height() or 650
+            n = 2 ** self.zoom
+            max_x = n * TILE_SIZE - w
+            max_y = n * TILE_SIZE - h
+            self.offset_x = max(0, min(max_x, self._drag_start[0] - dx))
+            self.offset_y = max(0, min(max_y, self._drag_start[1] - dy))
             self.draw_area.queue_draw()
 
     def on_drag_end(self, gesture, dx, dy):
         self._drag_start = None
+        def on_mouse_motion(self, ctrl, x, y):
+        self._mouse_x = x
+        self._mouse_y = y
 
 
 class MainWindow(Adw.ApplicationWindow):
