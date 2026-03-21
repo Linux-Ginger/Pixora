@@ -1,7 +1,7 @@
 # Pixora
 ### by LinuxGinger
 
-# Under Development!
+### Under Development!
 
 ![Pixora Logo](docs/pixora-logo-light.svg)
 
