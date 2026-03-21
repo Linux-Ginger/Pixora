@@ -540,7 +540,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.observer = None
 
     def reload_photos(self):
-        self.load_load()
+        self.load_photos()
         return False
 
     def on_close(self, window):
@@ -683,14 +683,6 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_map_closed(self, win):
         self._map_open = False
         self.map_btn.set_sensitive(True)
-        return False
-
-    def _show_map_window(self, markers):
-        self.map_btn.set_label("🗺 laden...")
-        map_win = MapWindow(self, markers)
-        map_win.connect("close-request", self._on_map_closed)
-        map_win.present()
-        self.map_btn.set_label("🗺")
         return False
 
     # ── Viewer pagina ────────────────────────────────────────────────
