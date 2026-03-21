@@ -276,7 +276,7 @@ class TimelineBar(Gtk.ScrolledWindow):
 
 
 # ── Kaartvenster ─────────────────────────────────────────────────────
-class MapWindow(Gtk.Window):
+class MapWindow(Adw.Window):
     def __init__(self, parent, markers):
         super().__init__()
         self.set_title("Kaartweergave")
