@@ -15,10 +15,15 @@ import time
 import datetime
 from collections import defaultdict
 
+# WebKit sandbox uitzetten — moet vóór gi imports
+os.environ["WEBKIT_DISABLE_SANDBOX"] = "1"
+os.environ["WEBKIT_DISABLE_COMPOSITING_MODE"] = "1"
+
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk
+gi.require_version("WebKit", "6.0")
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk, WebKit
 
 try:
     from watchdog.observers import Observer
@@ -339,6 +344,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.set_transition_duration(200)
         self.main_stack.add_named(self.build_grid_page(),   "grid")
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
+        self.main_stack.add_named(self.build_map_page(),    "map")
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(self.build_header())
@@ -494,30 +500,60 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Kaart pagina ─────────────────────────────────────────────────
 
     def open_map(self, btn=None):
-        """Open kaartweergave in standaard browser."""
-        threading.Thread(target=self._load_gps_and_open_browser, daemon=True).start()
+        self.header.set_visible(False)
+        self.main_stack.set_visible_child_name("map")
+        self.map_title.set_text("Kaart — foto's laden...")
+        threading.Thread(target=self._load_gps_data, daemon=True).start()
 
-    def _load_gps_and_open_browser(self):
+    def _load_gps_data(self):
         markers = []
         for path in self.photos:
             coords = get_gps_coords(path)
             if coords:
-                lat, lon  = coords
-                filename  = os.path.basename(path)
+                lat, lon = coords
+                filename = os.path.basename(path)
                 try:
                     mtime = os.path.getmtime(path)
                     datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y")
                 except Exception:
                     datum = ""
                 markers.append((lat, lon, filename, datum))
+        GLib.idle_add(self._show_map, markers)
 
+    def _show_map(self, markers):
         html = build_map_html(markers)
-        map_path = os.path.expanduser("~/.cache/pixora/map.html")
-        os.makedirs(os.path.dirname(map_path), exist_ok=True)
-        with open(map_path, "w") as f:
-            f.write(html)
+        self.webview.load_html(html, "about:blank")
+        self.map_title.set_text(f"Kaart — {len(markers)} foto's met locatie")
+        return False
 
-        subprocess.Popen(["xdg-open", map_path])
+    def close_map(self, btn=None):
+        self.header.set_visible(True)
+        self.main_stack.set_visible_child_name("grid")
+
+    def build_map_page(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.set_vexpand(True)
+        box.set_hexpand(True)
+
+        map_header = Adw.HeaderBar()
+        map_header.add_css_class("flat")
+
+        back_btn = Gtk.Button(icon_name="go-previous-symbolic")
+        back_btn.add_css_class("flat")
+        back_btn.connect("clicked", self.close_map)
+        map_header.pack_start(back_btn)
+
+        self.map_title = Gtk.Label(label="Kaart")
+        self.map_title.add_css_class("title")
+        map_header.set_title_widget(self.map_title)
+        box.append(map_header)
+
+        self.webview = WebKit.WebView()
+        self.webview.set_vexpand(True)
+        self.webview.set_hexpand(True)
+        self.webview.load_html(build_map_html([]), "about:blank")
+        box.append(self.webview)
+        return box
 
 
     # ── Viewer pagina ────────────────────────────────────────────────
