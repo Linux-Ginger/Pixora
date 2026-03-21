@@ -286,10 +286,14 @@ class MapWindow(Adw.Window):
         self.set_transient_for(parent)
         self.set_modal(False)
 
-        self.markers    = markers
-        self.zoom       = 10 if markers else 7
-        self.tile_cache = {}
-        self._drag_start = None
+        self.markers         = markers
+        self.zoom            = 10 if markers else 7
+        self.tile_cache      = {}
+        self._drag_start     = None
+        self._mouse_x        = 450
+        self._mouse_y        = 325
+        self._hover_idx      = -1
+        self._hover_pixbufs  = {}
 
         if markers:
             avg_lat = sum(m[0] for m in markers) / len(markers)
@@ -319,8 +323,6 @@ class MapWindow(Adw.Window):
         drag.connect("drag-end",    self.on_drag_end)
         self.draw_area.add_controller(drag)
 
-        self._mouse_x = 450
-        self._mouse_y = 325
         motion = Gtk.EventControllerMotion.new()
         motion.connect("motion", self.on_mouse_motion)
         self.draw_area.add_controller(motion)
@@ -351,12 +353,12 @@ class MapWindow(Adw.Window):
         GLib.idle_add(self._request_visible_tiles)
 
     def _get_visible_tiles(self, width, height):
-        z    = self.zoom
-        n    = 2 ** z
-        tx0  = int(self.offset_x / TILE_SIZE)
-        ty0  = int(self.offset_y / TILE_SIZE)
-        px0  = -(self.offset_x % TILE_SIZE)
-        py0  = -(self.offset_y % TILE_SIZE)
+        z   = self.zoom
+        n   = 2 ** z
+        tx0 = int(self.offset_x / TILE_SIZE)
+        ty0 = int(self.offset_y / TILE_SIZE)
+        px0 = -(self.offset_x % TILE_SIZE)
+        py0 = -(self.offset_y % TILE_SIZE)
 
         tiles = []
         py, ty = py0, ty0
@@ -427,7 +429,8 @@ class MapWindow(Adw.Window):
                 cr.paint()
 
         # Markers
-        for lat, lon, filename, datum in self.markers:
+        for i, marker in enumerate(self.markers):
+            lat, lon = marker[0], marker[1]
             tx_f, ty_f = lat_lon_to_tile_float(lat, lon, self.zoom)
             mx = tx_f * TILE_SIZE - self.offset_x
             my = ty_f * TILE_SIZE - self.offset_y
@@ -436,7 +439,7 @@ class MapWindow(Adw.Window):
                 cr.set_source_rgba(0, 0, 0, 0.25)
                 cr.arc(mx + 1, my + 2, 9, 0, 2 * math.pi)
                 cr.fill()
-                # Rode stip
+                # Oranje stip
                 cr.set_source_rgb(0.914, 0.329, 0.125)
                 cr.arc(mx, my, 9, 0, 2 * math.pi)
                 cr.fill()
@@ -446,15 +449,115 @@ class MapWindow(Adw.Window):
                 cr.arc(mx, my, 9, 0, 2 * math.pi)
                 cr.stroke()
 
+        # Hover preview
+        if 0 <= self._hover_idx < len(self.markers):
+            marker   = self.markers[self._hover_idx]
+            lat, lon = marker[0], marker[1]
+            filename = marker[2]
+            datum    = marker[3]
+            path     = marker[4]
+
+            tx_f, ty_f = lat_lon_to_tile_float(lat, lon, self.zoom)
+            mx = tx_f * TILE_SIZE - self.offset_x
+            my = ty_f * TILE_SIZE - self.offset_y
+
+            pixbuf = self._hover_pixbufs.get(path)
+            pw     = pixbuf.get_width()  if pixbuf else 0
+            ph     = pixbuf.get_height() if pixbuf else 0
+
+            box_w = max(180, pw + 16)
+            box_h = (ph + 16 if pixbuf else 0) + 44
+            bx    = mx + 14
+            by    = my - box_h - 6
+
+            if bx + box_w > width:
+                bx = mx - box_w - 14
+            if by < 0:
+                by = my + 14
+
+            # Achtergrond popup
+            cr.set_source_rgba(0.1, 0.1, 0.1, 0.92)
+            self._rounded_rect(cr, bx, by, box_w, box_h, 8)
+            cr.fill()
+
+            # Thumbnail
+            if pixbuf:
+                Gdk.cairo_set_source_pixbuf(cr, pixbuf, bx + 8, by + 8)
+                cr.paint()
+
+            # Bestandsnaam
+            cr.set_source_rgb(1, 1, 1)
+            cr.select_font_face("Sans", 0, 1)
+            cr.set_font_size(11)
+            cr.move_to(bx + 8, by + ph + 22)
+            cr.show_text(filename[:28] + "…" if len(filename) > 28 else filename)
+
+            # Datum
+            cr.set_source_rgba(1, 1, 1, 0.6)
+            cr.select_font_face("Sans", 0, 0)
+            cr.set_font_size(10)
+            cr.move_to(bx + 8, by + ph + 36)
+            cr.show_text(datum)
+
         GLib.idle_add(self._request_visible_tiles)
+
+    def _rounded_rect(self, cr, x, y, w, h, r):
+        cr.move_to(x + r, y)
+        cr.line_to(x + w - r, y)
+        cr.arc(x + w - r, y + r, r, -1.5708, 0)
+        cr.line_to(x + w, y + h - r)
+        cr.arc(x + w - r, y + h - r, r, 0, 1.5708)
+        cr.line_to(x + r, y + h)
+        cr.arc(x + r, y + h - r, r, 1.5708, 3.14159)
+        cr.line_to(x, y + r)
+        cr.arc(x + r, y + r, r, 3.14159, 4.71239)
+        cr.close_path()
+
+    def _load_hover_thumb(self, path):
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 160, 120, True)
+        except Exception:
+            pixbuf = None
+        GLib.idle_add(self._hover_thumb_loaded, path, pixbuf)
+
+    def _hover_thumb_loaded(self, path, pixbuf):
+        self._hover_pixbufs[path] = pixbuf
+        self.draw_area.queue_draw()
+        return False
+
+    def on_mouse_motion(self, ctrl, x, y):
+        self._mouse_x = x
+        self._mouse_y = y
+
+        hover = -1
+        for i, marker in enumerate(self.markers):
+            lat, lon = marker[0], marker[1]
+            tx_f, ty_f = lat_lon_to_tile_float(lat, lon, self.zoom)
+            mx = tx_f * TILE_SIZE - self.offset_x
+            my = ty_f * TILE_SIZE - self.offset_y
+            if math.sqrt((x - mx) ** 2 + (y - my) ** 2) < 12:
+                hover = i
+                break
+
+        if hover != self._hover_idx:
+            self._hover_idx = hover
+            if hover >= 0:
+                path = self.markers[hover][4]
+                if path not in self._hover_pixbufs:
+                    threading.Thread(
+                        target=self._load_hover_thumb,
+                        args=(path,),
+                        daemon=True
+                    ).start()
+            self.draw_area.queue_draw()
 
     def zoom_by(self, delta, cx=None, cy=None):
         w = self.draw_area.get_width() or 900
         h = self.draw_area.get_height() or 650
         if cx is None:
-            cx = getattr(self, "_mouse_x", w / 2)
+            cx = self._mouse_x
         if cy is None:
-            cy = getattr(self, "_mouse_y", h / 2)
+            cy = self._mouse_y
         new_zoom = max(3, min(19, self.zoom + delta))
         if new_zoom != self.zoom:
             scale         = 2 ** (new_zoom - self.zoom)
@@ -472,9 +575,9 @@ class MapWindow(Adw.Window):
 
     def on_drag_update(self, gesture, dx, dy):
         if self._drag_start:
-            w = self.draw_area.get_width() or 900
-            h = self.draw_area.get_height() or 650
-            n = 2 ** self.zoom
+            w     = self.draw_area.get_width() or 900
+            h     = self.draw_area.get_height() or 650
+            n     = 2 ** self.zoom
             max_x = n * TILE_SIZE - w
             max_y = n * TILE_SIZE - h
             self.offset_x = max(0, min(max_x, self._drag_start[0] - dx))
@@ -483,10 +586,6 @@ class MapWindow(Adw.Window):
 
     def on_drag_end(self, gesture, dx, dy):
         self._drag_start = None
-
-    def on_mouse_motion(self, ctrl, x, y):
-        self._mouse_x = x
-        self._mouse_y = y
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -505,6 +604,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._sort_timer     = None
         self._select_mode    = False
         self._selected       = set()
+        self._map_open       = False
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -670,10 +770,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Kaart ────────────────────────────────────────────────────────
     def open_map(self, btn=None):
-        if hasattr(self, "_map_open") and self._map_open:
+        if self._map_open:
             return
         self._map_open = True
         self.map_btn.set_sensitive(False)
+        self.map_btn.set_label("🗺 laden...")
         threading.Thread(target=self._load_gps_and_open_map, daemon=True).start()
 
     def _load_gps_and_open_map(self):
@@ -688,18 +789,20 @@ class MainWindow(Adw.ApplicationWindow):
                     datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y")
                 except Exception:
                     datum = ""
-                markers.append((lat, lon, filename, datum))
+                markers.append((lat, lon, filename, datum, path))
         GLib.idle_add(self._show_map_window, markers)
 
     def _show_map_window(self, markers):
         map_win = MapWindow(self, markers)
         map_win.connect("close-request", self._on_map_closed)
         map_win.present()
+        self.map_btn.set_label("🗺")
         return False
 
     def _on_map_closed(self, win):
         self._map_open = False
         self.map_btn.set_sensitive(True)
+        self.map_btn.set_label("🗺")
         return False
 
     # ── Viewer pagina ────────────────────────────────────────────────
