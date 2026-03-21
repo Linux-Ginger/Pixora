@@ -540,7 +540,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.observer = None
 
     def reload_photos(self):
-        self.start_load()
+        self.load_load()
         return False
 
     def on_close(self, window):
@@ -569,7 +569,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.sort_combo.connect("notify::selected", self.on_sort_changed)
         self.header.pack_start(self.sort_combo)
 
-        self.map_btn = Gtk.Button(icon_name="map-symbolic")
+        self.map_btn = Gtk.Button(label="🗺")
         self.map_btn.add_css_class("flat")
         self.map_btn.set_tooltip_text("Kaartweergave")
         self.map_btn.connect("clicked", self.open_map)
@@ -653,6 +653,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Kaart ────────────────────────────────────────────────────────
     def open_map(self, btn=None):
+        if hasattr(self, "_map_open") and self._map_open:
+            return
+        self._map_open = True
+        self.map_btn.set_sensitive(False)
         threading.Thread(target=self._load_gps_and_open_map, daemon=True).start()
 
     def _load_gps_and_open_map(self):
@@ -672,7 +676,21 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_map_window(self, markers):
         map_win = MapWindow(self, markers)
+        map_win.connect("close-request", self._on_map_closed)
         map_win.present()
+        return False
+
+    def _on_map_closed(self, win):
+        self._map_open = False
+        self.map_btn.set_sensitive(True)
+        return False
+
+    def _show_map_window(self, markers):
+        self.map_btn.set_label("🗺 laden...")
+        map_win = MapWindow(self, markers)
+        map_win.connect("close-request", self._on_map_closed)
+        map_win.present()
+        self.map_btn.set_label("🗺")
         return False
 
     # ── Viewer pagina ────────────────────────────────────────────────
