@@ -17,7 +17,9 @@ from collections import defaultdict
 
 # WebKit sandbox fixes — moeten vóór gi imports staan
 os.environ["WEBKIT_DISABLE_SANDBOX"] = "1"
+os.environ["WEBKIT_FORCE_SANDBOX"] = "0"
 os.environ["WEBKIT_DISABLE_COMPOSITING_MODE"] = "1"
+os.environ["GIO_USE_VFS"] = "local"
 
 import gi
 gi.require_version("Gtk", "4.0")
