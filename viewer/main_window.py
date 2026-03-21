@@ -6,6 +6,7 @@
 # ─────────────────────────────────────────────
 
 import os
+import math
 import threading
 import subprocess
 import sys
@@ -13,19 +14,19 @@ import json
 import hashlib
 import time
 import datetime
+import urllib.request
 from collections import defaultdict
-
-# WebKit sandbox fixes — moeten vóór gi imports staan
-os.environ["WEBKIT_DISABLE_SANDBOX"] = "1"
-os.environ["WEBKIT_FORCE_SANDBOX"] = "0"
-os.environ["WEBKIT_DISABLE_COMPOSITING_MODE"] = "1"
-os.environ["GIO_USE_VFS"] = "local"
 
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-gi.require_version("WebKit", "6.0")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk, WebKit
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk
+
+try:
+    import cairo
+    CAIRO_AVAILABLE = True
+except ImportError:
+    CAIRO_AVAILABLE = False
 
 try:
     from watchdog.observers import Observer
@@ -38,8 +39,10 @@ IMPORTER_PATH    = os.path.join(os.path.dirname(__file__), "..", "importer", "ma
 DOCS_DIR         = os.path.join(os.path.dirname(__file__), "..", "docs")
 CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
+TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
 THUMB_SIZE       = 180
 BATCH_SIZE       = 30
+TILE_SIZE        = 256
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
 BACKUP_FSTYPES   = {"ext4","ext3","ext2","ntfs","exfat","fuseblk","btrfs","xfs","vfat"}
 
@@ -112,85 +115,40 @@ def format_date_header(dt):
 
 # ── GPS EXIF uitlezen ────────────────────────────────────────────────
 def get_gps_coords(photo_path):
-    """Lees GPS coördinaten uit EXIF data. Geeft (lat, lon) of None terug."""
     try:
         from PIL import Image
         from PIL.ExifTags import TAGS, GPSTAGS
-
         img  = Image.open(photo_path)
         exif = img._getexif()
         if not exif:
             return None
-
         gps_info = {}
         for tag, value in exif.items():
             tag_name = TAGS.get(tag, tag)
             if tag_name == "GPSInfo":
                 for gps_tag, gps_value in value.items():
                     gps_info[GPSTAGS.get(gps_tag, gps_tag)] = gps_value
-
         if not gps_info:
             return None
-
         def to_decimal(coords, ref):
             d, m, s = coords
             decimal = float(d) + float(m) / 60 + float(s) / 3600
             if ref in ["S", "W"]:
                 decimal = -decimal
             return decimal
-
         lat = to_decimal(gps_info["GPSLatitude"],  gps_info.get("GPSLatitudeRef",  "N"))
         lon = to_decimal(gps_info["GPSLongitude"], gps_info.get("GPSLongitudeRef", "E"))
         return (lat, lon)
     except Exception:
         return None
 
-# ── Kaart HTML ───────────────────────────────────────────────────────
-def build_map_html(markers):
-    """Bouw Leaflet kaart HTML met markers."""
-    markers_js = ""
-    for lat, lon, filename, datum in markers:
-        safe_filename = filename.replace("'", "\\'")
-        safe_datum    = datum.replace("'", "\\'")
-        markers_js += f"""
-        L.marker([{lat}, {lon}])
-            .addTo(map)
-            .bindPopup('<b>{safe_filename}</b><br>{safe_datum}');
-        """
-
-    # Centreer op eerste marker of Nederland als fallback
-    if markers:
-        center_lat, center_lon = markers[0][0], markers[0][1]
-        zoom = 10
-    else:
-        center_lat, center_lon = 52.3, 5.3
-        zoom = 7
-
-    return f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ background: #1a1a1a; }}
-        #map {{ width: 100vw; height: 100vh; }}
-    </style>
-</head>
-<body>
-    <div id="map"></div>
-    <script>
-        var map = L.map('map').setView([{center_lat}, {center_lon}], {zoom});
-        L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png', {{
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> bijdragers © <a href="https://carto.com/attributions">CARTO</a>',
-            maxZoom: 19
-        }}).addTo(map);
-        {markers_js}
-    </script>
-</body>
-</html>"""
+# ── Kaart tile helper ────────────────────────────────────────────────
+def lat_lon_to_tile_float(lat, lon, zoom):
+    n     = 2 ** zoom
+    x     = (lon + 180) / 360 * n
+    lat_r = math.radians(lat)
+    y     = (1 - math.log(math.tan(lat_r) + 1 / math.cos(lat_r)) / math.pi) / 2 * n
+    return x, y
 
 # ── Thumbnail cache ──────────────────────────────────────────────────
 def get_cache_path(photo_path):
@@ -317,6 +275,201 @@ class TimelineBar(Gtk.ScrolledWindow):
             btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
 
+# ── Kaartvenster ─────────────────────────────────────────────────────
+class MapWindow(Gtk.Window):
+    def __init__(self, parent, markers):
+        super().__init__()
+        self.set_title("Kaartweergave")
+        self.set_default_size(900, 650)
+        self.set_transient_for(parent)
+        self.set_modal(False)
+
+        self.markers    = markers
+        self.zoom       = 10 if markers else 7
+        self.tile_cache = {}
+        self._drag_start = None
+
+        if markers:
+            avg_lat = sum(m[0] for m in markers) / len(markers)
+            avg_lon = sum(m[1] for m in markers) / len(markers)
+        else:
+            avg_lat, avg_lon = 52.3, 5.3
+
+        tx, ty = lat_lon_to_tile_float(avg_lat, avg_lon, self.zoom)
+        self.offset_x = tx * TILE_SIZE - 450
+        self.offset_y = ty * TILE_SIZE - 325
+
+        self.draw_area = Gtk.DrawingArea()
+        self.draw_area.set_draw_func(self.on_draw)
+        self.draw_area.set_vexpand(True)
+        self.draw_area.set_hexpand(True)
+
+        scroll_ctrl = Gtk.EventControllerScroll.new(
+            Gtk.EventControllerScrollFlags.VERTICAL |
+            Gtk.EventControllerScrollFlags.DISCRETE
+        )
+        scroll_ctrl.connect("scroll", self.on_scroll)
+        self.draw_area.add_controller(scroll_ctrl)
+
+        drag = Gtk.GestureDrag.new()
+        drag.connect("drag-begin",  self.on_drag_begin)
+        drag.connect("drag-update", self.on_drag_update)
+        drag.connect("drag-end",    self.on_drag_end)
+        self.draw_area.add_controller(drag)
+
+        header = Adw.HeaderBar()
+
+        zoom_in_btn = Gtk.Button(icon_name="zoom-in-symbolic")
+        zoom_in_btn.add_css_class("flat")
+        zoom_in_btn.set_tooltip_text("Inzoomen")
+        zoom_in_btn.connect("clicked", lambda _: self.zoom_by(1))
+        header.pack_end(zoom_in_btn)
+
+        zoom_out_btn = Gtk.Button(icon_name="zoom-out-symbolic")
+        zoom_out_btn.add_css_class("flat")
+        zoom_out_btn.set_tooltip_text("Uitzoomen")
+        zoom_out_btn.connect("clicked", lambda _: self.zoom_by(-1))
+        header.pack_end(zoom_out_btn)
+
+        count_label = Gtk.Label(label=f"{len(markers)} foto's met GPS")
+        count_label.add_css_class("dim-label")
+        header.set_title_widget(count_label)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.append(header)
+        box.append(self.draw_area)
+        self.set_content(box)
+
+        GLib.idle_add(self._request_visible_tiles)
+
+    def _get_visible_tiles(self, width, height):
+        z    = self.zoom
+        n    = 2 ** z
+        tx0  = int(self.offset_x / TILE_SIZE)
+        ty0  = int(self.offset_y / TILE_SIZE)
+        px0  = -(self.offset_x % TILE_SIZE)
+        py0  = -(self.offset_y % TILE_SIZE)
+
+        tiles = []
+        py, ty = py0, ty0
+        while py < height + TILE_SIZE:
+            px, tx = px0, tx0
+            while px < width + TILE_SIZE:
+                if 0 <= tx < n and 0 <= ty < n:
+                    tiles.append((z, tx, ty, px, py))
+                px += TILE_SIZE
+                tx += 1
+            py += TILE_SIZE
+            ty += 1
+        return tiles
+
+    def _request_visible_tiles(self):
+        w = self.draw_area.get_width() or 900
+        h = self.draw_area.get_height() or 650
+        for z, tx, ty, _, _ in self._get_visible_tiles(w, h):
+            key = (z, tx, ty)
+            if key not in self.tile_cache:
+                self.tile_cache[key] = None
+                threading.Thread(target=self._load_tile, args=(z, tx, ty), daemon=True).start()
+        return False
+
+    def _load_tile(self, z, tx, ty):
+        import io
+        if not CAIRO_AVAILABLE:
+            return
+
+        key        = (z, tx, ty)
+        cache_path = os.path.join(TILE_CACHE_DIR, f"{z}_{tx}_{ty}.png")
+
+        if os.path.exists(cache_path):
+            try:
+                surface = cairo.ImageSurface.create_from_png(cache_path)
+                GLib.idle_add(self._tile_loaded, key, surface)
+                return
+            except Exception:
+                pass
+
+        try:
+            url = f"https://tile.openstreetmap.org/{z}/{tx}/{ty}.png"
+            req = urllib.request.Request(url, headers={"User-Agent": "Pixora/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = resp.read()
+            os.makedirs(TILE_CACHE_DIR, exist_ok=True)
+            with open(cache_path, "wb") as f:
+                f.write(data)
+            surface = cairo.ImageSurface.create_from_png(io.BytesIO(data))
+            GLib.idle_add(self._tile_loaded, key, surface)
+        except Exception:
+            GLib.idle_add(self._tile_loaded, key, None)
+
+    def _tile_loaded(self, key, surface):
+        self.tile_cache[key] = surface
+        self.draw_area.queue_draw()
+        return False
+
+    def on_draw(self, area, cr, width, height):
+        # Achtergrond
+        cr.set_source_rgb(0.85, 0.87, 0.88)
+        cr.paint()
+
+        for z, tx, ty, px, py in self._get_visible_tiles(width, height):
+            surface = self.tile_cache.get((z, tx, ty))
+            if surface:
+                cr.set_source_surface(surface, px, py)
+                cr.paint()
+
+        # Markers
+        for lat, lon, filename, datum in self.markers:
+            tx_f, ty_f = lat_lon_to_tile_float(lat, lon, self.zoom)
+            mx = tx_f * TILE_SIZE - self.offset_x
+            my = ty_f * TILE_SIZE - self.offset_y
+            if -20 <= mx <= width + 20 and -20 <= my <= height + 20:
+                # Schaduw
+                cr.set_source_rgba(0, 0, 0, 0.25)
+                cr.arc(mx + 1, my + 2, 9, 0, 2 * math.pi)
+                cr.fill()
+                # Rode stip
+                cr.set_source_rgb(0.914, 0.329, 0.125)
+                cr.arc(mx, my, 9, 0, 2 * math.pi)
+                cr.fill()
+                # Witte rand
+                cr.set_source_rgb(1, 1, 1)
+                cr.set_line_width(2)
+                cr.arc(mx, my, 9, 0, 2 * math.pi)
+                cr.stroke()
+
+        GLib.idle_add(self._request_visible_tiles)
+
+    def zoom_by(self, delta):
+        w  = self.draw_area.get_width() or 900
+        h  = self.draw_area.get_height() or 650
+        cx = self.offset_x + w / 2
+        cy = self.offset_y + h / 2
+        new_zoom = max(3, min(19, self.zoom + delta))
+        if new_zoom != self.zoom:
+            scale         = 2 ** (new_zoom - self.zoom)
+            self.offset_x = cx * scale - w / 2
+            self.offset_y = cy * scale - h / 2
+            self.zoom     = new_zoom
+            self.draw_area.queue_draw()
+
+    def on_scroll(self, ctrl, dx, dy):
+        self.zoom_by(-1 if dy > 0 else 1)
+        return True
+
+    def on_drag_begin(self, gesture, x, y):
+        self._drag_start = (self.offset_x, self.offset_y)
+
+    def on_drag_update(self, gesture, dx, dy):
+        if self._drag_start:
+            self.offset_x = self._drag_start[0] - dx
+            self.offset_y = self._drag_start[1] - dy
+            self.draw_area.queue_draw()
+
+    def on_drag_end(self, gesture, dx, dy):
+        self._drag_start = None
+
+
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
@@ -345,7 +498,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.set_transition_duration(200)
         self.main_stack.add_named(self.build_grid_page(),   "grid")
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
-        self.main_stack.add_named(self.build_map_page(),    "map")
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(self.build_header())
@@ -415,7 +567,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.sort_combo.connect("notify::selected", self.on_sort_changed)
         self.header.pack_start(self.sort_combo)
 
-        # Kaart knop
         self.map_btn = Gtk.Button(icon_name="map-symbolic")
         self.map_btn.add_css_class("flat")
         self.map_btn.set_tooltip_text("Kaartweergave")
@@ -498,62 +649,29 @@ class MainWindow(Adw.ApplicationWindow):
         outer.append(self.content_stack)
         return outer
 
-    # ── Kaart pagina ─────────────────────────────────────────────────
-
-    def build_map_page(self):
-        """Bouw de in-app kaartpagina met WebKit WebView."""
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        box.set_vexpand(True)
-        box.set_hexpand(True)
-
-        # Terug-knop bovenin
-        header = Adw.HeaderBar()
-        header.set_show_back_button(False)
-        back_btn = Gtk.Button(label="‹ Terug")
-        back_btn.add_css_class("flat")
-        back_btn.connect("clicked", lambda _: self.main_stack.set_visible_child_name("grid"))
-        header.pack_start(back_btn)
-        header.set_title_widget(Gtk.Label(label="Kaartweergave"))
-        box.append(header)
-
-        self.map_webview = WebKit.WebView()
-        self.map_webview.set_vexpand(True)
-        self.map_webview.set_hexpand(True)
-        box.append(self.map_webview)
-
-        return box
-
+    # ── Kaart ────────────────────────────────────────────────────────
     def open_map(self, btn=None):
-        """Open kaartweergave in-app via WebKit."""
-        threading.Thread(target=self._load_gps_and_show_map, daemon=True).start()
+        threading.Thread(target=self._load_gps_and_open_map, daemon=True).start()
 
-    def _load_gps_and_show_map(self):
+    def _load_gps_and_open_map(self):
         markers = []
         for path in self.photos:
             coords = get_gps_coords(path)
             if coords:
-                lat, lon  = coords
-                filename  = os.path.basename(path)
+                lat, lon = coords
+                filename = os.path.basename(path)
                 try:
                     mtime = os.path.getmtime(path)
                     datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y")
                 except Exception:
                     datum = ""
                 markers.append((lat, lon, filename, datum))
+        GLib.idle_add(self._show_map_window, markers)
 
-        html = build_map_html(markers)
-        map_path = os.path.expanduser("~/.cache/pixora/map.html")
-        os.makedirs(os.path.dirname(map_path), exist_ok=True)
-        with open(map_path, "w") as f:
-            f.write(html)
-
-        GLib.idle_add(self._show_map_page, map_path)
-
-    def _show_map_page(self, map_path):
-        self.map_webview.load_uri(f"file://{map_path}")
-        self.main_stack.set_visible_child_name("map")
+    def _show_map_window(self, markers):
+        map_win = MapWindow(self, markers)
+        map_win.present()
         return False
-
 
     # ── Viewer pagina ────────────────────────────────────────────────
     def build_viewer_page(self):
