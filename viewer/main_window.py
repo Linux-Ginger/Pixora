@@ -15,10 +15,15 @@ import time
 import datetime
 from collections import defaultdict
 
+# WebKit sandbox fixes — moeten vóór gi imports staan
+os.environ["WEBKIT_DISABLE_SANDBOX"] = "1"
+os.environ["WEBKIT_DISABLE_COMPOSITING_MODE"] = "1"
+
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk
+gi.require_version("WebKit", "6.0")
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk, WebKit
 
 try:
     from watchdog.observers import Observer
@@ -176,8 +181,8 @@ def build_map_html(markers):
     <div id="map"></div>
     <script>
         var map = L.map('map').setView([{center_lat}, {center_lon}], {zoom});
-        L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-            attribution: '© OpenStreetMap bijdragers',
+        L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> bijdragers © <a href="https://carto.com/attributions">CARTO</a>',
             maxZoom: 19
         }}).addTo(map);
         {markers_js}
@@ -338,6 +343,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.set_transition_duration(200)
         self.main_stack.add_named(self.build_grid_page(),   "grid")
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
+        self.main_stack.add_named(self.build_map_page(),    "map")
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(self.build_header())
@@ -492,11 +498,34 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Kaart pagina ─────────────────────────────────────────────────
 
-    def open_map(self, btn=None):
-        """Open kaartweergave in standaard browser."""
-        threading.Thread(target=self._load_gps_and_open_browser, daemon=True).start()
+    def build_map_page(self):
+        """Bouw de in-app kaartpagina met WebKit WebView."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.set_vexpand(True)
+        box.set_hexpand(True)
 
-    def _load_gps_and_open_browser(self):
+        # Terug-knop bovenin
+        header = Adw.HeaderBar()
+        header.set_show_back_button(False)
+        back_btn = Gtk.Button(label="‹ Terug")
+        back_btn.add_css_class("flat")
+        back_btn.connect("clicked", lambda _: self.main_stack.set_visible_child_name("grid"))
+        header.pack_start(back_btn)
+        header.set_title_widget(Gtk.Label(label="Kaartweergave"))
+        box.append(header)
+
+        self.map_webview = WebKit.WebView()
+        self.map_webview.set_vexpand(True)
+        self.map_webview.set_hexpand(True)
+        box.append(self.map_webview)
+
+        return box
+
+    def open_map(self, btn=None):
+        """Open kaartweergave in-app via WebKit."""
+        threading.Thread(target=self._load_gps_and_show_map, daemon=True).start()
+
+    def _load_gps_and_show_map(self):
         markers = []
         for path in self.photos:
             coords = get_gps_coords(path)
@@ -516,7 +545,12 @@ class MainWindow(Adw.ApplicationWindow):
         with open(map_path, "w") as f:
             f.write(html)
 
-        subprocess.Popen(["xdg-open", map_path])
+        GLib.idle_add(self._show_map_page, map_path)
+
+    def _show_map_page(self, map_path):
+        self.map_webview.load_uri(f"file://{map_path}")
+        self.main_stack.set_visible_child_name("map")
+        return False
 
 
     # ── Viewer pagina ────────────────────────────────────────────────
@@ -663,10 +697,12 @@ class MainWindow(Adw.ApplicationWindow):
 
         entries = []
         for date_str, label in self.date_widgets.items():
-            success, x, y = label.translate_coordinates(self.grid_box, 0, 0)
-            if success:
-                frac = max(0.0, min(1.0, y / total))
-                entries.append((date_str, frac))
+            coords = label.translate_coordinates(self.grid_box, 0, 0)
+            if coords is None:
+                continue
+            x, y = coords
+            frac = max(0.0, min(1.0, y / total))
+            entries.append((date_str, frac))
 
         entries.sort(key=lambda e: e[1])
         self.timeline.set_entries(entries)
