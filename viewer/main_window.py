@@ -379,7 +379,7 @@ class MapWidget(Gtk.DrawingArea):
         h = self.get_height() or 650
         for z, tx, ty, _, _ in self._get_visible_tiles(w, h):
             key = (z, tx, ty)
-            if key not in self.tile_cache:
+            if key not in self.tile_cache or self.tile_cache[key] is None:
                 self.tile_cache[key] = None
                 threading.Thread(target=self._load_tile, args=(z, tx, ty), daemon=True).start()
         return False
@@ -569,22 +569,6 @@ class MapWidget(Gtk.DrawingArea):
                 self.open_photo_cb(path)
                 return
 
-    def zoom_by(self, delta, cx=None, cy=None):
-        w = self.get_width() or 900
-        h = self.get_height() or 650
-        if cx is None:
-            cx = self._mouse_x
-        if cy is None:
-            cy = self._mouse_y
-        new_zoom = max(3, min(19, self.zoom + delta))
-        if new_zoom != self.zoom:
-            scale         = 2 ** (new_zoom - self.zoom)
-            self.offset_x = (self.offset_x + cx) * scale - cx
-            self.offset_y = (self.offset_y + cy) * scale - cy
-            self.zoom     = new_zoom
-            self._clamp_offset()
-            self.queue_draw()
-
     def _clamp_offset(self):
         w     = self.get_width() or 900
         h     = self.get_height() or 650
@@ -595,12 +579,12 @@ class MapWidget(Gtk.DrawingArea):
         self.offset_y = max(0, min(max_y, self.offset_y))
 
     def on_scroll(self, ctrl, dx, dy):
-        # Onderscheid trackpad (klein) en muiswiel (groot/discreet)
-        if abs(dy) < 1.5:
-            # Trackpad — vloeiend inzoomen
-            self.zoom_by(-dy * 0.15)
+        if dy == 0:
+            return True
+        # Trackpad geeft kleine waarden, muiswiel geeft 1.0
+        if abs(dy) < 1.0:
+            self.zoom_by(-dy * 0.3)
         else:
-            # Muiswiel — stap voor stap
             self.zoom_by(-1 if dy > 0 else 1)
         return True
 
