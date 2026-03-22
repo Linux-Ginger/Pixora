@@ -852,7 +852,7 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Startup splash ───────────────────────────────────────────────
     def _update_splash(self):
         elapsed = time.time() - self._splash_start
-        duration = 10.0
+        duration = 25.0
         self._splash_bar.set_fraction(min(elapsed / duration, 1.0))
         if elapsed >= duration:
             self._splash.set_visible(False)
@@ -1487,11 +1487,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_scrubber.add_css_class("video-scrubber")
         scrubber_css = Gtk.CssProvider()
         scrubber_css.load_from_string(
-            ".video-scrubber trough { border-radius: 6px; min-height: 5px; }"
-            " .video-scrubber highlight { border-radius: 6px; }"
+            "scale.video-scrubber trough { border-radius: 6px; min-height: 5px; }"
+            " scale.video-scrubber fill { border-radius: 6px; }"
         )
-        self.video_scrubber.get_style_context().add_provider(
-            scrubber_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            scrubber_css,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.video_scrubber.connect("value-changed", self._on_video_scrub)
 
         # Scrubber preview popover
