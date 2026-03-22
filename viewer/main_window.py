@@ -1158,7 +1158,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # ── Filmstrip ────────────────────────────────────────────────
         self.filmstrip_scroll = Gtk.ScrolledWindow()
-        self.filmstrip_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
+        self.filmstrip_scroll.set_policy(Gtk.PolicyType.EXTERNAL, Gtk.PolicyType.NEVER)
         self.filmstrip_scroll.set_halign(Gtk.Align.FILL)
         self.filmstrip_scroll.set_valign(Gtk.Align.END)
         self.filmstrip_scroll.set_margin_bottom(8)
@@ -1166,7 +1166,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.filmstrip_scroll.set_margin_end(60)
         self.filmstrip_scroll.set_size_request(-1, FILM_THUMB + 12)
         film_css = Gtk.CssProvider()
-        film_css.load_from_string("scrolledwindow { border-radius: 12px; }")
+        film_css.load_from_string("""
+            scrolledwindow { border-radius: 12px; }
+            scrollbar { opacity: 0; min-width: 0; min-height: 0; }
+        """)
         self.filmstrip_scroll.get_style_context().add_provider(
             film_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.filmstrip_scroll.set_overflow(Gtk.Overflow.HIDDEN)
@@ -1704,7 +1707,7 @@ class MainWindow(Adw.ApplicationWindow):
                 dx = x + (FILM_THUMB - pw) // 2
                 dy = y + (FILM_THUMB - ph) // 2
                 cr.save()
-                self._film_rounded_rect(cr, x, y, FILM_THUMB, FILM_THUMB, 6)
+                self._film_rounded_rect(cr, dx, dy, pw, ph, 6)
                 cr.clip()
                 Gdk.cairo_set_source_pixbuf(cr, pb, dx, dy)
                 cr.paint()
