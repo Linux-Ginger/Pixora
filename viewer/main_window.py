@@ -653,6 +653,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._select_mode    = False
         self._selected       = set()
         self._photo_location = {}
+        self._viewer_zoom    = 1.0
+        self._viewer_offset  = [0.0, 0.0]
+        self._viewer_drag    = None
         self._map_widget     = None
 
         self.set_title("Pixora")
@@ -1013,6 +1016,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_counter.set_margin_bottom(20)
         viewer_area.add_overlay(self.viewer_counter)
 
+        scroll_ctrl = Gtk.EventControllerScroll.new(
+            Gtk.EventControllerScrollFlags.VERTICAL |
+            Gtk.EventControllerScrollFlags.DISCRETE
+        )
+        scroll_ctrl.connect("scroll", self.on_viewer_scroll)
+        viewer_area.add_controller(scroll_ctrl)
+
+        drag_ctrl = Gtk.GestureDrag.new()
+        drag_ctrl.connect("drag-begin",  self.on_viewer_drag_begin)
+        drag_ctrl.connect("drag-update", self.on_viewer_drag_update)
+        drag_ctrl.connect("drag-end",    self.on_viewer_drag_end)
+        viewer_area.add_controller(drag_ctrl)
+        
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self.on_viewer_key)
         self.add_controller(key_ctrl)
@@ -1385,8 +1401,11 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._show_full_photo, pixbuf, path, location)
 
     def _show_full_photo(self, pixbuf, path, location=""):
+        self._viewer_zoom   = 1.0
+        self._viewer_offset = [0.0, 0.0]
         if pixbuf:
             self.photo_picture.set_pixbuf(pixbuf)
+            self._apply_viewer_transform()
         mtime = os.path.getmtime(path)
         datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y  %H:%M")
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
@@ -1425,6 +1444,45 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_picture.set_pixbuf(None)
         self.header.set_visible(True)
         self.main_stack.set_visible_child_name("grid")
+
+    def _apply_viewer_transform(self):
+        z  = self._viewer_zoom
+        ox = self._viewer_offset[0]
+        oy = self._viewer_offset[1]
+        css = Gtk.CssProvider()
+        css.load_from_string(f"""
+            picture {{
+                transform: scale({z}) translate({ox}px, {oy}px);
+                transform-origin: center center;
+            }}
+        """)
+        self.photo_picture.get_style_context().add_provider(
+            css, Gtk.STYLE_PROVIDER_PRIORITY_USER
+        )
+
+    def on_viewer_scroll(self, ctrl, dx, dy):
+        if self.main_stack.get_visible_child_name() != "viewer":
+            return False
+        factor = 0.9 if dy > 0 else 1.1
+        self._viewer_zoom = max(1.0, min(8.0, self._viewer_zoom * factor))
+        if self._viewer_zoom == 1.0:
+            self._viewer_offset = [0.0, 0.0]
+        self._apply_viewer_transform()
+        return True
+
+    def on_viewer_drag_begin(self, gesture, x, y):
+        if self._viewer_zoom > 1.0:
+            self._viewer_drag = (x, y, self._viewer_offset[0], self._viewer_offset[1])
+
+    def on_viewer_drag_update(self, gesture, dx, dy):
+        if self._viewer_drag and self._viewer_zoom > 1.0:
+            _, _, ox, oy = self._viewer_drag
+            self._viewer_offset[0] = ox + dx / self._viewer_zoom
+            self._viewer_offset[1] = oy + dy / self._viewer_zoom
+            self._apply_viewer_transform()
+
+    def on_viewer_drag_end(self, gesture, dx, dy):
+        self._viewer_drag = None
 
     def on_viewer_key(self, controller, keyval, keycode, state):
         if self.main_stack.get_visible_child_name() != "viewer":
