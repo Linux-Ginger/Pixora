@@ -853,11 +853,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.grid_box.set_margin_end(8)
 
         self.scroll.set_child(self.grid_box)
-        self.scroll.get_vadjustment().connect("value-changed", self._on_scroll_changed)
         grid_with_timeline.append(self.scroll)
-
-        self.timeline = TimelineBar(self._on_timeline_click, self.style_manager)
-        grid_with_timeline.append(self.timeline)
         self.content_stack.add_named(grid_with_timeline, "grid")
 
         status_page = Adw.StatusPage()
@@ -1245,63 +1241,10 @@ class MainWindow(Adw.ApplicationWindow):
         adj.set_value(max(0.0, min(scroll_px, max(0.0, max_val))))
 
     def _on_scroll_changed(self, adj):
-        max_scroll = adj.get_upper() - adj.get_page_size()
-        self.timeline.update_scroll(adj.get_value(), max(max_scroll, 0.0))
+        pass  # tijdlijn tijdelijk uitgeschakeld voor beta
 
     def _update_timeline_from_positions(self):
-        """Build timeline entries from actual Y positions of date headers."""
-        if not self.date_widgets:
-            return False
-        adj        = self.scroll.get_vadjustment()
-        upper      = adj.get_upper()
-        max_scroll = upper - adj.get_page_size()
-        # When all content fits in one page (max_scroll<=0) use total height
-        # so positions are still distributed proportionally across the bar.
-        draw_scale = max_scroll if max_scroll > 1 else upper
-
-        # Collect pixel Y position of every date header
-        items = []
-        for date_str, label in self.date_widgets.items():
-            coords = label.translate_coordinates(self.grid_box, 0, 0)
-            if coords is None:
-                continue
-            _, y = coords
-            items.append((y, date_str))
-
-        if not items:
-            GLib.timeout_add(500, self._update_timeline_from_positions)
-            return False
-
-        items.sort()
-
-        entries     = []
-        seen_years  = set()
-        seen_months = set()
-        for y_px, date_str in items:
-            parts = date_str.split()
-            if len(parts) == 3:
-                year_str = parts[2]
-                try:
-                    month_num  = MONTHS_NL_FULL.index(parts[1].lower())
-                    month_abbr = MONTHS_NL[month_num]
-                except (ValueError, IndexError):
-                    month_num  = 0
-                    month_abbr = parts[1][:3]
-                if year_str not in seen_years:
-                    entries.append((year_str, y_px, True))
-                    seen_years.add(year_str)
-                if (year_str, month_num) not in seen_months:
-                    entries.append((month_abbr, y_px, False))
-                    seen_months.add((year_str, month_num))
-            else:
-                entries.append((date_str, y_px, False))
-
-        self.timeline.set_data(entries, max(draw_scale, 1.0))
-
-        # Retry until every date header has been laid out
-        if len(items) < len(self.date_widgets):
-            GLib.timeout_add(400, self._update_timeline_from_positions)
-        return False
+        return False  # tijdlijn tijdelijk uitgeschakeld voor beta
 
     # ── Selectie modus ────────────────────────────────────────────────
     def toggle_select_mode(self, btn=None):
