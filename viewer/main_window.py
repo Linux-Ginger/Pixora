@@ -1818,14 +1818,28 @@ class MainWindow(Adw.ApplicationWindow):
                 from PIL import Image
                 original_mtime = os.path.getmtime(path)
                 old_cache = get_cache_path(path)
+                from PIL import ImageOps
                 img = Image.open(path)
+                ext = os.path.splitext(path)[1].lower()
+                is_jpeg = ext in (".jpg", ".jpeg")
+
+                # Bewaar alle EXIF-metadata (GPS, cameragegevens, etc.)
+                exif = img.getexif() if is_jpeg else None
+
+                # Normaliseer EXIF-oriëntatie zodat PIL en GdkPixbuf overeenkomen
+                img = ImageOps.exif_transpose(img)
+
                 if rotation != 0:
                     img = img.rotate(rotation, expand=True)
                 if crop_box:
                     img = img.crop(crop_box)
-                ext = os.path.splitext(path)[1].lower()
-                if ext in (".jpg", ".jpeg"):
-                    img.save(path, "JPEG", quality=95)
+
+                if is_jpeg:
+                    # Zet oriëntatie op normaal (1) — pixels zijn nu fysiek correct
+                    if exif is not None:
+                        exif[0x0112] = 1
+                    img.save(path, "JPEG", quality=95,
+                             exif=exif.tobytes() if exif is not None else b"")
                 else:
                     img.save(path, "PNG")
                 # Verwijder oude thumbnail-cache en herstel originele datum
