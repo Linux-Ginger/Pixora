@@ -815,9 +815,28 @@ class MainWindow(Adw.ApplicationWindow):
 
         box.append(map_header)
 
-        self.map_container = Gtk.Box()
+        self.map_container = Gtk.Stack()
         self.map_container.set_vexpand(True)
         self.map_container.set_hexpand(True)
+
+        map_spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        map_spinner_box.set_halign(Gtk.Align.CENTER)
+        map_spinner_box.set_valign(Gtk.Align.CENTER)
+        map_spinner_box.set_vexpand(True)
+        self.map_spinner = Gtk.Spinner()
+        self.map_spinner.set_size_request(48, 48)
+        map_spinner_label = Gtk.Label(label="GPS locaties laden...")
+        map_spinner_label.add_css_class("dim-label")
+        map_spinner_box.append(self.map_spinner)
+        map_spinner_box.append(map_spinner_label)
+        self.map_container.add_named(map_spinner_box, "loading")
+
+        self.map_content = Gtk.Box()
+        self.map_content.set_vexpand(True)
+        self.map_content.set_hexpand(True)
+        self.map_container.add_named(self.map_content, "map")
+        self.map_container.set_visible_child_name("loading")
+
         box.append(self.map_container)
 
         return box
@@ -826,6 +845,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.header.set_visible(False)
         self.map_btn.set_label("🗺 laden...")
         self.map_btn.set_sensitive(False)
+        self.map_container.set_visible_child_name("loading")
+        self.map_spinner.start()
+        self.main_stack.set_visible_child_name("map")
         threading.Thread(target=self._load_gps_and_show_map, daemon=True).start()
 
     def _load_gps_and_show_map(self):
@@ -845,11 +867,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_map(self, markers):
         if self._map_widget:
-            self.map_container.remove(self._map_widget)
+            self.map_content.remove(self._map_widget)
             self._map_widget = None
 
         self._map_widget = MapWidget(markers, self._open_photo_from_map)
-        self.map_container.append(self._map_widget)
+        self.map_content.append(self._map_widget)
+        self.map_spinner.stop()
+        self.map_container.set_visible_child_name("map")
 
         self.map_title_label.set_text("Kaartweergave")
         self.map_btn.set_label("🗺")
