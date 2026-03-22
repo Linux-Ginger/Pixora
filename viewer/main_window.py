@@ -290,8 +290,6 @@ class TimelineBar(Gtk.ScrolledWindow):
 
 
 # ── Kaart: aparte popup (bewezen werkend) + open-in-app navigatie ────
-class MapWindow(Adw.Window):
-    """Kaartvenster als popup — tiles werken gegarandeerd."""
 
     def __init__(self, parent, markers, open_photo_cb):
         super().__init__()
@@ -815,12 +813,10 @@ class MainWindow(Adw.ApplicationWindow):
         return outer
 
     def open_map(self, btn=None):
-        if self._map_open:
-            return
-        self._map_open = True
-        self.map_btn.set_sensitive(False)
+        self.header.set_visible(False)
         self.map_btn.set_label("🗺 laden...")
-        threading.Thread(target=self._load_gps_and_open_map, daemon=True).start()
+        self.map_btn.set_sensitive(False)
+        threading.Thread(target=self._load_gps_and_show_map, daemon=True).start()
 
     def _load_gps_and_open_map(self):
         markers = []
