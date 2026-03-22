@@ -837,10 +837,6 @@ class MainWindow(Adw.ApplicationWindow):
         spinner_box.append(self.spinner_label)
         self.content_stack.add_named(spinner_box, "loading")
 
-        grid_with_timeline = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        grid_with_timeline.set_vexpand(True)
-        grid_with_timeline.set_hexpand(True)
-
         self.scroll = Gtk.ScrolledWindow()
         self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.scroll.set_vexpand(True)
@@ -853,8 +849,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.grid_box.set_margin_end(8)
 
         self.scroll.set_child(self.grid_box)
-        grid_with_timeline.append(self.scroll)
-        self.content_stack.add_named(grid_with_timeline, "grid")
+        self.content_stack.add_named(self.scroll, "grid")
 
         status_page = Adw.StatusPage()
         status_page.set_icon_name("image-missing-symbolic")
