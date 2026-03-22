@@ -795,7 +795,41 @@ class MainWindow(Adw.ApplicationWindow):
         toolbar_view.add_top_bar(self.build_header())
         toolbar_view.set_content(self.main_stack)
         toolbar_view.add_bottom_bar(self.build_bottombar())
-        self.set_content(toolbar_view)
+
+        # ── Startup splash overlay ────────────────────────────────────
+        root_overlay = Gtk.Overlay()
+        root_overlay.set_child(toolbar_view)
+
+        splash = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        splash.set_halign(Gtk.Align.FILL)
+        splash.set_valign(Gtk.Align.FILL)
+        splash_css = Gtk.CssProvider()
+        splash_css.load_from_string("box.splash { background-color: @window_bg_color; }")
+        splash.add_css_class("splash")
+        splash.get_style_context().add_provider(splash_css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+
+        splash_spinner = Gtk.Spinner()
+        splash_spinner.set_size_request(48, 48)
+        splash_spinner.set_halign(Gtk.Align.CENTER)
+        splash_spinner.start()
+
+        splash_lbl = Gtk.Label(label="Pixora wordt gestart…")
+        splash_lbl.add_css_class("title-2")
+
+        self._splash_bar = Gtk.ProgressBar()
+        self._splash_bar.set_size_request(280, -1)
+        self._splash_bar.set_halign(Gtk.Align.CENTER)
+
+        splash.append(splash_spinner)
+        splash.append(splash_lbl)
+        splash.append(self._splash_bar)
+
+        root_overlay.add_overlay(splash)
+        self._splash = splash
+        self._splash_start = time.time()
+        GLib.timeout_add(80, self._update_splash)
+
+        self.set_content(root_overlay)
 
         photo_path = self.settings.get("photo_path", "")
         if photo_path:
@@ -808,6 +842,16 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
         GLib.timeout_add(4000, self._check_for_update)
+
+    # ── Startup splash ───────────────────────────────────────────────
+    def _update_splash(self):
+        elapsed = time.time() - self._splash_start
+        duration = 10.0
+        self._splash_bar.set_fraction(min(elapsed / duration, 1.0))
+        if elapsed >= duration:
+            self._splash.set_visible(False)
+            return False
+        return True
 
     # ── Update systeem ───────────────────────────────────────────────
     def _get_local_version(self):
@@ -2111,6 +2155,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_display.set_visible(True)
         self.video_controls.set_visible(True)
         self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 8 + 56)
+        self.viewer_counter.set_visible(True)
+        self.filmstrip_scroll.set_visible(True)
         self._video_media = Gtk.MediaFile.new_for_filename(path)
         self.video_display.set_paintable(self._video_media)
         GLib.idle_add(self._video_media.play)
@@ -2194,6 +2240,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_video_scrub(self, scale):
         if self._video_scrubbing_lock or not self._video_media:
             return
+        self._trigger_scrub_preview(scale.get_value())
         if self._video_seek_pending_id:
             GLib.source_remove(self._video_seek_pending_id)
         self._video_seek_pending_id = GLib.timeout_add(80, self._do_video_seek)
@@ -2226,6 +2273,10 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_viewer_motion(self, ctrl, x, y):
         if self.main_stack.get_visible_child_name() != "viewer":
             return
+        new_pos = (round(x), round(y))
+        if getattr(self, '_last_viewer_mouse', None) == new_pos:
+            return
+        self._last_viewer_mouse = new_pos
         self._show_viewer_ui()
         if self._video_media and self._video_media.get_playing():
             self._reset_fade_timer()
@@ -2270,37 +2321,38 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Scrubber preview ──────────────────────────────────────────────
 
-    def _on_scrubber_hover(self, ctrl, x, y):
+    def _trigger_scrub_preview(self, fraction):
         if not self._video_media:
             return
         dur = self._video_media.get_duration()
         if dur <= 0:
             return
-        w = self.video_scrubber.get_width()
-        if w <= 0:
-            return
-        fraction = max(0.0, min(1.0, x / w))
-        ts_s     = (int(fraction * dur / 1_000_000) // 2) * 2  # round to 2s
-
+        ts_s = (int(fraction * dur / 1_000_000) // 2) * 2  # round to 2s
         self._preview_time_lbl.set_text(format_duration(ts_s))
-
-        rect = Gdk.Rectangle()
-        rect.x = int(x); rect.y = 0
-        rect.width = 1; rect.height = self.video_scrubber.get_height()
-        self._preview_popover.set_pointing_to(rect)
-        if not self._preview_popover.get_visible():
-            self._preview_popover.popup()
-
+        w = self.video_scrubber.get_width()
+        if w > 0:
+            rect = Gdk.Rectangle()
+            rect.x = int(fraction * w); rect.y = 0
+            rect.width = 1; rect.height = self.video_scrubber.get_height()
+            self._preview_popover.set_pointing_to(rect)
+            if not self._preview_popover.get_visible():
+                self._preview_popover.popup()
         pb = self._preview_cache.get(ts_s, "missing")
         if pb is not None and pb != "missing":
             self._preview_picture.set_pixbuf(pb)
             return
-
-        # Debounce: wait 180ms of stillness before extracting
         self._preview_pending_ts = ts_s
         if self._preview_debounce_id:
             GLib.source_remove(self._preview_debounce_id)
-        self._preview_debounce_id = GLib.timeout_add(180, self._do_debounced_preview)
+        self._preview_debounce_id = GLib.timeout_add(120, self._do_debounced_preview)
+
+    def _on_scrubber_hover(self, ctrl, x, y):
+        if not self._video_media:
+            return
+        w = self.video_scrubber.get_width()
+        if w <= 0:
+            return
+        self._trigger_scrub_preview(max(0.0, min(1.0, x / w)))
 
     def _on_scrubber_leave(self, ctrl):
         if self._preview_debounce_id:
