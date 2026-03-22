@@ -1136,7 +1136,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_counter.add_css_class("osd")
         self.viewer_counter.set_halign(Gtk.Align.CENTER)
         self.viewer_counter.set_valign(Gtk.Align.END)
-        self.viewer_counter.set_margin_bottom(20)
+        self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 16)
         viewer_area.add_overlay(self.viewer_counter)
 
         scroll_ctrl = Gtk.EventControllerScroll.new(
@@ -1158,13 +1158,18 @@ class MainWindow(Adw.ApplicationWindow):
 
         # ── Filmstrip ────────────────────────────────────────────────
         self.filmstrip_scroll = Gtk.ScrolledWindow()
-        self.filmstrip_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
+        self.filmstrip_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
         self.filmstrip_scroll.set_halign(Gtk.Align.FILL)
         self.filmstrip_scroll.set_valign(Gtk.Align.END)
         self.filmstrip_scroll.set_margin_bottom(8)
-        self.filmstrip_scroll.set_margin_start(8)
-        self.filmstrip_scroll.set_margin_end(8)
+        self.filmstrip_scroll.set_margin_start(60)
+        self.filmstrip_scroll.set_margin_end(60)
         self.filmstrip_scroll.set_size_request(-1, FILM_THUMB + 12)
+        film_css = Gtk.CssProvider()
+        film_css.load_from_string("scrolledwindow { border-radius: 12px; }")
+        self.filmstrip_scroll.get_style_context().add_provider(
+            film_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.filmstrip_scroll.set_overflow(Gtk.Overflow.HIDDEN)
 
         self.filmstrip_area = Gtk.DrawingArea()
         self.filmstrip_area.set_draw_func(self._draw_filmstrip)
@@ -1217,23 +1222,30 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Tijdlijn ──────────────────────────────────────────────────────
     def _on_timeline_scroll(self, fraction):
-        adj   = self.scroll.get_vadjustment()
-        total = adj.get_upper() - adj.get_lower() - adj.get_page_size()
-        if total > 0:
-            adj.set_value(adj.get_lower() + fraction * total)
+        adj      = self.scroll.get_vadjustment()
+        lower    = adj.get_lower()
+        upper    = adj.get_upper()
+        page     = adj.get_page_size()
+        max_val  = upper - page
+        target   = fraction * max_val
+        adj.set_value(max(lower, min(target, max_val)))
 
     def _on_scroll_changed(self, adj):
-        total = adj.get_upper()
-        if total > 0:
-            frac = adj.get_value() / total
+        upper    = adj.get_upper()
+        page     = adj.get_page_size()
+        max_scroll = upper - page
+        if max_scroll > 0:
+            frac = min(1.0, adj.get_value() / max_scroll)
             self.timeline.highlight(frac)
 
     def _update_timeline_from_positions(self):
         if not self.date_widgets:
             return False
-        adj   = self.scroll.get_vadjustment()
-        total = adj.get_upper()
-        if total == 0:
+        adj        = self.scroll.get_vadjustment()
+        upper      = adj.get_upper()
+        page       = adj.get_page_size()
+        max_scroll = upper - page
+        if max_scroll <= 0:
             return False
 
         # Verzamel Y-posities per datum
@@ -1243,14 +1255,14 @@ class MainWindow(Adw.ApplicationWindow):
             if coords is None:
                 continue
             _, y = coords
-            frac = max(0.0, min(1.0, y / total))
+            frac = max(0.0, min(1.0, y / max_scroll))
             items.append((frac, date_str))
         items.sort(key=lambda e: e[0])
 
         # Bouw jaar+maand entries met afgekorte maandnamen
-        entries        = []
-        last_year      = None
-        last_month_num = None
+        entries      = []
+        seen_years   = set()
+        seen_months  = set()
         for frac, date_str in items:
             parts = date_str.split()
             if len(parts) == 3:
@@ -1261,13 +1273,12 @@ class MainWindow(Adw.ApplicationWindow):
                 except (ValueError, IndexError):
                     month_num  = 0
                     month_abbr = parts[1][:3]
-                if year_str != last_year:
+                if year_str not in seen_years:
                     entries.append((year_str, frac))
-                    last_year      = year_str
-                    last_month_num = None
-                if month_num != last_month_num:
+                    seen_years.add(year_str)
+                if (year_str, month_num) not in seen_months:
                     entries.append((month_abbr, frac))
-                    last_month_num = month_num
+                    seen_months.add((year_str, month_num))
             else:
                 entries.append((date_str, frac))
 
@@ -1280,20 +1291,19 @@ class MainWindow(Adw.ApplicationWindow):
         total_photos = sum(len(indices) for _, _, indices in groups)
         if total_photos == 0:
             return []
-        entries         = []
-        cumulative      = 0
-        last_year       = None
-        last_month_num  = None
+        entries        = []
+        cumulative     = 0
+        seen_years     = set()
+        seen_months    = set()
         for date_str, date_obj, indices in groups:
             frac     = cumulative / total_photos
             year_str = str(date_obj.year)
-            if year_str != last_year:
+            if year_str not in seen_years:
                 entries.append((year_str, frac))
-                last_year      = year_str
-                last_month_num = None
-            if date_obj.month != last_month_num:
+                seen_years.add(year_str)
+            if (year_str, date_obj.month) not in seen_months:
                 entries.append((MONTHS_NL[date_obj.month], frac))
-                last_month_num = date_obj.month
+                seen_months.add((year_str, date_obj.month))
             cumulative += len(indices)
         return entries
 
@@ -1498,7 +1508,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_stack.set_visible_child_name("grid")
         self.photo_count_label.set_text(f"{total} foto's")
         self._loading = False
-        GLib.timeout_add(300, self._update_timeline_from_positions)
+        GLib.timeout_add(800, self._update_timeline_from_positions)
         return False
 
     def show_empty_state(self):
@@ -1714,17 +1724,13 @@ class MainWindow(Adw.ApplicationWindow):
             ).start()
 
     def _scroll_filmstrip_to_current(self):
-        """Scroll the filmstrip so the current photo is visible."""
+        """Scroll the filmstrip so the current photo is always centered."""
         cell = FILM_THUMB + 4
-        target = self.current_index * cell
-        adj = self.filmstrip_scroll.get_hadjustment()
+        adj  = self.filmstrip_scroll.get_hadjustment()
         page = adj.get_page_size()
-        lo = adj.get_value()
-        hi = lo + page - cell
-        if target < lo:
-            adj.set_value(max(0, target - cell))
-        elif target > hi:
-            adj.set_value(target - page + cell * 2)
+        center_of_current = self.current_index * cell + cell / 2
+        target = center_of_current - page / 2
+        adj.set_value(max(0, min(target, adj.get_upper() - page)))
 
     def _apply_viewer_transform(self):
         z  = self._viewer_zoom
