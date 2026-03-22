@@ -43,7 +43,6 @@ CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
 TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
 THUMB_SIZE       = 180
-THUMB_CACHE_SIZE = 320   # groter dan display zodat COVER altijd downscalt
 BATCH_SIZE       = 30
 TILE_SIZE        = 256
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
@@ -170,7 +169,7 @@ def lat_lon_to_tile_float(lat, lon, zoom):
 
 def get_cache_path(photo_path):
     mtime = str(os.path.getmtime(photo_path))
-    key   = hashlib.md5((photo_path + mtime + str(THUMB_CACHE_SIZE)).encode()).hexdigest()
+    key   = hashlib.md5((photo_path + mtime).encode()).hexdigest()
     return os.path.join(CACHE_DIR, key + ".png")
 
 def load_thumbnail(photo_path):
@@ -181,9 +180,7 @@ def load_thumbnail(photo_path):
         except Exception:
             pass
     try:
-        # Genereer op THUMB_CACHE_SIZE zodat COVER bij display altijd downscalt → scherp
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-            photo_path, THUMB_CACHE_SIZE, THUMB_CACHE_SIZE, True)
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(photo_path, THUMB_SIZE, THUMB_SIZE, True)
         os.makedirs(CACHE_DIR, exist_ok=True)
         pixbuf.savev(cache_path, "png", [], [])
         return pixbuf
@@ -259,7 +256,7 @@ class TimelineBar(Gtk.DrawingArea):
             return
         is_dark = self.style_manager and self.style_manager.get_dark()
 
-        last_bottom = -99.0  # onderrand van het laatste getekende label
+        last_bottom = -99.0
 
         for i, (label, frac) in enumerate(self.entries):
             is_year = label.isdigit() and len(label) == 4
@@ -276,16 +273,16 @@ class TimelineBar(Gtk.DrawingArea):
                 cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
 
             cr.set_font_size(font_size)
-            ext     = cr.text_extents(label)
+            ext = cr.text_extents(label)
+
+            # Proportionele positie, maar altijd minstens 2px onder het vorige label
             ideal_y = frac * height
+            ty = max(last_bottom + 2, ideal_y)
+            ty = max(ext.height, min(height - 2, ty))
 
-            # Maand overslaan als er geen ruimte is; jaar altijd tonen
-            if ideal_y < last_bottom + 2:
-                if not is_year and not active:
-                    continue
-                ideal_y = last_bottom + 2  # jaar iets omlaag duwen
-
-            ty = max(ext.height, min(height - 2, ideal_y))
+            # Overslaan als er echt geen ruimte meer is onderaan
+            if ty >= height - 2 and i < len(self.entries) - 1:
+                continue
 
             if active:
                 cr.set_source_rgb(*self._ORANGE)
@@ -296,10 +293,8 @@ class TimelineBar(Gtk.DrawingArea):
                 v = 0.75 if is_dark else 0.35
                 cr.set_source_rgba(v, v, v, 0.65)
 
-            tx = max(2, width - ext.width - 5)
-            cr.move_to(tx, ty)
+            cr.move_to(max(2, width - ext.width - 5), ty)
             cr.show_text(label)
-
             last_bottom = ty + font_size + 1
 
     def _on_click(self, gesture, n_press, x, y):
@@ -675,7 +670,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.thumb_widgets   = {}
         self.date_widgets    = {}
         self.current_index   = 0
-        self._thumb_size     = self.settings.get("thumb_size", 180)
         self.settings_drives = []
         self.observer        = None
         self._loading        = False
@@ -1172,22 +1166,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
 
-        # Thumbnail-grootte schuif
-        size_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        zoom_out = Gtk.Image.new_from_icon_name("zoom-out-symbolic")
-        zoom_out.set_pixel_size(16)
-        size_box.append(zoom_out)
-        self.thumb_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 100, 300, 20)
-        self.thumb_scale.set_value(self._thumb_size)
-        self.thumb_scale.set_draw_value(False)
-        self.thumb_scale.set_size_request(120, -1)
-        self.thumb_scale.connect("value-changed", self._on_thumb_size_changed)
-        size_box.append(self.thumb_scale)
-        zoom_in = Gtk.Image.new_from_icon_name("zoom-in-symbolic")
-        zoom_in.set_pixel_size(16)
-        size_box.append(zoom_in)
-        normal_bar.set_center_widget(size_box)
-
         if importer_installed():
             import_btn = Gtk.Button(label="📱  Importeer van iPhone")
             import_btn.add_css_class("suggested-action")
@@ -1212,23 +1190,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.bottom_stack.set_visible_child_name("normal")
 
         return self.bottom_stack
-
-    def _on_thumb_size_changed(self, scale):
-        new_size = int(scale.get_value())
-        if new_size == self._thumb_size:
-            return
-        self._thumb_size = new_size
-        self.settings["thumb_size"] = new_size
-        save_settings(self.settings)
-        # Debounce: wacht tot de gebruiker stopt met slepen
-        if hasattr(self, '_thumb_resize_timer') and self._thumb_resize_timer:
-            GLib.source_remove(self._thumb_resize_timer)
-        self._thumb_resize_timer = GLib.timeout_add(120, self._apply_thumb_resize)
-
-    def _apply_thumb_resize(self):
-        self._thumb_resize_timer = None
-        self.start_load()  # thumbnails komen uit cache → snel
-        return False
 
     # ── Tijdlijn ──────────────────────────────────────────────────────
     def _on_timeline_scroll(self, fraction):
@@ -1442,11 +1403,11 @@ class MainWindow(Adw.ApplicationWindow):
                 picture = Gtk.Picture.new_for_pixbuf(pixbuf)
             else:
                 picture = Gtk.Picture()
-            picture.set_size_request(self._thumb_size, self._thumb_size)
+            picture.set_size_request(THUMB_SIZE, THUMB_SIZE)
             picture.set_content_fit(Gtk.ContentFit.COVER)
 
             overlay = Gtk.Overlay()
-            overlay.set_size_request(self._thumb_size, self._thumb_size)
+            overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
             overlay.set_child(picture)
 
             check_box = Gtk.Box()
@@ -1481,7 +1442,7 @@ class MainWindow(Adw.ApplicationWindow):
             btn = Gtk.Button()
             btn.set_child(overlay)
             btn.set_overflow(Gtk.Overflow.HIDDEN)
-            btn.set_size_request(self._thumb_size, self._thumb_size)
+            btn.set_size_request(THUMB_SIZE, THUMB_SIZE)
 
             css = Gtk.CssProvider()
             css.load_from_string("""
