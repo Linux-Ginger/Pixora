@@ -214,78 +214,86 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
 
 # ── Tijdlijn scrollbar ───────────────────────────────────────────────
-class TimelineBar(Gtk.ScrolledWindow):
-    def __init__(self, scroll_callback):
+class TimelineBar(Gtk.DrawingArea):
+    _ORANGE = (0.914, 0.329, 0.125)
+
+    def __init__(self, scroll_callback, style_manager=None):
         super().__init__()
         self.scroll_callback = scroll_callback
-        self.entries  = []
-        self._buttons = []
+        self.style_manager   = style_manager
+        self.entries         = []   # [(label_str, frac), ...]
+        self.active_idx      = 0
 
-        self.set_size_request(60, -1)
+        self.set_size_request(56, -1)
         self.set_vexpand(True)
-        self.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
+        self.set_draw_func(self._draw)
 
-        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.box.set_valign(Gtk.Align.FILL)
-        self.box.set_vexpand(True)
-        self.set_child(self.box)
+        click = Gtk.GestureClick()
+        click.connect("pressed", self._on_click)
+        self.add_controller(click)
 
     def set_entries(self, entries):
-        self.entries  = entries
-        self._buttons = []
-        while True:
-            child = self.box.get_first_child()
-            if child is None:
-                break
-            self.box.remove(child)
-
-        for label_str, frac in entries:
-            is_year = label_str.isdigit() and len(label_str) == 4
-            btn = Gtk.Button(label=label_str)
-            btn.add_css_class("flat")
-            btn.set_vexpand(True)
-            btn.set_valign(Gtk.Align.CENTER)
-            btn_css = Gtk.CssProvider()
-            if is_year:
-                btn_css.load_from_string("""
-                    button { font-size: 10px; font-weight: bold;
-                             color: @window_fg_color; padding: 2px 4px; min-height: 0; }
-                """)
-            else:
-                btn_css.load_from_string("""
-                    button { font-size: 9px; color: alpha(@window_fg_color, 0.5);
-                             padding: 1px 4px; min-height: 0; }
-                """)
-            btn.get_style_context().add_provider(btn_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-            f = frac
-            btn.connect("clicked", lambda b, fr=f: self.scroll_callback(fr))
-            self.box.append(btn)
-            self._buttons.append(btn)
+        self.entries    = entries
+        self.active_idx = 0
+        self.queue_draw()
 
     def highlight(self, frac):
-        if not self.entries or not self._buttons:
+        if not self.entries:
             return
-        closest = min(range(len(self.entries)), key=lambda i: abs(self.entries[i][1] - frac))
-        for i, btn in enumerate(self._buttons):
-            css = Gtk.CssProvider()
-            if i == closest:
-                css.load_from_string("""
-                    button { color: #e95420; font-weight: bold;
-                             font-size: 10px; padding: 2px 4px; min-height: 0; }
-                """)
+        # Laatste entry waarvan frac <= scroll positie = huidig zichtbare datum
+        new_idx = 0
+        for i, (_, ef) in enumerate(self.entries):
+            if ef <= frac:
+                new_idx = i
             else:
-                is_year = self.entries[i][0].isdigit() and len(self.entries[i][0]) == 4
-                if is_year:
-                    css.load_from_string("""
-                        button { font-size: 10px; font-weight: bold;
-                                 color: @window_fg_color; padding: 2px 4px; min-height: 0; }
-                    """)
-                else:
-                    css.load_from_string("""
-                        button { font-size: 9px; color: alpha(@window_fg_color, 0.5);
-                                 padding: 1px 4px; min-height: 0; }
-                    """)
-            btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+                break
+        if new_idx != self.active_idx:
+            self.active_idx = new_idx
+            self.queue_draw()
+
+    def _draw(self, area, cr, width, height):
+        if not self.entries or height == 0:
+            return
+        is_dark = self.style_manager and self.style_manager.get_dark()
+
+        for i, (label, frac) in enumerate(self.entries):
+            is_year = label.isdigit() and len(label) == 4
+            y = frac * height
+
+            if i == self.active_idx:
+                cr.set_source_rgb(*self._ORANGE)
+                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+                font_size = 11 if is_year else 10
+            elif is_year:
+                cr.set_source_rgba(0.95 if is_dark else 0.1, 0.95 if is_dark else 0.1,
+                                   0.95 if is_dark else 0.1, 0.9)
+                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+                font_size = 11
+            else:
+                cr.set_source_rgba(0.75 if is_dark else 0.35, 0.75 if is_dark else 0.35,
+                                   0.75 if is_dark else 0.35, 0.65)
+                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+                font_size = 9
+
+            cr.set_font_size(font_size)
+            ext = cr.text_extents(label)
+            tx  = max(2, width - ext.width - 5)
+            ty  = y + ext.height / 2
+            # Zorg dat tekst niet buiten het widget valt
+            ty  = max(ext.height, min(height - 2, ty))
+            cr.move_to(tx, ty)
+            cr.show_text(label)
+
+    def _on_click(self, gesture, n_press, x, y):
+        if not self.entries:
+            return
+        height = self.get_height()
+        if height <= 0:
+            return
+        click_frac = y / height
+        closest = min(range(len(self.entries)),
+                      key=lambda i: abs(self.entries[i][1] - click_frac))
+        self.scroll_callback(self.entries[closest][1])
 
 
 # ── Kaart widget (in-app, geen apart venster) ────────────────────────
@@ -696,7 +704,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.set_hide_on_close(False)
         btn_layout = Gtk.Settings.get_default()
-        btn_layout.set_property("gtk-decoration-layout", "icon:close,minimize")
+        btn_layout.set_property("gtk-decoration-layout", "icon:minimize,close")
 
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
@@ -819,7 +827,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.scroll.get_vadjustment().connect("value-changed", self._on_scroll_changed)
         grid_with_timeline.append(self.scroll)
 
-        self.timeline = TimelineBar(self._on_timeline_scroll)
+        self.timeline = TimelineBar(self._on_timeline_scroll, self.style_manager)
         grid_with_timeline.append(self.timeline)
         self.content_stack.add_named(grid_with_timeline, "grid")
 
@@ -1178,9 +1186,9 @@ class MainWindow(Adw.ApplicationWindow):
             adj.set_value(adj.get_lower() + fraction * total)
 
     def _on_scroll_changed(self, adj):
-        total = adj.get_upper() - adj.get_lower() - adj.get_page_size()
+        total = adj.get_upper()
         if total > 0:
-            frac = (adj.get_value() - adj.get_lower()) / total
+            frac = adj.get_value() / total
             self.timeline.highlight(frac)
 
     def _update_timeline_from_positions(self):
@@ -1190,15 +1198,37 @@ class MainWindow(Adw.ApplicationWindow):
         total = adj.get_upper()
         if total == 0:
             return False
-        entries = []
+
+        # Verzamel Y-posities per datum
+        items = []
         for date_str, label in self.date_widgets.items():
             coords = label.translate_coordinates(self.grid_box, 0, 0)
             if coords is None:
                 continue
-            x, y = coords
+            _, y = coords
             frac = max(0.0, min(1.0, y / total))
-            entries.append((date_str, frac))
-        entries.sort(key=lambda e: e[1])
+            items.append((frac, date_str))
+        items.sort(key=lambda e: e[0])
+
+        # Bouw jaar+maand entries met afgekorte maandnamen
+        entries   = []
+        last_year = None
+        for frac, date_str in items:
+            parts = date_str.split()
+            if len(parts) == 3:
+                year_str = parts[2]
+                try:
+                    month_num  = MONTHS_NL_FULL.index(parts[1].lower())
+                    month_abbr = MONTHS_NL[month_num]
+                except (ValueError, IndexError):
+                    month_abbr = parts[1][:3]
+                if year_str != last_year:
+                    entries.append((year_str, frac))
+                    last_year = year_str
+                entries.append((month_abbr, frac))
+            else:
+                entries.append((date_str, frac))
+
         self.timeline.set_entries(entries)
         return False
 
@@ -1472,6 +1502,7 @@ class MainWindow(Adw.ApplicationWindow):
     def open_photo(self, index):
         self.current_index = index
         self.header.set_visible(False)
+        self.bottom_stack.set_visible(False)
         self.photo_picture.set_pixbuf(None)
         self.viewer_location.set_text("")
         self.main_stack.set_visible_child_name("viewer")
@@ -1543,6 +1574,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_load_id += 1
         self.photo_picture.set_pixbuf(None)
         self.header.set_visible(True)
+        self.bottom_stack.set_visible(True)
         if hasattr(self, '_photos_before_cluster') and self._photos_before_cluster is not None:
             self.photos = self._photos_before_cluster
             self._photos_before_cluster = None
