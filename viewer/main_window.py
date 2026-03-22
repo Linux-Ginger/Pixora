@@ -15,6 +15,7 @@ import hashlib
 import time
 import datetime
 import urllib.request
+import urllib.parse
 from collections import defaultdict
 
 import gi
@@ -143,6 +144,24 @@ def get_gps_coords(photo_path):
         return (lat, lon)
     except Exception:
         return None
+
+def reverse_geocode(lat, lon):
+    """Geeft 'Stad, Land' terug via Nominatim."""
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+        req = urllib.request.Request(url, headers={"User-Agent": "Pixora/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        addr = data.get("address", {})
+        city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("municipality") or ""
+        country = addr.get("country", "")
+        if city and country:
+            return f"{city}, {country}"
+        elif country:
+            return country
+        return ""
+    except Exception:
+        return ""
 
 # ── Kaart tile helper ────────────────────────────────────────────────
 def lat_lon_to_tile_float(lat, lon, zoom):
@@ -277,23 +296,21 @@ class TimelineBar(Gtk.ScrolledWindow):
             btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
 
-# ── Kaartvenster ─────────────────────────────────────────────────────
-class MapWindow(Adw.Window):
-    def __init__(self, parent, markers):
-        super().__init__()
-        self.set_title("Kaartweergave")
-        self.set_default_size(900, 650)
-        self.set_transient_for(parent)
-        self.set_modal(False)
+# ── Kaart widget ─────────────────────────────────────────────────────
+class MapWidget(Gtk.DrawingArea):
+    """Ingebedde kaart widget — geen apart venster."""
 
-        self.markers         = markers
-        self.zoom            = 10 if markers else 7
-        self.tile_cache      = {}
-        self._drag_start     = None
-        self._mouse_x        = 450
-        self._mouse_y        = 325
-        self._hover_idx      = -1
-        self._hover_pixbufs  = {}
+    def __init__(self, markers, open_photo_cb):
+        super().__init__()
+        self.markers        = markers
+        self.open_photo_cb  = open_photo_cb
+        self.zoom           = 10 if markers else 7
+        self.tile_cache     = {}
+        self._drag_start    = None
+        self._mouse_x       = 450
+        self._mouse_y       = 325
+        self._hover_idx     = -1
+        self._hover_pixbufs = {}
 
         if markers:
             avg_lat = sum(m[0] for m in markers) / len(markers)
@@ -305,50 +322,34 @@ class MapWindow(Adw.Window):
         self.offset_x = tx * TILE_SIZE - 450
         self.offset_y = ty * TILE_SIZE - 325
 
-        self.draw_area = Gtk.DrawingArea()
-        self.draw_area.set_draw_func(self.on_draw)
-        self.draw_area.set_vexpand(True)
-        self.draw_area.set_hexpand(True)
+        self.set_vexpand(True)
+        self.set_hexpand(True)
+        self.set_draw_func(self.on_draw)
 
+        # Scroll (muis + trackpad)
         scroll_ctrl = Gtk.EventControllerScroll.new(
             Gtk.EventControllerScrollFlags.VERTICAL |
-            Gtk.EventControllerScrollFlags.DISCRETE
+            Gtk.EventControllerScrollFlags.KINETIC
         )
         scroll_ctrl.connect("scroll", self.on_scroll)
-        self.draw_area.add_controller(scroll_ctrl)
+        self.add_controller(scroll_ctrl)
 
+        # Drag
         drag = Gtk.GestureDrag.new()
         drag.connect("drag-begin",  self.on_drag_begin)
         drag.connect("drag-update", self.on_drag_update)
         drag.connect("drag-end",    self.on_drag_end)
-        self.draw_area.add_controller(drag)
+        self.add_controller(drag)
 
+        # Muis beweging
         motion = Gtk.EventControllerMotion.new()
         motion.connect("motion", self.on_mouse_motion)
-        self.draw_area.add_controller(motion)
+        self.add_controller(motion)
 
-        header = Adw.HeaderBar()
-
-        zoom_in_btn = Gtk.Button(icon_name="zoom-in-symbolic")
-        zoom_in_btn.add_css_class("flat")
-        zoom_in_btn.set_tooltip_text("Inzoomen")
-        zoom_in_btn.connect("clicked", lambda _: self.zoom_by(1))
-        header.pack_end(zoom_in_btn)
-
-        zoom_out_btn = Gtk.Button(icon_name="zoom-out-symbolic")
-        zoom_out_btn.add_css_class("flat")
-        zoom_out_btn.set_tooltip_text("Uitzoomen")
-        zoom_out_btn.connect("clicked", lambda _: self.zoom_by(-1))
-        header.pack_end(zoom_out_btn)
-
-        count_label = Gtk.Label(label=f"{len(markers)} foto's met GPS")
-        count_label.add_css_class("dim-label")
-        header.set_title_widget(count_label)
-
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        box.append(header)
-        box.append(self.draw_area)
-        self.set_content(box)
+        # Klik
+        click = Gtk.GestureClick.new()
+        click.connect("released", self.on_click)
+        self.add_controller(click)
 
         GLib.idle_add(self._request_visible_tiles)
 
@@ -374,8 +375,8 @@ class MapWindow(Adw.Window):
         return tiles
 
     def _request_visible_tiles(self):
-        w = self.draw_area.get_width() or 900
-        h = self.draw_area.get_height() or 650
+        w = self.get_width() or 900
+        h = self.get_height() or 650
         for z, tx, ty, _, _ in self._get_visible_tiles(w, h):
             key = (z, tx, ty)
             if key not in self.tile_cache:
@@ -387,10 +388,8 @@ class MapWindow(Adw.Window):
         import io
         if not CAIRO_AVAILABLE:
             return
-
         key        = (z, tx, ty)
         cache_path = os.path.join(TILE_CACHE_DIR, f"{z}_{tx}_{ty}.png")
-
         if os.path.exists(cache_path):
             try:
                 surface = cairo.ImageSurface.create_from_png(cache_path)
@@ -398,7 +397,6 @@ class MapWindow(Adw.Window):
                 return
             except Exception:
                 pass
-
         try:
             url = f"https://tile.openstreetmap.org/{z}/{tx}/{ty}.png"
             req = urllib.request.Request(url, headers={"User-Agent": "Pixora/1.0"})
@@ -414,11 +412,10 @@ class MapWindow(Adw.Window):
 
     def _tile_loaded(self, key, surface):
         self.tile_cache[key] = surface
-        self.draw_area.queue_draw()
+        self.queue_draw()
         return False
 
     def on_draw(self, area, cr, width, height):
-        # Achtergrond
         cr.set_source_rgb(0.85, 0.87, 0.88)
         cr.paint()
 
@@ -435,15 +432,12 @@ class MapWindow(Adw.Window):
             mx = tx_f * TILE_SIZE - self.offset_x
             my = ty_f * TILE_SIZE - self.offset_y
             if -20 <= mx <= width + 20 and -20 <= my <= height + 20:
-                # Schaduw
                 cr.set_source_rgba(0, 0, 0, 0.25)
                 cr.arc(mx + 1, my + 2, 9, 0, 2 * math.pi)
                 cr.fill()
-                # Oranje stip
                 cr.set_source_rgb(0.914, 0.329, 0.125)
                 cr.arc(mx, my, 9, 0, 2 * math.pi)
                 cr.fill()
-                # Witte rand
                 cr.set_source_rgb(1, 1, 1)
                 cr.set_line_width(2)
                 cr.arc(mx, my, 9, 0, 2 * math.pi)
@@ -465,39 +459,52 @@ class MapWindow(Adw.Window):
             pw     = pixbuf.get_width()  if pixbuf else 0
             ph     = pixbuf.get_height() if pixbuf else 0
 
-            box_w = max(180, pw + 16)
-            box_h = (ph + 16 if pixbuf else 0) + 44
+            pad   = 10
+            box_w = max(180, pw + pad * 2)
+            box_h = (ph + pad if pixbuf else 0) + 48
             bx    = mx + 14
             by    = my - box_h - 6
 
-            if bx + box_w > width:
+            if bx + box_w > width - 4:
                 bx = mx - box_w - 14
-            if by < 0:
+            if by < 4:
                 by = my + 14
+            if bx < 4:
+                bx = 4
 
-            # Achtergrond popup
-            cr.set_source_rgba(0.1, 0.1, 0.1, 0.92)
-            self._rounded_rect(cr, bx, by, box_w, box_h, 8)
+            # Achtergrond met ronde hoeken
+            cr.set_source_rgba(0.12, 0.12, 0.12, 0.94)
+            self._rounded_rect(cr, bx, by, box_w, box_h, 10)
             cr.fill()
 
-            # Thumbnail
+            # Thumbnail met ronde hoeken
             if pixbuf:
-                Gdk.cairo_set_source_pixbuf(cr, pixbuf, bx + 8, by + 8)
+                cr.save()
+                self._rounded_rect(cr, bx + pad, by + pad, pw, ph, 6)
+                cr.clip()
+                Gdk.cairo_set_source_pixbuf(cr, pixbuf, bx + pad, by + pad)
                 cr.paint()
+                cr.restore()
 
             # Bestandsnaam
             cr.set_source_rgb(1, 1, 1)
             cr.select_font_face("Sans", 0, 1)
             cr.set_font_size(11)
-            cr.move_to(bx + 8, by + ph + 22)
-            cr.show_text(filename[:28] + "…" if len(filename) > 28 else filename)
+            cr.move_to(bx + pad, by + ph + pad + 18)
+            cr.show_text(filename[:26] + "…" if len(filename) > 26 else filename)
 
             # Datum
             cr.set_source_rgba(1, 1, 1, 0.6)
             cr.select_font_face("Sans", 0, 0)
             cr.set_font_size(10)
-            cr.move_to(bx + 8, by + ph + 36)
+            cr.move_to(bx + pad, by + ph + pad + 34)
             cr.show_text(datum)
+
+            # Tip: klik om te openen
+            cr.set_source_rgba(0.914, 0.329, 0.125, 0.8)
+            cr.set_font_size(9)
+            cr.move_to(bx + pad, by + box_h - 8)
+            cr.show_text("Klik om te openen")
 
         GLib.idle_add(self._request_visible_tiles)
 
@@ -522,7 +529,7 @@ class MapWindow(Adw.Window):
 
     def _hover_thumb_loaded(self, path, pixbuf):
         self._hover_pixbufs[path] = pixbuf
-        self.draw_area.queue_draw()
+        self.queue_draw()
         return False
 
     def on_mouse_motion(self, ctrl, x, y):
@@ -549,11 +556,22 @@ class MapWindow(Adw.Window):
                         args=(path,),
                         daemon=True
                     ).start()
-            self.draw_area.queue_draw()
+            self.queue_draw()
+
+    def on_click(self, gesture, n_press, x, y):
+        for i, marker in enumerate(self.markers):
+            lat, lon = marker[0], marker[1]
+            tx_f, ty_f = lat_lon_to_tile_float(lat, lon, self.zoom)
+            mx = tx_f * TILE_SIZE - self.offset_x
+            my = ty_f * TILE_SIZE - self.offset_y
+            if math.sqrt((x - mx) ** 2 + (y - my) ** 2) < 12:
+                path = marker[4]
+                self.open_photo_cb(path)
+                return
 
     def zoom_by(self, delta, cx=None, cy=None):
-        w = self.draw_area.get_width() or 900
-        h = self.draw_area.get_height() or 650
+        w = self.get_width() or 900
+        h = self.get_height() or 650
         if cx is None:
             cx = self._mouse_x
         if cy is None:
@@ -564,25 +582,53 @@ class MapWindow(Adw.Window):
             self.offset_x = (self.offset_x + cx) * scale - cx
             self.offset_y = (self.offset_y + cy) * scale - cy
             self.zoom     = new_zoom
-            self.draw_area.queue_draw()
+            self._clamp_offset()
+            self.queue_draw()
+
+    def _clamp_offset(self):
+        w     = self.get_width() or 900
+        h     = self.get_height() or 650
+        n     = 2 ** self.zoom
+        max_x = max(0, n * TILE_SIZE - w)
+        max_y = max(0, n * TILE_SIZE - h)
+        self.offset_x = max(0, min(max_x, self.offset_x))
+        self.offset_y = max(0, min(max_y, self.offset_y))
 
     def on_scroll(self, ctrl, dx, dy):
-        self.zoom_by(-1 if dy > 0 else 1)
+        # Onderscheid trackpad (klein) en muiswiel (groot/discreet)
+        if abs(dy) < 1.5:
+            # Trackpad — vloeiend inzoomen
+            self.zoom_by(-dy * 0.15)
+        else:
+            # Muiswiel — stap voor stap
+            self.zoom_by(-1 if dy > 0 else 1)
         return True
+
+    def zoom_by(self, delta, cx=None, cy=None):
+        w = self.get_width() or 900
+        h = self.get_height() or 650
+        if cx is None:
+            cx = self._mouse_x
+        if cy is None:
+            cy = self._mouse_y
+        new_zoom = max(3.0, min(19.0, self.zoom + delta))
+        if abs(new_zoom - self.zoom) > 0.001:
+            scale         = 2 ** (new_zoom - self.zoom)
+            self.offset_x = (self.offset_x + cx) * scale - cx
+            self.offset_y = (self.offset_y + cy) * scale - cy
+            self.zoom     = new_zoom
+            self._clamp_offset()
+            self.queue_draw()
 
     def on_drag_begin(self, gesture, x, y):
         self._drag_start = (self.offset_x, self.offset_y)
 
     def on_drag_update(self, gesture, dx, dy):
         if self._drag_start:
-            w     = self.draw_area.get_width() or 900
-            h     = self.draw_area.get_height() or 650
-            n     = 2 ** self.zoom
-            max_x = n * TILE_SIZE - w
-            max_y = n * TILE_SIZE - h
-            self.offset_x = max(0, min(max_x, self._drag_start[0] - dx))
-            self.offset_y = max(0, min(max_y, self._drag_start[1] - dy))
-            self.draw_area.queue_draw()
+            self.offset_x = self._drag_start[0] - dx
+            self.offset_y = self._drag_start[1] - dy
+            self._clamp_offset()
+            self.queue_draw()
 
     def on_drag_end(self, gesture, dx, dy):
         self._drag_start = None
@@ -604,7 +650,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._sort_timer     = None
         self._select_mode    = False
         self._selected       = set()
-        self._map_open       = False
+        self._photo_location = {}  # path → locatie string cache
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -617,6 +663,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.set_transition_duration(200)
         self.main_stack.add_named(self.build_grid_page(),   "grid")
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
+        self.main_stack.add_named(self.build_map_page(),    "map")
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(self.build_header())
@@ -768,16 +815,55 @@ class MainWindow(Adw.ApplicationWindow):
         outer.append(self.content_stack)
         return outer
 
-    # ── Kaart ────────────────────────────────────────────────────────
-    def open_map(self, btn=None):
-        if self._map_open:
-            return
-        self._map_open = True
-        self.map_btn.set_sensitive(False)
-        self.map_btn.set_label("🗺 laden...")
-        threading.Thread(target=self._load_gps_and_open_map, daemon=True).start()
+    # ── Kaart pagina ─────────────────────────────────────────────────
+    def build_map_page(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.set_vexpand(True)
+        box.set_hexpand(True)
 
-    def _load_gps_and_open_map(self):
+        # Header met terugknop
+        map_header = Adw.HeaderBar()
+        map_header.add_css_class("flat")
+
+        back_btn = Gtk.Button(icon_name="go-previous-symbolic")
+        back_btn.add_css_class("flat")
+        back_btn.set_tooltip_text("Terug")
+        back_btn.connect("clicked", self.close_map)
+        map_header.pack_start(back_btn)
+
+        # Zoom knoppen
+        zoom_in_btn = Gtk.Button(icon_name="zoom-in-symbolic")
+        zoom_in_btn.add_css_class("flat")
+        zoom_in_btn.connect("clicked", lambda _: self._map_widget and self._map_widget.zoom_by(1))
+        map_header.pack_end(zoom_in_btn)
+
+        zoom_out_btn = Gtk.Button(icon_name="zoom-out-symbolic")
+        zoom_out_btn.add_css_class("flat")
+        zoom_out_btn.connect("clicked", lambda _: self._map_widget and self._map_widget.zoom_by(-1))
+        map_header.pack_end(zoom_out_btn)
+
+        self.map_count_label = Gtk.Label(label="Kaart")
+        self.map_count_label.add_css_class("dim-label")
+        map_header.set_title_widget(self.map_count_label)
+
+        box.append(map_header)
+
+        # Container voor de kaart widget
+        self.map_container = Gtk.Box()
+        self.map_container.set_vexpand(True)
+        self.map_container.set_hexpand(True)
+        box.append(self.map_container)
+
+        self._map_widget = None
+        return box
+
+    def open_map(self, btn=None):
+        self.header.set_visible(False)
+        self.map_btn.set_label("🗺 laden...")
+        self.map_btn.set_sensitive(False)
+        threading.Thread(target=self._load_gps_and_show_map, daemon=True).start()
+
+    def _load_gps_and_show_map(self):
         markers = []
         for path in self.photos:
             coords = get_gps_coords(path)
@@ -790,20 +876,33 @@ class MainWindow(Adw.ApplicationWindow):
                 except Exception:
                     datum = ""
                 markers.append((lat, lon, filename, datum, path))
-        GLib.idle_add(self._show_map_window, markers)
+        GLib.idle_add(self._show_map, markers)
 
-    def _show_map_window(self, markers):
-        map_win = MapWindow(self, markers)
-        map_win.connect("close-request", self._on_map_closed)
-        map_win.present()
+    def _show_map(self, markers):
+        # Verwijder oude kaart widget
+        if self._map_widget:
+            self.map_container.remove(self._map_widget)
+            self._map_widget = None
+
+        self._map_widget = MapWidget(markers, self._open_photo_from_map)
+        self.map_container.append(self._map_widget)
+
+        self.map_count_label.set_text(f"{len(markers)} foto's met GPS locatie")
         self.map_btn.set_label("🗺")
-        return False
-
-    def _on_map_closed(self, win):
-        self._map_open = False
         self.map_btn.set_sensitive(True)
-        self.map_btn.set_label("🗺")
+        self.main_stack.set_visible_child_name("map")
         return False
+
+    def _open_photo_from_map(self, path):
+        """Open een foto vanuit de kaart."""
+        if path in self.photos:
+            index = self.photos.index(path)
+            self.close_map()
+            GLib.idle_add(self.open_photo, index)
+
+    def close_map(self, btn=None):
+        self.header.set_visible(True)
+        self.main_stack.set_visible_child_name("grid")
 
     # ── Viewer pagina ────────────────────────────────────────────────
     def build_viewer_page(self):
@@ -847,13 +946,24 @@ class MainWindow(Adw.ApplicationWindow):
         delete_btn.connect("clicked", self.on_delete_current)
         viewer_area.add_overlay(delete_btn)
 
+        # Titel + locatie linksboven
+        title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        title_box.add_css_class("osd")
+        title_box.set_halign(Gtk.Align.START)
+        title_box.set_valign(Gtk.Align.START)
+        title_box.set_margin_top(16)
+        title_box.set_margin_start(16)
+
         self.viewer_title = Gtk.Label(label="")
-        self.viewer_title.add_css_class("osd")
         self.viewer_title.set_halign(Gtk.Align.START)
-        self.viewer_title.set_valign(Gtk.Align.START)
-        self.viewer_title.set_margin_top(20)
-        self.viewer_title.set_margin_start(16)
-        viewer_area.add_overlay(self.viewer_title)
+        title_box.append(self.viewer_title)
+
+        self.viewer_location = Gtk.Label(label="")
+        self.viewer_location.add_css_class("dim-label")
+        self.viewer_location.set_halign(Gtk.Align.START)
+        title_box.append(self.viewer_location)
+
+        viewer_area.add_overlay(title_box)
 
         self.prev_btn = Gtk.Button(icon_name="go-previous-symbolic")
         self.prev_btn.add_css_class("osd")
@@ -1257,6 +1367,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.current_index = index
         self.header.set_visible(False)
         self.photo_picture.set_pixbuf(None)
+        self.viewer_location.set_text("")
         self.main_stack.set_visible_child_name("viewer")
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
@@ -1271,15 +1382,27 @@ class MainWindow(Adw.ApplicationWindow):
             pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
         except Exception:
             pixbuf = None
-        if load_id == self._viewer_load_id:
-            GLib.idle_add(self._show_full_photo, pixbuf, path)
 
-    def _show_full_photo(self, pixbuf, path):
+        # Locatie ophalen
+        location = self._photo_location.get(path)
+        if location is None:
+            coords = get_gps_coords(path)
+            if coords:
+                location = reverse_geocode(coords[0], coords[1])
+            else:
+                location = ""
+            self._photo_location[path] = location
+
+        if load_id == self._viewer_load_id:
+            GLib.idle_add(self._show_full_photo, pixbuf, path, location)
+
+    def _show_full_photo(self, pixbuf, path, location=""):
         if pixbuf:
             self.photo_picture.set_pixbuf(pixbuf)
         mtime = os.path.getmtime(path)
         datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y  %H:%M")
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
+        self.viewer_location.set_text(f"📍 {location}" if location else "")
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
@@ -1290,6 +1413,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.current_index -= 1
             self._viewer_load_id += 1
             load_id = self._viewer_load_id
+            self.viewer_location.set_text("")
             threading.Thread(
                 target=self._load_full_photo,
                 args=(self.photos[self.current_index], load_id),
@@ -1301,6 +1425,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.current_index += 1
             self._viewer_load_id += 1
             load_id = self._viewer_load_id
+            self.viewer_location.set_text("")
             threading.Thread(
                 target=self._load_full_photo,
                 args=(self.photos[self.current_index], load_id),
