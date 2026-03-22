@@ -769,8 +769,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._filmstrip_load_id     = 0
         self._video_media           = None
         self._video_poll_id         = None
-        self._video_rotation        = 0
         self._video_scrubbing_lock  = False
+        self._video_seek_pending_id = None
         self._preview_cache         = {}   # timestamp_s -> pixbuf | None (loading)
         self._preview_debounce_id   = None
         self._preview_extracting    = False
@@ -1243,7 +1243,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_display.set_vexpand(True)
         self.video_display.set_hexpand(True)
         self.video_display.set_visible(False)
-        self.video_display.add_css_class("video-display")
         viewer_area.add_overlay(self.video_display)
 
         close_btn = Gtk.Button(icon_name="window-close-symbolic")
@@ -1410,6 +1409,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.add_controller(key_ctrl)
 
         viewer_motion = Gtk.EventControllerMotion()
+        viewer_motion.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         viewer_motion.connect("motion", self._on_viewer_motion)
         viewer_area.add_controller(viewer_motion)
         self.viewer_area = viewer_area
@@ -1451,7 +1451,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._preview_picture.set_size_request(160, 90)
         self._preview_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
         prev_pic_css = Gtk.CssProvider()
-        prev_pic_css.load_from_string("picture { border-radius: 8px; overflow: hidden; }")
+        prev_pic_css.load_from_string("picture { border-radius: 8px; }")
         self._preview_picture.get_style_context().add_provider(
             prev_pic_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self._preview_time_lbl = Gtk.Label()
@@ -1489,19 +1489,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_vol_scale.set_draw_value(False)
         self.video_vol_scale.connect("value-changed", self._on_video_volume)
         self.video_controls.append(self.video_vol_scale)
-
-        sep2 = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
-        sep2.set_margin_top(8)
-        sep2.set_margin_bottom(8)
-        self.video_controls.append(sep2)
-
-        self.video_rotate_btn = Gtk.Button(icon_name="object-rotate-right-symbolic")
-        self.video_rotate_btn.add_css_class("flat")
-        self.video_rotate_btn.add_css_class("circular")
-        self.video_rotate_btn.set_can_focus(False)
-        self.video_rotate_btn.set_tooltip_text("Draaien (wordt opgeslagen)")
-        self.video_rotate_btn.connect("clicked", self._on_video_rotate)
-        self.video_controls.append(self.video_rotate_btn)
 
         viewer_area.add_overlay(self.video_controls)
 
@@ -2124,11 +2111,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_display.set_visible(True)
         self.video_controls.set_visible(True)
         self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 8 + 56)
-        self._video_rotation = 0
-        self._apply_video_rotation()
         self._video_media = Gtk.MediaFile.new_for_filename(path)
         self.video_display.set_paintable(self._video_media)
-        self._video_media.play()
+        GLib.idle_add(self._video_media.play)
         self.video_play_btn.set_icon_name("media-playback-pause-symbolic")
         self.video_mute_btn.set_icon_name("audio-volume-high-symbolic")
         self.video_vol_scale.set_value(1.0)
@@ -2150,6 +2135,9 @@ class MainWindow(Adw.ApplicationWindow):
     def _stop_video(self):
         self._stop_video_poll()
         self._cancel_fade()
+        if self._video_seek_pending_id:
+            GLib.source_remove(self._video_seek_pending_id)
+            self._video_seek_pending_id = None
         if self._video_media:
             self._video_media.pause()
             self._video_media = None
@@ -2206,9 +2194,18 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_video_scrub(self, scale):
         if self._video_scrubbing_lock or not self._video_media:
             return
+        if self._video_seek_pending_id:
+            GLib.source_remove(self._video_seek_pending_id)
+        self._video_seek_pending_id = GLib.timeout_add(80, self._do_video_seek)
+
+    def _do_video_seek(self):
+        self._video_seek_pending_id = None
+        if not self._video_media:
+            return False
         dur = self._video_media.get_duration()
         if dur > 0:
-            self._video_media.seek(int(scale.get_value() * dur))
+            self._video_media.seek(int(self.video_scrubber.get_value() * dur))
+        return False
 
     def _on_video_mute(self, btn):
         if not self._video_media:
@@ -2224,70 +2221,6 @@ class MainWindow(Adw.ApplicationWindow):
             return
         self._video_media.set_volume(scale.get_value())
 
-    def _on_video_rotate(self, btn):
-        self._video_rotation = (self._video_rotation + 90) % 360
-        self._apply_video_rotation()
-        path = self.photos[self.current_index]
-        threading.Thread(
-            target=self._save_video_rotation,
-            args=(path, self._video_rotation),
-            daemon=True
-        ).start()
-
-    def _apply_video_rotation(self):
-        css_str = f".video-display {{ transform: rotate({self._video_rotation}deg); }}"
-        provider = Gtk.CssProvider()
-        provider.load_from_string(css_str)
-        self.video_display.get_style_context().add_provider(
-            provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
-
-    # ── Rotatie opslaan ───────────────────────────────────────────────
-
-    def _save_video_rotation(self, path, rotation):
-        vf_map = {90: "transpose=1", 180: "vflip,hflip", 270: "transpose=2"}
-        vf = vf_map.get(rotation % 360)
-        if not vf:
-            return
-        tmp = path + ".rot_tmp.mp4"
-        try:
-            result = subprocess.run(
-                ["ffmpeg", "-i", path,
-                 "-map_metadata", "0",
-                 "-movflags", "use_metadata_tags",
-                 "-c:v", "libx264", "-crf", "18", "-preset", "fast",
-                 "-c:a", "copy",
-                 "-vf", vf,
-                 tmp, "-y"],
-                capture_output=True, timeout=300
-            )
-            if result.returncode == 0:
-                os.replace(tmp, path)
-                cache = get_cache_path(path)
-                if os.path.exists(cache):
-                    os.remove(cache)
-                GLib.idle_add(self._after_rotation_saved)
-        except Exception:
-            pass
-        finally:
-            if os.path.exists(tmp):
-                try:
-                    os.remove(tmp)
-                except Exception:
-                    pass
-
-    def _after_rotation_saved(self):
-        # Reset visual rotation (baked into file now) and reload stream
-        self._video_rotation = 0
-        self._apply_video_rotation()
-        if self._video_media:
-            path = self.photos[self.current_index]
-            self._video_media = Gtk.MediaFile.new_for_filename(path)
-            self.video_display.set_paintable(self._video_media)
-            self._video_media.play()
-            self.video_play_btn.set_icon_name("media-playback-pause-symbolic")
-        return False
-
     # ── Auto-fade viewer UI ───────────────────────────────────────────
 
     def _on_viewer_motion(self, ctrl, x, y):
@@ -2300,12 +2233,14 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_viewer_ui(self):
         self._cancel_fade()
         self.video_controls.set_opacity(1.0)
+        self.video_controls.set_can_target(True)
         self.filmstrip_scroll.set_opacity(1.0)
+        self.filmstrip_scroll.set_can_target(True)
 
     def _reset_fade_timer(self):
         if self._fade_timer_id:
             GLib.source_remove(self._fade_timer_id)
-        self._fade_timer_id = GLib.timeout_add(1500, self._start_fade)
+        self._fade_timer_id = GLib.timeout_add(800, self._start_fade)
 
     def _cancel_fade(self):
         if self._fade_timer_id:
@@ -2327,6 +2262,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_controls.set_opacity(opacity)
         self.filmstrip_scroll.set_opacity(opacity)
         if opacity <= 0.0:
+            self.video_controls.set_can_target(False)
+            self.filmstrip_scroll.set_can_target(False)
             self._fade_anim_id = None
             return False
         return True
@@ -2417,6 +2354,13 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _apply_viewer_transform(self):
+        if getattr(self, '_transform_pending', False):
+            return
+        self._transform_pending = True
+        GLib.idle_add(self._do_apply_viewer_transform)
+
+    def _do_apply_viewer_transform(self):
+        self._transform_pending = False
         z  = self._viewer_zoom
         ox = self._viewer_offset[0]
         oy = self._viewer_offset[1]
@@ -2436,6 +2380,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.set_visible(not zoomed)
         self.viewer_counter.set_visible(not zoomed)
         self.filmstrip_scroll.set_visible(not zoomed)
+        return False
 
     def on_viewer_scroll(self, ctrl, dx, dy):
         if self.main_stack.get_visible_child_name() != "viewer":
