@@ -771,6 +771,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._video_poll_id         = None
         self._video_rotation        = 0
         self._video_scrubbing_lock  = False
+        self._preview_cache         = {}   # timestamp_s -> pixbuf | None (loading)
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -1420,6 +1421,32 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_scrubber.set_hexpand(True)
         self.video_scrubber.set_draw_value(False)
         self.video_scrubber.connect("value-changed", self._on_video_scrub)
+
+        # Scrubber preview popover
+        self._preview_popover = Gtk.Popover()
+        self._preview_popover.set_parent(self.video_scrubber)
+        self._preview_popover.set_autohide(False)
+        self._preview_popover.set_has_arrow(True)
+        self._preview_popover.set_position(Gtk.PositionType.TOP)
+        prev_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        prev_box.set_margin_top(4)
+        prev_box.set_margin_bottom(4)
+        prev_box.set_margin_start(4)
+        prev_box.set_margin_end(4)
+        self._preview_picture = Gtk.Picture()
+        self._preview_picture.set_size_request(160, 90)
+        self._preview_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self._preview_time_lbl = Gtk.Label()
+        self._preview_time_lbl.add_css_class("caption")
+        prev_box.append(self._preview_picture)
+        prev_box.append(self._preview_time_lbl)
+        self._preview_popover.set_child(prev_box)
+
+        scrubber_motion = Gtk.EventControllerMotion()
+        scrubber_motion.connect("motion", self._on_scrubber_hover)
+        scrubber_motion.connect("leave",  self._on_scrubber_leave)
+        self.video_scrubber.add_controller(scrubber_motion)
+
         self.video_controls.append(self.video_scrubber)
 
         self.video_time_label = Gtk.Label(label="0:00 / 0:00")
@@ -2069,6 +2096,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_video(self, path, location=""):
         self._stop_video()
+        self._preview_cache = {}
         self.photo_picture.set_visible(False)
         self.edit_btn.set_visible(False)
         self.video_widget.set_visible(True)
@@ -2173,6 +2201,75 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_widget.get_style_context().add_provider(
             provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
+
+    # ── Scrubber preview ──────────────────────────────────────────────
+
+    def _on_scrubber_hover(self, ctrl, x, y):
+        if not self._video_media:
+            return
+        dur = self._video_media.get_duration()
+        if dur <= 0:
+            return
+        w = self.video_scrubber.get_width()
+        if w <= 0:
+            return
+        fraction  = max(0.0, min(1.0, x / w))
+        ts_s      = int(fraction * dur / 1_000_000)
+        ts_s      = (ts_s // 2) * 2   # round to 2s for better cache reuse
+
+        self._preview_time_lbl.set_text(format_duration(ts_s))
+
+        # Position popover arrow at cursor
+        rect = Gdk.Rectangle()
+        rect.x      = int(x)
+        rect.y      = 0
+        rect.width  = 1
+        rect.height = self.video_scrubber.get_height()
+        self._preview_popover.set_pointing_to(rect)
+
+        if not self._preview_popover.get_visible():
+            self._preview_popover.popup()
+
+        pb = self._preview_cache.get(ts_s, "missing")
+        if pb == "missing":
+            self._preview_cache[ts_s] = None   # mark loading
+            path = self.photos[self.current_index]
+            threading.Thread(
+                target=self._extract_preview_frame,
+                args=(path, ts_s),
+                daemon=True
+            ).start()
+        elif pb is not None:
+            self._preview_picture.set_pixbuf(pb)
+
+    def _on_scrubber_leave(self, ctrl):
+        self._preview_popover.popdown()
+
+    def _extract_preview_frame(self, path, ts_s):
+        import tempfile
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+                tmp = f.name
+            subprocess.run(
+                ["ffmpeg", "-ss", str(ts_s), "-i", path,
+                 "-vframes", "1", "-vf", "scale=160:-1", tmp, "-y"],
+                capture_output=True, timeout=8
+            )
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(tmp, 160, 90, True)
+            os.unlink(tmp)
+            if len(self._preview_cache) > 60:
+                # drop oldest entry to cap memory
+                del self._preview_cache[next(iter(self._preview_cache))]
+            self._preview_cache[ts_s] = pb
+            GLib.idle_add(self._apply_preview_frame, ts_s)
+        except Exception:
+            pass
+
+    def _apply_preview_frame(self, ts_s):
+        pb = self._preview_cache.get(ts_s)
+        if pb and self._preview_popover.get_visible():
+            self._preview_picture.set_pixbuf(pb)
+        return False
 
     def _apply_viewer_transform(self):
         z  = self._viewer_zoom
