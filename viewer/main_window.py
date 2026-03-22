@@ -1247,6 +1247,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def open_map(self, btn=None):
         self.header.set_visible(False)
+        self.bottom_stack.set_visible(False)
         self.map_btn.set_label("🗺 laden...")
         self.map_btn.set_sensitive(False)
         self.map_container.set_visible_child_name("loading")
@@ -1294,13 +1295,21 @@ class MainWindow(Adw.ApplicationWindow):
             index = self.photos.index(valid[0])
             GLib.idle_add(self.open_photo, index)
         else:
-            # Cluster: toon alleen de foto's in dit cluster
+            # Cluster: toon gefilterde grid met alleen die foto's
             self._photos_before_cluster = self.photos
             self.photos = valid
-            GLib.idle_add(self.open_photo, 0)
+            # Toon locatienaam in header als beschikbaar
+            loc = self._photo_location.get(valid[0], "")
+            if loc:
+                self._cluster_location_label = f"Gefilterd op locatie: {loc}"
+            else:
+                self._cluster_location_label = f"Gefilterd ({len(valid)} foto's)"
+            self.photo_count_label.set_text(self._cluster_location_label)
+            GLib.idle_add(self.start_load)
 
     def close_map(self, btn=None):
         self.header.set_visible(True)
+        self.bottom_stack.set_visible(True)
         self.main_stack.set_visible_child_name("grid")
 
     # ── Viewer pagina ─────────────────────────────────────────────────
@@ -1904,7 +1913,8 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         self.spinner.stop()
         self.content_stack.set_visible_child_name("grid")
-        self.photo_count_label.set_text(f"{total} foto's")
+        cluster_lbl = getattr(self, '_cluster_location_label', None)
+        self.photo_count_label.set_text(cluster_lbl if cluster_lbl else f"{total} foto's")
         self._loading = False
         GLib.timeout_add(800, self._update_timeline_from_positions)
         return False
@@ -1951,11 +1961,21 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
         self.spinner_label.set_text("Sorteren...")
-        threading.Thread(target=self._do_sort_bg, daemon=True).start()
+        sort_index = self.sort_combo.get_selected()
+        threading.Thread(target=self._do_sort_bg, args=(sort_index,), daemon=True).start()
         return False
 
-    def _do_sort_bg(self):
-        self.apply_sort()
+    def _do_sort_bg(self, sort_index):
+        photos = list(self.photos)
+        if sort_index == 0:
+            photos.sort(key=os.path.getmtime, reverse=True)
+        elif sort_index == 1:
+            photos.sort(key=os.path.getmtime)
+        elif sort_index == 2:
+            photos.sort(key=lambda p: os.path.basename(p).lower())
+        elif sort_index == 3:
+            photos.sort(key=lambda p: os.path.basename(p).lower(), reverse=True)
+        self.photos = photos
         GLib.idle_add(self.start_load)
 
     # ── Foto viewer ───────────────────────────────────────────────────
@@ -2018,6 +2038,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_full_photo(self, pixbuf, path, location=""):
         self._stop_video()
+        self._show_viewer_ui()   # reset opacity/visibility from any previous fade
         self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
         self.photo_picture.set_visible(True)
@@ -2078,6 +2099,8 @@ class MainWindow(Adw.ApplicationWindow):
         if hasattr(self, '_photos_before_cluster') and self._photos_before_cluster is not None:
             self.photos = self._photos_before_cluster
             self._photos_before_cluster = None
+            self._cluster_location_label = None
+            self.photo_count_label.set_text(f"{len(self.photos)} foto's")
         self.main_stack.set_visible_child_name("grid")
         GLib.idle_add(self._close_viewer_cleanup)
 
@@ -2220,6 +2243,9 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_video(self, path, location=""):
         self._stop_video()
         self._preview_cache = {}
+        self._viewer_zoom   = 1.0
+        self._viewer_offset = [0.0, 0.0]
+        self._show_viewer_ui()   # reset opacity/visibility from any previous fade
         self.photo_picture.set_visible(False)
         self.edit_btn.set_visible(False)
         self.video_display.set_visible(True)
@@ -2382,6 +2408,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.viewer_title_box,
             self.viewer_close_btn,
             self.viewer_delete_btn,
+            self.edit_btn,
             self.prev_btn,
             self.next_btn,
         ]
@@ -2389,7 +2416,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _reset_fade_timer(self):
         if self._fade_timer_id:
             GLib.source_remove(self._fade_timer_id)
-        self._fade_timer_id = GLib.timeout_add(800, self._start_fade)
+        delay = 800 if self._video_media else 10_000
+        self._fade_timer_id = GLib.timeout_add(delay, self._start_fade)
 
     def _cancel_fade(self):
         if self._fade_timer_id:
