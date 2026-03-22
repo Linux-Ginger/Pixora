@@ -50,6 +50,11 @@ FILM_THUMB       = 70
 BATCH_SIZE       = 30
 TILE_SIZE        = 256
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
+VIDEO_EXTENSIONS = {".mp4", ".mov"}
+
+
+def is_video(path):
+    return os.path.splitext(path)[1].lower() in VIDEO_EXTENSIONS
 BACKUP_FSTYPES   = {"ext4","ext3","ext2","ntfs","exfat","fuseblk","btrfs","xfs","vfat"}
 
 MONTHS_NL_FULL = [
@@ -176,6 +181,47 @@ def get_cache_path(photo_path):
     key   = hashlib.md5((photo_path + mtime).encode()).hexdigest()
     return os.path.join(CACHE_DIR, key + ".png")
 
+def get_video_duration(path):
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", path],
+            capture_output=True, text=True, timeout=5
+        )
+        data = json.loads(result.stdout)
+        return float(data.get("format", {}).get("duration", 0))
+    except Exception:
+        return 0.0
+
+
+def format_duration(seconds):
+    seconds = int(seconds)
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    if h:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
+def get_video_gps_coords(path):
+    import re
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", path],
+            capture_output=True, text=True, timeout=5
+        )
+        data = json.loads(result.stdout)
+        tags = data.get("format", {}).get("tags", {})
+        loc = (tags.get("location") or
+               tags.get("com.apple.quicktime.location.ISO6709") or "")
+        if loc:
+            m = re.match(r'([+-]\d+\.\d+)([+-]\d+\.\d+)', loc)
+            if m:
+                return (float(m.group(1)), float(m.group(2)))
+    except Exception:
+        pass
+    return None
+
+
 def load_thumbnail(photo_path):
     cache_path = get_cache_path(photo_path)
     if os.path.exists(cache_path):
@@ -183,9 +229,20 @@ def load_thumbnail(photo_path):
             return GdkPixbuf.Pixbuf.new_from_file(cache_path)
         except Exception:
             pass
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    if is_video(photo_path):
+        try:
+            subprocess.run(
+                ["ffmpeg", "-i", photo_path, "-ss", "00:00:01", "-vframes", "1",
+                 "-vf", f"scale={THUMB_SIZE}:{THUMB_SIZE}:force_original_aspect_ratio=decrease",
+                 cache_path, "-y"],
+                capture_output=True, timeout=15
+            )
+            return GdkPixbuf.Pixbuf.new_from_file(cache_path)
+        except Exception:
+            return None
     try:
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(photo_path, THUMB_SIZE, THUMB_SIZE, True)
-        os.makedirs(CACHE_DIR, exist_ok=True)
         pixbuf.savev(cache_path, "png", [], [])
         return pixbuf
     except Exception:
@@ -710,6 +767,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_rect_origin      = None   # rect state at drag start
         self._filmstrip_thumbs      = {}     # index -> pixbuf
         self._filmstrip_load_id     = 0
+        self._video_media           = None
+        self._video_poll_id         = None
+        self._video_rotation        = 0
+        self._video_scrubbing_lock  = False
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -1171,6 +1232,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_picture.set_hexpand(True)
         viewer_area.add_overlay(self.photo_picture)
 
+        self.video_widget = Gtk.Video()
+        self.video_widget.set_vexpand(True)
+        self.video_widget.set_hexpand(True)
+        self.video_widget.set_visible(False)
+        viewer_area.add_overlay(self.video_widget)
+
         close_btn = Gtk.Button(icon_name="window-close-symbolic")
         close_btn.add_css_class("osd")
         close_btn.add_css_class("circular")
@@ -1332,6 +1399,64 @@ class MainWindow(Adw.ApplicationWindow):
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self.on_viewer_key)
         self.add_controller(key_ctrl)
+
+        # ── Video controls ───────────────────────────────────────────
+        self.video_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.video_controls.add_css_class("osd")
+        self.video_controls.set_halign(Gtk.Align.FILL)
+        self.video_controls.set_valign(Gtk.Align.END)
+        self.video_controls.set_margin_bottom(FILM_THUMB + 12 + 8)
+        self.video_controls.set_margin_start(16)
+        self.video_controls.set_margin_end(16)
+        self.video_controls.set_visible(False)
+
+        self.video_play_btn = Gtk.Button(icon_name="media-playback-start-symbolic")
+        self.video_play_btn.add_css_class("flat")
+        self.video_play_btn.add_css_class("circular")
+        self.video_play_btn.connect("clicked", self._on_video_play_pause)
+        self.video_controls.append(self.video_play_btn)
+
+        self.video_scrubber = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.001)
+        self.video_scrubber.set_hexpand(True)
+        self.video_scrubber.set_draw_value(False)
+        self.video_scrubber.connect("value-changed", self._on_video_scrub)
+        self.video_controls.append(self.video_scrubber)
+
+        self.video_time_label = Gtk.Label(label="0:00 / 0:00")
+        self.video_time_label.set_width_chars(13)
+        self.video_controls.append(self.video_time_label)
+
+        sep1 = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        sep1.set_margin_top(8)
+        sep1.set_margin_bottom(8)
+        self.video_controls.append(sep1)
+
+        self.video_mute_btn = Gtk.Button(icon_name="audio-volume-high-symbolic")
+        self.video_mute_btn.add_css_class("flat")
+        self.video_mute_btn.add_css_class("circular")
+        self.video_mute_btn.connect("clicked", self._on_video_mute)
+        self.video_controls.append(self.video_mute_btn)
+
+        self.video_vol_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.05)
+        self.video_vol_scale.set_value(1.0)
+        self.video_vol_scale.set_size_request(90, -1)
+        self.video_vol_scale.set_draw_value(False)
+        self.video_vol_scale.connect("value-changed", self._on_video_volume)
+        self.video_controls.append(self.video_vol_scale)
+
+        sep2 = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        sep2.set_margin_top(8)
+        sep2.set_margin_bottom(8)
+        self.video_controls.append(sep2)
+
+        self.video_rotate_btn = Gtk.Button(icon_name="object-rotate-right-symbolic")
+        self.video_rotate_btn.add_css_class("flat")
+        self.video_rotate_btn.add_css_class("circular")
+        self.video_rotate_btn.set_tooltip_text("Draaien")
+        self.video_rotate_btn.connect("clicked", self._on_video_rotate)
+        self.video_controls.append(self.video_rotate_btn)
+
+        viewer_area.add_overlay(self.video_controls)
 
         # ── Filmstrip ────────────────────────────────────────────────
         self.filmstrip_scroll = Gtk.ScrolledWindow()
@@ -1506,7 +1631,8 @@ class MainWindow(Adw.ApplicationWindow):
                 if load_id != self._load_id:
                     return
                 pixbuf = load_thumbnail(photos[idx])
-                batch.append((idx, photos[idx], pixbuf))
+                dur = get_video_duration(photos[idx]) if is_video(photos[idx]) else 0.0
+                batch.append((idx, photos[idx], pixbuf, dur))
                 loaded += 1
                 if len(batch) >= BATCH_SIZE:
                     GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
@@ -1546,7 +1672,7 @@ class MainWindow(Adw.ApplicationWindow):
         if load_id != self._load_id:
             return False
         self.spinner_label.set_text(f"Foto's laden... {loaded} / {total}")
-        for index, path, pixbuf in batch:
+        for index, path, pixbuf, duration in batch:
             if pixbuf:
                 picture = Gtk.Picture.new_for_pixbuf(pixbuf)
             else:
@@ -1557,6 +1683,47 @@ class MainWindow(Adw.ApplicationWindow):
             overlay = Gtk.Overlay()
             overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
             overlay.set_child(picture)
+
+            # Video overlay: play icon + duration
+            if duration > 0:
+                play_box = Gtk.Box()
+                play_box.set_halign(Gtk.Align.CENTER)
+                play_box.set_valign(Gtk.Align.CENTER)
+                play_css = Gtk.CssProvider()
+                play_css.load_from_string(
+                    "box { background-color: rgba(0,0,0,0.5); border-radius: 50%; padding: 8px; }"
+                )
+                play_box.get_style_context().add_provider(
+                    play_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                play_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+                play_icon.set_pixel_size(24)
+                play_icon_css = Gtk.CssProvider()
+                play_icon_css.load_from_string("image { color: white; }")
+                play_icon.get_style_context().add_provider(
+                    play_icon_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                play_box.append(play_icon)
+                overlay.add_overlay(play_box)
+
+                dur_box = Gtk.Box()
+                dur_box.set_halign(Gtk.Align.END)
+                dur_box.set_valign(Gtk.Align.END)
+                dur_box.set_margin_end(6)
+                dur_box.set_margin_bottom(6)
+                dur_css = Gtk.CssProvider()
+                dur_css.load_from_string(
+                    "box { background-color: rgba(0,0,0,0.65); border-radius: 4px; padding: 2px 5px; }"
+                )
+                dur_box.get_style_context().add_provider(
+                    dur_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                dur_label = Gtk.Label(label=format_duration(duration))
+                dur_label_css = Gtk.CssProvider()
+                dur_label_css.load_from_string(
+                    "label { color: white; font-size: 10px; font-weight: bold; }"
+                )
+                dur_label.get_style_context().add_provider(
+                    dur_label_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                dur_box.append(dur_label)
+                overlay.add_overlay(dur_box)
 
             check_box = Gtk.Box()
             check_box.set_size_request(22, 22)
@@ -1664,6 +1831,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.current_index = index
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
+        self._stop_video()
         self.photo_picture.set_pixbuf(None)
         self.viewer_location.set_text("")
         self.main_stack.set_visible_child_name("viewer")
@@ -1679,6 +1847,18 @@ class MainWindow(Adw.ApplicationWindow):
         ).start()
 
     def _load_full_photo(self, path, load_id):
+        if is_video(path):
+            location = self._photo_location.get(path)
+            if location is None:
+                coords = get_video_gps_coords(path)
+                if coords:
+                    location = reverse_geocode(coords[0], coords[1])
+                else:
+                    location = ""
+                self._photo_location[path] = location
+            if load_id == self._viewer_load_id:
+                GLib.idle_add(self._show_video, path, location)
+            return
         try:
             pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
         except Exception:
@@ -1695,6 +1875,11 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._show_full_photo, pixbuf, path, location)
 
     def _show_full_photo(self, pixbuf, path, location=""):
+        self._stop_video()
+        self.video_widget.set_visible(False)
+        self.video_controls.set_visible(False)
+        self.photo_picture.set_visible(True)
+        self.edit_btn.set_visible(True)
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
         self._viewer_pixbuf = pixbuf
@@ -1714,6 +1899,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def prev_photo(self, btn=None):
         if self.current_index > 0:
+            self._stop_video()
             self.current_index -= 1
             self._viewer_load_id += 1
             load_id = self._viewer_load_id
@@ -1728,6 +1914,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def next_photo(self, btn=None):
         if self.current_index < len(self.photos) - 1:
+            self._stop_video()
             self.current_index += 1
             self._viewer_load_id += 1
             load_id = self._viewer_load_id
@@ -1741,8 +1928,13 @@ class MainWindow(Adw.ApplicationWindow):
             ).start()
 
     def close_viewer(self, btn=None):
+        self._stop_video()
         self._viewer_load_id += 1
         self.photo_picture.set_pixbuf(None)
+        self.video_widget.set_visible(False)
+        self.video_controls.set_visible(False)
+        self.photo_picture.set_visible(True)
+        self.edit_btn.set_visible(True)
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
         if hasattr(self, '_photos_before_cluster') and self._photos_before_cluster is not None:
@@ -1771,8 +1963,16 @@ class MainWindow(Adw.ApplicationWindow):
             if i in self._filmstrip_thumbs:
                 continue
             try:
-                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-                    path, FILM_THUMB, FILM_THUMB, True)
+                if is_video(path):
+                    pb = load_thumbnail(path)  # uses ffmpeg cache
+                    if pb:
+                        pb = pb.scale_simple(
+                            min(FILM_THUMB, pb.get_width()),
+                            min(FILM_THUMB, pb.get_height()),
+                            GdkPixbuf.InterpType.BILINEAR)
+                else:
+                    pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                        path, FILM_THUMB, FILM_THUMB, True)
             except Exception:
                 pb = None
             if load_id != self._filmstrip_load_id:
@@ -1817,6 +2017,19 @@ class MainWindow(Adw.ApplicationWindow):
                 cr.set_source_rgba(0.3, 0.3, 0.3, 1.0)
                 self._film_rounded_rect(cr, x, y, FILM_THUMB, FILM_THUMB, 6)
                 cr.fill()
+            # video: draw play triangle
+            if i < len(self.photos) and is_video(self.photos[i]):
+                cx = x + FILM_THUMB // 2
+                cy = y + FILM_THUMB // 2
+                cr.set_source_rgba(0, 0, 0, 0.45)
+                cr.arc(cx, cy, 13, 0, 2 * math.pi)
+                cr.fill()
+                cr.set_source_rgba(1, 1, 1, 0.95)
+                cr.move_to(cx - 4, cy - 7)
+                cr.line_to(cx - 4, cy + 7)
+                cr.line_to(cx + 9, cy)
+                cr.close_path()
+                cr.fill()
             # highlight current with orange rounded border
             if i == self.current_index:
                 cr.set_source_rgba(0.914, 0.329, 0.125, 1.0)
@@ -1851,6 +2064,115 @@ class MainWindow(Adw.ApplicationWindow):
         target = center_of_current - page / 2
         adj.set_value(max(0, min(target, adj.get_upper() - page)))
         return False
+
+    # ── Video speler ──────────────────────────────────────────────────
+
+    def _show_video(self, path, location=""):
+        self._stop_video()
+        self.photo_picture.set_visible(False)
+        self.edit_btn.set_visible(False)
+        self.video_widget.set_visible(True)
+        self.video_controls.set_visible(True)
+        self._video_rotation = 0
+        self._apply_video_rotation()
+        self._video_media = Gtk.MediaFile.new_for_filename(path)
+        self.video_widget.set_media_stream(self._video_media)
+        self._video_media.play()
+        self.video_play_btn.set_icon_name("media-playback-pause-symbolic")
+        self.video_mute_btn.set_icon_name("audio-volume-high-symbolic")
+        self.video_vol_scale.set_value(1.0)
+        self.video_scrubber.set_value(0.0)
+        self.video_time_label.set_text("0:00 / 0:00")
+        mtime = os.path.getmtime(path)
+        datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y  %H:%M")
+        self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
+        self.viewer_location.set_text(f"📍 {location}" if location else "")
+        self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
+        self.prev_btn.set_sensitive(self.current_index > 0)
+        self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
+        self.filmstrip_area.queue_draw()
+        GLib.idle_add(self._scroll_filmstrip_to_current)
+        self._start_video_poll()
+        return False
+
+    def _stop_video(self):
+        self._stop_video_poll()
+        if self._video_media:
+            self._video_media.pause()
+            self._video_media = None
+
+    def _start_video_poll(self):
+        self._stop_video_poll()
+        self._video_poll_id = GLib.timeout_add(250, self._update_video_position)
+
+    def _stop_video_poll(self):
+        if self._video_poll_id:
+            GLib.source_remove(self._video_poll_id)
+            self._video_poll_id = None
+
+    def _update_video_position(self):
+        if not self._video_media:
+            return False
+        dur = self._video_media.get_duration()
+        pos = self._video_media.get_timestamp()
+        if dur > 0:
+            self._video_scrubbing_lock = True
+            self.video_scrubber.set_value(pos / dur)
+            self._video_scrubbing_lock = False
+        pos_s = pos // 1_000_000
+        dur_s = dur // 1_000_000
+        self.video_time_label.set_text(
+            f"{format_duration(pos_s)} / {format_duration(dur_s)}"
+        )
+        if self._video_media.get_ended():
+            self.video_play_btn.set_icon_name("media-playback-start-symbolic")
+            return False
+        return True
+
+    def _on_video_play_pause(self, btn):
+        if not self._video_media:
+            return
+        if self._video_media.get_playing():
+            self._video_media.pause()
+            btn.set_icon_name("media-playback-start-symbolic")
+            self._stop_video_poll()
+        else:
+            self._video_media.play()
+            btn.set_icon_name("media-playback-pause-symbolic")
+            self._start_video_poll()
+
+    def _on_video_scrub(self, scale):
+        if self._video_scrubbing_lock or not self._video_media:
+            return
+        dur = self._video_media.get_duration()
+        if dur > 0:
+            self._video_media.seek(int(scale.get_value() * dur))
+
+    def _on_video_mute(self, btn):
+        if not self._video_media:
+            return
+        muted = not self._video_media.get_muted()
+        self._video_media.set_muted(muted)
+        btn.set_icon_name(
+            "audio-volume-muted-symbolic" if muted else "audio-volume-high-symbolic"
+        )
+
+    def _on_video_volume(self, scale):
+        if not self._video_media:
+            return
+        self._video_media.set_volume(scale.get_value())
+
+    def _on_video_rotate(self, btn):
+        self._video_rotation = (self._video_rotation + 90) % 360
+        self._apply_video_rotation()
+
+    def _apply_video_rotation(self):
+        css_str = f"video {{ transform: rotate({self._video_rotation}deg); }}"
+        provider = Gtk.CssProvider()
+        provider.load_from_string(css_str)
+        self.video_widget.get_style_context().add_provider(
+            provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
     def _apply_viewer_transform(self):
         z  = self._viewer_zoom
