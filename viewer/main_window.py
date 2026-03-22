@@ -1045,7 +1045,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.editor_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.editor_bar.set_halign(Gtk.Align.CENTER)
         self.editor_bar.set_valign(Gtk.Align.END)
-        self.editor_bar.set_margin_bottom(24)
+        self.editor_bar.set_margin_bottom(FILM_THUMB + 12 + 16)
         self.editor_bar.set_visible(False)
 
         rot_left_btn = Gtk.Button(icon_name="object-rotate-left-symbolic")
@@ -1253,7 +1253,11 @@ class MainWindow(Adw.ApplicationWindow):
         if not self.date_widgets:
             return False
         adj        = self.scroll.get_vadjustment()
-        max_scroll = adj.get_upper() - adj.get_page_size()
+        upper      = adj.get_upper()
+        max_scroll = upper - adj.get_page_size()
+        # When all content fits in one page (max_scroll<=0) use total height
+        # so positions are still distributed proportionally across the bar.
+        draw_scale = max_scroll if max_scroll > 1 else upper
 
         # Collect pixel Y position of every date header
         items = []
@@ -1292,7 +1296,7 @@ class MainWindow(Adw.ApplicationWindow):
             else:
                 entries.append((date_str, y_px, False))
 
-        self.timeline.set_data(entries, max(max_scroll, 0.0))
+        self.timeline.set_data(entries, max(draw_scale, 1.0))
 
         # Retry until every date header has been laid out
         if len(items) < len(self.date_widgets):
