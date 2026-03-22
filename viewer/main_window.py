@@ -658,12 +658,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_drag    = None
         self._map_widget     = None
         self._viewer_pixbuf  = None
-        self._editor_active       = False
-        self._editor_rotation     = 0
-        self._editor_crop_mode    = False
+        self._editor_active         = False
+        self._editor_rotation       = 0
+        self._editor_crop_mode      = False
         self._editor_display_pixbuf = None
-        self._crop_start      = None
-        self._crop_end        = None
+        self._crop_rect             = None   # [x1, y1, x2, y2] widget coords
+        self._crop_handle           = None   # 'tl','tr','bl','br','move'
+        self._crop_rect_origin      = None   # rect state at drag start
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -1597,12 +1598,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Foto editor ───────────────────────────────────────────────────
     def on_edit_current(self, btn):
-        self._editor_active       = True
-        self._editor_rotation     = 0
-        self._editor_crop_mode    = False
+        self._editor_active         = True
+        self._editor_rotation       = 0
+        self._editor_crop_mode      = False
         self._editor_display_pixbuf = self._viewer_pixbuf
-        self._crop_start          = None
-        self._crop_end            = None
+        self._crop_rect             = None
+        self._crop_handle           = None
+        self._crop_rect_origin      = None
         self.crop_toggle_btn.set_active(False)
         self.crop_overlay_area.set_visible(False)
         self.editor_bar.set_visible(True)
@@ -1610,12 +1612,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.set_sensitive(False)
 
     def on_editor_cancel(self, btn=None):
-        self._editor_active       = False
-        self._editor_rotation     = 0
-        self._editor_crop_mode    = False
+        self._editor_active         = False
+        self._editor_rotation       = 0
+        self._editor_crop_mode      = False
         self._editor_display_pixbuf = None
-        self._crop_start          = None
-        self._crop_end            = None
+        self._crop_rect             = None
+        self._crop_handle           = None
+        self._crop_rect_origin      = None
         self.crop_toggle_btn.set_active(False)
         self.crop_overlay_area.set_visible(False)
         self.editor_bar.set_visible(False)
@@ -1625,22 +1628,22 @@ class MainWindow(Adw.ApplicationWindow):
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
 
-    def on_editor_rotate_left(self, btn):
-        self._editor_rotation = (self._editor_rotation + 90) % 360
+    def _reset_crop(self):
         self._editor_crop_mode = False
         self.crop_toggle_btn.set_active(False)
         self.crop_overlay_area.set_visible(False)
-        self._crop_start = None
-        self._crop_end = None
+        self._crop_rect        = None
+        self._crop_handle      = None
+        self._crop_rect_origin = None
+
+    def on_editor_rotate_left(self, btn):
+        self._editor_rotation = (self._editor_rotation + 90) % 360
+        self._reset_crop()
         self._editor_apply_preview()
 
     def on_editor_rotate_right(self, btn):
         self._editor_rotation = (self._editor_rotation - 90) % 360
-        self._editor_crop_mode = False
-        self.crop_toggle_btn.set_active(False)
-        self.crop_overlay_area.set_visible(False)
-        self._crop_start = None
-        self._crop_end = None
+        self._reset_crop()
         self._editor_apply_preview()
 
     def _editor_apply_preview(self):
@@ -1662,82 +1665,136 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_editor_toggle_crop(self, btn):
         self._editor_crop_mode = btn.get_active()
-        self._crop_start = None
-        self._crop_end = None
+        self._crop_rect        = None
+        self._crop_handle      = None
+        self._crop_rect_origin = None
         self.crop_overlay_area.set_visible(self._editor_crop_mode)
         if self._editor_crop_mode:
             self.crop_overlay_area.queue_draw()
 
+    def _get_image_display_rect(self, widget_w, widget_h):
+        """Geeft (x, y, w, h) van de foto binnen de widget (letterbox)."""
+        pixbuf = self._editor_display_pixbuf or self._viewer_pixbuf
+        if not pixbuf:
+            return (0, 0, widget_w, widget_h)
+        img_w  = pixbuf.get_width()
+        img_h  = pixbuf.get_height()
+        scale  = min(widget_w / img_w, widget_h / img_h)
+        disp_w = img_w * scale
+        disp_h = img_h * scale
+        return ((widget_w - disp_w) / 2, (widget_h - disp_h) / 2, disp_w, disp_h)
+
     def on_crop_draw(self, area, cr, w, h):
-        cr.set_source_rgba(0, 0, 0, 0.5)
+        # Initialiseer crop rect op de foto-grenzen
+        if self._crop_rect is None:
+            ix, iy, iw, ih = self._get_image_display_rect(w, h)
+            self._crop_rect = [ix, iy, ix + iw, iy + ih]
+
+        x1, y1, x2, y2 = self._crop_rect
+        rw, rh = x2 - x1, y2 - y1
+
+        # Donkere overlay
+        cr.set_source_rgba(0, 0, 0, 0.55)
         cr.paint()
-        if self._crop_start and self._crop_end:
-            x1, y1 = self._crop_start
-            x2, y2 = self._crop_end
-            rx = min(x1, x2)
-            ry = min(y1, y2)
-            rw = abs(x2 - x1)
-            rh = abs(y2 - y1)
-            if rw > 4 and rh > 4:
-                cr.set_operator(cairo.OPERATOR_CLEAR)
-                cr.rectangle(rx, ry, rw, rh)
-                cr.fill()
-                cr.set_operator(cairo.OPERATOR_OVER)
-                cr.set_source_rgba(1, 1, 1, 0.9)
-                cr.set_line_width(2)
-                cr.rectangle(rx, ry, rw, rh)
-                cr.stroke()
-                # Derde-lijn rasters
-                cr.set_source_rgba(1, 1, 1, 0.4)
-                cr.set_line_width(1)
-                for i in (1, 2):
-                    cr.move_to(rx + rw * i / 3, ry)
-                    cr.line_to(rx + rw * i / 3, ry + rh)
-                    cr.move_to(rx, ry + rh * i / 3)
-                    cr.line_to(rx + rw, ry + rh * i / 3)
-                cr.stroke()
-        else:
-            cr.set_operator(cairo.OPERATOR_OVER)
-            cr.set_source_rgba(1, 1, 1, 0.7)
-            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-            cr.set_font_size(18)
-            text = "Sleep om bij te snijden"
-            ext = cr.text_extents(text)
-            cr.move_to((w - ext.width) / 2, h / 2)
-            cr.show_text(text)
+
+        # Snijgebied uitsparen
+        cr.set_operator(cairo.OPERATOR_CLEAR)
+        cr.rectangle(x1, y1, rw, rh)
+        cr.fill()
+        cr.set_operator(cairo.OPERATOR_OVER)
+
+        # Rand
+        cr.set_source_rgba(1, 1, 1, 1.0)
+        cr.set_line_width(2)
+        cr.rectangle(x1, y1, rw, rh)
+        cr.stroke()
+
+        # Derde-lijn rasters
+        cr.set_source_rgba(1, 1, 1, 0.35)
+        cr.set_line_width(1)
+        for i in (1, 2):
+            cr.move_to(x1 + rw * i / 3, y1)
+            cr.line_to(x1 + rw * i / 3, y2)
+            cr.move_to(x1, y1 + rh * i / 3)
+            cr.line_to(x2, y1 + rh * i / 3)
+        cr.stroke()
+
+        # Hoekpunten (witte gevulde cirkels)
+        HANDLE_R = 7
+        for hx, hy in [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]:
+            cr.set_source_rgba(0, 0, 0, 0.5)
+            cr.arc(hx, hy, HANDLE_R + 2, 0, 2 * math.pi)
+            cr.fill()
+            cr.set_source_rgba(1, 1, 1, 1.0)
+            cr.arc(hx, hy, HANDLE_R, 0, 2 * math.pi)
+            cr.fill()
 
     def on_crop_drag_begin(self, gesture, x, y):
-        self._crop_start = (x, y)
-        self._crop_end   = (x, y)
-        self.crop_overlay_area.queue_draw()
+        if self._crop_rect is None:
+            return
+        self._crop_rect_origin = list(self._crop_rect)
+        HANDLE_R = 20  # detectie-straal
+        x1, y1, x2, y2 = self._crop_rect
+        for name, (hx, hy) in [('tl', (x1, y1)), ('tr', (x2, y1)),
+                                ('bl', (x1, y2)), ('br', (x2, y2))]:
+            if (x - hx) ** 2 + (y - hy) ** 2 < HANDLE_R ** 2:
+                self._crop_handle = name
+                return
+        if x1 <= x <= x2 and y1 <= y <= y2:
+            self._crop_handle = 'move'
+        else:
+            self._crop_handle = None
 
     def on_crop_drag_update(self, gesture, dx, dy):
-        if self._crop_start:
-            x0, y0 = self._crop_start
-            self._crop_end = (x0 + dx, y0 + dy)
-            self.crop_overlay_area.queue_draw()
+        if not self._crop_handle or not self._crop_rect_origin:
+            return
+        ox1, oy1, ox2, oy2 = self._crop_rect_origin
+        MIN = 40
+        aw = self.crop_overlay_area.get_width()
+        ah = self.crop_overlay_area.get_height()
+        ix, iy, iw, ih = self._get_image_display_rect(aw, ah)
+        ix2, iy2 = ix + iw, iy + ih
+
+        r = list(self._crop_rect)
+        h = self._crop_handle
+        if h == 'tl':
+            r[0] = max(ix, min(ox2 - MIN, ox1 + dx))
+            r[1] = max(iy, min(oy2 - MIN, oy1 + dy))
+        elif h == 'tr':
+            r[2] = min(ix2, max(ox1 + MIN, ox2 + dx))
+            r[1] = max(iy, min(oy2 - MIN, oy1 + dy))
+        elif h == 'bl':
+            r[0] = max(ix, min(ox2 - MIN, ox1 + dx))
+            r[3] = min(iy2, max(oy1 + MIN, oy2 + dy))
+        elif h == 'br':
+            r[2] = min(ix2, max(ox1 + MIN, ox2 + dx))
+            r[3] = min(iy2, max(oy1 + MIN, oy2 + dy))
+        elif h == 'move':
+            rw = ox2 - ox1
+            rh = oy2 - oy1
+            nx1 = max(ix, min(ix2 - rw, ox1 + dx))
+            ny1 = max(iy, min(iy2 - rh, oy1 + dy))
+            r = [nx1, ny1, nx1 + rw, ny1 + rh]
+        self._crop_rect = r
+        self.crop_overlay_area.queue_draw()
 
     def on_crop_drag_end(self, gesture, dx, dy):
-        if self._crop_start:
-            x0, y0 = self._crop_start
-            self._crop_end = (x0 + dx, y0 + dy)
-            self.crop_overlay_area.queue_draw()
+        self._crop_handle      = None
+        self._crop_rect_origin = None
 
     def _widget_to_image_coords(self, wx, wy, widget_w, widget_h):
         pixbuf = self._editor_display_pixbuf or self._viewer_pixbuf
         if not pixbuf:
             return None
-        img_w = pixbuf.get_width()
-        img_h = pixbuf.get_height()
+        img_w  = pixbuf.get_width()
+        img_h  = pixbuf.get_height()
         scale  = min(widget_w / img_w, widget_h / img_h)
         disp_w = img_w * scale
         disp_h = img_h * scale
         x_off  = (widget_w - disp_w) / 2
         y_off  = (widget_h - disp_h) / 2
-        ix = (wx - x_off) / scale
-        iy = (wy - y_off) / scale
-        ix = max(0, min(img_w, ix))
-        iy = max(0, min(img_h, iy))
+        ix = max(0, min(img_w, (wx - x_off) / scale))
+        iy = max(0, min(img_h, (wy - y_off) / scale))
         return (int(ix), int(iy))
 
     def on_editor_save(self, btn):
@@ -1745,24 +1802,22 @@ class MainWindow(Adw.ApplicationWindow):
         rotation = self._editor_rotation
 
         crop_box = None
-        if self._editor_crop_mode and self._crop_start and self._crop_end:
-            w = self.crop_overlay_area.get_width()
-            h = self.crop_overlay_area.get_height()
-            p1 = self._widget_to_image_coords(self._crop_start[0], self._crop_start[1], w, h)
-            p2 = self._widget_to_image_coords(self._crop_end[0],   self._crop_end[1],   w, h)
-            if p1 and p2:
-                x1, y1 = p1
-                x2, y2 = p2
-                rw = abs(x2 - x1)
-                rh = abs(y2 - y1)
-                if rw > 4 and rh > 4:
-                    crop_box = (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+        if self._editor_crop_mode and self._crop_rect:
+            aw = self.crop_overlay_area.get_width()
+            ah = self.crop_overlay_area.get_height()
+            p1 = self._widget_to_image_coords(self._crop_rect[0], self._crop_rect[1], aw, ah)
+            p2 = self._widget_to_image_coords(self._crop_rect[2], self._crop_rect[3], aw, ah)
+            if p1 and p2 and abs(p2[0] - p1[0]) > 4 and abs(p2[1] - p1[1]) > 4:
+                crop_box = (min(p1[0], p2[0]), min(p1[1], p2[1]),
+                            max(p1[0], p2[0]), max(p1[1], p2[1]))
 
         self.on_editor_cancel()
 
         def _do_save():
             try:
                 from PIL import Image
+                original_mtime = os.path.getmtime(path)
+                old_cache = get_cache_path(path)
                 img = Image.open(path)
                 if rotation != 0:
                     img = img.rotate(rotation, expand=True)
@@ -1773,6 +1828,10 @@ class MainWindow(Adw.ApplicationWindow):
                     img.save(path, "JPEG", quality=95)
                 else:
                     img.save(path, "PNG")
+                # Verwijder oude thumbnail-cache en herstel originele datum
+                if os.path.exists(old_cache):
+                    os.remove(old_cache)
+                os.utime(path, (original_mtime, original_mtime))
                 GLib.idle_add(_after_save)
             except Exception as e:
                 print(f"Editor opslaan mislukt: {e}")
