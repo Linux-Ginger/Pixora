@@ -681,6 +681,10 @@ class MainWindow(Adw.ApplicationWindow):
         if photo_path:
             os.makedirs(photo_path, exist_ok=True)
 
+        self.set_hide_on_close(False)
+        btn_layout = Gtk.Settings.get_default()
+        btn_layout.set_property("gtk-decoration-layout", "icon:close,minimize")
+
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
 
@@ -1459,6 +1463,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_picture.get_style_context().add_provider(
             css, Gtk.STYLE_PROVIDER_PRIORITY_USER
         )
+        zoomed = z > 1.0
+        self.prev_btn.set_visible(not zoomed)
+        self.next_btn.set_visible(not zoomed)
+        self.viewer_counter.set_visible(not zoomed)
 
     def on_viewer_scroll(self, ctrl, dx, dy):
         if self.main_stack.get_visible_child_name() != "viewer":
