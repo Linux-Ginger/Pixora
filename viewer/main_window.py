@@ -329,7 +329,7 @@ class MapWidget(Gtk.DrawingArea):
         # Scroll (muis + trackpad)
         scroll_ctrl = Gtk.EventControllerScroll.new(
             Gtk.EventControllerScrollFlags.VERTICAL |
-            Gtk.EventControllerScrollFlags.KINETIC
+            Gtk.EventControllerScrollFlags.BOTH_AXES
         )
         scroll_ctrl.connect("scroll", self.on_scroll)
         self.add_controller(scroll_ctrl)
@@ -618,6 +618,8 @@ class MapWidget(Gtk.DrawingArea):
             self.offset_y = (self.offset_y + cy) * scale - cy
             self.zoom     = new_zoom
             self._clamp_offset()
+            # Forceer nieuwe tiles voor dit zoomniveau
+            GLib.idle_add(self._request_visible_tiles)
             self.queue_draw()
 
     def on_drag_begin(self, gesture, x, y):
@@ -842,7 +844,7 @@ class MainWindow(Adw.ApplicationWindow):
         zoom_out_btn.connect("clicked", lambda _: self._map_widget and self._map_widget.zoom_by(-1))
         map_header.pack_end(zoom_out_btn)
 
-        self.map_count_label = Gtk.Label(label="Kaart")
+        self.map_count_label = Gtk.Label(label="Kaartweergave")
         self.map_count_label.add_css_class("dim-label")
         map_header.set_title_widget(self.map_count_label)
 
@@ -887,7 +889,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._map_widget = MapWidget(markers, self._open_photo_from_map)
         self.map_container.append(self._map_widget)
 
-        self.map_count_label.set_text(f"{len(markers)} foto's met GPS locatie")
+        self.map_count_label.set_text("Kaartweergave")
         self.map_btn.set_label("🗺")
         self.map_btn.set_sensitive(True)
         self.main_stack.set_visible_child_name("map")
