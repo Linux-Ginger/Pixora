@@ -43,6 +43,7 @@ CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
 TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
 THUMB_SIZE       = 180
+FILM_THUMB       = 70
 BATCH_SIZE       = 30
 TILE_SIZE        = 256
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
@@ -691,6 +692,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_rect             = None   # [x1, y1, x2, y2] widget coords
         self._crop_handle           = None   # 'tl','tr','bl','br','move'
         self._crop_rect_origin      = None   # rect state at drag start
+        self._filmstrip_thumbs      = {}     # index -> pixbuf
+        self._filmstrip_load_id     = 0
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -1113,7 +1116,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.prev_btn.set_halign(Gtk.Align.START)
         self.prev_btn.set_valign(Gtk.Align.CENTER)
         self.prev_btn.set_margin_start(16)
-        self.prev_btn.set_margin_bottom(60)
+        self.prev_btn.set_margin_bottom(105)
         self.prev_btn.set_size_request(48, 48)
         self.prev_btn.connect("clicked", self.prev_photo)
         viewer_area.add_overlay(self.prev_btn)
@@ -1124,7 +1127,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.set_halign(Gtk.Align.END)
         self.next_btn.set_valign(Gtk.Align.CENTER)
         self.next_btn.set_margin_end(16)
-        self.next_btn.set_margin_bottom(60)
+        self.next_btn.set_margin_bottom(105)
         self.next_btn.set_size_request(48, 48)
         self.next_btn.connect("clicked", self.next_photo)
         viewer_area.add_overlay(self.next_btn)
@@ -1148,10 +1151,31 @@ class MainWindow(Adw.ApplicationWindow):
         drag_ctrl.connect("drag-update", self.on_viewer_drag_update)
         drag_ctrl.connect("drag-end",    self.on_viewer_drag_end)
         viewer_area.add_controller(drag_ctrl)
-        
+
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self.on_viewer_key)
         self.add_controller(key_ctrl)
+
+        # ── Filmstrip ────────────────────────────────────────────────
+        self.filmstrip_scroll = Gtk.ScrolledWindow()
+        self.filmstrip_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
+        self.filmstrip_scroll.set_halign(Gtk.Align.FILL)
+        self.filmstrip_scroll.set_valign(Gtk.Align.END)
+        self.filmstrip_scroll.set_margin_bottom(8)
+        self.filmstrip_scroll.set_margin_start(8)
+        self.filmstrip_scroll.set_margin_end(8)
+        self.filmstrip_scroll.set_size_request(-1, FILM_THUMB + 12)
+
+        self.filmstrip_area = Gtk.DrawingArea()
+        self.filmstrip_area.set_draw_func(self._draw_filmstrip)
+        self.filmstrip_area.set_size_request(FILM_THUMB + 4, FILM_THUMB + 8)
+
+        film_click = Gtk.GestureClick()
+        film_click.connect("pressed", self._on_filmstrip_click)
+        self.filmstrip_area.add_controller(film_click)
+
+        self.filmstrip_scroll.set_child(self.filmstrip_area)
+        viewer_area.add_overlay(self.filmstrip_scroll)
 
         return viewer_area
 
@@ -1224,8 +1248,9 @@ class MainWindow(Adw.ApplicationWindow):
         items.sort(key=lambda e: e[0])
 
         # Bouw jaar+maand entries met afgekorte maandnamen
-        entries   = []
-        last_year = None
+        entries        = []
+        last_year      = None
+        last_month_num = None
         for frac, date_str in items:
             parts = date_str.split()
             if len(parts) == 3:
@@ -1234,11 +1259,15 @@ class MainWindow(Adw.ApplicationWindow):
                     month_num  = MONTHS_NL_FULL.index(parts[1].lower())
                     month_abbr = MONTHS_NL[month_num]
                 except (ValueError, IndexError):
+                    month_num  = 0
                     month_abbr = parts[1][:3]
                 if year_str != last_year:
                     entries.append((year_str, frac))
-                    last_year = year_str
-                entries.append((month_abbr, frac))
+                    last_year      = year_str
+                    last_month_num = None
+                if month_num != last_month_num:
+                    entries.append((month_abbr, frac))
+                    last_month_num = month_num
             else:
                 entries.append((date_str, frac))
 
@@ -1251,16 +1280,20 @@ class MainWindow(Adw.ApplicationWindow):
         total_photos = sum(len(indices) for _, _, indices in groups)
         if total_photos == 0:
             return []
-        entries    = []
-        cumulative = 0
-        last_year  = None
+        entries         = []
+        cumulative      = 0
+        last_year       = None
+        last_month_num  = None
         for date_str, date_obj, indices in groups:
             frac     = cumulative / total_photos
             year_str = str(date_obj.year)
             if year_str != last_year:
                 entries.append((year_str, frac))
-                last_year = year_str
-            entries.append((MONTHS_NL[date_obj.month], frac))
+                last_year      = year_str
+                last_month_num = None
+            if date_obj.month != last_month_num:
+                entries.append((MONTHS_NL[date_obj.month], frac))
+                last_month_num = date_obj.month
             cumulative += len(indices)
         return entries
 
@@ -1519,6 +1552,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_picture.set_pixbuf(None)
         self.viewer_location.set_text("")
         self.main_stack.set_visible_child_name("viewer")
+        self._filmstrip_thumbs = {}
+        self._update_filmstrip()
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
         threading.Thread(
@@ -1557,6 +1592,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
+        self.filmstrip_area.queue_draw()
+        GLib.idle_add(self._scroll_filmstrip_to_current)
         return False
 
     def prev_photo(self, btn=None):
@@ -1565,6 +1602,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._viewer_load_id += 1
             load_id = self._viewer_load_id
             self.viewer_location.set_text("")
+            self.filmstrip_area.queue_draw()
+            self._scroll_filmstrip_to_current()
             threading.Thread(
                 target=self._load_full_photo,
                 args=(self.photos[self.current_index], load_id),
@@ -1577,6 +1616,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._viewer_load_id += 1
             load_id = self._viewer_load_id
             self.viewer_location.set_text("")
+            self.filmstrip_area.queue_draw()
+            self._scroll_filmstrip_to_current()
             threading.Thread(
                 target=self._load_full_photo,
                 args=(self.photos[self.current_index], load_id),
@@ -1592,6 +1633,98 @@ class MainWindow(Adw.ApplicationWindow):
             self.photos = self._photos_before_cluster
             self._photos_before_cluster = None
         self.main_stack.set_visible_child_name("grid")
+
+    # ── Filmstrip ─────────────────────────────────────────────────────
+    def _update_filmstrip(self):
+        """Resize the DrawingArea and start loading thumbnails for all photos."""
+        n = len(self.photos)
+        w = n * (FILM_THUMB + 4)
+        self.filmstrip_area.set_size_request(max(w, FILM_THUMB + 4), FILM_THUMB + 8)
+        self._filmstrip_load_id += 1
+        load_id = self._filmstrip_load_id
+        threading.Thread(
+            target=self._load_filmstrip_bg,
+            args=(list(self.photos), load_id),
+            daemon=True
+        ).start()
+
+    def _load_filmstrip_bg(self, photos, load_id):
+        for i, path in enumerate(photos):
+            if load_id != self._filmstrip_load_id:
+                return
+            if i in self._filmstrip_thumbs:
+                continue
+            try:
+                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                    path, FILM_THUMB, FILM_THUMB, True)
+            except Exception:
+                pb = None
+            if load_id != self._filmstrip_load_id:
+                return
+            self._filmstrip_thumbs[i] = pb
+            GLib.idle_add(self.filmstrip_area.queue_draw)
+
+    def _draw_filmstrip(self, area, cr, width, height):
+        n = len(self.photos)
+        if n == 0:
+            return
+        cell = FILM_THUMB + 4
+        # dark background
+        cr.set_source_rgba(0, 0, 0, 0.65)
+        cr.rectangle(0, 0, width, height)
+        cr.fill()
+        for i in range(n):
+            x = i * cell + 2
+            y = (height - FILM_THUMB) // 2
+            pb = self._filmstrip_thumbs.get(i)
+            if pb:
+                # center the pixbuf within the cell
+                pw = pb.get_width()
+                ph = pb.get_height()
+                dx = x + (FILM_THUMB - pw) // 2
+                dy = y + (FILM_THUMB - ph) // 2
+                Gdk.cairo_set_source_pixbuf(cr, pb, dx, dy)
+                cr.rectangle(dx, dy, pw, ph)
+                cr.fill()
+            else:
+                # placeholder
+                cr.set_source_rgba(0.3, 0.3, 0.3, 1.0)
+                cr.rectangle(x, y, FILM_THUMB, FILM_THUMB)
+                cr.fill()
+            # highlight current
+            if i == self.current_index:
+                cr.set_source_rgba(0.914, 0.329, 0.125, 1.0)
+                cr.set_line_width(3)
+                cr.rectangle(x, y, FILM_THUMB, FILM_THUMB)
+                cr.stroke()
+
+    def _on_filmstrip_click(self, gesture, n_press, x, y):
+        cell = FILM_THUMB + 4
+        idx = int(x // cell)
+        if 0 <= idx < len(self.photos) and idx != self.current_index:
+            self.current_index = idx
+            self._viewer_load_id += 1
+            load_id = self._viewer_load_id
+            self.viewer_location.set_text("")
+            self.filmstrip_area.queue_draw()
+            threading.Thread(
+                target=self._load_full_photo,
+                args=(self.photos[idx], load_id),
+                daemon=True
+            ).start()
+
+    def _scroll_filmstrip_to_current(self):
+        """Scroll the filmstrip so the current photo is visible."""
+        cell = FILM_THUMB + 4
+        target = self.current_index * cell
+        adj = self.filmstrip_scroll.get_hadjustment()
+        page = adj.get_page_size()
+        lo = adj.get_value()
+        hi = lo + page - cell
+        if target < lo:
+            adj.set_value(max(0, target - cell))
+        elif target > hi:
+            adj.set_value(target - page + cell * 2)
 
     def _apply_viewer_transform(self):
         z  = self._viewer_zoom
@@ -1611,6 +1744,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.prev_btn.set_visible(not zoomed)
         self.next_btn.set_visible(not zoomed)
         self.viewer_counter.set_visible(not zoomed)
+        self.filmstrip_scroll.set_visible(not zoomed)
 
     def on_viewer_scroll(self, ctrl, dx, dy):
         if self.main_stack.get_visible_child_name() != "viewer":
