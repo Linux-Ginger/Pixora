@@ -657,6 +657,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_offset  = [0.0, 0.0]
         self._viewer_drag    = None
         self._map_widget     = None
+        self._viewer_pixbuf  = None
+        self._editor_active       = False
+        self._editor_rotation     = 0
+        self._editor_crop_mode    = False
+        self._editor_display_pixbuf = None
+        self._crop_start      = None
+        self._crop_end        = None
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -972,6 +979,78 @@ class MainWindow(Adw.ApplicationWindow):
         delete_btn.set_size_request(40, 40)
         delete_btn.connect("clicked", self.on_delete_current)
         viewer_area.add_overlay(delete_btn)
+
+        self.edit_btn = Gtk.Button(icon_name="document-edit-symbolic")
+        self.edit_btn.add_css_class("osd")
+        self.edit_btn.add_css_class("circular")
+        self.edit_btn.set_halign(Gtk.Align.END)
+        self.edit_btn.set_valign(Gtk.Align.START)
+        self.edit_btn.set_margin_top(16)
+        self.edit_btn.set_margin_end(120)
+        self.edit_btn.set_size_request(40, 40)
+        self.edit_btn.set_tooltip_text("Foto bewerken")
+        self.edit_btn.connect("clicked", self.on_edit_current)
+        viewer_area.add_overlay(self.edit_btn)
+
+        # ── Editor toolbar (verborgen tot editor modus) ────────────────
+        self.editor_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.editor_bar.add_css_class("osd")
+        self.editor_bar.set_halign(Gtk.Align.CENTER)
+        self.editor_bar.set_valign(Gtk.Align.END)
+        self.editor_bar.set_margin_bottom(24)
+        self.editor_bar.set_margin_start(12)
+        self.editor_bar.set_margin_end(12)
+        self.editor_bar.set_visible(False)
+
+        rot_left_btn = Gtk.Button(icon_name="object-rotate-left-symbolic")
+        rot_left_btn.add_css_class("circular")
+        rot_left_btn.set_tooltip_text("Draaien links (90°)")
+        rot_left_btn.connect("clicked", self.on_editor_rotate_left)
+        self.editor_bar.append(rot_left_btn)
+
+        rot_right_btn = Gtk.Button(icon_name="object-rotate-right-symbolic")
+        rot_right_btn.add_css_class("circular")
+        rot_right_btn.set_tooltip_text("Draaien rechts (90°)")
+        rot_right_btn.connect("clicked", self.on_editor_rotate_right)
+        self.editor_bar.append(rot_right_btn)
+
+        self.crop_toggle_btn = Gtk.ToggleButton(label="Bijsnijden")
+        self.crop_toggle_btn.add_css_class("circular")
+        self.crop_toggle_btn.set_tooltip_text("Interactief bijsnijden")
+        self.crop_toggle_btn.connect("toggled", self.on_editor_toggle_crop)
+        self.editor_bar.append(self.crop_toggle_btn)
+
+        sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        sep.set_margin_start(4)
+        sep.set_margin_end(4)
+        self.editor_bar.append(sep)
+
+        save_btn = Gtk.Button(label="Opslaan")
+        save_btn.add_css_class("circular")
+        save_btn.add_css_class("suggested-action")
+        save_btn.connect("clicked", self.on_editor_save)
+        self.editor_bar.append(save_btn)
+
+        cancel_editor_btn = Gtk.Button(label="Annuleren")
+        cancel_editor_btn.add_css_class("circular")
+        cancel_editor_btn.connect("clicked", self.on_editor_cancel)
+        self.editor_bar.append(cancel_editor_btn)
+
+        viewer_area.add_overlay(self.editor_bar)
+
+        # ── Crop overlay DrawingArea ───────────────────────────────────
+        self.crop_overlay_area = Gtk.DrawingArea()
+        self.crop_overlay_area.set_draw_func(self.on_crop_draw)
+        self.crop_overlay_area.set_vexpand(True)
+        self.crop_overlay_area.set_hexpand(True)
+        self.crop_overlay_area.set_visible(False)
+
+        crop_drag = Gtk.GestureDrag()
+        crop_drag.connect("drag-begin",  self.on_crop_drag_begin)
+        crop_drag.connect("drag-update", self.on_crop_drag_update)
+        crop_drag.connect("drag-end",    self.on_crop_drag_end)
+        self.crop_overlay_area.add_controller(crop_drag)
+        viewer_area.add_overlay(self.crop_overlay_area)
 
         title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         title_box.add_css_class("osd")
@@ -1407,6 +1486,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_full_photo(self, pixbuf, path, location=""):
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
+        self._viewer_pixbuf = pixbuf
         if pixbuf:
             self.photo_picture.set_pixbuf(pixbuf)
             self._apply_viewer_transform()
@@ -1495,16 +1575,219 @@ class MainWindow(Adw.ApplicationWindow):
     def on_viewer_key(self, controller, keyval, keycode, state):
         if self.main_stack.get_visible_child_name() != "viewer":
             return False
+        if keyval == 65307:  # Escape
+            if self._editor_active:
+                self.on_editor_cancel()
+            else:
+                self.close_viewer()
+            return True
+        if self._editor_active:
+            return False
         if keyval == 65361:
             self.prev_photo()
             return True
         elif keyval == 65363:
             self.next_photo()
             return True
-        elif keyval == 65307:
-            self.close_viewer()
-            return True
         return False
+
+    # ── Foto editor ───────────────────────────────────────────────────
+    def on_edit_current(self, btn):
+        self._editor_active       = True
+        self._editor_rotation     = 0
+        self._editor_crop_mode    = False
+        self._editor_display_pixbuf = self._viewer_pixbuf
+        self._crop_start          = None
+        self._crop_end            = None
+        self.crop_toggle_btn.set_active(False)
+        self.crop_overlay_area.set_visible(False)
+        self.editor_bar.set_visible(True)
+        self.prev_btn.set_sensitive(False)
+        self.next_btn.set_sensitive(False)
+
+    def on_editor_cancel(self, btn=None):
+        self._editor_active       = False
+        self._editor_rotation     = 0
+        self._editor_crop_mode    = False
+        self._editor_display_pixbuf = None
+        self._crop_start          = None
+        self._crop_end            = None
+        self.crop_toggle_btn.set_active(False)
+        self.crop_overlay_area.set_visible(False)
+        self.editor_bar.set_visible(False)
+        if self._viewer_pixbuf:
+            self.photo_picture.set_pixbuf(self._viewer_pixbuf)
+            self._apply_viewer_transform()
+        self.prev_btn.set_sensitive(self.current_index > 0)
+        self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
+
+    def on_editor_rotate_left(self, btn):
+        self._editor_rotation = (self._editor_rotation + 90) % 360
+        self._editor_crop_mode = False
+        self.crop_toggle_btn.set_active(False)
+        self.crop_overlay_area.set_visible(False)
+        self._crop_start = None
+        self._crop_end = None
+        self._editor_apply_preview()
+
+    def on_editor_rotate_right(self, btn):
+        self._editor_rotation = (self._editor_rotation - 90) % 360
+        self._editor_crop_mode = False
+        self.crop_toggle_btn.set_active(False)
+        self.crop_overlay_area.set_visible(False)
+        self._crop_start = None
+        self._crop_end = None
+        self._editor_apply_preview()
+
+    def _editor_apply_preview(self):
+        path = self.photos[self.current_index]
+        try:
+            from PIL import Image
+            import io
+            img = Image.open(path)
+            if self._editor_rotation != 0:
+                img = img.rotate(self._editor_rotation, expand=True)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            buf.seek(0)
+            loader = GdkPixbuf.PixbufLoader()
+            loader.write(buf.read())
+            loader.close()
+            self._editor_display_pixbuf = loader.get_pixbuf()
+            self.photo_picture.set_pixbuf(self._editor_display_pixbuf)
+        except Exception as e:
+            print(f"Editor preview fout: {e}")
+
+    def on_editor_toggle_crop(self, btn):
+        self._editor_crop_mode = btn.get_active()
+        self._crop_start = None
+        self._crop_end = None
+        self.crop_overlay_area.set_visible(self._editor_crop_mode)
+        if self._editor_crop_mode:
+            self.crop_overlay_area.queue_draw()
+
+    def on_crop_draw(self, area, cr, w, h):
+        cr.set_source_rgba(0, 0, 0, 0.5)
+        cr.paint()
+        if self._crop_start and self._crop_end:
+            x1, y1 = self._crop_start
+            x2, y2 = self._crop_end
+            rx = min(x1, x2)
+            ry = min(y1, y2)
+            rw = abs(x2 - x1)
+            rh = abs(y2 - y1)
+            if rw > 4 and rh > 4:
+                cr.set_operator(cairo.OPERATOR_CLEAR)
+                cr.rectangle(rx, ry, rw, rh)
+                cr.fill()
+                cr.set_operator(cairo.OPERATOR_OVER)
+                cr.set_source_rgba(1, 1, 1, 0.9)
+                cr.set_line_width(2)
+                cr.rectangle(rx, ry, rw, rh)
+                cr.stroke()
+                # Derde-lijn rasters
+                cr.set_source_rgba(1, 1, 1, 0.4)
+                cr.set_line_width(1)
+                for i in (1, 2):
+                    cr.move_to(rx + rw * i / 3, ry)
+                    cr.line_to(rx + rw * i / 3, ry + rh)
+                    cr.move_to(rx, ry + rh * i / 3)
+                    cr.line_to(rx + rw, ry + rh * i / 3)
+                cr.stroke()
+        else:
+            cr.set_operator(cairo.OPERATOR_OVER)
+            cr.set_source_rgba(1, 1, 1, 0.7)
+            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+            cr.set_font_size(18)
+            text = "Sleep om bij te snijden"
+            ext = cr.text_extents(text)
+            cr.move_to((w - ext.width) / 2, h / 2)
+            cr.show_text(text)
+
+    def on_crop_drag_begin(self, gesture, x, y):
+        self._crop_start = (x, y)
+        self._crop_end   = (x, y)
+        self.crop_overlay_area.queue_draw()
+
+    def on_crop_drag_update(self, gesture, dx, dy):
+        if self._crop_start:
+            x0, y0 = self._crop_start
+            self._crop_end = (x0 + dx, y0 + dy)
+            self.crop_overlay_area.queue_draw()
+
+    def on_crop_drag_end(self, gesture, dx, dy):
+        if self._crop_start:
+            x0, y0 = self._crop_start
+            self._crop_end = (x0 + dx, y0 + dy)
+            self.crop_overlay_area.queue_draw()
+
+    def _widget_to_image_coords(self, wx, wy, widget_w, widget_h):
+        pixbuf = self._editor_display_pixbuf or self._viewer_pixbuf
+        if not pixbuf:
+            return None
+        img_w = pixbuf.get_width()
+        img_h = pixbuf.get_height()
+        scale  = min(widget_w / img_w, widget_h / img_h)
+        disp_w = img_w * scale
+        disp_h = img_h * scale
+        x_off  = (widget_w - disp_w) / 2
+        y_off  = (widget_h - disp_h) / 2
+        ix = (wx - x_off) / scale
+        iy = (wy - y_off) / scale
+        ix = max(0, min(img_w, ix))
+        iy = max(0, min(img_h, iy))
+        return (int(ix), int(iy))
+
+    def on_editor_save(self, btn):
+        path     = self.photos[self.current_index]
+        rotation = self._editor_rotation
+
+        crop_box = None
+        if self._editor_crop_mode and self._crop_start and self._crop_end:
+            w = self.crop_overlay_area.get_width()
+            h = self.crop_overlay_area.get_height()
+            p1 = self._widget_to_image_coords(self._crop_start[0], self._crop_start[1], w, h)
+            p2 = self._widget_to_image_coords(self._crop_end[0],   self._crop_end[1],   w, h)
+            if p1 and p2:
+                x1, y1 = p1
+                x2, y2 = p2
+                rw = abs(x2 - x1)
+                rh = abs(y2 - y1)
+                if rw > 4 and rh > 4:
+                    crop_box = (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+
+        try:
+            from PIL import Image
+            img = Image.open(path)
+            if rotation != 0:
+                img = img.rotate(rotation, expand=True)
+            if crop_box:
+                img = img.crop(crop_box)
+            ext = os.path.splitext(path)[1].lower()
+            if ext in (".jpg", ".jpeg"):
+                img.save(path, "JPEG", quality=95)
+            else:
+                img.save(path, "PNG")
+        except Exception as e:
+            print(f"Editor opslaan mislukt: {e}")
+            dialog = Adw.MessageDialog(
+                transient_for=self,
+                heading="Opslaan mislukt",
+                body=str(e)
+            )
+            dialog.add_response("ok", "OK")
+            dialog.present()
+            return
+
+        self.on_editor_cancel()
+        self._viewer_load_id += 1
+        load_id = self._viewer_load_id
+        threading.Thread(
+            target=self._load_full_photo,
+            args=(path, load_id),
+            daemon=True
+        ).start()
+        GLib.timeout_add(300, self.start_load)
 
     # ── Verwijderen ───────────────────────────────────────────────────
     def on_delete_current(self, btn):
