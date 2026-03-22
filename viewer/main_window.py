@@ -39,6 +39,9 @@ except ImportError:
 
 IMPORTER_PATH    = os.path.join(os.path.dirname(__file__), "..", "importer", "main.py")
 DOCS_DIR         = os.path.join(os.path.dirname(__file__), "..", "docs")
+VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
+INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
+REMOTE_VERSION_URL = "https://raw.githubusercontent.com/Linux-Ginger/pixora/main/version.txt"
 CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
 TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
@@ -737,6 +740,126 @@ class MainWindow(Adw.ApplicationWindow):
 
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
+        GLib.timeout_add(4000, self._check_for_update)
+
+    # ── Update systeem ───────────────────────────────────────────────
+    def _get_local_version(self):
+        try:
+            with open(VERSION_FILE) as f:
+                return f.read().strip()
+        except Exception:
+            return None
+
+    def _check_for_update(self):
+        threading.Thread(target=self._fetch_remote_version, daemon=True).start()
+        return False
+
+    def _fetch_remote_version(self):
+        try:
+            with urllib.request.urlopen(REMOTE_VERSION_URL, timeout=8) as r:
+                remote = r.read().decode().strip()
+            local = self._get_local_version()
+            if local and remote and remote != local:
+                GLib.idle_add(self._show_update_available, remote)
+        except Exception:
+            pass
+
+    def _show_update_available(self, version):
+        self.update_btn.set_label(f"⬆  Update {version}")
+        self.update_btn.set_tooltip_text(f"Versie {version} is beschikbaar — klik om bij te werken")
+        self.update_btn.set_visible(True)
+        return False
+
+    def _on_update_clicked(self, btn):
+        # Alleen updaten als geïnstalleerd via install.sh
+        if not os.path.isdir(os.path.join(INSTALL_DIR, ".git")):
+            dlg = Adw.AlertDialog(
+                heading="Kan niet bijwerken",
+                body="Pixora is niet geïnstalleerd via de installer. Update handmatig.",
+            )
+            dlg.add_response("ok", "OK")
+            dlg.present(self)
+            return
+        self._show_update_dialog()
+
+    def _show_update_dialog(self):
+        win = Gtk.Window()
+        win.set_title("Pixora bijwerken")
+        win.set_transient_for(self)
+        win.set_modal(True)
+        win.set_resizable(False)
+        win.set_default_size(360, -1)
+        win.set_deletable(False)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        box.set_margin_top(32)
+        box.set_margin_bottom(32)
+        box.set_margin_start(32)
+        box.set_margin_end(32)
+
+        title = Gtk.Label(label="Pixora bijwerken")
+        title.add_css_class("title-2")
+        box.append(title)
+
+        self._update_status_label = Gtk.Label(label="Downloaden en installeren...")
+        self._update_status_label.add_css_class("dim-label")
+        box.append(self._update_status_label)
+
+        self._update_progress = Gtk.ProgressBar()
+        self._update_progress.set_pulse_step(0.08)
+        box.append(self._update_progress)
+
+        self._update_restart_btn = Gtk.Button(label="Pixora herstarten")
+        self._update_restart_btn.add_css_class("suggested-action")
+        self._update_restart_btn.add_css_class("pill")
+        self._update_restart_btn.set_visible(False)
+        self._update_restart_btn.connect("clicked", self._restart_app)
+        box.append(self._update_restart_btn)
+
+        win.set_child(box)
+        win.present()
+
+        self._update_win = win
+        self._update_pulse_id = GLib.timeout_add(80, self._pulse_update_bar)
+        threading.Thread(target=self._run_git_pull, daemon=True).start()
+
+    def _pulse_update_bar(self):
+        self._update_progress.pulse()
+        return True  # blijf pulseren
+
+    def _run_git_pull(self):
+        try:
+            result = subprocess.run(
+                ["git", "-C", INSTALL_DIR, "pull", "--ff-only"],
+                capture_output=True, text=True, timeout=120
+            )
+            success = result.returncode == 0
+        except Exception:
+            success = False
+        GLib.idle_add(self._update_done, success)
+
+    def _update_done(self, success):
+        if hasattr(self, "_update_pulse_id"):
+            GLib.source_remove(self._update_pulse_id)
+            self._update_pulse_id = None
+
+        self._update_progress.set_fraction(1.0)
+        if success:
+            self._update_status_label.set_text("Update geïnstalleerd!")
+            self._update_restart_btn.set_visible(True)
+            self.update_btn.set_visible(False)
+        else:
+            self._update_status_label.set_text("Update mislukt. Probeer het later opnieuw.")
+            close_btn = Gtk.Button(label="Sluiten")
+            close_btn.add_css_class("pill")
+            close_btn.connect("clicked", lambda b: self._update_win.close())
+            self._update_win.get_child().append(close_btn)
+        self._update_win.set_deletable(True)
+        return False
+
+    def _restart_app(self, btn=None):
+        self.get_application().quit()
+        os.execv(sys.executable, [sys.executable] + sys.argv)
 
     # ── Dark mode ────────────────────────────────────────────────────
     def is_dark(self):
@@ -809,6 +932,13 @@ class MainWindow(Adw.ApplicationWindow):
         settings_btn.set_tooltip_text("Instellingen")
         settings_btn.connect("clicked", self.on_settings_clicked)
         self.header.pack_end(settings_btn)
+
+        self.update_btn = Gtk.Button(label="Update beschikbaar")
+        self.update_btn.add_css_class("suggested-action")
+        self.update_btn.add_css_class("pill")
+        self.update_btn.set_visible(False)
+        self.update_btn.connect("clicked", self._on_update_clicked)
+        self.header.pack_end(self.update_btn)
 
         return self.header
 
