@@ -1081,6 +1081,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.observer = None
 
     def reload_photos(self):
+        self._photo_location.clear()
         self.load_photos()
         return False
 
@@ -1808,6 +1809,29 @@ class MainWindow(Adw.ApplicationWindow):
         if load_id != self._load_id:
             return False
         self.spinner_label.set_text(f"Foto's laden... {loaded} / {total}")
+        # Shared CSS providers — created once, reused for every thumbnail
+        if not hasattr(self, '_thumb_css'):
+            tc = {}
+            p = Gtk.CssProvider()
+            p.load_from_string("box { background-color: rgba(0,0,0,0.5); border-radius: 50%; padding: 8px; }")
+            tc['play_box'] = p
+            p = Gtk.CssProvider()
+            p.load_from_string("image { color: white; }")
+            tc['white_icon'] = p
+            p = Gtk.CssProvider()
+            p.load_from_string("box { background-color: rgba(0,0,0,0.65); border-radius: 4px; padding: 2px 5px; }")
+            tc['dur_box'] = p
+            p = Gtk.CssProvider()
+            p.load_from_string("label { color: white; font-size: 10px; font-weight: bold; }")
+            tc['dur_label'] = p
+            p = Gtk.CssProvider()
+            p.load_from_string("box { background-color: #e95420; border-radius: 6px; min-width: 22px; min-height: 22px; }")
+            tc['check_box'] = p
+            p = Gtk.CssProvider()
+            p.load_from_string("button { border-radius: 8px; padding: 0; } button picture { border-radius: 8px; } button:hover { outline: 2px solid #e95420; outline-offset: -2px; border-radius: 8px; }")
+            tc['btn'] = p
+            self._thumb_css = tc
+        tc = self._thumb_css
         for index, path, pixbuf, duration in batch:
             if pixbuf:
                 picture = Gtk.Picture.new_for_pixbuf(pixbuf)
@@ -1825,18 +1849,10 @@ class MainWindow(Adw.ApplicationWindow):
                 play_box = Gtk.Box()
                 play_box.set_halign(Gtk.Align.CENTER)
                 play_box.set_valign(Gtk.Align.CENTER)
-                play_css = Gtk.CssProvider()
-                play_css.load_from_string(
-                    "box { background-color: rgba(0,0,0,0.5); border-radius: 50%; padding: 8px; }"
-                )
-                play_box.get_style_context().add_provider(
-                    play_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                play_box.get_style_context().add_provider(tc['play_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
                 play_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
                 play_icon.set_pixel_size(24)
-                play_icon_css = Gtk.CssProvider()
-                play_icon_css.load_from_string("image { color: white; }")
-                play_icon.get_style_context().add_provider(
-                    play_icon_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                play_icon.get_style_context().add_provider(tc['white_icon'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
                 play_box.append(play_icon)
                 overlay.add_overlay(play_box)
 
@@ -1845,19 +1861,9 @@ class MainWindow(Adw.ApplicationWindow):
                 dur_box.set_valign(Gtk.Align.END)
                 dur_box.set_margin_end(6)
                 dur_box.set_margin_bottom(6)
-                dur_css = Gtk.CssProvider()
-                dur_css.load_from_string(
-                    "box { background-color: rgba(0,0,0,0.65); border-radius: 4px; padding: 2px 5px; }"
-                )
-                dur_box.get_style_context().add_provider(
-                    dur_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                dur_box.get_style_context().add_provider(tc['dur_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
                 dur_label = Gtk.Label(label=format_duration(duration))
-                dur_label_css = Gtk.CssProvider()
-                dur_label_css.load_from_string(
-                    "label { color: white; font-size: 10px; font-weight: bold; }"
-                )
-                dur_label.get_style_context().add_provider(
-                    dur_label_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                dur_label.get_style_context().add_provider(tc['dur_label'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
                 dur_box.append(dur_label)
                 overlay.add_overlay(dur_box)
 
@@ -1868,13 +1874,7 @@ class MainWindow(Adw.ApplicationWindow):
             check_box.set_margin_end(6)
             check_box.set_margin_bottom(6)
             check_box.set_visible(False)
-
-            check_css = Gtk.CssProvider()
-            check_css.load_from_string("""
-                box { background-color: #e95420; border-radius: 6px;
-                      min-width: 22px; min-height: 22px; }
-            """)
-            check_box.get_style_context().add_provider(check_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            check_box.get_style_context().add_provider(tc['check_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
             check_icon = Gtk.Image.new_from_icon_name("object-select-symbolic")
             check_icon.set_pixel_size(14)
@@ -1882,10 +1882,7 @@ class MainWindow(Adw.ApplicationWindow):
             check_icon.set_valign(Gtk.Align.CENTER)
             check_icon.set_hexpand(True)
             check_icon.set_vexpand(True)
-
-            check_icon_css = Gtk.CssProvider()
-            check_icon_css.load_from_string("image { color: white; }")
-            check_icon.get_style_context().add_provider(check_icon_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            check_icon.get_style_context().add_provider(tc['white_icon'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
             check_box.append(check_icon)
             overlay.add_overlay(check_box)
@@ -1894,14 +1891,7 @@ class MainWindow(Adw.ApplicationWindow):
             btn.set_child(overlay)
             btn.set_overflow(Gtk.Overflow.HIDDEN)
             btn.set_size_request(THUMB_SIZE, THUMB_SIZE)
-
-            css = Gtk.CssProvider()
-            css.load_from_string("""
-                button { border-radius: 8px; padding: 0; }
-                button picture { border-radius: 8px; }
-                button:hover { outline: 2px solid #e95420; outline-offset: -2px; border-radius: 8px; }
-            """)
-            btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            btn.get_style_context().add_provider(tc['btn'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
             idx = index
             btn.connect("clicked", lambda b, i=idx: self.on_thumb_clicked(i))
@@ -1958,9 +1948,15 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _do_sort(self):
         self._sort_timer = None
-        self.apply_sort()
-        self.start_load()
+        self.content_stack.set_visible_child_name("loading")
+        self.spinner.start()
+        self.spinner_label.set_text("Sorteren...")
+        threading.Thread(target=self._do_sort_bg, daemon=True).start()
         return False
+
+    def _do_sort_bg(self):
+        self.apply_sort()
+        GLib.idle_add(self.start_load)
 
     # ── Foto viewer ───────────────────────────────────────────────────
     def open_photo(self, index):
@@ -1972,7 +1968,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_location.set_text("")
         self.main_stack.set_visible_child_name("viewer")
         self._filmstrip_thumbs = {}
-        self._update_filmstrip()
+        GLib.idle_add(self._update_filmstrip)
         GLib.timeout_add(80, self._scroll_filmstrip_to_current)
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
@@ -1989,9 +1985,14 @@ class MainWindow(Adw.ApplicationWindow):
                 coords = get_video_gps_coords(path)
                 if coords:
                     location = reverse_geocode(coords[0], coords[1])
+                    self._photo_location[path] = location
                 else:
                     location = ""
-                self._photo_location[path] = location
+                    try:
+                        if time.time() - os.path.getmtime(path) > 30:
+                            self._photo_location[path] = location
+                    except Exception:
+                        pass
             if load_id == self._viewer_load_id:
                 GLib.idle_add(self._show_video, path, location)
             return
@@ -2004,9 +2005,14 @@ class MainWindow(Adw.ApplicationWindow):
             coords = get_gps_coords(path)
             if coords:
                 location = reverse_geocode(coords[0], coords[1])
+                self._photo_location[path] = location
             else:
                 location = ""
-            self._photo_location[path] = location
+                try:
+                    if time.time() - os.path.getmtime(path) > 30:
+                        self._photo_location[path] = location
+                except Exception:
+                    pass
         if load_id == self._viewer_load_id:
             GLib.idle_add(self._show_full_photo, pixbuf, path, location)
 
@@ -2067,18 +2073,22 @@ class MainWindow(Adw.ApplicationWindow):
     def close_viewer(self, btn=None):
         self._stop_video()
         self._viewer_load_id += 1
-        self.photo_picture.set_pixbuf(None)
-        self.video_display.set_visible(False)
-        self.video_controls.set_visible(False)
-        self.photo_picture.set_visible(True)
-        self.edit_btn.set_visible(True)
-        self._show_viewer_ui()
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
         if hasattr(self, '_photos_before_cluster') and self._photos_before_cluster is not None:
             self.photos = self._photos_before_cluster
             self._photos_before_cluster = None
         self.main_stack.set_visible_child_name("grid")
+        GLib.idle_add(self._close_viewer_cleanup)
+
+    def _close_viewer_cleanup(self):
+        self.photo_picture.set_pixbuf(None)
+        self.video_display.set_visible(False)
+        self.video_controls.set_visible(False)
+        self.photo_picture.set_visible(True)
+        self.edit_btn.set_visible(True)
+        self._show_viewer_ui()
+        return False
 
     # ── Filmstrip ─────────────────────────────────────────────────────
     def _update_filmstrip(self):
@@ -2116,7 +2126,9 @@ class MainWindow(Adw.ApplicationWindow):
             if load_id != self._filmstrip_load_id:
                 return
             self._filmstrip_thumbs[i] = pb
-            GLib.idle_add(self.filmstrip_area.queue_draw)
+            if i % 5 == 0:
+                GLib.idle_add(self.filmstrip_area.queue_draw)
+        GLib.idle_add(self.filmstrip_area.queue_draw)
 
     @staticmethod
     def _film_rounded_rect(cr, x, y, w, h, r=6):
@@ -2343,14 +2355,24 @@ class MainWindow(Adw.ApplicationWindow):
             return
         self._last_viewer_mouse = new_pos
         self._show_viewer_ui()
-        if self._video_media and self._video_media.get_playing():
-            self._reset_fade_timer()
+        self._reset_fade_timer()
 
     def _show_viewer_ui(self):
         self._cancel_fade()
         for w in self._video_fade_widgets():
+            w.set_visible(True)
             w.set_opacity(1.0)
             w.set_can_target(True)
+        # video_controls only shown in video mode
+        if self._video_media is None:
+            self.video_controls.set_visible(False)
+        # restore zoom-driven visibility
+        zoomed = getattr(self, '_viewer_zoom', 1.0) > 1.0
+        if zoomed:
+            self.prev_btn.set_visible(False)
+            self.next_btn.set_visible(False)
+            self.viewer_counter.set_visible(False)
+            self.filmstrip_scroll.set_visible(False)
 
     def _video_fade_widgets(self):
         return [
@@ -2389,7 +2411,9 @@ class MainWindow(Adw.ApplicationWindow):
         for w in self._video_fade_widgets():
             w.set_opacity(opacity)
         if opacity <= 0.0:
+            # Remove faded widgets from render tree to eliminate GPU compositing overhead
             for w in self._video_fade_widgets():
+                w.set_visible(False)
                 w.set_can_target(False)
             self._fade_anim_id = None
             return False
