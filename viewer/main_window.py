@@ -772,6 +772,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._video_rotation        = 0
         self._video_scrubbing_lock  = False
         self._preview_cache         = {}   # timestamp_s -> pixbuf | None (loading)
+        self._preview_debounce_id   = None
+        self._preview_extracting    = False
+        self._preview_pending_ts    = None
         self._fade_timer_id         = None
         self._fade_anim_id          = None
 
@@ -1402,6 +1405,7 @@ class MainWindow(Adw.ApplicationWindow):
         viewer_area.add_controller(drag_ctrl)
 
         key_ctrl = Gtk.EventControllerKey()
+        key_ctrl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         key_ctrl.connect("key-pressed", self.on_viewer_key)
         self.add_controller(key_ctrl)
 
@@ -1423,6 +1427,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_play_btn = Gtk.Button(icon_name="media-playback-start-symbolic")
         self.video_play_btn.add_css_class("flat")
         self.video_play_btn.add_css_class("circular")
+        self.video_play_btn.set_can_focus(False)
         self.video_play_btn.connect("clicked", self._on_video_play_pause)
         self.video_controls.append(self.video_play_btn)
 
@@ -1474,6 +1479,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_mute_btn = Gtk.Button(icon_name="audio-volume-high-symbolic")
         self.video_mute_btn.add_css_class("flat")
         self.video_mute_btn.add_css_class("circular")
+        self.video_mute_btn.set_can_focus(False)
         self.video_mute_btn.connect("clicked", self._on_video_mute)
         self.video_controls.append(self.video_mute_btn)
 
@@ -1492,7 +1498,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_rotate_btn = Gtk.Button(icon_name="object-rotate-right-symbolic")
         self.video_rotate_btn.add_css_class("flat")
         self.video_rotate_btn.add_css_class("circular")
-        self.video_rotate_btn.set_tooltip_text("Draaien")
+        self.video_rotate_btn.set_can_focus(False)
+        self.video_rotate_btn.set_tooltip_text("Draaien (wordt opgeslagen)")
         self.video_rotate_btn.connect("clicked", self._on_video_rotate)
         self.video_controls.append(self.video_rotate_btn)
 
@@ -1920,6 +1927,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_controls.set_visible(False)
         self.photo_picture.set_visible(True)
         self.edit_btn.set_visible(True)
+        self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 16)
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
         self._viewer_pixbuf = pixbuf
@@ -2115,6 +2123,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.edit_btn.set_visible(False)
         self.video_display.set_visible(True)
         self.video_controls.set_visible(True)
+        self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 8 + 56)
         self._video_rotation = 0
         self._apply_video_rotation()
         self._video_media = Gtk.MediaFile.new_for_filename(path)
@@ -2236,25 +2245,48 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Rotatie opslaan ───────────────────────────────────────────────
 
     def _save_video_rotation(self, path, rotation):
-        tmp = path + ".rot_tmp"
+        vf_map = {90: "transpose=1", 180: "vflip,hflip", 270: "transpose=2"}
+        vf = vf_map.get(rotation % 360)
+        if not vf:
+            return
+        tmp = path + ".rot_tmp.mp4"
         try:
-            subprocess.run(
+            result = subprocess.run(
                 ["ffmpeg", "-i", path,
                  "-map_metadata", "0",
-                 "-c", "copy",
-                 "-metadata:s:v:0", f"rotate={rotation}",
+                 "-movflags", "use_metadata_tags",
+                 "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+                 "-c:a", "copy",
+                 "-vf", vf,
                  tmp, "-y"],
-                capture_output=True, timeout=60
+                capture_output=True, timeout=300
             )
-            os.replace(tmp, path)
-            cache = get_cache_path(path)
-            if os.path.exists(cache):
-                os.remove(cache)
+            if result.returncode == 0:
+                os.replace(tmp, path)
+                cache = get_cache_path(path)
+                if os.path.exists(cache):
+                    os.remove(cache)
+                GLib.idle_add(self._after_rotation_saved)
         except Exception:
-            try:
-                os.remove(tmp)
-            except Exception:
-                pass
+            pass
+        finally:
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except Exception:
+                    pass
+
+    def _after_rotation_saved(self):
+        # Reset visual rotation (baked into file now) and reload stream
+        self._video_rotation = 0
+        self._apply_video_rotation()
+        if self._video_media:
+            path = self.photos[self.current_index]
+            self._video_media = Gtk.MediaFile.new_for_filename(path)
+            self.video_display.set_paintable(self._video_media)
+            self._video_media.play()
+            self.video_play_btn.set_icon_name("media-playback-pause-symbolic")
+        return False
 
     # ── Auto-fade viewer UI ───────────────────────────────────────────
 
@@ -2273,7 +2305,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _reset_fade_timer(self):
         if self._fade_timer_id:
             GLib.source_remove(self._fade_timer_id)
-        self._fade_timer_id = GLib.timeout_add(3000, self._start_fade)
+        self._fade_timer_id = GLib.timeout_add(1500, self._start_fade)
 
     def _cancel_fade(self):
         if self._fade_timer_id:
@@ -2310,37 +2342,51 @@ class MainWindow(Adw.ApplicationWindow):
         w = self.video_scrubber.get_width()
         if w <= 0:
             return
-        fraction  = max(0.0, min(1.0, x / w))
-        ts_s      = int(fraction * dur / 1_000_000)
-        ts_s      = (ts_s // 2) * 2   # round to 2s for better cache reuse
+        fraction = max(0.0, min(1.0, x / w))
+        ts_s     = (int(fraction * dur / 1_000_000) // 2) * 2  # round to 2s
 
         self._preview_time_lbl.set_text(format_duration(ts_s))
 
-        # Position popover arrow at cursor
         rect = Gdk.Rectangle()
-        rect.x      = int(x)
-        rect.y      = 0
-        rect.width  = 1
-        rect.height = self.video_scrubber.get_height()
+        rect.x = int(x); rect.y = 0
+        rect.width = 1; rect.height = self.video_scrubber.get_height()
         self._preview_popover.set_pointing_to(rect)
-
         if not self._preview_popover.get_visible():
             self._preview_popover.popup()
 
         pb = self._preview_cache.get(ts_s, "missing")
-        if pb == "missing":
-            self._preview_cache[ts_s] = None   # mark loading
-            path = self.photos[self.current_index]
-            threading.Thread(
-                target=self._extract_preview_frame,
-                args=(path, ts_s),
-                daemon=True
-            ).start()
-        elif pb is not None:
+        if pb is not None and pb != "missing":
             self._preview_picture.set_pixbuf(pb)
+            return
+
+        # Debounce: wait 180ms of stillness before extracting
+        self._preview_pending_ts = ts_s
+        if self._preview_debounce_id:
+            GLib.source_remove(self._preview_debounce_id)
+        self._preview_debounce_id = GLib.timeout_add(180, self._do_debounced_preview)
 
     def _on_scrubber_leave(self, ctrl):
+        if self._preview_debounce_id:
+            GLib.source_remove(self._preview_debounce_id)
+            self._preview_debounce_id = None
         self._preview_popover.popdown()
+
+    def _do_debounced_preview(self):
+        self._preview_debounce_id = None
+        ts_s = self._preview_pending_ts
+        if ts_s is None or self._preview_extracting:
+            return False
+        if ts_s in self._preview_cache:
+            return False
+        self._preview_cache[ts_s] = None  # mark loading
+        self._preview_extracting = True
+        path = self.photos[self.current_index]
+        threading.Thread(
+            target=self._extract_preview_frame,
+            args=(path, ts_s),
+            daemon=True
+        ).start()
+        return False
 
     def _extract_preview_frame(self, path, ts_s):
         import tempfile
@@ -2361,6 +2407,8 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._apply_preview_frame, ts_s)
         except Exception:
             pass
+        finally:
+            self._preview_extracting = False
 
     def _apply_preview_frame(self, ts_s):
         pb = self._preview_cache.get(ts_s)
@@ -2372,16 +2420,17 @@ class MainWindow(Adw.ApplicationWindow):
         z  = self._viewer_zoom
         ox = self._viewer_offset[0]
         oy = self._viewer_offset[1]
-        css = Gtk.CssProvider()
-        css.load_from_string(f"""
+        if not hasattr(self, '_viewer_css_provider'):
+            self._viewer_css_provider = Gtk.CssProvider()
+            self.photo_picture.get_style_context().add_provider(
+                self._viewer_css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
+            )
+        self._viewer_css_provider.load_from_string(f"""
             picture {{
                 transform: scale({z}) translate({ox}px, {oy}px);
                 transform-origin: center center;
             }}
         """)
-        self.photo_picture.get_style_context().add_provider(
-            css, Gtk.STYLE_PROVIDER_PRIORITY_USER
-        )
         zoomed = z > 1.0
         self.prev_btn.set_visible(not zoomed)
         self.next_btn.set_visible(not zoomed)
