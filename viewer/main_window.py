@@ -800,13 +800,18 @@ class MainWindow(Adw.ApplicationWindow):
         root_overlay = Gtk.Overlay()
         root_overlay.set_child(toolbar_view)
 
-        splash = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        splash = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         splash.set_halign(Gtk.Align.FILL)
         splash.set_valign(Gtk.Align.FILL)
         splash_css = Gtk.CssProvider()
         splash_css.load_from_string("box.splash { background-color: @window_bg_color; }")
         splash.add_css_class("splash")
         splash.get_style_context().add_provider(splash_css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+
+        splash_inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        splash_inner.set_halign(Gtk.Align.CENTER)
+        splash_inner.set_valign(Gtk.Align.CENTER)
+        splash_inner.set_vexpand(True)
 
         splash_spinner = Gtk.Spinner()
         splash_spinner.set_size_request(48, 48)
@@ -820,9 +825,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._splash_bar.set_size_request(280, -1)
         self._splash_bar.set_halign(Gtk.Align.CENTER)
 
-        splash.append(splash_spinner)
-        splash.append(splash_lbl)
-        splash.append(self._splash_bar)
+        splash_inner.append(splash_spinner)
+        splash_inner.append(splash_lbl)
+        splash_inner.append(self._splash_bar)
+        splash.append(splash_inner)
 
         root_overlay.add_overlay(splash)
         self._splash = splash
@@ -1289,27 +1295,27 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_display.set_visible(False)
         viewer_area.add_overlay(self.video_display)
 
-        close_btn = Gtk.Button(icon_name="window-close-symbolic")
-        close_btn.add_css_class("osd")
-        close_btn.add_css_class("circular")
-        close_btn.set_halign(Gtk.Align.END)
-        close_btn.set_valign(Gtk.Align.START)
-        close_btn.set_margin_top(16)
-        close_btn.set_margin_end(16)
-        close_btn.set_size_request(40, 40)
-        close_btn.connect("clicked", self.close_viewer)
-        viewer_area.add_overlay(close_btn)
+        self.viewer_close_btn = Gtk.Button(icon_name="window-close-symbolic")
+        self.viewer_close_btn.add_css_class("osd")
+        self.viewer_close_btn.add_css_class("circular")
+        self.viewer_close_btn.set_halign(Gtk.Align.END)
+        self.viewer_close_btn.set_valign(Gtk.Align.START)
+        self.viewer_close_btn.set_margin_top(16)
+        self.viewer_close_btn.set_margin_end(16)
+        self.viewer_close_btn.set_size_request(40, 40)
+        self.viewer_close_btn.connect("clicked", self.close_viewer)
+        viewer_area.add_overlay(self.viewer_close_btn)
 
-        delete_btn = Gtk.Button(icon_name="user-trash-symbolic")
-        delete_btn.add_css_class("osd")
-        delete_btn.add_css_class("circular")
-        delete_btn.set_halign(Gtk.Align.END)
-        delete_btn.set_valign(Gtk.Align.START)
-        delete_btn.set_margin_top(16)
-        delete_btn.set_margin_end(68)
-        delete_btn.set_size_request(40, 40)
-        delete_btn.connect("clicked", self.on_delete_current)
-        viewer_area.add_overlay(delete_btn)
+        self.viewer_delete_btn = Gtk.Button(icon_name="user-trash-symbolic")
+        self.viewer_delete_btn.add_css_class("osd")
+        self.viewer_delete_btn.add_css_class("circular")
+        self.viewer_delete_btn.set_halign(Gtk.Align.END)
+        self.viewer_delete_btn.set_valign(Gtk.Align.START)
+        self.viewer_delete_btn.set_margin_top(16)
+        self.viewer_delete_btn.set_margin_end(68)
+        self.viewer_delete_btn.set_size_request(40, 40)
+        self.viewer_delete_btn.connect("clicked", self.on_delete_current)
+        viewer_area.add_overlay(self.viewer_delete_btn)
 
         self.edit_btn = Gtk.Button(icon_name="document-edit-symbolic")
         self.edit_btn.add_css_class("osd")
@@ -1387,23 +1393,23 @@ class MainWindow(Adw.ApplicationWindow):
         self.crop_overlay_area.add_controller(crop_drag)
         viewer_area.add_overlay(self.crop_overlay_area)
 
-        title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        title_box.add_css_class("osd")
-        title_box.set_halign(Gtk.Align.START)
-        title_box.set_valign(Gtk.Align.START)
-        title_box.set_margin_top(16)
-        title_box.set_margin_start(16)
+        self.viewer_title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        self.viewer_title_box.add_css_class("osd")
+        self.viewer_title_box.set_halign(Gtk.Align.START)
+        self.viewer_title_box.set_valign(Gtk.Align.START)
+        self.viewer_title_box.set_margin_top(16)
+        self.viewer_title_box.set_margin_start(16)
 
         self.viewer_title = Gtk.Label(label="")
         self.viewer_title.set_halign(Gtk.Align.START)
-        title_box.append(self.viewer_title)
+        self.viewer_title_box.append(self.viewer_title)
 
         self.viewer_location = Gtk.Label(label="")
         self.viewer_location.add_css_class("dim-label")
         self.viewer_location.set_halign(Gtk.Align.START)
-        title_box.append(self.viewer_location)
+        self.viewer_title_box.append(self.viewer_location)
 
-        viewer_area.add_overlay(title_box)
+        viewer_area.add_overlay(self.viewer_title_box)
 
         self.prev_btn = Gtk.Button(icon_name="go-previous-symbolic")
         self.prev_btn.add_css_class("osd")
@@ -1478,6 +1484,14 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_scrubber = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.001)
         self.video_scrubber.set_hexpand(True)
         self.video_scrubber.set_draw_value(False)
+        self.video_scrubber.add_css_class("video-scrubber")
+        scrubber_css = Gtk.CssProvider()
+        scrubber_css.load_from_string(
+            ".video-scrubber trough { border-radius: 6px; min-height: 5px; }"
+            " .video-scrubber highlight { border-radius: 6px; }"
+        )
+        self.video_scrubber.get_style_context().add_provider(
+            scrubber_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.video_scrubber.connect("value-changed", self._on_video_scrub)
 
         # Scrubber preview popover
@@ -1564,6 +1578,14 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.filmstrip_scroll.set_child(self.filmstrip_area)
         viewer_area.add_overlay(self.filmstrip_scroll)
+
+        # ── Video loading spinner ─────────────────────────────────────
+        self.video_spinner = Gtk.Spinner()
+        self.video_spinner.set_size_request(64, 64)
+        self.video_spinner.set_halign(Gtk.Align.CENTER)
+        self.video_spinner.set_valign(Gtk.Align.CENTER)
+        self.video_spinner.set_visible(False)
+        viewer_area.add_overlay(self.video_spinner)
 
         return viewer_area
 
@@ -2157,6 +2179,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 8 + 56)
         self.viewer_counter.set_visible(True)
         self.filmstrip_scroll.set_visible(True)
+        self.video_spinner.set_visible(True)
+        self.video_spinner.start()
         self._video_media = Gtk.MediaFile.new_for_filename(path)
         self.video_display.set_paintable(self._video_media)
         GLib.idle_add(self._video_media.play)
@@ -2184,6 +2208,8 @@ class MainWindow(Adw.ApplicationWindow):
         if self._video_seek_pending_id:
             GLib.source_remove(self._video_seek_pending_id)
             self._video_seek_pending_id = None
+        self.video_spinner.set_visible(False)
+        self.video_spinner.stop()
         if self._video_media:
             self._video_media.pause()
             self._video_media = None
@@ -2203,6 +2229,9 @@ class MainWindow(Adw.ApplicationWindow):
         dur = self._video_media.get_duration()
         pos = self._video_media.get_timestamp()
         if dur > 0:
+            if self.video_spinner.get_visible():
+                self.video_spinner.set_visible(False)
+                self.video_spinner.stop()
             self._video_scrubbing_lock = True
             self.video_scrubber.set_value(pos / dur)
             self._video_scrubbing_lock = False
@@ -2283,10 +2312,21 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_viewer_ui(self):
         self._cancel_fade()
-        self.video_controls.set_opacity(1.0)
-        self.video_controls.set_can_target(True)
-        self.filmstrip_scroll.set_opacity(1.0)
-        self.filmstrip_scroll.set_can_target(True)
+        for w in self._video_fade_widgets():
+            w.set_opacity(1.0)
+            w.set_can_target(True)
+
+    def _video_fade_widgets(self):
+        return [
+            self.video_controls,
+            self.filmstrip_scroll,
+            self.viewer_counter,
+            self.viewer_title_box,
+            self.viewer_close_btn,
+            self.viewer_delete_btn,
+            self.prev_btn,
+            self.next_btn,
+        ]
 
     def _reset_fade_timer(self):
         if self._fade_timer_id:
@@ -2310,11 +2350,11 @@ class MainWindow(Adw.ApplicationWindow):
     def _fade_tick(self):
         self._fade_step += 1
         opacity = max(0.0, 1.0 - self._fade_step / 20)  # ~600ms
-        self.video_controls.set_opacity(opacity)
-        self.filmstrip_scroll.set_opacity(opacity)
+        for w in self._video_fade_widgets():
+            w.set_opacity(opacity)
         if opacity <= 0.0:
-            self.video_controls.set_can_target(False)
-            self.filmstrip_scroll.set_can_target(False)
+            for w in self._video_fade_widgets():
+                w.set_can_target(False)
             self._fade_anim_id = None
             return False
         return True
