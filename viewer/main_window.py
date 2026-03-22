@@ -772,6 +772,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._video_rotation        = 0
         self._video_scrubbing_lock  = False
         self._preview_cache         = {}   # timestamp_s -> pixbuf | None (loading)
+        self._fade_timer_id         = None
+        self._fade_anim_id          = None
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -1233,11 +1235,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_picture.set_hexpand(True)
         viewer_area.add_overlay(self.photo_picture)
 
-        self.video_widget = Gtk.Video()
-        self.video_widget.set_vexpand(True)
-        self.video_widget.set_hexpand(True)
-        self.video_widget.set_visible(False)
-        viewer_area.add_overlay(self.video_widget)
+        self.video_display = Gtk.Picture()
+        self.video_display.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self.video_display.set_vexpand(True)
+        self.video_display.set_hexpand(True)
+        self.video_display.set_visible(False)
+        self.video_display.add_css_class("video-display")
+        viewer_area.add_overlay(self.video_display)
 
         close_btn = Gtk.Button(icon_name="window-close-symbolic")
         close_btn.add_css_class("osd")
@@ -1401,6 +1405,11 @@ class MainWindow(Adw.ApplicationWindow):
         key_ctrl.connect("key-pressed", self.on_viewer_key)
         self.add_controller(key_ctrl)
 
+        viewer_motion = Gtk.EventControllerMotion()
+        viewer_motion.connect("motion", self._on_viewer_motion)
+        viewer_area.add_controller(viewer_motion)
+        self.viewer_area = viewer_area
+
         # ── Video controls ───────────────────────────────────────────
         self.video_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.video_controls.add_css_class("osd")
@@ -1436,6 +1445,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._preview_picture = Gtk.Picture()
         self._preview_picture.set_size_request(160, 90)
         self._preview_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
+        prev_pic_css = Gtk.CssProvider()
+        prev_pic_css.load_from_string("picture { border-radius: 8px; overflow: hidden; }")
+        self._preview_picture.get_style_context().add_provider(
+            prev_pic_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self._preview_time_lbl = Gtk.Label()
         self._preview_time_lbl.add_css_class("caption")
         prev_box.append(self._preview_picture)
@@ -1903,7 +1916,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_full_photo(self, pixbuf, path, location=""):
         self._stop_video()
-        self.video_widget.set_visible(False)
+        self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
         self.photo_picture.set_visible(True)
         self.edit_btn.set_visible(True)
@@ -1958,10 +1971,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._stop_video()
         self._viewer_load_id += 1
         self.photo_picture.set_pixbuf(None)
-        self.video_widget.set_visible(False)
+        self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
         self.photo_picture.set_visible(True)
         self.edit_btn.set_visible(True)
+        self._show_viewer_ui()
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
         if hasattr(self, '_photos_before_cluster') and self._photos_before_cluster is not None:
@@ -2099,12 +2113,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._preview_cache = {}
         self.photo_picture.set_visible(False)
         self.edit_btn.set_visible(False)
-        self.video_widget.set_visible(True)
+        self.video_display.set_visible(True)
         self.video_controls.set_visible(True)
         self._video_rotation = 0
         self._apply_video_rotation()
         self._video_media = Gtk.MediaFile.new_for_filename(path)
-        self.video_widget.set_media_stream(self._video_media)
+        self.video_display.set_paintable(self._video_media)
         self._video_media.play()
         self.video_play_btn.set_icon_name("media-playback-pause-symbolic")
         self.video_mute_btn.set_icon_name("audio-volume-high-symbolic")
@@ -2121,10 +2135,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.filmstrip_area.queue_draw()
         GLib.idle_add(self._scroll_filmstrip_to_current)
         self._start_video_poll()
+        self._reset_fade_timer()
         return False
 
     def _stop_video(self):
         self._stop_video_poll()
+        self._cancel_fade()
         if self._video_media:
             self._video_media.pause()
             self._video_media = None
@@ -2162,12 +2178,21 @@ class MainWindow(Adw.ApplicationWindow):
             return
         if self._video_media.get_playing():
             self._video_media.pause()
-            btn.set_icon_name("media-playback-start-symbolic")
+            if btn:
+                btn.set_icon_name("media-playback-start-symbolic")
+            else:
+                self.video_play_btn.set_icon_name("media-playback-start-symbolic")
             self._stop_video_poll()
+            self._cancel_fade()
+            self._show_viewer_ui()
         else:
             self._video_media.play()
-            btn.set_icon_name("media-playback-pause-symbolic")
+            if btn:
+                btn.set_icon_name("media-playback-pause-symbolic")
+            else:
+                self.video_play_btn.set_icon_name("media-playback-pause-symbolic")
             self._start_video_poll()
+            self._reset_fade_timer()
 
     def _on_video_scrub(self, scale):
         if self._video_scrubbing_lock or not self._video_media:
@@ -2193,14 +2218,86 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_video_rotate(self, btn):
         self._video_rotation = (self._video_rotation + 90) % 360
         self._apply_video_rotation()
+        path = self.photos[self.current_index]
+        threading.Thread(
+            target=self._save_video_rotation,
+            args=(path, self._video_rotation),
+            daemon=True
+        ).start()
 
     def _apply_video_rotation(self):
-        css_str = f"video {{ transform: rotate({self._video_rotation}deg); }}"
+        css_str = f".video-display {{ transform: rotate({self._video_rotation}deg); }}"
         provider = Gtk.CssProvider()
         provider.load_from_string(css_str)
-        self.video_widget.get_style_context().add_provider(
+        self.video_display.get_style_context().add_provider(
             provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
+
+    # ── Rotatie opslaan ───────────────────────────────────────────────
+
+    def _save_video_rotation(self, path, rotation):
+        tmp = path + ".rot_tmp"
+        try:
+            subprocess.run(
+                ["ffmpeg", "-i", path,
+                 "-map_metadata", "0",
+                 "-c", "copy",
+                 "-metadata:s:v:0", f"rotate={rotation}",
+                 tmp, "-y"],
+                capture_output=True, timeout=60
+            )
+            os.replace(tmp, path)
+            cache = get_cache_path(path)
+            if os.path.exists(cache):
+                os.remove(cache)
+        except Exception:
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+
+    # ── Auto-fade viewer UI ───────────────────────────────────────────
+
+    def _on_viewer_motion(self, ctrl, x, y):
+        if self.main_stack.get_visible_child_name() != "viewer":
+            return
+        self._show_viewer_ui()
+        if self._video_media and self._video_media.get_playing():
+            self._reset_fade_timer()
+
+    def _show_viewer_ui(self):
+        self._cancel_fade()
+        self.video_controls.set_opacity(1.0)
+        self.filmstrip_scroll.set_opacity(1.0)
+
+    def _reset_fade_timer(self):
+        if self._fade_timer_id:
+            GLib.source_remove(self._fade_timer_id)
+        self._fade_timer_id = GLib.timeout_add(3000, self._start_fade)
+
+    def _cancel_fade(self):
+        if self._fade_timer_id:
+            GLib.source_remove(self._fade_timer_id)
+            self._fade_timer_id = None
+        if self._fade_anim_id:
+            GLib.source_remove(self._fade_anim_id)
+            self._fade_anim_id = None
+
+    def _start_fade(self):
+        self._fade_timer_id = None
+        self._fade_step = 0
+        self._fade_anim_id = GLib.timeout_add(30, self._fade_tick)
+        return False
+
+    def _fade_tick(self):
+        self._fade_step += 1
+        opacity = max(0.0, 1.0 - self._fade_step / 20)  # ~600ms
+        self.video_controls.set_opacity(opacity)
+        self.filmstrip_scroll.set_opacity(opacity)
+        if opacity <= 0.0:
+            self._fade_anim_id = None
+            return False
+        return True
 
     # ── Scrubber preview ──────────────────────────────────────────────
 
@@ -2326,6 +2423,10 @@ class MainWindow(Adw.ApplicationWindow):
             return True
         if self._editor_active:
             return False
+        if keyval == Gdk.KEY_space:
+            if self._video_media:
+                self._on_video_play_pause(None)
+            return True
         if keyval == 65361:
             self.prev_photo()
             return True
