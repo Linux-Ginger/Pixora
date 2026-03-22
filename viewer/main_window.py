@@ -41,7 +41,7 @@ IMPORTER_PATH    = os.path.join(os.path.dirname(__file__), "..", "importer", "ma
 DOCS_DIR         = os.path.join(os.path.dirname(__file__), "..", "docs")
 VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
 INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
-REMOTE_VERSION_URL = "https://raw.githubusercontent.com/Linux-Ginger/pixora/main/version.txt"
+GITHUB_RELEASES_API = "https://api.github.com/repos/Linux-Ginger/pixora/releases/latest"
 CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
 TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
@@ -751,16 +751,25 @@ class MainWindow(Adw.ApplicationWindow):
             return None
 
     def _check_for_update(self):
-        threading.Thread(target=self._fetch_remote_version, daemon=True).start()
+        threading.Thread(target=self._fetch_release_info, daemon=True).start()
         return False
 
-    def _fetch_remote_version(self):
+    def _fetch_release_info(self):
+        """Fetch latest GitHub release and compare with local version."""
         try:
-            with urllib.request.urlopen(REMOTE_VERSION_URL, timeout=8) as r:
-                remote = r.read().decode().strip()
+            req = urllib.request.Request(
+                GITHUB_RELEASES_API,
+                headers={"Accept": "application/vnd.github+json",
+                         "User-Agent": "Pixora-App"}
+            )
+            with urllib.request.urlopen(req, timeout=8) as r:
+                data = json.loads(r.read().decode())
+            tag = data.get("tag_name", "").lstrip("v")
+            tarball_url = data.get("tarball_url", "")
             local = self._get_local_version()
-            if local and remote and remote != local:
-                GLib.idle_add(self._show_update_available, remote)
+            if local and tag and tag != local and tarball_url:
+                self._pending_tarball_url = tarball_url
+                GLib.idle_add(self._show_update_available, tag)
         except Exception:
             pass
 
@@ -771,8 +780,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_update_clicked(self, btn):
-        # Alleen updaten als geïnstalleerd via install.sh
-        if not os.path.isdir(os.path.join(INSTALL_DIR, ".git")):
+        if not os.path.isdir(INSTALL_DIR):
             dlg = Adw.AlertDialog(
                 heading="Kan niet bijwerken",
                 body="Pixora is niet geïnstalleerd via de installer. Update handmatig.",
@@ -801,7 +809,7 @@ class MainWindow(Adw.ApplicationWindow):
         title.add_css_class("title-2")
         box.append(title)
 
-        self._update_status_label = Gtk.Label(label="Downloaden en installeren...")
+        self._update_status_label = Gtk.Label(label="Downloaden...")
         self._update_status_label.add_css_class("dim-label")
         box.append(self._update_status_label)
 
@@ -821,25 +829,60 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._update_win = win
         self._update_pulse_id = GLib.timeout_add(80, self._pulse_update_bar)
-        threading.Thread(target=self._run_git_pull, daemon=True).start()
+        threading.Thread(
+            target=self._run_release_update,
+            args=(self._pending_tarball_url,),
+            daemon=True
+        ).start()
 
     def _pulse_update_bar(self):
         self._update_progress.pulse()
-        return True  # blijf pulseren
+        return True
 
-    def _run_git_pull(self):
+    def _run_release_update(self, tarball_url):
+        """Download release tarball and extract into install dir."""
+        import tempfile, tarfile
         try:
-            result = subprocess.run(
-                ["git", "-C", INSTALL_DIR, "pull", "--ff-only"],
-                capture_output=True, text=True, timeout=120
-            )
-            success = result.returncode == 0
-        except Exception:
+            # Downloaden
+            GLib.idle_add(self._set_update_status, "Downloaden...")
+            req = urllib.request.Request(tarball_url,
+                                         headers={"User-Agent": "Pixora-App"})
+            with urllib.request.urlopen(req, timeout=120) as r:
+                data = r.read()
+
+            # Uitpakken naar tijdelijke map
+            GLib.idle_add(self._set_update_status, "Installeren...")
+            with tempfile.TemporaryDirectory() as tmp:
+                archive = os.path.join(tmp, "release.tar.gz")
+                with open(archive, "wb") as f:
+                    f.write(data)
+                with tarfile.open(archive, "r:gz") as tar:
+                    tar.extractall(tmp)
+                # GitHub pakt uit in een map als "Linux-Ginger-pixora-<hash>/"
+                extracted = [
+                    d for d in os.listdir(tmp)
+                    if os.path.isdir(os.path.join(tmp, d)) and d != "__MACOSX"
+                ]
+                if not extracted:
+                    raise RuntimeError("Lege tarball")
+                src = os.path.join(tmp, extracted[0])
+                # Kopieer bestanden naar install dir (behoud user-data mappen)
+                subprocess.run(
+                    ["rsync", "-a", "--exclude=.git",
+                     src + "/", INSTALL_DIR + "/"],
+                    check=True, timeout=60
+                )
+            success = True
+        except Exception as e:
             success = False
         GLib.idle_add(self._update_done, success)
 
+    def _set_update_status(self, text):
+        self._update_status_label.set_text(text)
+        return False
+
     def _update_done(self, success):
-        if hasattr(self, "_update_pulse_id"):
+        if hasattr(self, "_update_pulse_id") and self._update_pulse_id:
             GLib.source_remove(self._update_pulse_id)
             self._update_pulse_id = None
 
