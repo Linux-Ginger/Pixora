@@ -259,39 +259,48 @@ class TimelineBar(Gtk.DrawingArea):
             return
         is_dark = self.style_manager and self.style_manager.get_dark()
 
-        min_next_y = 0.0  # minimale Y voor het volgende label (voorkomt overlap)
+        last_bottom = -99.0  # onderrand van het laatste getekende label
 
         for i, (label, frac) in enumerate(self.entries):
             is_year = label.isdigit() and len(label) == 4
+            active  = (i == self.active_idx)
 
-            if i == self.active_idx:
-                cr.set_source_rgb(*self._ORANGE)
-                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            if active:
                 font_size = 11 if is_year else 10
-            elif is_year:
-                cr.set_source_rgba(0.95 if is_dark else 0.1, 0.95 if is_dark else 0.1,
-                                   0.95 if is_dark else 0.1, 0.9)
                 cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            elif is_year:
                 font_size = 11
+                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
             else:
-                cr.set_source_rgba(0.75 if is_dark else 0.35, 0.75 if is_dark else 0.35,
-                                   0.75 if is_dark else 0.35, 0.65)
-                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
                 font_size = 9
+                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
 
             cr.set_font_size(font_size)
-            ext = cr.text_extents(label)
+            ext     = cr.text_extents(label)
+            ideal_y = frac * height
 
-            # Proportionele Y, maar nooit hoger dan vorig label + minimale spatie
-            ideal_y = frac * height + ext.height / 2
-            ty = max(min_next_y, ideal_y)
-            ty = max(ext.height, min(height - 2, ty))
+            # Maand overslaan als er geen ruimte is; jaar altijd tonen
+            if ideal_y < last_bottom + 2:
+                if not is_year and not active:
+                    continue
+                ideal_y = last_bottom + 2  # jaar iets omlaag duwen
+
+            ty = max(ext.height, min(height - 2, ideal_y))
+
+            if active:
+                cr.set_source_rgb(*self._ORANGE)
+            elif is_year:
+                v = 0.95 if is_dark else 0.1
+                cr.set_source_rgba(v, v, v, 0.9)
+            else:
+                v = 0.75 if is_dark else 0.35
+                cr.set_source_rgba(v, v, v, 0.65)
 
             tx = max(2, width - ext.width - 5)
             cr.move_to(tx, ty)
             cr.show_text(label)
 
-            min_next_y = ty + font_size + 3  # label-hoogte + spatie
+            last_bottom = ty + font_size + 1
 
     def _on_click(self, gesture, n_press, x, y):
         if not self.entries:
@@ -1211,14 +1220,15 @@ class MainWindow(Adw.ApplicationWindow):
         self._thumb_size = new_size
         self.settings["thumb_size"] = new_size
         save_settings(self.settings)
-        for _, (btn, _) in self.thumb_widgets.items():
-            btn.set_size_request(new_size, new_size)
-            overlay = btn.get_child()
-            if overlay:
-                overlay.set_size_request(new_size, new_size)
-                pic = overlay.get_child()
-                if pic:
-                    pic.set_size_request(new_size, new_size)
+        # Debounce: wacht tot de gebruiker stopt met slepen
+        if hasattr(self, '_thumb_resize_timer') and self._thumb_resize_timer:
+            GLib.source_remove(self._thumb_resize_timer)
+        self._thumb_resize_timer = GLib.timeout_add(120, self._apply_thumb_resize)
+
+    def _apply_thumb_resize(self):
+        self._thumb_resize_timer = None
+        self.start_load()  # thumbnails komen uit cache → snel
+        return False
 
     # ── Tijdlijn ──────────────────────────────────────────────────────
     def _on_timeline_scroll(self, fraction):
