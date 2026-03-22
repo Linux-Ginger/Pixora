@@ -224,6 +224,7 @@ class TimelineBar(Gtk.DrawingArea):
         self.style_manager   = style_manager
         self.entries         = []   # [(label_str, frac), ...]
         self.active_idx      = 0
+        self._last_frac      = 0.0
 
         self.set_size_request(56, -1)
         self.set_vexpand(True)
@@ -234,20 +235,28 @@ class TimelineBar(Gtk.DrawingArea):
         self.add_controller(click)
 
     def set_entries(self, entries):
-        self.entries    = entries
-        self.active_idx = 0
+        self.entries = entries
+        self._update_active(self._last_frac)
         self.queue_draw()
 
     def highlight(self, frac):
+        self._last_frac = frac
+        self._update_active(frac)
+
+    def _update_active(self, frac):
         if not self.entries:
             return
-        # Laatste entry waarvan frac <= scroll positie = huidig zichtbare datum
+        # Find the last month entry (non-year) whose frac <= current scroll
         new_idx = 0
-        for i, (_, ef) in enumerate(self.entries):
+        for i, (label, ef) in enumerate(self.entries):
             if ef <= frac:
                 new_idx = i
-            else:
-                break
+        # If active is a year label and the next entry is a month at same frac, prefer month
+        label, ef = self.entries[new_idx]
+        if label.isdigit() and len(label) == 4 and new_idx + 1 < len(self.entries):
+            next_label, next_ef = self.entries[new_idx + 1]
+            if next_ef == ef:
+                new_idx += 1
         if new_idx != self.active_idx:
             self.active_idx = new_idx
             self.queue_draw()
@@ -304,10 +313,7 @@ class TimelineBar(Gtk.DrawingArea):
         height = self.get_height()
         if height <= 0:
             return
-        click_frac = y / height
-        closest = min(range(len(self.entries)),
-                      key=lambda i: abs(self.entries[i][1] - click_frac))
-        self.scroll_callback(self.entries[closest][1])
+        self.scroll_callback(y / height)
 
 
 # ── Kaart widget (in-app, geen apart venster) ────────────────────────
@@ -1234,12 +1240,11 @@ class MainWindow(Adw.ApplicationWindow):
         adj.set_value(max(lower, min(target, max_val)))
 
     def _on_scroll_changed(self, adj):
-        upper    = adj.get_upper()
-        page     = adj.get_page_size()
+        upper      = adj.get_upper()
+        page       = adj.get_page_size()
         max_scroll = upper - page
-        if max_scroll > 0:
-            frac = min(1.0, adj.get_value() / max_scroll)
-            self.timeline.highlight(frac)
+        frac = min(1.0, adj.get_value() / max_scroll) if max_scroll > 0 else 0.0
+        self.timeline.highlight(frac)
 
     def _update_timeline_from_positions(self):
         if not self.date_widgets:
@@ -1287,6 +1292,11 @@ class MainWindow(Adw.ApplicationWindow):
                 entries.append((date_str, frac))
 
         self.timeline.set_entries(entries)
+        # Sync highlight to current scroll position
+        self._on_scroll_changed(adj)
+        # Retry if not all date labels were positioned yet
+        if len(items) < len(self.date_widgets):
+            GLib.timeout_add(400, self._update_timeline_from_positions)
         return False
 
     def _build_timeline_entries(self, groups):
