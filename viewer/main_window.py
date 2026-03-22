@@ -833,7 +833,9 @@ class MainWindow(Adw.ApplicationWindow):
         root_overlay.add_overlay(splash)
         self._splash = splash
         self._splash_start = time.time()
+        self._splash_prewarm_done = False
         GLib.timeout_add(80, self._update_splash)
+        threading.Thread(target=self._prewarm_gstreamer, daemon=True).start()
 
         self.set_content(root_overlay)
 
@@ -850,13 +852,45 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add(4000, self._check_for_update)
 
     # ── Startup splash ───────────────────────────────────────────────
+    def _prewarm_gstreamer(self):
+        """Initialize GStreamer pipeline in background so first video opens fast."""
+        try:
+            import gi
+            gi.require_version("Gst", "1.0")
+            from gi.repository import Gst
+            Gst.init(None)
+            pipeline = Gst.parse_launch("audiotestsrc wave=4 num-buffers=1 ! fakesink")
+            pipeline.set_state(Gst.State.PLAYING)
+            pipeline.get_bus().timed_pop_filtered(
+                Gst.CLOCK_TIME_NONE,
+                Gst.MessageType.EOS | Gst.MessageType.ERROR
+            )
+            pipeline.set_state(Gst.State.NULL)
+        except Exception:
+            pass
+        finally:
+            GLib.idle_add(self._on_prewarm_done)
+
+    def _on_prewarm_done(self):
+        self._splash_prewarm_done = True
+        return False
+
     def _update_splash(self):
         elapsed = time.time() - self._splash_start
-        duration = 25.0
-        self._splash_bar.set_fraction(min(elapsed / duration, 1.0))
-        if elapsed >= duration:
-            self._splash.set_visible(False)
-            return False
+        min_time = 2.0   # always show at least 2 seconds
+        max_time = 30.0  # hard cap
+        if self._splash_prewarm_done:
+            # fill up progress bar quickly then close
+            self._splash_bar.set_fraction(min(elapsed / min_time, 1.0))
+            if elapsed >= min_time:
+                self._splash.set_visible(False)
+                return False
+        else:
+            # pulse toward ~80%, reserve last 20% for when prewarm completes
+            self._splash_bar.set_fraction(min(elapsed / max_time * 0.8, 0.8))
+            if elapsed >= max_time:
+                self._splash.set_visible(False)
+                return False
         return True
 
     # ── Update systeem ───────────────────────────────────────────────
