@@ -1245,7 +1245,8 @@ class MainWindow(Adw.ApplicationWindow):
         upper      = adj.get_upper()
         page       = adj.get_page_size()
         max_scroll = upper - page
-        if max_scroll <= 0:
+        frac_base  = max_scroll if max_scroll > 1 else upper
+        if frac_base <= 0:
             return False
 
         # Verzamel Y-posities per datum
@@ -1255,7 +1256,7 @@ class MainWindow(Adw.ApplicationWindow):
             if coords is None:
                 continue
             _, y = coords
-            frac = max(0.0, min(1.0, y / max_scroll))
+            frac = max(0.0, min(1.0, y / frac_base))
             items.append((frac, date_str))
         items.sort(key=lambda e: e[0])
 
@@ -1564,6 +1565,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.set_visible_child_name("viewer")
         self._filmstrip_thumbs = {}
         self._update_filmstrip()
+        GLib.timeout_add(80, self._scroll_filmstrip_to_current)
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
         threading.Thread(
@@ -1674,6 +1676,15 @@ class MainWindow(Adw.ApplicationWindow):
             self._filmstrip_thumbs[i] = pb
             GLib.idle_add(self.filmstrip_area.queue_draw)
 
+    @staticmethod
+    def _film_rounded_rect(cr, x, y, w, h, r=6):
+        cr.new_sub_path()
+        cr.arc(x + w - r, y + r,     r, -math.pi / 2, 0)
+        cr.arc(x + w - r, y + h - r, r,  0,            math.pi / 2)
+        cr.arc(x + r,     y + h - r, r,  math.pi / 2,  math.pi)
+        cr.arc(x + r,     y + r,     r,  math.pi,      3 * math.pi / 2)
+        cr.close_path()
+
     def _draw_filmstrip(self, area, cr, width, height):
         n = len(self.photos)
         if n == 0:
@@ -1688,24 +1699,25 @@ class MainWindow(Adw.ApplicationWindow):
             y = (height - FILM_THUMB) // 2
             pb = self._filmstrip_thumbs.get(i)
             if pb:
-                # center the pixbuf within the cell
                 pw = pb.get_width()
                 ph = pb.get_height()
                 dx = x + (FILM_THUMB - pw) // 2
                 dy = y + (FILM_THUMB - ph) // 2
+                cr.save()
+                self._film_rounded_rect(cr, x, y, FILM_THUMB, FILM_THUMB, 6)
+                cr.clip()
                 Gdk.cairo_set_source_pixbuf(cr, pb, dx, dy)
-                cr.rectangle(dx, dy, pw, ph)
-                cr.fill()
+                cr.paint()
+                cr.restore()
             else:
-                # placeholder
                 cr.set_source_rgba(0.3, 0.3, 0.3, 1.0)
-                cr.rectangle(x, y, FILM_THUMB, FILM_THUMB)
+                self._film_rounded_rect(cr, x, y, FILM_THUMB, FILM_THUMB, 6)
                 cr.fill()
-            # highlight current
+            # highlight current with orange rounded border
             if i == self.current_index:
                 cr.set_source_rgba(0.914, 0.329, 0.125, 1.0)
                 cr.set_line_width(3)
-                cr.rectangle(x, y, FILM_THUMB, FILM_THUMB)
+                self._film_rounded_rect(cr, x + 1.5, y + 1.5, FILM_THUMB - 3, FILM_THUMB - 3, 5)
                 cr.stroke()
 
     def _on_filmstrip_click(self, gesture, n_press, x, y):
@@ -1728,9 +1740,13 @@ class MainWindow(Adw.ApplicationWindow):
         cell = FILM_THUMB + 4
         adj  = self.filmstrip_scroll.get_hadjustment()
         page = adj.get_page_size()
+        if page <= 0:
+            GLib.timeout_add(50, self._scroll_filmstrip_to_current)
+            return False
         center_of_current = self.current_index * cell + cell / 2
         target = center_of_current - page / 2
         adj.set_value(max(0, min(target, adj.get_upper() - page)))
+        return False
 
     def _apply_viewer_transform(self):
         z  = self._viewer_zoom
