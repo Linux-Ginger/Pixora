@@ -299,9 +299,10 @@ class MapWidget(Gtk.DrawingArea):
         self._drag_start    = None
         self._mouse_x       = 450.0
         self._mouse_y       = 325.0
-        self._hover_idx     = -1
-        self._hover_pixbufs = {}
-        self._last_clusters = []
+        self._hover_idx       = -1
+        self._hover_pixbufs   = {}
+        self._last_clusters   = []
+        self._clusters_dirty  = True
 
         if markers:
             avg_lat = sum(m[0] for m in markers) / len(markers)
@@ -420,8 +421,10 @@ class MapWidget(Gtk.DrawingArea):
                 cr.set_source_surface(surface, px, py)
                 cr.paint()
 
-        # Clusters + markers
-        self._last_clusters = self._get_clusters()
+        # Clusters + markers (alleen herberekenen na zoom/pan)
+        if self._clusters_dirty:
+            self._last_clusters  = self._get_clusters()
+            self._clusters_dirty = False
         for mx, my, group in self._last_clusters:
             if -20 <= mx <= width + 20 and -20 <= my <= height + 20:
                 count  = len(group)
@@ -596,7 +599,8 @@ class MapWidget(Gtk.DrawingArea):
             scale         = 2 ** (new_zoom - self.zoom)
             self.offset_x = (self.offset_x + cx) * scale - cx
             self.offset_y = (self.offset_y + cy) * scale - cy
-            self.zoom     = new_zoom
+            self.zoom            = new_zoom
+            self._clusters_dirty = True
             self._clamp_offset()
             GLib.idle_add(self._request_visible_tiles)
             self.queue_draw()
@@ -626,8 +630,9 @@ class MapWidget(Gtk.DrawingArea):
 
     def on_drag_update(self, gesture, dx, dy):
         if self._drag_start:
-            self.offset_x = self._drag_start[0] - dx
-            self.offset_y = self._drag_start[1] - dy
+            self.offset_x        = self._drag_start[0] - dx
+            self.offset_y        = self._drag_start[1] - dy
+            self._clusters_dirty = True
             self._clamp_offset()
             self.queue_draw()
 
@@ -932,8 +937,14 @@ class MainWindow(Adw.ApplicationWindow):
         if not valid:
             return
         self.close_map()
-        index = self.photos.index(valid[0])
-        GLib.idle_add(self.open_photo, index)
+        if len(valid) == 1:
+            index = self.photos.index(valid[0])
+            GLib.idle_add(self.open_photo, index)
+        else:
+            # Cluster: toon alleen de foto's in dit cluster
+            self._photos_before_cluster = self.photos
+            self.photos = valid
+            GLib.idle_add(self.open_photo, 0)
 
     def close_map(self, btn=None):
         self.header.set_visible(True)
@@ -1532,6 +1543,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_load_id += 1
         self.photo_picture.set_pixbuf(None)
         self.header.set_visible(True)
+        if hasattr(self, '_photos_before_cluster') and self._photos_before_cluster is not None:
+            self.photos = self._photos_before_cluster
+            self._photos_before_cluster = None
         self.main_stack.set_visible_child_name("grid")
 
     def _apply_viewer_transform(self):
