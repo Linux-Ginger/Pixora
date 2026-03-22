@@ -993,46 +993,50 @@ class MainWindow(Adw.ApplicationWindow):
         viewer_area.add_overlay(self.edit_btn)
 
         # ── Editor toolbar (verborgen tot editor modus) ────────────────
-        self.editor_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        self.editor_bar.add_css_class("osd")
+        self.editor_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.editor_bar.set_halign(Gtk.Align.CENTER)
         self.editor_bar.set_valign(Gtk.Align.END)
         self.editor_bar.set_margin_bottom(24)
-        self.editor_bar.set_margin_start(12)
-        self.editor_bar.set_margin_end(12)
         self.editor_bar.set_visible(False)
 
         rot_left_btn = Gtk.Button(icon_name="object-rotate-left-symbolic")
+        rot_left_btn.add_css_class("osd")
         rot_left_btn.add_css_class("circular")
-        rot_left_btn.set_tooltip_text("Draaien links (90°)")
+        rot_left_btn.set_size_request(48, 48)
+        rot_left_btn.set_tooltip_text("Draaien links")
         rot_left_btn.connect("clicked", self.on_editor_rotate_left)
         self.editor_bar.append(rot_left_btn)
 
         rot_right_btn = Gtk.Button(icon_name="object-rotate-right-symbolic")
+        rot_right_btn.add_css_class("osd")
         rot_right_btn.add_css_class("circular")
-        rot_right_btn.set_tooltip_text("Draaien rechts (90°)")
+        rot_right_btn.set_size_request(48, 48)
+        rot_right_btn.set_tooltip_text("Draaien rechts")
         rot_right_btn.connect("clicked", self.on_editor_rotate_right)
         self.editor_bar.append(rot_right_btn)
 
-        self.crop_toggle_btn = Gtk.ToggleButton(label="Bijsnijden")
+        self.crop_toggle_btn = Gtk.ToggleButton(label="✂")
+        self.crop_toggle_btn.add_css_class("osd")
         self.crop_toggle_btn.add_css_class("circular")
-        self.crop_toggle_btn.set_tooltip_text("Interactief bijsnijden")
+        self.crop_toggle_btn.set_size_request(48, 48)
+        self.crop_toggle_btn.set_tooltip_text("Bijsnijden")
         self.crop_toggle_btn.connect("toggled", self.on_editor_toggle_crop)
         self.editor_bar.append(self.crop_toggle_btn)
 
-        sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
-        sep.set_margin_start(4)
-        sep.set_margin_end(4)
-        self.editor_bar.append(sep)
-
-        save_btn = Gtk.Button(label="Opslaan")
+        save_btn = Gtk.Button(icon_name="document-save-symbolic")
+        save_btn.add_css_class("osd")
         save_btn.add_css_class("circular")
         save_btn.add_css_class("suggested-action")
+        save_btn.set_size_request(48, 48)
+        save_btn.set_tooltip_text("Opslaan")
         save_btn.connect("clicked", self.on_editor_save)
         self.editor_bar.append(save_btn)
 
-        cancel_editor_btn = Gtk.Button(label="Annuleren")
+        cancel_editor_btn = Gtk.Button(icon_name="window-close-symbolic")
+        cancel_editor_btn.add_css_class("osd")
         cancel_editor_btn.add_css_class("circular")
+        cancel_editor_btn.set_size_request(48, 48)
+        cancel_editor_btn.set_tooltip_text("Annuleren")
         cancel_editor_btn.connect("clicked", self.on_editor_cancel)
         self.editor_bar.append(cancel_editor_btn)
 
@@ -1640,23 +1644,21 @@ class MainWindow(Adw.ApplicationWindow):
         self._editor_apply_preview()
 
     def _editor_apply_preview(self):
-        path = self.photos[self.current_index]
-        try:
-            from PIL import Image
-            import io
-            img = Image.open(path)
-            if self._editor_rotation != 0:
-                img = img.rotate(self._editor_rotation, expand=True)
-            buf = io.BytesIO()
-            img.save(buf, format="PNG")
-            buf.seek(0)
-            loader = GdkPixbuf.PixbufLoader()
-            loader.write(buf.read())
-            loader.close()
-            self._editor_display_pixbuf = loader.get_pixbuf()
-            self.photo_picture.set_pixbuf(self._editor_display_pixbuf)
-        except Exception as e:
-            print(f"Editor preview fout: {e}")
+        if not self._viewer_pixbuf:
+            return
+        rotation = self._editor_rotation % 360
+        gdk_rot_map = {
+            0:   GdkPixbuf.PixbufRotation.NONE,
+            90:  GdkPixbuf.PixbufRotation.COUNTERCLOCKWISE,
+            180: GdkPixbuf.PixbufRotation.UPSIDEDOWN,
+            270: GdkPixbuf.PixbufRotation.CLOCKWISE,
+        }
+        gdk_rot = gdk_rot_map.get(rotation, GdkPixbuf.PixbufRotation.NONE)
+        if gdk_rot == GdkPixbuf.PixbufRotation.NONE:
+            self._editor_display_pixbuf = self._viewer_pixbuf
+        else:
+            self._editor_display_pixbuf = self._viewer_pixbuf.rotate_simple(gdk_rot)
+        self.photo_picture.set_pixbuf(self._editor_display_pixbuf)
 
     def on_editor_toggle_crop(self, btn):
         self._editor_crop_mode = btn.get_active()
@@ -1756,38 +1758,46 @@ class MainWindow(Adw.ApplicationWindow):
                 if rw > 4 and rh > 4:
                     crop_box = (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
 
-        try:
-            from PIL import Image
-            img = Image.open(path)
-            if rotation != 0:
-                img = img.rotate(rotation, expand=True)
-            if crop_box:
-                img = img.crop(crop_box)
-            ext = os.path.splitext(path)[1].lower()
-            if ext in (".jpg", ".jpeg"):
-                img.save(path, "JPEG", quality=95)
-            else:
-                img.save(path, "PNG")
-        except Exception as e:
-            print(f"Editor opslaan mislukt: {e}")
+        self.on_editor_cancel()
+
+        def _do_save():
+            try:
+                from PIL import Image
+                img = Image.open(path)
+                if rotation != 0:
+                    img = img.rotate(rotation, expand=True)
+                if crop_box:
+                    img = img.crop(crop_box)
+                ext = os.path.splitext(path)[1].lower()
+                if ext in (".jpg", ".jpeg"):
+                    img.save(path, "JPEG", quality=95)
+                else:
+                    img.save(path, "PNG")
+                GLib.idle_add(_after_save)
+            except Exception as e:
+                print(f"Editor opslaan mislukt: {e}")
+                GLib.idle_add(_save_error, str(e))
+
+        def _after_save():
+            self._viewer_load_id += 1
+            load_id = self._viewer_load_id
+            threading.Thread(
+                target=self._load_full_photo,
+                args=(path, load_id),
+                daemon=True
+            ).start()
+            GLib.timeout_add(300, self.start_load)
+
+        def _save_error(msg):
             dialog = Adw.MessageDialog(
                 transient_for=self,
                 heading="Opslaan mislukt",
-                body=str(e)
+                body=msg
             )
             dialog.add_response("ok", "OK")
             dialog.present()
-            return
 
-        self.on_editor_cancel()
-        self._viewer_load_id += 1
-        load_id = self._viewer_load_id
-        threading.Thread(
-            target=self._load_full_photo,
-            args=(path, load_id),
-            daemon=True
-        ).start()
-        GLib.timeout_add(300, self.start_load)
+        threading.Thread(target=_do_save, daemon=True).start()
 
     # ── Verwijderen ───────────────────────────────────────────────────
     def on_delete_current(self, btn):
