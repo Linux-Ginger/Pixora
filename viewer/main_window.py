@@ -43,6 +43,7 @@ CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
 TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
 THUMB_SIZE       = 180
+THUMB_CACHE_SIZE = 320   # groter dan display zodat COVER altijd downscalt
 BATCH_SIZE       = 30
 TILE_SIZE        = 256
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
@@ -169,7 +170,7 @@ def lat_lon_to_tile_float(lat, lon, zoom):
 
 def get_cache_path(photo_path):
     mtime = str(os.path.getmtime(photo_path))
-    key   = hashlib.md5((photo_path + mtime).encode()).hexdigest()
+    key   = hashlib.md5((photo_path + mtime + str(THUMB_CACHE_SIZE)).encode()).hexdigest()
     return os.path.join(CACHE_DIR, key + ".png")
 
 def load_thumbnail(photo_path):
@@ -180,7 +181,9 @@ def load_thumbnail(photo_path):
         except Exception:
             pass
     try:
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(photo_path, THUMB_SIZE, THUMB_SIZE, True)
+        # Genereer op THUMB_CACHE_SIZE zodat COVER bij display altijd downscalt → scherp
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+            photo_path, THUMB_CACHE_SIZE, THUMB_CACHE_SIZE, True)
         os.makedirs(CACHE_DIR, exist_ok=True)
         pixbuf.savev(cache_path, "png", [], [])
         return pixbuf
@@ -256,9 +259,10 @@ class TimelineBar(Gtk.DrawingArea):
             return
         is_dark = self.style_manager and self.style_manager.get_dark()
 
+        min_next_y = 0.0  # minimale Y voor het volgende label (voorkomt overlap)
+
         for i, (label, frac) in enumerate(self.entries):
             is_year = label.isdigit() and len(label) == 4
-            y = frac * height
 
             if i == self.active_idx:
                 cr.set_source_rgb(*self._ORANGE)
@@ -277,12 +281,17 @@ class TimelineBar(Gtk.DrawingArea):
 
             cr.set_font_size(font_size)
             ext = cr.text_extents(label)
-            tx  = max(2, width - ext.width - 5)
-            ty  = y + ext.height / 2
-            # Zorg dat tekst niet buiten het widget valt
-            ty  = max(ext.height, min(height - 2, ty))
+
+            # Proportionele Y, maar nooit hoger dan vorig label + minimale spatie
+            ideal_y = frac * height + ext.height / 2
+            ty = max(min_next_y, ideal_y)
+            ty = max(ext.height, min(height - 2, ty))
+
+            tx = max(2, width - ext.width - 5)
             cr.move_to(tx, ty)
             cr.show_text(label)
+
+            min_next_y = ty + 2  # 2px minimale spatie tussen labels
 
     def _on_click(self, gesture, n_press, x, y):
         if not self.entries:
