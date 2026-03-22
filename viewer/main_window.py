@@ -187,6 +187,8 @@ def load_thumbnail(photo_path):
     except Exception:
         return None
 
+
+# ── File watcher ─────────────────────────────────────────────────────
 class PhotoFolderHandler(FileSystemEventHandler):
     def __init__(self, callback):
         super().__init__()
@@ -211,6 +213,7 @@ class PhotoFolderHandler(FileSystemEventHandler):
         self._schedule_reload()
 
 
+# ── Tijdlijn scrollbar ───────────────────────────────────────────────
 class TimelineBar(Gtk.ScrolledWindow):
     def __init__(self, scroll_callback):
         super().__init__()
@@ -230,7 +233,6 @@ class TimelineBar(Gtk.ScrolledWindow):
     def set_entries(self, entries):
         self.entries  = entries
         self._buttons = []
-
         while True:
             child = self.box.get_first_child()
             if child is None:
@@ -239,12 +241,10 @@ class TimelineBar(Gtk.ScrolledWindow):
 
         for label_str, frac in entries:
             is_year = label_str.isdigit() and len(label_str) == 4
-
             btn = Gtk.Button(label=label_str)
             btn.add_css_class("flat")
             btn.set_vexpand(True)
             btn.set_valign(Gtk.Align.CENTER)
-
             btn_css = Gtk.CssProvider()
             if is_year:
                 btn_css.load_from_string("""
@@ -257,7 +257,6 @@ class TimelineBar(Gtk.ScrolledWindow):
                              padding: 1px 4px; min-height: 0; }
                 """)
             btn.get_style_context().add_provider(btn_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
             f = frac
             btn.connect("clicked", lambda b, fr=f: self.scroll_callback(fr))
             self.box.append(btn)
@@ -289,24 +288,19 @@ class TimelineBar(Gtk.ScrolledWindow):
             btn.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
 
-# ── Kaart: aparte popup (bewezen werkend) + open-in-app navigatie ────
-
-    def __init__(self, parent, markers, open_photo_cb):
+# ── Kaart widget (in-app, geen apart venster) ────────────────────────
+class MapWidget(Gtk.DrawingArea):
+    def __init__(self, markers, open_photo_cb):
         super().__init__()
-        self.set_title("Kaartweergave")
-        self.set_default_size(900, 650)
-        self.set_transient_for(parent)
-        self.set_modal(True)
-
-        self.markers         = markers
-        self.open_photo_cb   = open_photo_cb
-        self.zoom            = 10 if markers else 7
-        self.tile_cache      = {}
-        self._drag_start     = None
-        self._mouse_x        = 450
-        self._mouse_y        = 325
-        self._hover_idx      = -1
-        self._hover_pixbufs  = {}
+        self.markers        = markers
+        self.open_photo_cb  = open_photo_cb
+        self.zoom           = 10.0 if markers else 7.0
+        self.tile_cache     = {}
+        self._drag_start    = None
+        self._mouse_x       = 450.0
+        self._mouse_y       = 325.0
+        self._hover_idx     = -1
+        self._hover_pixbufs = {}
 
         if markers:
             avg_lat = sum(m[0] for m in markers) / len(markers)
@@ -315,65 +309,41 @@ class TimelineBar(Gtk.ScrolledWindow):
             avg_lat, avg_lon = 52.3, 5.3
 
         tx, ty = lat_lon_to_tile_float(avg_lat, avg_lon, self.zoom)
-        self.offset_x = tx * TILE_SIZE - 450
-        self.offset_y = ty * TILE_SIZE - 325
+        self.offset_x = tx * TILE_SIZE - 450.0
+        self.offset_y = ty * TILE_SIZE - 325.0
 
-        self.draw_area = Gtk.DrawingArea()
-        self.draw_area.set_draw_func(self.on_draw)
-        self.draw_area.set_vexpand(True)
-        self.draw_area.set_hexpand(True)
+        self.set_vexpand(True)
+        self.set_hexpand(True)
+        self.set_draw_func(self.on_draw)
 
-        # Muiswiel (discreet)
-        scroll_ctrl = Gtk.EventControllerScroll.new(
+        # Muiswiel — discreet
+        scroll_discrete = Gtk.EventControllerScroll.new(
             Gtk.EventControllerScrollFlags.VERTICAL |
             Gtk.EventControllerScrollFlags.DISCRETE
         )
-        scroll_ctrl.connect("scroll", self.on_scroll_discrete)
-        self.draw_area.add_controller(scroll_ctrl)
+        scroll_discrete.connect("scroll", self.on_scroll_discrete)
+        self.add_controller(scroll_discrete)
 
-        # Trackpad (smooth)
+        # Trackpad — smooth
         scroll_smooth = Gtk.EventControllerScroll.new(
             Gtk.EventControllerScrollFlags.VERTICAL
         )
         scroll_smooth.connect("scroll", self.on_scroll_smooth)
-        self.draw_area.add_controller(scroll_smooth)
+        self.add_controller(scroll_smooth)
 
         drag = Gtk.GestureDrag.new()
         drag.connect("drag-begin",  self.on_drag_begin)
         drag.connect("drag-update", self.on_drag_update)
         drag.connect("drag-end",    self.on_drag_end)
-        self.draw_area.add_controller(drag)
+        self.add_controller(drag)
 
         motion = Gtk.EventControllerMotion.new()
         motion.connect("motion", self.on_mouse_motion)
-        self.draw_area.add_controller(motion)
+        self.add_controller(motion)
 
         click = Gtk.GestureClick.new()
         click.connect("released", self.on_click)
-        self.draw_area.add_controller(click)
-
-        header = Adw.HeaderBar()
-
-        zoom_in_btn = Gtk.Button(icon_name="zoom-in-symbolic")
-        zoom_in_btn.add_css_class("flat")
-        zoom_in_btn.set_tooltip_text("Inzoomen")
-        zoom_in_btn.connect("clicked", lambda _: self.zoom_by(1))
-        header.pack_end(zoom_in_btn)
-
-        zoom_out_btn = Gtk.Button(icon_name="zoom-out-symbolic")
-        zoom_out_btn.add_css_class("flat")
-        zoom_out_btn.set_tooltip_text("Uitzoomen")
-        zoom_out_btn.connect("clicked", lambda _: self.zoom_by(-1))
-        header.pack_end(zoom_out_btn)
-
-        count_label = Gtk.Label(label="Kaartweergave")
-        count_label.add_css_class("dim-label")
-        header.set_title_widget(count_label)
-
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        box.append(header)
-        box.append(self.draw_area)
-        self.set_content(box)
+        self.add_controller(click)
 
         GLib.idle_add(self._request_visible_tiles)
 
@@ -399,11 +369,11 @@ class TimelineBar(Gtk.ScrolledWindow):
         return tiles
 
     def _request_visible_tiles(self):
-        w = self.draw_area.get_width() or 900
-        h = self.draw_area.get_height() or 650
+        w = self.get_width() or 900
+        h = self.get_height() or 650
         for z, tx, ty, _, _ in self._get_visible_tiles(w, h):
             key = (z, tx, ty)
-            if key not in self.tile_cache:
+            if key not in self.tile_cache or self.tile_cache[key] is None:
                 self.tile_cache[key] = None
                 threading.Thread(target=self._load_tile, args=(z, tx, ty), daemon=True).start()
         return False
@@ -436,7 +406,7 @@ class TimelineBar(Gtk.ScrolledWindow):
 
     def _tile_loaded(self, key, surface):
         self.tile_cache[key] = surface
-        self.draw_area.queue_draw()
+        self.queue_draw()
         return False
 
     def on_draw(self, area, cr, width, height):
@@ -449,6 +419,7 @@ class TimelineBar(Gtk.ScrolledWindow):
                 cr.set_source_surface(surface, px, py)
                 cr.paint()
 
+        # Markers
         for i, marker in enumerate(self.markers):
             lat, lon = marker[0], marker[1]
             tx_f, ty_f = lat_lon_to_tile_float(lat, lon, self.zoom)
@@ -466,6 +437,7 @@ class TimelineBar(Gtk.ScrolledWindow):
                 cr.arc(mx, my, 9, 0, 2 * math.pi)
                 cr.stroke()
 
+        # Hover preview
         if 0 <= self._hover_idx < len(self.markers):
             marker   = self.markers[self._hover_idx]
             lat, lon = marker[0], marker[1]
@@ -546,7 +518,7 @@ class TimelineBar(Gtk.ScrolledWindow):
 
     def _hover_thumb_loaded(self, path, pixbuf):
         self._hover_pixbufs[path] = pixbuf
-        self.draw_area.queue_draw()
+        self.queue_draw()
         return False
 
     def on_mouse_motion(self, ctrl, x, y):
@@ -571,7 +543,7 @@ class TimelineBar(Gtk.ScrolledWindow):
                         args=(path,),
                         daemon=True
                     ).start()
-            self.draw_area.queue_draw()
+            self.queue_draw()
 
     def on_click(self, gesture, n_press, x, y):
         for marker in self.markers:
@@ -580,7 +552,6 @@ class TimelineBar(Gtk.ScrolledWindow):
             mx = tx_f * TILE_SIZE - self.offset_x
             my = ty_f * TILE_SIZE - self.offset_y
             if math.sqrt((x - mx) ** 2 + (y - my) ** 2) < 12:
-                self.close()
                 GLib.idle_add(self.open_photo_cb, marker[4])
                 return
 
@@ -597,11 +568,11 @@ class TimelineBar(Gtk.ScrolledWindow):
             self.zoom     = new_zoom
             self._clamp_offset()
             GLib.idle_add(self._request_visible_tiles)
-            self.draw_area.queue_draw()
+            self.queue_draw()
 
     def _clamp_offset(self):
-        w     = self.draw_area.get_width() or 900
-        h     = self.draw_area.get_height() or 650
+        w     = self.get_width() or 900
+        h     = self.get_height() or 650
         z     = int(self.zoom)
         n     = 2 ** z
         max_x = max(0, n * TILE_SIZE - w)
@@ -610,12 +581,10 @@ class TimelineBar(Gtk.ScrolledWindow):
         self.offset_y = max(0.0, min(float(max_y), self.offset_y))
 
     def on_scroll_discrete(self, ctrl, dx, dy):
-        # Muiswiel
         self.zoom_by(-1 if dy > 0 else 1)
         return True
 
     def on_scroll_smooth(self, ctrl, dx, dy):
-        # Trackpad
         if abs(dy) < 1.0:
             self.zoom_by(-dy * 0.25)
             return True
@@ -629,12 +598,13 @@ class TimelineBar(Gtk.ScrolledWindow):
             self.offset_x = self._drag_start[0] - dx
             self.offset_y = self._drag_start[1] - dy
             self._clamp_offset()
-            self.draw_area.queue_draw()
+            self.queue_draw()
 
     def on_drag_end(self, gesture, dx, dy):
         self._drag_start = None
 
 
+# ── Hoofdvenster ─────────────────────────────────────────────────────
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
@@ -652,7 +622,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._select_mode    = False
         self._selected       = set()
         self._photo_location = {}
-        self._map_open       = False
+        self._map_widget     = None
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
@@ -665,6 +635,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.set_transition_duration(200)
         self.main_stack.add_named(self.build_grid_page(),   "grid")
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
+        self.main_stack.add_named(self.build_map_page(),    "map")
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(self.build_header())
@@ -679,6 +650,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
 
+    # ── Dark mode ────────────────────────────────────────────────────
     def is_dark(self):
         return self.style_manager.get_dark()
 
@@ -687,6 +659,7 @@ class MainWindow(Adw.ApplicationWindow):
         if os.path.exists(logo_path):
             self.logo_picture.set_filename(logo_path)
 
+    # ── File watcher ─────────────────────────────────────────────────
     def start_watcher(self, path):
         if not WATCHDOG_AVAILABLE or not os.path.exists(path):
             return
@@ -710,6 +683,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.stop_watcher()
         return False
 
+    # ── Header ───────────────────────────────────────────────────────
     def build_header(self):
         self.header = Adw.HeaderBar()
         self.header.add_css_class("flat")
@@ -750,6 +724,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         return self.header
 
+    # ── Grid pagina ───────────────────────────────────────────────────
     def build_grid_page(self):
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         outer.set_vexpand(True)
@@ -768,10 +743,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.spinner = Gtk.Spinner()
         self.spinner.set_size_request(48, 48)
-
         self.spinner_label = Gtk.Label(label="Foto's laden...")
         self.spinner_label.add_css_class("dim-label")
-
         spinner_box.append(self.spinner)
         spinner_box.append(self.spinner_label)
         self.content_stack.add_named(spinner_box, "loading")
@@ -797,7 +770,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.timeline = TimelineBar(self._on_timeline_scroll)
         grid_with_timeline.append(self.timeline)
-
         self.content_stack.add_named(grid_with_timeline, "grid")
 
         status_page = Adw.StatusPage()
@@ -812,13 +784,51 @@ class MainWindow(Adw.ApplicationWindow):
         outer.append(self.content_stack)
         return outer
 
+    # ── Kaart pagina (in-app) ─────────────────────────────────────────
+    def build_map_page(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.set_vexpand(True)
+        box.set_hexpand(True)
+
+        map_header = Adw.HeaderBar()
+        map_header.add_css_class("flat")
+
+        back_btn = Gtk.Button(icon_name="go-previous-symbolic")
+        back_btn.add_css_class("flat")
+        back_btn.set_tooltip_text("Terug")
+        back_btn.connect("clicked", self.close_map)
+        map_header.pack_start(back_btn)
+
+        zoom_in_btn = Gtk.Button(icon_name="zoom-in-symbolic")
+        zoom_in_btn.add_css_class("flat")
+        zoom_in_btn.connect("clicked", lambda _: self._map_widget and self._map_widget.zoom_by(1))
+        map_header.pack_end(zoom_in_btn)
+
+        zoom_out_btn = Gtk.Button(icon_name="zoom-out-symbolic")
+        zoom_out_btn.add_css_class("flat")
+        zoom_out_btn.connect("clicked", lambda _: self._map_widget and self._map_widget.zoom_by(-1))
+        map_header.pack_end(zoom_out_btn)
+
+        self.map_title_label = Gtk.Label(label="Kaartweergave")
+        self.map_title_label.add_css_class("dim-label")
+        map_header.set_title_widget(self.map_title_label)
+
+        box.append(map_header)
+
+        self.map_container = Gtk.Box()
+        self.map_container.set_vexpand(True)
+        self.map_container.set_hexpand(True)
+        box.append(self.map_container)
+
+        return box
+
     def open_map(self, btn=None):
         self.header.set_visible(False)
         self.map_btn.set_label("🗺 laden...")
         self.map_btn.set_sensitive(False)
         threading.Thread(target=self._load_gps_and_show_map, daemon=True).start()
 
-    def _load_gps_and_open_map(self):
+    def _load_gps_and_show_map(self):
         markers = []
         for path in self.photos:
             coords = get_gps_coords(path)
@@ -831,26 +841,33 @@ class MainWindow(Adw.ApplicationWindow):
                 except Exception:
                     datum = ""
                 markers.append((lat, lon, filename, datum, path))
-        GLib.idle_add(self._show_map_window, markers)
+        GLib.idle_add(self._show_map, markers)
 
-    def _show_map_window(self, markers):
-        map_win = MapWindow(self, markers, self._open_photo_from_map)
-        map_win.connect("close-request", self._on_map_closed)
-        map_win.present()
+    def _show_map(self, markers):
+        if self._map_widget:
+            self.map_container.remove(self._map_widget)
+            self._map_widget = None
+
+        self._map_widget = MapWidget(markers, self._open_photo_from_map)
+        self.map_container.append(self._map_widget)
+
+        self.map_title_label.set_text("Kaartweergave")
         self.map_btn.set_label("🗺")
-        return False
-
-    def _on_map_closed(self, win):
-        self._map_open = False
         self.map_btn.set_sensitive(True)
-        self.map_btn.set_label("🗺")
+        self.main_stack.set_visible_child_name("map")
         return False
 
     def _open_photo_from_map(self, path):
         if path in self.photos:
             index = self.photos.index(path)
-            self.open_photo(index)
+            self.close_map()
+            GLib.idle_add(self.open_photo, index)
 
+    def close_map(self, btn=None):
+        self.header.set_visible(True)
+        self.main_stack.set_visible_child_name("grid")
+
+    # ── Viewer pagina ─────────────────────────────────────────────────
     def build_viewer_page(self):
         viewer_area = Gtk.Overlay()
         viewer_area.set_vexpand(True)
@@ -945,6 +962,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         return viewer_area
 
+    # ── Onderste balk ─────────────────────────────────────────────────
     def build_bottombar(self):
         self.bottom_stack = Gtk.Stack()
         self.bottom_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
@@ -980,6 +998,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         return self.bottom_stack
 
+    # ── Tijdlijn ──────────────────────────────────────────────────────
     def _on_timeline_scroll(self, fraction):
         adj   = self.scroll.get_vadjustment()
         total = adj.get_upper() - adj.get_lower() - adj.get_page_size()
@@ -999,7 +1018,6 @@ class MainWindow(Adw.ApplicationWindow):
         total = adj.get_upper()
         if total == 0:
             return False
-
         entries = []
         for date_str, label in self.date_widgets.items():
             coords = label.translate_coordinates(self.grid_box, 0, 0)
@@ -1008,7 +1026,6 @@ class MainWindow(Adw.ApplicationWindow):
             x, y = coords
             frac = max(0.0, min(1.0, y / total))
             entries.append((date_str, frac))
-
         entries.sort(key=lambda e: e[1])
         self.timeline.set_entries(entries)
         return False
@@ -1019,11 +1036,9 @@ class MainWindow(Adw.ApplicationWindow):
         total_photos = sum(len(indices) for _, _, indices in groups)
         if total_photos == 0:
             return []
-
         entries    = []
         cumulative = 0
         last_year  = None
-
         for date_str, date_obj, indices in groups:
             frac     = cumulative / total_photos
             year_str = str(date_obj.year)
@@ -1032,13 +1047,12 @@ class MainWindow(Adw.ApplicationWindow):
                 last_year = year_str
             entries.append((MONTHS_NL[date_obj.month], frac))
             cumulative += len(indices)
-
         return entries
 
+    # ── Selectie modus ────────────────────────────────────────────────
     def toggle_select_mode(self, btn=None):
         self._select_mode = not self._select_mode
         self._selected.clear()
-
         if self._select_mode:
             self.select_btn.set_label("Annuleren")
             self.select_btn.add_css_class("suggested-action")
@@ -1058,23 +1072,21 @@ class MainWindow(Adw.ApplicationWindow):
         btn, check_box = widget
         check_box.set_visible(index in self._selected)
 
+    # ── Foto's laden ──────────────────────────────────────────────────
     def load_photos(self):
         photo_path = self.settings.get("photo_path", "")
         if not photo_path or not os.path.exists(photo_path):
             self.show_empty_state()
             return False
-
         photos = []
         for root, dirs, files in os.walk(photo_path):
             for file in files:
                 if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
                     photos.append(os.path.join(root, file))
-
         if not photos:
             self.show_empty_state()
             self.start_watcher(photo_path)
             return False
-
         self.photos = photos
         self.apply_sort()
         self.photo_count_label.set_text(f"{len(self.photos)} foto's")
@@ -1086,20 +1098,17 @@ class MainWindow(Adw.ApplicationWindow):
         self._load_id += 1
         load_id = self._load_id
         self._loading = True
-
         while True:
             child = self.grid_box.get_first_child()
             if child is None:
                 break
             self.grid_box.remove(child)
-
         self.thumb_widgets = {}
         self.date_widgets  = {}
         self._selected.clear()
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
         self.spinner_label.set_text(f"Foto's laden... 0 / {len(self.photos)}")
-
         thread = threading.Thread(
             target=self._load_thread,
             args=(load_id, list(self.photos)),
@@ -1122,17 +1131,13 @@ class MainWindow(Adw.ApplicationWindow):
     def _load_thread(self, load_id, photos):
         total  = len(photos)
         groups = self._group_by_date(photos)
-
         timeline_entries = self._build_timeline_entries(groups)
         GLib.idle_add(self.timeline.set_entries, timeline_entries)
-
         loaded = 0
         for date_str, date_obj, indices in groups:
             if load_id != self._load_id:
                 return
-
             GLib.idle_add(self._add_date_group, load_id, date_str)
-
             batch = []
             for idx in indices:
                 if load_id != self._load_id:
@@ -1140,21 +1145,17 @@ class MainWindow(Adw.ApplicationWindow):
                 pixbuf = load_thumbnail(photos[idx])
                 batch.append((idx, photos[idx], pixbuf))
                 loaded += 1
-
                 if len(batch) >= BATCH_SIZE:
                     GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
                     batch = []
                     time.sleep(0.005)
-
             if batch and load_id == self._load_id:
                 GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
-
         GLib.idle_add(self._load_done, load_id, total)
 
     def _add_date_group(self, load_id, date_str):
         if load_id != self._load_id:
             return False
-
         label = Gtk.Label(label=date_str)
         label.add_css_class("title-4")
         label.set_halign(Gtk.Align.START)
@@ -1163,7 +1164,6 @@ class MainWindow(Adw.ApplicationWindow):
         label.set_margin_start(4)
         self.grid_box.append(label)
         self.date_widgets[date_str] = label
-
         flow = Gtk.FlowBox()
         flow.set_valign(Gtk.Align.START)
         flow.set_max_children_per_line(12)
@@ -1172,22 +1172,17 @@ class MainWindow(Adw.ApplicationWindow):
         flow.set_row_spacing(4)
         flow.set_column_spacing(4)
         flow.set_homogeneous(True)
-
         self._current_flow = flow
         self.grid_box.append(flow)
-
         if self.content_stack.get_visible_child_name() == "loading":
             self.spinner.stop()
             self.content_stack.set_visible_child_name("grid")
-
         return False
 
     def _apply_batch(self, load_id, batch, loaded, total):
         if load_id != self._load_id:
             return False
-
         self.spinner_label.set_text(f"Foto's laden... {loaded} / {total}")
-
         for index, path, pixbuf in batch:
             if pixbuf:
                 picture = Gtk.Picture.new_for_pixbuf(pixbuf)
@@ -1244,10 +1239,8 @@ class MainWindow(Adw.ApplicationWindow):
 
             idx = index
             btn.connect("clicked", lambda b, i=idx: self.on_thumb_clicked(i))
-
             self._current_flow.append(btn)
             self.thumb_widgets[index] = (btn, check_box)
-
         return False
 
     def _load_done(self, load_id, total):
@@ -1266,6 +1259,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label.set_text("0 foto's")
         self._loading = False
 
+    # ── Thumbnail klik ────────────────────────────────────────────────
     def on_thumb_clicked(self, index):
         if self._select_mode:
             if index in self._selected:
@@ -1277,6 +1271,7 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             self.open_photo(index)
 
+    # ── Sorteren ──────────────────────────────────────────────────────
     def apply_sort(self):
         index = self.sort_combo.get_selected()
         if index == 0:
@@ -1301,6 +1296,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.start_load()
         return False
 
+    # ── Foto viewer ───────────────────────────────────────────────────
     def open_photo(self, index):
         self.current_index = index
         self.header.set_visible(False)
@@ -1320,7 +1316,6 @@ class MainWindow(Adw.ApplicationWindow):
             pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
         except Exception:
             pixbuf = None
-
         location = self._photo_location.get(path)
         if location is None:
             coords = get_gps_coords(path)
@@ -1329,7 +1324,6 @@ class MainWindow(Adw.ApplicationWindow):
             else:
                 location = ""
             self._photo_location[path] = location
-
         if load_id == self._viewer_load_id:
             GLib.idle_add(self._show_full_photo, pixbuf, path, location)
 
@@ -1389,6 +1383,7 @@ class MainWindow(Adw.ApplicationWindow):
             return True
         return False
 
+    # ── Verwijderen ───────────────────────────────────────────────────
     def on_delete_current(self, btn):
         path = self.photos[self.current_index]
         dialog = Adw.MessageDialog(
@@ -1415,17 +1410,13 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             print(f"Verwijderen mislukt: {e}")
             return
-
         self.photos.remove(path)
-
         if not self.photos:
             self.close_viewer()
             self.show_empty_state()
             return
-
         if self.current_index >= len(self.photos):
             self.current_index = len(self.photos) - 1
-
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
         threading.Thread(
@@ -1433,13 +1424,11 @@ class MainWindow(Adw.ApplicationWindow):
             args=(self.photos[self.current_index], load_id),
             daemon=True
         ).start()
-
         GLib.timeout_add(500, self.start_load)
 
     def on_delete_selected(self, btn):
         if not self._selected:
             return
-
         count = len(self._selected)
         dialog = Adw.MessageDialog(
             transient_for=self,
@@ -1457,9 +1446,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_delete_selected_response(self, dialog, response):
         if response != "delete":
             return
-
         paths_to_delete = [self.photos[i] for i in self._selected if i < len(self.photos)]
-
         for path in paths_to_delete:
             try:
                 os.remove(path)
@@ -1468,10 +1455,10 @@ class MainWindow(Adw.ApplicationWindow):
                     os.remove(cache_path)
             except Exception as e:
                 print(f"Verwijderen mislukt: {e}")
-
         self.toggle_select_mode()
         self.load_photos()
 
+    # ── Instellingen ──────────────────────────────────────────────────
     def on_settings_clicked(self, btn):
         dialog = Adw.PreferencesDialog()
         dialog.set_title("Instellingen")
