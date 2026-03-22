@@ -291,7 +291,7 @@ class TimelineBar(Gtk.DrawingArea):
             cr.move_to(tx, ty)
             cr.show_text(label)
 
-            min_next_y = ty + 2  # 2px minimale spatie tussen labels
+            min_next_y = ty + font_size + 3  # label-hoogte + spatie
 
     def _on_click(self, gesture, n_press, x, y):
         if not self.entries:
@@ -666,6 +666,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.thumb_widgets   = {}
         self.date_widgets    = {}
         self.current_index   = 0
+        self._thumb_size     = self.settings.get("thumb_size", 180)
         self.settings_drives = []
         self.observer        = None
         self._loading        = False
@@ -1162,6 +1163,22 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
 
+        # Thumbnail-grootte schuif
+        size_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        zoom_out = Gtk.Image.new_from_icon_name("zoom-out-symbolic")
+        zoom_out.set_pixel_size(16)
+        size_box.append(zoom_out)
+        self.thumb_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 100, 300, 20)
+        self.thumb_scale.set_value(self._thumb_size)
+        self.thumb_scale.set_draw_value(False)
+        self.thumb_scale.set_size_request(120, -1)
+        self.thumb_scale.connect("value-changed", self._on_thumb_size_changed)
+        size_box.append(self.thumb_scale)
+        zoom_in = Gtk.Image.new_from_icon_name("zoom-in-symbolic")
+        zoom_in.set_pixel_size(16)
+        size_box.append(zoom_in)
+        normal_bar.set_center_widget(size_box)
+
         if importer_installed():
             import_btn = Gtk.Button(label="📱  Importeer van iPhone")
             import_btn.add_css_class("suggested-action")
@@ -1186,6 +1203,22 @@ class MainWindow(Adw.ApplicationWindow):
         self.bottom_stack.set_visible_child_name("normal")
 
         return self.bottom_stack
+
+    def _on_thumb_size_changed(self, scale):
+        new_size = int(scale.get_value())
+        if new_size == self._thumb_size:
+            return
+        self._thumb_size = new_size
+        self.settings["thumb_size"] = new_size
+        save_settings(self.settings)
+        for _, (btn, _) in self.thumb_widgets.items():
+            btn.set_size_request(new_size, new_size)
+            overlay = btn.get_child()
+            if overlay:
+                overlay.set_size_request(new_size, new_size)
+                pic = overlay.get_child()
+                if pic:
+                    pic.set_size_request(new_size, new_size)
 
     # ── Tijdlijn ──────────────────────────────────────────────────────
     def _on_timeline_scroll(self, fraction):
@@ -1399,11 +1432,11 @@ class MainWindow(Adw.ApplicationWindow):
                 picture = Gtk.Picture.new_for_pixbuf(pixbuf)
             else:
                 picture = Gtk.Picture()
-            picture.set_size_request(THUMB_SIZE, THUMB_SIZE)
+            picture.set_size_request(self._thumb_size, self._thumb_size)
             picture.set_content_fit(Gtk.ContentFit.COVER)
 
             overlay = Gtk.Overlay()
-            overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
+            overlay.set_size_request(self._thumb_size, self._thumb_size)
             overlay.set_child(picture)
 
             check_box = Gtk.Box()
@@ -1438,7 +1471,7 @@ class MainWindow(Adw.ApplicationWindow):
             btn = Gtk.Button()
             btn.set_child(overlay)
             btn.set_overflow(Gtk.Overflow.HIDDEN)
-            btn.set_size_request(THUMB_SIZE, THUMB_SIZE)
+            btn.set_size_request(self._thumb_size, self._thumb_size)
 
             css = Gtk.CssProvider()
             css.load_from_string("""
