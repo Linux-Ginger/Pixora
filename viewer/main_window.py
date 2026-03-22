@@ -301,6 +301,7 @@ class MapWidget(Gtk.DrawingArea):
         self._mouse_y       = 325.0
         self._hover_idx     = -1
         self._hover_pixbufs = {}
+        self._last_clusters = []
 
         if markers:
             avg_lat = sum(m[0] for m in markers) / len(markers)
@@ -419,23 +420,34 @@ class MapWidget(Gtk.DrawingArea):
                 cr.set_source_surface(surface, px, py)
                 cr.paint()
 
-        # Markers
-        for i, marker in enumerate(self.markers):
-            lat, lon = marker[0], marker[1]
-            tx_f, ty_f = lat_lon_to_tile_float(lat, lon, self.zoom)
-            mx = tx_f * TILE_SIZE - self.offset_x
-            my = ty_f * TILE_SIZE - self.offset_y
+        # Clusters + markers
+        self._last_clusters = self._get_clusters()
+        for mx, my, group in self._last_clusters:
             if -20 <= mx <= width + 20 and -20 <= my <= height + 20:
+                count  = len(group)
+                radius = 9 if count == 1 else 14
+
                 cr.set_source_rgba(0, 0, 0, 0.25)
-                cr.arc(mx + 1, my + 2, 9, 0, 2 * math.pi)
+                cr.arc(mx + 1, my + 2, radius, 0, 2 * math.pi)
                 cr.fill()
+
                 cr.set_source_rgb(0.914, 0.329, 0.125)
-                cr.arc(mx, my, 9, 0, 2 * math.pi)
+                cr.arc(mx, my, radius, 0, 2 * math.pi)
                 cr.fill()
+
                 cr.set_source_rgb(1, 1, 1)
                 cr.set_line_width(2)
-                cr.arc(mx, my, 9, 0, 2 * math.pi)
+                cr.arc(mx, my, radius, 0, 2 * math.pi)
                 cr.stroke()
+
+                if count > 1:
+                    label = str(count)
+                    cr.set_source_rgb(1, 1, 1)
+                    cr.select_font_face("Sans", 0, 1)
+                    cr.set_font_size(10)
+                    extents = cr.text_extents(label)
+                    cr.move_to(mx - extents.width / 2, my + extents.height / 2)
+                    cr.show_text(label)
 
         # Hover preview
         if 0 <= self._hover_idx < len(self.markers):
@@ -525,13 +537,10 @@ class MapWidget(Gtk.DrawingArea):
         self._mouse_x = x
         self._mouse_y = y
         hover = -1
-        for i, marker in enumerate(self.markers):
-            lat, lon = marker[0], marker[1]
-            tx_f, ty_f = lat_lon_to_tile_float(lat, lon, self.zoom)
-            mx = tx_f * TILE_SIZE - self.offset_x
-            my = ty_f * TILE_SIZE - self.offset_y
-            if math.sqrt((x - mx) ** 2 + (y - my) ** 2) < 12:
-                hover = i
+        for mx, my, group in self._last_clusters:
+            radius = 9 if len(group) == 1 else 14
+            if math.sqrt((x - mx) ** 2 + (y - my) ** 2) < radius + 4:
+                hover = group[0]
                 break
         if hover != self._hover_idx:
             self._hover_idx = hover
@@ -546,14 +555,36 @@ class MapWidget(Gtk.DrawingArea):
             self.queue_draw()
 
     def on_click(self, gesture, n_press, x, y):
-        for marker in self.markers:
-            lat, lon = marker[0], marker[1]
-            tx_f, ty_f = lat_lon_to_tile_float(lat, lon, self.zoom)
+        for mx, my, group in self._last_clusters:
+            radius = 9 if len(group) == 1 else 14
+            if math.sqrt((x - mx) ** 2 + (y - my) ** 2) < radius + 4:
+                paths = [self.markers[i][4] for i in group]
+                GLib.idle_add(self.open_photo_cb, paths)
+                return
+
+    def _get_clusters(self):
+        CLUSTER_RADIUS = 24
+        assigned = [False] * len(self.markers)
+        clusters = []
+        for i, marker in enumerate(self.markers):
+            if assigned[i]:
+                continue
+            tx_f, ty_f = lat_lon_to_tile_float(marker[0], marker[1], self.zoom)
             mx = tx_f * TILE_SIZE - self.offset_x
             my = ty_f * TILE_SIZE - self.offset_y
-            if math.sqrt((x - mx) ** 2 + (y - my) ** 2) < 12:
-                GLib.idle_add(self.open_photo_cb, marker[4])
-                return
+            group = [i]
+            assigned[i] = True
+            for j, other in enumerate(self.markers):
+                if assigned[j]:
+                    continue
+                tx2, ty2 = lat_lon_to_tile_float(other[0], other[1], self.zoom)
+                ox = tx2 * TILE_SIZE - self.offset_x
+                oy = ty2 * TILE_SIZE - self.offset_y
+                if math.sqrt((mx - ox) ** 2 + (my - oy) ** 2) < CLUSTER_RADIUS:
+                    group.append(j)
+                    assigned[j] = True
+            clusters.append((mx, my, group))
+        return clusters
 
     def zoom_by(self, delta, cx=None, cy=None):
         if cx is None:
@@ -874,18 +905,20 @@ class MainWindow(Adw.ApplicationWindow):
         self.map_content.append(self._map_widget)
         self.map_spinner.stop()
         self.map_container.set_visible_child_name("map")
-
         self.map_title_label.set_text("Kaartweergave")
         self.map_btn.set_label("🗺")
         self.map_btn.set_sensitive(True)
-        self.main_stack.set_visible_child_name("map")
         return False
 
-    def _open_photo_from_map(self, path):
-        if path in self.photos:
-            index = self.photos.index(path)
-            self.close_map()
-            GLib.idle_add(self.open_photo, index)
+    def _open_photo_from_map(self, paths):
+        if isinstance(paths, str):
+            paths = [paths]
+        valid = [p for p in paths if p in self.photos]
+        if not valid:
+            return
+        self.close_map()
+        index = self.photos.index(valid[0])
+        GLib.idle_add(self.open_photo, index)
 
     def close_map(self, btn=None):
         self.header.set_visible(True)
