@@ -216,17 +216,26 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
 # ── Tijdlijn scrollbar ───────────────────────────────────────────────
 class TimelineBar(Gtk.DrawingArea):
+    """Right-side timeline bar.
+
+    Entries are stored as (label, y_px, is_year) where y_px is the actual
+    Y pixel position of that date header inside the grid_box.  The bar maps
+    those pixel values to proportional positions using max_scroll
+    (= adj.upper - adj.page_size), so everything stays consistent with the
+    scroll adjustment — no fractions, no conversion errors.
+    """
     _ORANGE = (0.914, 0.329, 0.125)
 
-    def __init__(self, scroll_callback, style_manager=None):
+    def __init__(self, scroll_cb, style_manager=None):
         super().__init__()
-        self.scroll_callback = scroll_callback
-        self.style_manager   = style_manager
-        self.entries         = []   # [(label_str, frac), ...]
-        self.active_idx      = 0
-        self._last_frac      = 0.0
+        self._scroll_cb    = scroll_cb
+        self.style_manager = style_manager
+        self._entries      = []   # [(label, y_px, is_year), ...]  sorted by y_px
+        self._active       = 0
+        self._scroll_val   = 0.0
+        self._max_scroll   = 1.0
 
-        self.set_size_request(56, -1)
+        self.set_size_request(52, -1)
         self.set_vexpand(True)
         self.set_draw_func(self._draw)
 
@@ -234,86 +243,84 @@ class TimelineBar(Gtk.DrawingArea):
         click.connect("pressed", self._on_click)
         self.add_controller(click)
 
-    def set_entries(self, entries):
-        self.entries = entries
-        self._update_active(self._last_frac)
+    # ── Public API ────────────────────────────────────────────────────
+
+    def set_data(self, entries, max_scroll):
+        """Replace all entries and redraw.  Called after loading finishes."""
+        self._entries    = entries
+        self._max_scroll = max(max_scroll, 1.0)
+        self._recalc()
         self.queue_draw()
 
-    def highlight(self, frac):
-        self._last_frac = frac
-        self._update_active(frac)
+    def update_scroll(self, value, max_scroll):
+        """Called on every scroll-position change."""
+        self._scroll_val = value
+        self._max_scroll = max(max_scroll, 1.0)
+        self._recalc()
 
-    def _update_active(self, frac):
-        if not self.entries:
+    # ── Internal ──────────────────────────────────────────────────────
+
+    def _recalc(self):
+        """Find the active entry: last one whose y_px <= current scroll."""
+        if not self._entries:
             return
-        # Find the last month entry (non-year) whose frac <= current scroll
-        new_idx = 0
-        for i, (label, ef) in enumerate(self.entries):
-            if ef <= frac:
-                new_idx = i
-        # If active is a year label and the next entry is a month at same frac, prefer month
-        label, ef = self.entries[new_idx]
-        if label.isdigit() and len(label) == 4 and new_idx + 1 < len(self.entries):
-            next_label, next_ef = self.entries[new_idx + 1]
-            if next_ef == ef:
-                new_idx += 1
-        if new_idx != self.active_idx:
-            self.active_idx = new_idx
+        new_active = 0
+        for i, (_, y_px, _) in enumerate(self._entries):
+            if y_px <= self._scroll_val:
+                new_active = i
+        if new_active != self._active:
+            self._active = new_active
             self.queue_draw()
 
     def _draw(self, area, cr, width, height):
-        if not self.entries or height == 0:
+        if not self._entries or height == 0:
             return
-        is_dark = self.style_manager and self.style_manager.get_dark()
+        is_dark    = self.style_manager and self.style_manager.get_dark()
+        last_bot   = -99.0
+        n          = len(self._entries)
+        max_scroll = max(self._max_scroll, 1.0)
 
-        last_bottom = -99.0
+        for i, (label, y_px, is_year) in enumerate(self._entries):
+            active = (i == self._active)
 
-        for i, (label, frac) in enumerate(self.entries):
-            is_year = label.isdigit() and len(label) == 4
-            active  = (i == self.active_idx)
-
-            if active:
-                font_size = 11 if is_year else 10
+            # Font
+            if active or is_year:
                 cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-            elif is_year:
-                font_size = 11
-                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+                font_size = 10 if active else 8
             else:
-                font_size = 9
                 cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+                font_size = 9
 
             cr.set_font_size(font_size)
             ext = cr.text_extents(label)
 
-            # Proportionele positie, maar altijd minstens 2px onder het vorige label
-            ideal_y = frac * height
-            ty = max(last_bottom + 2, ideal_y)
+            # Ideal position proportional to y_px in the grid
+            ideal_y = min(y_px / max_scroll, 1.0) * height
+            ty = max(last_bot + 2, ideal_y)
             ty = max(ext.height, min(height - 2, ty))
 
-            # Overslaan als er echt geen ruimte meer is onderaan
-            if ty >= height - 2 and i < len(self.entries) - 1:
+            # Skip crowded labels except the very last one
+            if ty >= height - 2 and i < n - 1:
                 continue
 
+            # Colour
             if active:
                 cr.set_source_rgb(*self._ORANGE)
             elif is_year:
-                v = 0.95 if is_dark else 0.1
-                cr.set_source_rgba(v, v, v, 0.9)
+                v = 0.85 if is_dark else 0.3
+                cr.set_source_rgba(v, v, v, 0.8)
             else:
-                v = 0.75 if is_dark else 0.35
+                v = 0.75 if is_dark else 0.4
                 cr.set_source_rgba(v, v, v, 0.65)
 
-            cr.move_to(max(2, width - ext.width - 5), ty)
+            cr.move_to(max(2, width - ext.width - 4), ty)
             cr.show_text(label)
-            last_bottom = ty + font_size + 1
+            last_bot = ty + font_size + 1
 
     def _on_click(self, gesture, n_press, x, y):
-        if not self.entries:
-            return
         height = self.get_height()
-        if height <= 0:
-            return
-        self.scroll_callback(y / height)
+        if height > 0:
+            self._scroll_cb((y / height) * self._max_scroll)
 
 
 # ── Kaart widget (in-app, geen apart venster) ────────────────────────
@@ -849,7 +856,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.scroll.get_vadjustment().connect("value-changed", self._on_scroll_changed)
         grid_with_timeline.append(self.scroll)
 
-        self.timeline = TimelineBar(self._on_timeline_scroll, self.style_manager)
+        self.timeline = TimelineBar(self._on_timeline_click, self.style_manager)
         grid_with_timeline.append(self.timeline)
         self.content_stack.add_named(grid_with_timeline, "grid")
 
@@ -1230,49 +1237,43 @@ class MainWindow(Adw.ApplicationWindow):
         return self.bottom_stack
 
     # ── Tijdlijn ──────────────────────────────────────────────────────
-    def _on_timeline_scroll(self, fraction):
-        adj      = self.scroll.get_vadjustment()
-        lower    = adj.get_lower()
-        upper    = adj.get_upper()
-        page     = adj.get_page_size()
-        max_val  = upper - page
-        target   = fraction * max_val
-        adj.set_value(max(lower, min(target, max_val)))
+
+    def _on_timeline_click(self, scroll_px):
+        """Scroll the grid to the requested pixel position."""
+        adj     = self.scroll.get_vadjustment()
+        max_val = adj.get_upper() - adj.get_page_size()
+        adj.set_value(max(0.0, min(scroll_px, max(0.0, max_val))))
 
     def _on_scroll_changed(self, adj):
-        upper      = adj.get_upper()
-        page       = adj.get_page_size()
-        max_scroll = upper - page
-        frac = min(1.0, adj.get_value() / max_scroll) if max_scroll > 0 else 0.0
-        self.timeline.highlight(frac)
+        max_scroll = adj.get_upper() - adj.get_page_size()
+        self.timeline.update_scroll(adj.get_value(), max(max_scroll, 0.0))
 
     def _update_timeline_from_positions(self):
+        """Build timeline entries from actual Y positions of date headers."""
         if not self.date_widgets:
             return False
         adj        = self.scroll.get_vadjustment()
-        upper      = adj.get_upper()
-        page       = adj.get_page_size()
-        max_scroll = upper - page
-        frac_base  = max_scroll if max_scroll > 1 else upper
-        if frac_base <= 0:
-            return False
+        max_scroll = adj.get_upper() - adj.get_page_size()
 
-        # Verzamel Y-posities per datum
+        # Collect pixel Y position of every date header
         items = []
         for date_str, label in self.date_widgets.items():
             coords = label.translate_coordinates(self.grid_box, 0, 0)
             if coords is None:
                 continue
             _, y = coords
-            frac = max(0.0, min(1.0, y / frac_base))
-            items.append((frac, date_str))
-        items.sort(key=lambda e: e[0])
+            items.append((y, date_str))
 
-        # Bouw jaar+maand entries met afgekorte maandnamen
-        entries      = []
-        seen_years   = set()
-        seen_months  = set()
-        for frac, date_str in items:
+        if not items:
+            GLib.timeout_add(500, self._update_timeline_from_positions)
+            return False
+
+        items.sort()
+
+        entries     = []
+        seen_years  = set()
+        seen_months = set()
+        for y_px, date_str in items:
             parts = date_str.split()
             if len(parts) == 3:
                 year_str = parts[2]
@@ -1283,43 +1284,20 @@ class MainWindow(Adw.ApplicationWindow):
                     month_num  = 0
                     month_abbr = parts[1][:3]
                 if year_str not in seen_years:
-                    entries.append((year_str, frac))
+                    entries.append((year_str, y_px, True))
                     seen_years.add(year_str)
                 if (year_str, month_num) not in seen_months:
-                    entries.append((month_abbr, frac))
+                    entries.append((month_abbr, y_px, False))
                     seen_months.add((year_str, month_num))
             else:
-                entries.append((date_str, frac))
+                entries.append((date_str, y_px, False))
 
-        self.timeline.set_entries(entries)
-        # Sync highlight to current scroll position
-        self._on_scroll_changed(adj)
-        # Retry if not all date labels were positioned yet
+        self.timeline.set_data(entries, max(max_scroll, 0.0))
+
+        # Retry until every date header has been laid out
         if len(items) < len(self.date_widgets):
             GLib.timeout_add(400, self._update_timeline_from_positions)
         return False
-
-    def _build_timeline_entries(self, groups):
-        if not groups:
-            return []
-        total_photos = sum(len(indices) for _, _, indices in groups)
-        if total_photos == 0:
-            return []
-        entries        = []
-        cumulative     = 0
-        seen_years     = set()
-        seen_months    = set()
-        for date_str, date_obj, indices in groups:
-            frac     = cumulative / total_photos
-            year_str = str(date_obj.year)
-            if year_str not in seen_years:
-                entries.append((year_str, frac))
-                seen_years.add(year_str)
-            if (year_str, date_obj.month) not in seen_months:
-                entries.append((MONTHS_NL[date_obj.month], frac))
-                seen_months.add((year_str, date_obj.month))
-            cumulative += len(indices)
-        return entries
 
     # ── Selectie modus ────────────────────────────────────────────────
     def toggle_select_mode(self, btn=None):
@@ -1403,8 +1381,6 @@ class MainWindow(Adw.ApplicationWindow):
     def _load_thread(self, load_id, photos):
         total  = len(photos)
         groups = self._group_by_date(photos)
-        timeline_entries = self._build_timeline_entries(groups)
-        GLib.idle_add(self.timeline.set_entries, timeline_entries)
         loaded = 0
         for date_str, date_obj, indices in groups:
             if load_id != self._load_id:
