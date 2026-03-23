@@ -48,6 +48,7 @@ STATE_WAITING   = "waiting"
 STATE_DETECTED  = "detected"
 STATE_MOUNTING  = "mounting"
 STATE_SCANNING  = "scanning"
+STATE_SELECTING = "selecting"
 STATE_HASHING   = "hashing"
 STATE_REVIEWING = "reviewing"
 STATE_IMPORTING = "importing"
@@ -250,6 +251,7 @@ class ImporterWindow(Adw.ApplicationWindow):
         self.udid: str | None = None
         self.device_name = "iPhone"
         self.iphone_files: list[Path] = []
+        self.selected_files: set[str] = set()
         self.library_hashes: dict = {}
         self.duplicates: list[tuple[Path, Path]] = []
         self.to_import: list[Path] = []
@@ -257,7 +259,8 @@ class ImporterWindow(Adw.ApplicationWindow):
         self.import_count = 0
 
         self.set_title("Pixora Importer")
-        self.set_default_size(680, 540)
+        self.set_default_size(780, 600)
+        self.set_size_request(680, 520)
 
         self._build_ui()
         self._start_detection_poll()
@@ -279,6 +282,7 @@ class ImporterWindow(Adw.ApplicationWindow):
         self._build_waiting_page()
         self._build_detected_page()
         self._build_progress_page()
+        self._build_selecting_page()
         self._build_review_page()
         self._build_done_page()
         self._build_error_page()
@@ -446,6 +450,187 @@ class ImporterWindow(Adw.ApplicationWindow):
         clamp.set_child(box)
         self.stack.add_named(clamp, "progress")
 
+    def _build_selecting_page(self):
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+
+        # Koptekst
+        header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        header_box.set_margin_top(20)
+        header_box.set_margin_bottom(10)
+        header_box.set_margin_start(24)
+        header_box.set_margin_end(24)
+
+        self.select_title = Gtk.Label()
+        self.select_title.add_css_class("title-1")
+        self.select_title.set_halign(Gtk.Align.START)
+        header_box.append(self.select_title)
+
+        self.select_subtitle = Gtk.Label()
+        self.select_subtitle.add_css_class("dim-label")
+        self.select_subtitle.set_halign(Gtk.Align.START)
+        header_box.append(self.select_subtitle)
+
+        outer.append(header_box)
+
+        # Foto-grid
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        self.select_flow = Gtk.FlowBox()
+        self.select_flow.set_homogeneous(True)
+        self.select_flow.set_max_children_per_line(6)
+        self.select_flow.set_min_children_per_line(2)
+        self.select_flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.select_flow.set_column_spacing(6)
+        self.select_flow.set_row_spacing(6)
+        self.select_flow.set_margin_start(12)
+        self.select_flow.set_margin_end(12)
+        self.select_flow.set_margin_bottom(8)
+
+        scroll.set_child(self.select_flow)
+        outer.append(scroll)
+
+        # Onderbalk
+        action_bar = Gtk.ActionBar()
+
+        sel_all_btn = Gtk.Button(label="Selecteer alles")
+        sel_all_btn.connect("clicked", self._on_select_all)
+        action_bar.pack_start(sel_all_btn)
+
+        desel_all_btn = Gtk.Button(label="Deselecteer alles")
+        desel_all_btn.connect("clicked", self._on_deselect_all)
+        action_bar.pack_start(desel_all_btn)
+
+        self.select_count_lbl = Gtk.Label()
+        self.select_count_lbl.add_css_class("dim-label")
+        action_bar.set_center_widget(self.select_count_lbl)
+
+        self.select_continue_btn = Gtk.Button(label="Doorgaan")
+        self.select_continue_btn.add_css_class("suggested-action")
+        self.select_continue_btn.connect("clicked", self._on_selecting_continue)
+        action_bar.pack_end(self.select_continue_btn)
+
+        outer.append(action_bar)
+        self.stack.add_named(outer, "selecting")
+
+    def _show_selecting(self, files: list[Path]):
+        n = len(files)
+        self.select_title.set_text(f"{n} bestand{'en' if n != 1 else ''} gevonden")
+        self.select_subtitle.set_text("Kies welke foto's en video's je wilt importeren.")
+
+        # Alles standaard geselecteerd
+        self.selected_files = {str(f) for f in files}
+        self._update_select_count()
+
+        # Verwijder oude kaarten
+        while child := self.select_flow.get_first_child():
+            self.select_flow.remove(child)
+
+        # Voeg kaarten toe en laad thumbnails in achtergrond
+        self._select_cards: dict[str, Gtk.CheckButton] = {}
+        self._select_overlays: dict[str, Gtk.Overlay] = {}
+        for fp in files:
+            card, check, overlay = self._make_select_card(fp)
+            self._select_cards[str(fp)] = check
+            self._select_overlays[str(fp)] = overlay
+            self.select_flow.append(card)
+
+        self._show_state(STATE_SELECTING)
+
+        # Thumbnails asynchroon laden
+        threading.Thread(target=self._load_select_thumbs, args=(list(files),), daemon=True).start()
+
+    def _make_select_card(self, fp: Path) -> tuple[Gtk.Widget, Gtk.CheckButton, Gtk.Overlay]:
+        """Maakt een thumbnail-kaart met vinkje. Geeft (widget, checkbutton) terug."""
+        overlay = Gtk.Overlay()
+        overlay.set_size_request(120, 100)
+
+        # Placeholder terwijl thumbnail laadt
+        placeholder = Gtk.Image.new_from_icon_name("image-loading-symbolic")
+        placeholder.set_pixel_size(32)
+        placeholder.set_size_request(120, 100)
+        placeholder.add_css_class("card")
+        overlay.set_child(placeholder)
+
+        # Vinkje linksboven
+        check = Gtk.CheckButton()
+        check.set_active(True)
+        check.set_halign(Gtk.Align.START)
+        check.set_valign(Gtk.Align.START)
+        check.set_margin_top(4)
+        check.set_margin_start(4)
+        check.connect("toggled", self._on_card_toggled, str(fp))
+        overlay.add_overlay(check)
+
+        # Video-indicator rechtsonder
+        ext = fp.suffix.lower()
+        if ext in {".mp4", ".mov", ".m4v"}:
+            video_lbl = Gtk.Label(label="▶")
+            video_lbl.add_css_class("caption")
+            video_lbl.set_halign(Gtk.Align.END)
+            video_lbl.set_valign(Gtk.Align.END)
+            video_lbl.set_margin_end(4)
+            video_lbl.set_margin_bottom(4)
+            overlay.add_overlay(video_lbl)
+
+        return overlay, check, overlay
+
+    def _load_select_thumbs(self, files: list[Path]):
+        """Laad thumbnails op de achtergrond en update de UI via idle_add."""
+        for fp in files:
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(fp), 120, 100, True)
+            except Exception:
+                continue
+            GLib.idle_add(self._set_select_thumb, str(fp), pixbuf)
+
+    def _set_select_thumb(self, path_str: str, pixbuf):
+        """Vervang placeholder door echte thumbnail in de selectiekaart."""
+        overlay = self._select_overlays.get(path_str)
+        if overlay is None:
+            return
+        pic = Gtk.Picture.new_for_pixbuf(pixbuf)
+        pic.set_can_shrink(True)
+        pic.set_content_fit(Gtk.ContentFit.COVER)
+        pic.set_size_request(120, 100)
+        pic.add_css_class("card")
+        overlay.set_child(pic)
+
+    def _on_card_toggled(self, check: Gtk.CheckButton, path_str: str):
+        if check.get_active():
+            self.selected_files.add(path_str)
+        else:
+            self.selected_files.discard(path_str)
+        self._update_select_count()
+
+    def _on_select_all(self, _btn):
+        self.selected_files = {str(f) for f in self.iphone_files}
+        for check in self._select_cards.values():
+            check.set_active(True)
+        self._update_select_count()
+
+    def _on_deselect_all(self, _btn):
+        self.selected_files.clear()
+        for check in self._select_cards.values():
+            check.set_active(False)
+        self._update_select_count()
+
+    def _update_select_count(self):
+        n = len(self.selected_files)
+        total = len(self.iphone_files)
+        self.select_count_lbl.set_text(f"{n} van {total} geselecteerd")
+        self.select_continue_btn.set_sensitive(n > 0)
+
+    def _on_selecting_continue(self, _btn):
+        selected = [f for f in self.iphone_files if str(f) in self.selected_files]
+        if not HAS_IMAGEHASH:
+            self.duplicates = []
+            self.to_import = selected
+            self._start_import()
+            return
+        self._start_hashing(selected)
+
     def _build_review_page(self):
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
@@ -580,6 +765,7 @@ class ImporterWindow(Adw.ApplicationWindow):
             STATE_DETECTED:  "detected",
             STATE_MOUNTING:  "progress",
             STATE_SCANNING:  "progress",
+            STATE_SELECTING: "selecting",
             STATE_HASHING:   "progress",
             STATE_REVIEWING: "review",
             STATE_IMPORTING: "progress",
@@ -654,12 +840,7 @@ class ImporterWindow(Adw.ApplicationWindow):
                 "Geen foto's of video's gevonden op de iPhone.\n"
                 "Mogelijk zijn alle media al eerder geïmporteerd.", False)
             return
-        if not HAS_IMAGEHASH:
-            self.duplicates = []
-            self.to_import = list(files)
-            self._start_import()
-            return
-        self._start_hashing(files)
+        self._show_selecting(files)
 
     def _start_hashing(self, files: list[Path]):
         self._set_progress("Duplicaten controleren…",
