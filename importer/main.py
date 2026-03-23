@@ -37,7 +37,7 @@ MOUNT_POINT  = Path(tempfile.gettempdir()) / "pixora_iphone"
 DOCS_DIR     = Path(__file__).parent.parent / "docs"
 
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
-SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".dng", ".mp4", ".mov", ".m4v", ".aae"}
+SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".dng", ".mp4", ".mov", ".m4v"}
 
 # Duplicate threshold → maximale hash-afstand
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
@@ -637,14 +637,15 @@ class ImporterWindow(Adw.ApplicationWindow):
         click.connect("pressed", lambda g, n, x, y, ip=str(fp): self._on_card_click(ip))
         overlay.add_controller(click)
 
-        # Vinkje linksboven
+        # Vinkje linksboven — alleen visueel, klik wordt afgehandeld door GestureClick
         check = Gtk.CheckButton()
         check.set_active(True)
         check.set_halign(Gtk.Align.START)
         check.set_valign(Gtk.Align.START)
         check.set_margin_top(4)
         check.set_margin_start(4)
-        check.connect("toggled", self._on_card_toggled, str(fp))
+        check.set_can_target(False)
+        check.set_focusable(False)
         overlay.add_overlay(check)
 
         # Video-indicator rechtsonder
@@ -679,13 +680,13 @@ class ImporterWindow(Adw.ApplicationWindow):
         overlay.set_child(pic)
 
     def _on_card_click(self, path_str: str):
-        """Klik op de kaart zelf togglet het vinkje."""
+        """Klik ergens op de kaart togglet het vinkje (enige toggle-handler)."""
         check = self._select_cards.get(path_str)
-        if check:
-            check.set_active(not check.get_active())
-
-    def _on_card_toggled(self, check: Gtk.CheckButton, path_str: str):
-        if check.get_active():
+        if check is None:
+            return
+        new_state = not check.get_active()
+        check.set_active(new_state)
+        if new_state:
             self.selected_files.add(path_str)
         else:
             self.selected_files.discard(path_str)
