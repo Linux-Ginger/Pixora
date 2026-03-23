@@ -738,7 +738,7 @@ class MapWidget(Gtk.DrawingArea):
 # ── Hoofdvenster ─────────────────────────────────────────────────────
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
-        super().__init__(application=app, maximized=True)
+        super().__init__(application=app)
         self.settings        = settings
         self.photos          = []
         self.thumb_widgets   = {}
