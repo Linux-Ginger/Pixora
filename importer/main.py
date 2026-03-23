@@ -18,7 +18,6 @@ import hashlib
 import subprocess
 import threading
 import tempfile
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime
 
@@ -662,14 +661,11 @@ class ImporterWindow(Adw.ApplicationWindow):
         return overlay, check, overlay
 
     def _load_select_thumbs(self, files: list[Path]):
-        """Laad thumbnails parallel (4 workers) en update de UI via idle_add."""
-        def load_one(fp: Path):
+        """Laad thumbnails één voor één — sneller op USB/FUSE dan parallel."""
+        for fp in files:
             pixbuf = load_select_thumb(fp)
             if pixbuf is not None:
                 GLib.idle_add(self._set_select_thumb, str(fp), pixbuf)
-
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            pool.map(load_one, files)
 
     def _set_select_thumb(self, path_str: str, pixbuf):
         """Vervang placeholder door echte thumbnail in de selectiekaart."""
