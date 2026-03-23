@@ -140,16 +140,41 @@ def unmount_iphone(mountpoint: Path):
         pass
 
 
-def scan_dcim(mountpoint: Path) -> list[Path]:
+def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
+    """
+    Scan de DCIM-map van de iPhone.
+    Gebruikt expliciete 2-level iteratie (DCIM/100APPLE/files) in plaats van
+    os.walk zodat een trage of falende submap de andere niet blokkeert.
+    """
     dcim = mountpoint / "DCIM"
     if not dcim.exists():
         return []
+
+    # Verzamel submappen (bijv. 100APPLE, 101APPLE, ...)
+    try:
+        subdirs = sorted(p for p in dcim.iterdir() if p.is_dir())
+    except OSError:
+        return []
+
     files = []
-    for root, dirs, filenames in os.walk(dcim):
-        dirs.sort()
-        for fn in sorted(filenames):
-            if Path(fn).suffix.lower() in SUPPORTED_EXT:
-                files.append(Path(root) / fn)
+    for subdir in subdirs:
+        # Retry tot 3× per submap bij FUSE-lees-errors
+        for attempt in range(3):
+            try:
+                entries = sorted(subdir.iterdir())
+                for entry in entries:
+                    if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXT:
+                        files.append(entry)
+                    if progress_cb:
+                        progress_cb(len(files))
+                break  # Gelukt, ga naar volgende submap
+            except OSError:
+                if attempt == 2:
+                    pass  # Geef op na 3 pogingen, ga door met de rest
+                else:
+                    import time as _time
+                    _time.sleep(0.3)  # Kort wachten voor retry
+
     return files
 
 
@@ -919,7 +944,9 @@ class ImporterWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._do_scan, daemon=True).start()
 
     def _do_scan(self):
-        files = scan_dcim(MOUNT_POINT)
+        def on_progress(count):
+            GLib.idle_add(self.progress_subtitle.set_text, f"{count} bestanden gevonden…")
+        files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
         GLib.idle_add(self._on_scan_done, files)
 
     def _on_scan_done(self, files: list[Path]):
