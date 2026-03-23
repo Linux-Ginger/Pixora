@@ -13,16 +13,18 @@ from gi.repository import Gtk, Adw, GLib
 
 import os
 import sys
+import json
 import subprocess
 import threading
+import urllib.request
 from pathlib import Path
 
 INSTALL_DIR  = Path.home() / ".local" / "share" / "pixora"
 BIN_DIR      = Path.home() / ".local" / "bin"
 DESKTOP_DIR  = Path.home() / ".local" / "share" / "applications"
 REPO_URL     = "https://github.com/Linux-Ginger/Pixora.git"
+RELEASES_API = "https://api.github.com/repos/Linux-Ginger/Pixora/releases"
 
-# Fases met stappen: (label, actie-sleutel)
 PHASES = [
     ("Downloaden", [
         ("Pixora bestanden downloaden", "clone"),
@@ -38,7 +40,6 @@ PHASES = [
     ]),
 ]
 
-# Platte lijst voor voortgangsbalk
 ALL_STEPS = [(label, key) for _, steps in PHASES for label, key in steps]
 
 
@@ -46,8 +47,10 @@ class InstallerWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title("Pixora Installer")
-        self.set_default_size(500, 520)
+        self.set_default_size(500, 580)
         self.set_resizable(False)
+
+        self.selected_version = None   # None = main/latest
 
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
@@ -56,10 +59,104 @@ class InstallerWindow(Adw.ApplicationWindow):
         header.set_show_start_title_buttons(False)
         toolbar.add_top_bar(header)
 
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        outer.set_vexpand(True)
+        # Twee schermen: versie-kiezer en installatie-voortgang
+        self.main_stack = Gtk.Stack()
+        self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.main_stack.set_transition_duration(200)
+        self.main_stack.add_named(self._build_select_page(), "select")
+        self.main_stack.add_named(self._build_install_page(), "install")
 
-        # ── Logo / titel ──
+        toolbar.set_content(self.main_stack)
+        self.set_content(toolbar)
+
+        # Releases ophalen op achtergrond
+        threading.Thread(target=self._fetch_releases, daemon=True).start()
+
+    # ── Versie-kiezer pagina ───────────────────────────────────────────
+
+    def _build_select_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        page.set_vexpand(True)
+
+        # Logo / titel
+        top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        top.set_margin_top(40)
+        top.set_margin_bottom(28)
+        top.set_halign(Gtk.Align.CENTER)
+
+        logo = Gtk.Image.new_from_icon_name("applications-graphics-symbolic")
+        logo.set_pixel_size(64)
+        top.append(logo)
+
+        title = Gtk.Label(label="Pixora")
+        title.add_css_class("title-1")
+        top.append(title)
+
+        sub = Gtk.Label(label="door LinuxGinger")
+        sub.add_css_class("dim-label")
+        top.append(sub)
+
+        page.append(top)
+
+        # Versie selectie
+        ver_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        ver_box.set_margin_start(32)
+        ver_box.set_margin_end(32)
+
+        ver_lbl = Gtk.Label(label="Versie")
+        ver_lbl.add_css_class("heading")
+        ver_lbl.set_halign(Gtk.Align.START)
+        ver_box.append(ver_lbl)
+
+        listbox = Gtk.ListBox()
+        listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        listbox.add_css_class("boxed-list")
+
+        self.version_model = Gtk.StringList()
+        self.version_model.append("Nieuwste versie (laden…)")
+
+        self.version_combo = Gtk.DropDown(model=self.version_model)
+        self.version_combo.set_size_request(220, -1)
+        self.version_combo.set_valign(Gtk.Align.CENTER)
+
+        ver_row = Adw.ActionRow(
+            title="Versie kiezen",
+            subtitle="Selecteer welke versie je wilt installeren"
+        )
+        ver_row.add_suffix(self.version_combo)
+        listbox.append(ver_row)
+
+        ver_box.append(listbox)
+        page.append(ver_box)
+
+        # Spacer
+        spacer = Gtk.Box()
+        spacer.set_vexpand(True)
+        page.append(spacer)
+
+        # Installeren knop
+        btn_box = Gtk.Box()
+        btn_box.set_margin_start(32)
+        btn_box.set_margin_end(32)
+        btn_box.set_margin_bottom(32)
+
+        self.install_btn = Gtk.Button(label="Installeren")
+        self.install_btn.add_css_class("suggested-action")
+        self.install_btn.add_css_class("pill")
+        self.install_btn.set_hexpand(True)
+        self.install_btn.set_size_request(-1, 48)
+        self.install_btn.connect("clicked", self._on_install_clicked)
+        btn_box.append(self.install_btn)
+
+        page.append(btn_box)
+        return page
+
+    # ── Installatie-voortgang pagina ───────────────────────────────────
+
+    def _build_install_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        page.set_vexpand(True)
+
         top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         top.set_margin_top(28)
         top.set_margin_bottom(20)
@@ -77,17 +174,15 @@ class InstallerWindow(Adw.ApplicationWindow):
         sub.add_css_class("dim-label")
         top.append(sub)
 
-        outer.append(top)
+        page.append(top)
 
-        # ── Fases met stappen ──
-        self.step_rows = {}   # actie-sleutel → (row, stack, spinner, check)
+        self.step_rows = {}
 
         phases_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         phases_box.set_margin_start(32)
         phases_box.set_margin_end(32)
 
         for phase_label, steps in PHASES:
-            # Fase-header
             phase_lbl = Gtk.Label(label=phase_label)
             phase_lbl.add_css_class("heading")
             phase_lbl.set_halign(Gtk.Align.START)
@@ -122,28 +217,62 @@ class InstallerWindow(Adw.ApplicationWindow):
 
             phases_box.append(listbox)
 
-        outer.append(phases_box)
+        page.append(phases_box)
 
-        # ── Status label ──
-        self.status_lbl = Gtk.Label(label="Installatie starten…")
+        self.status_lbl = Gtk.Label(label="")
         self.status_lbl.add_css_class("dim-label")
         self.status_lbl.set_margin_top(16)
         self.status_lbl.set_margin_bottom(8)
-        outer.append(self.status_lbl)
+        page.append(self.status_lbl)
 
-        # ── Voortgangsbalk ──
         self.progress = Gtk.ProgressBar()
         self.progress.set_margin_start(32)
         self.progress.set_margin_end(32)
         self.progress.set_margin_bottom(28)
-        outer.append(self.progress)
+        page.append(self.progress)
 
-        toolbar.set_content(outer)
-        self.set_content(toolbar)
+        return page
 
-        GLib.timeout_add(400, self._start)
+    # ── Releases ophalen ──────────────────────────────────────────────
 
-    def _start(self):
+    def _fetch_releases(self):
+        try:
+            req = urllib.request.Request(
+                RELEASES_API,
+                headers={"User-Agent": "Pixora-Installer"}
+            )
+            with urllib.request.urlopen(req, timeout=6) as r:
+                releases = json.loads(r.read())
+            tags = [rel["tag_name"] for rel in releases if not rel.get("draft")]
+            GLib.idle_add(self._update_version_list, tags)
+        except Exception:
+            GLib.idle_add(self._update_version_list, [])
+
+    def _update_version_list(self, tags):
+        while self.version_model.get_n_items() > 0:
+            self.version_model.remove(0)
+
+        self.version_model.append("Nieuwste versie (main)")
+        for tag in tags:
+            self.version_model.append(tag)
+
+        self.version_combo.set_selected(0)
+        return False
+
+    # ── Install starten ───────────────────────────────────────────────
+
+    def _on_install_clicked(self, btn):
+        selected = self.version_combo.get_selected()
+        if selected == 0:
+            self.selected_version = None   # clone main
+        else:
+            label = self.version_model.get_string(selected)
+            self.selected_version = label
+
+        self.main_stack.set_visible_child_name("install")
+        GLib.timeout_add(300, self._start_install)
+
+    def _start_install(self):
         threading.Thread(target=self._run_install, daemon=True).start()
         return False
 
@@ -183,20 +312,35 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         GLib.idle_add(self.progress.set_fraction, 1.0)
 
-    # ── Installatie stappen ────────────────────────────────────────────
+    # ── Installatie stappen ───────────────────────────────────────────
 
     def _clone_repo(self):
         try:
             if (INSTALL_DIR / ".git").exists():
-                subprocess.run(["git", "-C", str(INSTALL_DIR), "pull", "-q"],
-                               check=True, capture_output=True)
+                if self.selected_version:
+                    subprocess.run(["git", "-C", str(INSTALL_DIR), "fetch", "--tags", "-q"],
+                                   check=True, capture_output=True)
+                    subprocess.run(["git", "-C", str(INSTALL_DIR), "checkout", self.selected_version, "-q"],
+                                   check=True, capture_output=True)
+                else:
+                    subprocess.run(["git", "-C", str(INSTALL_DIR), "checkout", "main", "-q"],
+                                   check=True, capture_output=True)
+                    subprocess.run(["git", "-C", str(INSTALL_DIR), "pull", "-q"],
+                                   check=True, capture_output=True)
             else:
                 if INSTALL_DIR.exists():
                     import shutil
                     shutil.rmtree(INSTALL_DIR)
                 INSTALL_DIR.mkdir(parents=True, exist_ok=True)
-                subprocess.run(["git", "clone", "-q", REPO_URL, str(INSTALL_DIR)],
-                               check=True, capture_output=True)
+                if self.selected_version:
+                    subprocess.run(
+                        ["git", "clone", "-q", "--branch", self.selected_version,
+                         "--depth", "1", REPO_URL, str(INSTALL_DIR)],
+                        check=True, capture_output=True
+                    )
+                else:
+                    subprocess.run(["git", "clone", "-q", REPO_URL, str(INSTALL_DIR)],
+                                   check=True, capture_output=True)
             return True, ""
         except subprocess.CalledProcessError:
             return False, "downloaden mislukt"
@@ -258,12 +402,10 @@ class InstallerWindow(Adw.ApplicationWindow):
             return False, str(e)
 
     def _start_services(self):
-        # usbmuxd: communicatie met iPhone via USB
         try:
             subprocess.run(["sudo", "systemctl", "enable", "--now", "usbmuxd"],
                            check=True, capture_output=True)
         except subprocess.CalledProcessError:
-            # Niet fataal — usbmuxd start ook automatisch bij iPhone-aansluiting
             pass
         return True, ""
 
