@@ -3,6 +3,9 @@
 # ─────────────────────────────────────────────
 #  Pixora — install.sh
 #  by LinuxGinger
+#
+#  Gebruik:
+#    curl -fsSL https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/install.sh | bash
 # ─────────────────────────────────────────────
 
 set -e
@@ -44,6 +47,7 @@ sudo apt-get install -y -qq \
     gir1.2-gtk-4.0 \
     gir1.2-adw-1 \
     curl \
+    git \
     2>/dev/null
 
 echo -e "  ${GREEN}✓ Klaar — installer openen…${NC}"
