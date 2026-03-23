@@ -421,21 +421,46 @@ class ImporterPage(Gtk.Box):
     # ─── Pagina's bouwen ─────────────────────────────────────────────────────
 
     def _build_waiting_page(self):
-        status = Adw.StatusPage()
-        status.set_icon_name("computer-symbolic")
-        status.set_title("Verbind je iPhone")
-        status.set_description(
-            "Sluit je iPhone aan via een USB-kabel en ontgrendel het scherm.\n"
-            "Als je iPhone vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'."
-        )
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        box.set_margin_bottom(32)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        outer.set_vexpand(True)
+        outer.set_valign(Gtk.Align.FILL)
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(480)
+        clamp.set_vexpand(True)
+
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        inner.set_vexpand(True)
+        inner.set_valign(Gtk.Align.CENTER)
+        inner.set_margin_top(16)
+        inner.set_margin_bottom(16)
+        inner.set_margin_start(12)
+        inner.set_margin_end(12)
+
+        icon = Gtk.Image.new_from_icon_name("computer-symbolic")
+        icon.set_pixel_size(64)
+        icon.set_halign(Gtk.Align.CENTER)
+        inner.append(icon)
+
+        title_lbl = Gtk.Label(label="Verbind je iPhone")
+        title_lbl.add_css_class("title-2")
+        title_lbl.set_halign(Gtk.Align.CENTER)
+        title_lbl.set_margin_top(8)
+        inner.append(title_lbl)
+
+        desc_lbl = Gtk.Label(label="Sluit je iPhone aan via een USB-kabel en ontgrendel het scherm.\nAls je iPhone vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'.")
+        desc_lbl.add_css_class("dim-label")
+        desc_lbl.set_halign(Gtk.Align.CENTER)
+        desc_lbl.set_justify(Gtk.Justification.CENTER)
+        desc_lbl.set_wrap(True)
+        desc_lbl.set_margin_bottom(12)
+        inner.append(desc_lbl)
 
         listbox = Gtk.ListBox()
         listbox.set_selection_mode(Gtk.SelectionMode.NONE)
         listbox.add_css_class("boxed-list")
 
-        for icon, title, subtitle in [
+        for ico_name, title, subtitle in [
             ("drive-removable-media-symbolic", "USB-kabel",              "Gebruik bij voorkeur de originele Apple-kabel"),
             ("security-medium-symbolic",       "Vertrouw deze computer", "Tik op 'Vertrouw' als je iPhone dat vraagt"),
             ("system-lock-screen-symbolic",    "Ontgrendeld scherm",     "Zorg dat je iPhone ontgrendeld is tijdens de import"),
@@ -446,12 +471,12 @@ class ImporterPage(Gtk.Box):
             row = Adw.ActionRow()
             row.set_title(title)
             row.set_subtitle(subtitle)
-            ic = Gtk.Image.new_from_icon_name(icon)
+            ic = Gtk.Image.new_from_icon_name(ico_name)
             ic.set_pixel_size(16)
             row.add_prefix(ic)
             listbox.append(row)
 
-        box.append(listbox)
+        inner.append(listbox)
 
         spinner_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         spinner_box.set_halign(Gtk.Align.CENTER)
@@ -462,14 +487,11 @@ class ImporterPage(Gtk.Box):
         lbl = Gtk.Label(label="Zoeken naar iPhone…")
         lbl.add_css_class("dim-label")
         spinner_box.append(lbl)
-        box.append(spinner_box)
+        inner.append(spinner_box)
 
-        clamp = Adw.Clamp()
-        clamp.set_maximum_size(480)
-        clamp.set_child(box)
-        status.set_child(clamp)
-        status.set_vexpand(True)
-        self.stack.add_named(status, "waiting")
+        clamp.set_child(inner)
+        outer.append(clamp)
+        self.stack.add_named(outer, "waiting")
 
     def _build_detected_page(self):
         status = Adw.StatusPage()
