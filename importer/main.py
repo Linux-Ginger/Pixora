@@ -607,8 +607,12 @@ class ImporterWindow(Adw.ApplicationWindow):
         placeholder = Gtk.Image.new_from_icon_name("image-loading-symbolic")
         placeholder.set_pixel_size(32)
         placeholder.set_size_request(SELECT_THUMB, SELECT_THUMB)
-        placeholder.add_css_class("card")
         overlay.set_child(placeholder)
+
+        # Klik op de kaart zelf togglet het vinkje
+        click = Gtk.GestureClick.new()
+        click.connect("pressed", lambda g, n, x, y, ip=str(fp): self._on_card_click(ip))
+        overlay.add_controller(click)
 
         # Vinkje linksboven
         check = Gtk.CheckButton()
@@ -652,8 +656,13 @@ class ImporterWindow(Adw.ApplicationWindow):
         pic.set_can_shrink(False)
         pic.set_content_fit(Gtk.ContentFit.COVER)
         pic.set_size_request(SELECT_THUMB, SELECT_THUMB)
-        pic.add_css_class("card")
         overlay.set_child(pic)
+
+    def _on_card_click(self, path_str: str):
+        """Klik op de kaart zelf togglet het vinkje."""
+        check = self._select_cards.get(path_str)
+        if check:
+            check.set_active(not check.get_active())
 
     def _on_card_toggled(self, check: Gtk.CheckButton, path_str: str):
         if check.get_active():
