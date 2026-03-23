@@ -784,12 +784,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.style_manager = Adw.StyleManager.get_default()
         self.style_manager.connect("notify::dark", self.on_dark_mode_changed)
 
+        from importer_page import ImporterPage
+        self.importer_page = ImporterPage(
+            on_back_cb=self.close_importer,
+            on_done_cb=self.on_import_done,
+        )
+
         self.main_stack = Gtk.Stack()
         self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.main_stack.set_transition_duration(200)
         self.main_stack.add_named(self.build_grid_page(),   "grid")
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
         self.main_stack.add_named(self.build_map_page(),    "map")
+        self.main_stack.add_named(self.importer_page,       "importer")
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(self.build_header())
@@ -3210,5 +3217,19 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
-    def open_importer(self, btn):
-        subprocess.Popen([sys.executable, IMPORTER_PATH])
+    def open_importer(self, btn=None):
+        self.header.set_visible(False)
+        self.bottom_stack.set_visible(False)
+        self.main_stack.set_visible_child_name("importer")
+        self.importer_page.activate()
+
+    def close_importer(self):
+        self.importer_page.deactivate()
+        self.header.set_visible(True)
+        self.bottom_stack.set_visible(True)
+        self.main_stack.set_visible_child_name("grid")
+
+    def on_import_done(self, count):
+        self.close_importer()
+        if count and count > 0:
+            self.reload_photos()
