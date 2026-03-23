@@ -428,8 +428,6 @@ class ImporterPage(Gtk.Box):
             "Sluit je iPhone aan via een USB-kabel en ontgrendel het scherm.\n"
             "Als je iPhone vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'."
         )
-        status.set_vexpand(True)
-
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_bottom(32)
 
@@ -466,8 +464,16 @@ class ImporterPage(Gtk.Box):
         spinner_box.append(lbl)
         box.append(spinner_box)
 
-        status.set_child(box)
-        self.stack.add_named(status, "waiting")
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(480)
+        clamp.set_child(box)
+        status.set_child(clamp)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_child(status)
+        self.stack.add_named(scroll, "waiting")
 
     def _build_detected_page(self):
         status = Adw.StatusPage()
