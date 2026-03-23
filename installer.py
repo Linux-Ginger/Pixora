@@ -33,6 +33,7 @@ PHASES = [
         ("Launcher aanmaken",            "desktop"),
     ]),
     ("Starten", [
+        ("Services activeren",           "services"),
         ("Pixora starten",               "launch"),
     ]),
 ]
@@ -165,11 +166,12 @@ class InstallerWindow(Adw.ApplicationWindow):
 
     def _run_install(self):
         steps = [
-            ("clone",   "Pixora bestanden downloaden", self._clone_repo),
-            ("apt",     "Systeem packages installeren", self._install_apt),
-            ("pip",     "Python packages installeren",  self._install_pip),
-            ("desktop", "Launcher aanmaken",            self._create_launcher),
-            ("launch",  "Pixora starten",               self._launch_app),
+            ("clone",    "Pixora bestanden downloaden", self._clone_repo),
+            ("apt",      "Systeem packages installeren", self._install_apt),
+            ("pip",      "Python packages installeren",  self._install_pip),
+            ("desktop",  "Launcher aanmaken",            self._create_launcher),
+            ("services", "Services activeren",           self._start_services),
+            ("launch",   "Pixora starten",               self._launch_app),
         ]
         for key, label, fn in steps:
             GLib.idle_add(self._set_step_active, key, label)
@@ -254,6 +256,16 @@ class InstallerWindow(Adw.ApplicationWindow):
             return True, ""
         except Exception as e:
             return False, str(e)
+
+    def _start_services(self):
+        # usbmuxd: communicatie met iPhone via USB
+        try:
+            subprocess.run(["sudo", "systemctl", "enable", "--now", "usbmuxd"],
+                           check=True, capture_output=True)
+        except subprocess.CalledProcessError:
+            # Niet fataal — usbmuxd start ook automatisch bij iPhone-aansluiting
+            pass
+        return True, ""
 
     def _launch_app(self):
         try:
