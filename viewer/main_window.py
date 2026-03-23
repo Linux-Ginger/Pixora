@@ -851,6 +851,7 @@ class MainWindow(Adw.ApplicationWindow):
             os.makedirs(photo_path, exist_ok=True)
 
         self.set_hide_on_close(False)
+        Gtk.Settings.get_default().set_property("gtk-decoration-layout", "icon:minimize,close")
 
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
