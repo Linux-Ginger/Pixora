@@ -407,10 +407,11 @@ class ImporterWindow(Adw.ApplicationWindow):
         tips_group.set_title("Controleer")
 
         for icon, title, subtitle in [
-            ("cable-connected-symbolic",   "USB-kabel",             "Gebruik bij voorkeur de originele Apple-kabel"),
-            ("changes-allow-symbolic",     "Vertrouw deze computer","Tik op 'Vertrouw' als je iPhone dat vraagt"),
-            ("system-lock-screen-symbolic","Ontgrendeld scherm",    "Zorg dat je iPhone ontgrendeld is tijdens de import"),
+            ("cable-connected-symbolic",   "USB-kabel",              "Gebruik bij voorkeur de originele Apple-kabel"),
+            ("changes-allow-symbolic",     "Vertrouw deze computer", "Tik op 'Vertrouw' als je iPhone dat vraagt"),
+            ("system-lock-screen-symbolic","Ontgrendeld scherm",     "Zorg dat je iPhone ontgrendeld is tijdens de import"),
             ("thunderbolt-symbolic",       "Gebruik een blauwe USB-poort", "USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten"),
+            ("cloud-outline-symbolic",     "iCloud foto's",          "Niet alle foto's zijn zichtbaar? Zet op je iPhone: Instellingen → Foto's → 'Download and Keep Originals'"),
         ]:
             row = Adw.ActionRow()
             row.set_title(title)
