@@ -72,6 +72,9 @@ class SetupWizard(Adw.Window):
         self.set_default_size(520, 480)
         self.set_resizable(False)
 
+        self.style_manager = Adw.StyleManager.get_default()
+        self.style_manager.connect("notify::dark", self._on_dark_mode_changed)
+
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
         self.stack.set_transition_duration(250)
@@ -109,6 +112,14 @@ class SetupWizard(Adw.Window):
         self.pages = ["welcome", "folder", "backup", "duplicate"]
         self.current = 0
 
+    # ── Dark mode ────────────────────────────────────────────────────
+
+    def _on_dark_mode_changed(self, manager, _):
+        if hasattr(self, "welcome_logo"):
+            path = self._logo_path()
+            if path:
+                self.welcome_logo.set_filename(path)
+
     # ── Pagina: Welkom ───────────────────────────────────────────────
 
     def _build_welcome(self):
@@ -122,19 +133,14 @@ class SetupWizard(Adw.Window):
         page.set_vexpand(True)
 
         # Logo
+        self.welcome_logo = Gtk.Picture()
         logo_path = self._logo_path()
         if logo_path:
-            self.welcome_logo = Gtk.Picture()
             self.welcome_logo.set_filename(logo_path)
-            self.welcome_logo.set_size_request(220, 56)
-            self.welcome_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
-            self.welcome_logo.set_halign(Gtk.Align.CENTER)
-            page.append(self.welcome_logo)
-        else:
-            fallback = Gtk.Image.new_from_icon_name("applications-graphics-symbolic")
-            fallback.set_pixel_size(56)
-            fallback.set_halign(Gtk.Align.CENTER)
-            page.append(fallback)
+        self.welcome_logo.set_size_request(220, 56)
+        self.welcome_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self.welcome_logo.set_halign(Gtk.Align.CENTER)
+        page.append(self.welcome_logo)
 
         title = Gtk.Label(label="Welkom bij Pixora!")
         title.add_css_class("title-1")
@@ -485,8 +491,10 @@ class SetupWizard(Adw.Window):
     # ── Helpers ──────────────────────────────────────────────────────
 
     def _logo_path(self):
+        dark = self.style_manager.get_dark()
+        filename = "pixora-logo-dark.png" if dark else "pixora-logo-light.png"
         base = os.path.dirname(os.path.abspath(__file__))
-        for rel in ("../docs/pixora-logo-dark.png", "docs/pixora-logo-dark.png"):
+        for rel in (f"../docs/{filename}", f"docs/{filename}"):
             path = os.path.normpath(os.path.join(base, rel))
             if os.path.exists(path):
                 return path
