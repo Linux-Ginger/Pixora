@@ -43,9 +43,9 @@ SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".dng", ".mp4", ".mov", ".m4
 # Duplicate threshold → maximale hash-afstand
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
 
-# Thumbnailgrootte (zelfde cache als de viewer)
-THUMB_CACHE_DIR = Path.home() / ".cache" / "pixora" / "thumbnails"
-SELECT_THUMB    = 160  # vierkant, pixels
+# Eigen vierkante thumbnail-cache voor de importer
+IMPORT_THUMB_DIR = Path.home() / ".cache" / "pixora" / "import_thumbs"
+SELECT_THUMB     = 160  # vierkant, pixels
 
 # ─── States ──────────────────────────────────────────────────────────────────
 
@@ -244,11 +244,14 @@ def get_backup_mountpoint(uuid: str) -> Path | None:
         return None
 
 
-def _thumb_cache_path(photo_path: Path) -> Path:
-    """Zelfde cache-sleutel als de viewer (md5 van pad + mtime)."""
-    mtime = str(photo_path.stat().st_mtime)
-    key = hashlib.md5((str(photo_path) + mtime).encode()).hexdigest()
-    return THUMB_CACHE_DIR / (key + ".png")
+def _import_cache_path(photo_path: Path) -> Path:
+    """Cache-sleutel op basis van pad + mtime + grootte."""
+    try:
+        stat = photo_path.stat()
+        key = hashlib.md5(f"{photo_path}:{int(stat.st_mtime)}:{stat.st_size}".encode()).hexdigest()
+    except OSError:
+        key = hashlib.md5(str(photo_path).encode()).hexdigest()
+    return IMPORT_THUMB_DIR / (key + ".png")
 
 
 def _crop_to_square(pixbuf) -> "GdkPixbuf.Pixbuf":
@@ -263,34 +266,45 @@ def _crop_to_square(pixbuf) -> "GdkPixbuf.Pixbuf":
 
 def load_select_thumb(photo_path: Path):
     """
-    Laad een vierkante thumbnail voor de selectiepagina.
-    Hergebruikt de viewer-cache als die bestaat, anders genereren en opslaan.
+    Laad een vierkante thumbnail (SELECT_THUMB × SELECT_THUMB) voor de selectiepagina.
+    Sla het resultaat op in een eigen cache zodat de volgende keer direct geladen kan worden.
     """
-    THUMB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    IMPORT_THUMB_DIR.mkdir(parents=True, exist_ok=True)
+    cache = _import_cache_path(photo_path)
+
+    # Cache-hit: direct laden (al vierkant en goede kwaliteit)
+    if cache.exists():
+        try:
+            return GdkPixbuf.Pixbuf.new_from_file(str(cache))
+        except Exception:
+            cache.unlink(missing_ok=True)
+
     try:
-        cache = _thumb_cache_path(photo_path)
-        if cache.exists():
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file(str(cache))
+        ext = photo_path.suffix.lower()
+        if ext in {".mp4", ".mov", ".m4v"}:
+            # Video: haal eerste frame op via ffmpeg naar tijdelijk bestand
+            tmp = cache.with_suffix(".tmp.jpg")
+            result = subprocess.run(
+                ["ffmpeg", "-i", str(photo_path), "-ss", "00:00:01",
+                 "-vframes", "1", str(tmp), "-y"],
+                capture_output=True, timeout=15
+            )
+            if result.returncode != 0 or not tmp.exists():
+                return None
+            raw = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                str(tmp), SELECT_THUMB * 2, SELECT_THUMB * 2, True
+            )
+            tmp.unlink(missing_ok=True)
         else:
-            ext = photo_path.suffix.lower()
-            if ext in {".mp4", ".mov", ".m4v"}:
-                # Video: frame via ffmpeg
-                subprocess.run(
-                    ["ffmpeg", "-i", str(photo_path), "-ss", "00:00:01",
-                     "-vframes", "1",
-                     "-vf", f"scale={SELECT_THUMB * 2}:{SELECT_THUMB * 2}:force_original_aspect_ratio=decrease",
-                     str(cache), "-y"],
-                    capture_output=True, timeout=10
-                )
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file(str(cache))
-            else:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-                    str(photo_path), SELECT_THUMB * 2, SELECT_THUMB * 2, True
-                )
-                pixbuf.savev(str(cache), "png", [], [])
-        # Schaal naar SELECT_THUMB na center-crop
-        square = _crop_to_square(pixbuf)
-        return square.scale_simple(SELECT_THUMB, SELECT_THUMB, GdkPixbuf.InterpType.BILINEAR)
+            # Laad op dubbele grootte voor betere kwaliteit na downscale
+            raw = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                str(photo_path), SELECT_THUMB * 2, SELECT_THUMB * 2, True
+            )
+
+        square = _crop_to_square(raw)
+        thumb = square.scale_simple(SELECT_THUMB, SELECT_THUMB, GdkPixbuf.InterpType.HYPER)
+        thumb.savev(str(cache), "png", [], [])
+        return thumb
     except Exception:
         return None
 
@@ -508,6 +522,14 @@ class ImporterWindow(Adw.ApplicationWindow):
         self.stack.add_named(clamp, "progress")
 
     def _build_selecting_page(self):
+        # Gedeelde CSS voor ronde hoeken op thumbnails
+        thumb_css = Gtk.CssProvider()
+        thumb_css.load_from_string(".thumb-item { border-radius: 8px; }")
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(), thumb_css,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
         # Koptekst
@@ -602,6 +624,8 @@ class ImporterWindow(Adw.ApplicationWindow):
         """Maakt een vierkante thumbnail-kaart met vinkje. Geeft (widget, checkbutton, overlay) terug."""
         overlay = Gtk.Overlay()
         overlay.set_size_request(SELECT_THUMB, SELECT_THUMB)
+        overlay.set_overflow(Gtk.Overflow.HIDDEN)
+        overlay.add_css_class("thumb-item")
 
         # Placeholder terwijl thumbnail laadt
         placeholder = Gtk.Image.new_from_icon_name("image-loading-symbolic")
