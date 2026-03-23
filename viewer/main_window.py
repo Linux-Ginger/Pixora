@@ -780,6 +780,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
+        self.maximize()
+        self.connect("notify::maximized", self._enforce_maximized)
 
         self.style_manager = Adw.StyleManager.get_default()
         self.style_manager.connect("notify::dark", self.on_dark_mode_changed)
@@ -3233,3 +3235,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.close_importer()
         if count and count > 0:
             self.reload_photos()
+
+    def _enforce_maximized(self, win, _param):
+        if not win.is_maximized():
+            win.maximize()
