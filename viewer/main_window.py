@@ -781,6 +781,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
         self.maximize()
+        Gtk.Settings.get_default().set_property(
+            "gtk-decoration-layout", "appmenu:minimize,maximize,close"
+        )
 
         self.style_manager = Adw.StyleManager.get_default()
         self.style_manager.connect("notify::dark", self.on_dark_mode_changed)
