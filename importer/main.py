@@ -18,6 +18,7 @@ import hashlib
 import subprocess
 import threading
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime
 
@@ -41,6 +42,10 @@ SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".dng", ".mp4", ".mov", ".m4
 
 # Duplicate threshold → maximale hash-afstand
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
+
+# Thumbnailgrootte (zelfde cache als de viewer)
+THUMB_CACHE_DIR = Path.home() / ".cache" / "pixora" / "thumbnails"
+SELECT_THUMB    = 160  # vierkant, pixels
 
 # ─── States ──────────────────────────────────────────────────────────────────
 
@@ -239,6 +244,57 @@ def get_backup_mountpoint(uuid: str) -> Path | None:
         return None
 
 
+def _thumb_cache_path(photo_path: Path) -> Path:
+    """Zelfde cache-sleutel als de viewer (md5 van pad + mtime)."""
+    mtime = str(photo_path.stat().st_mtime)
+    key = hashlib.md5((str(photo_path) + mtime).encode()).hexdigest()
+    return THUMB_CACHE_DIR / (key + ".png")
+
+
+def _crop_to_square(pixbuf) -> "GdkPixbuf.Pixbuf":
+    """Snijd het midden van een pixbuf bij tot een vierkant."""
+    w = pixbuf.get_width()
+    h = pixbuf.get_height()
+    size = min(w, h)
+    x = (w - size) // 2
+    y = (h - size) // 2
+    return pixbuf.new_subpixbuf(x, y, size, size)
+
+
+def load_select_thumb(photo_path: Path):
+    """
+    Laad een vierkante thumbnail voor de selectiepagina.
+    Hergebruikt de viewer-cache als die bestaat, anders genereren en opslaan.
+    """
+    THUMB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        cache = _thumb_cache_path(photo_path)
+        if cache.exists():
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file(str(cache))
+        else:
+            ext = photo_path.suffix.lower()
+            if ext in {".mp4", ".mov", ".m4v"}:
+                # Video: frame via ffmpeg
+                subprocess.run(
+                    ["ffmpeg", "-i", str(photo_path), "-ss", "00:00:01",
+                     "-vframes", "1",
+                     "-vf", f"scale={SELECT_THUMB * 2}:{SELECT_THUMB * 2}:force_original_aspect_ratio=decrease",
+                     str(cache), "-y"],
+                    capture_output=True, timeout=10
+                )
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file(str(cache))
+            else:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                    str(photo_path), SELECT_THUMB * 2, SELECT_THUMB * 2, True
+                )
+                pixbuf.savev(str(cache), "png", [], [])
+        # Schaal naar SELECT_THUMB na center-crop
+        square = _crop_to_square(pixbuf)
+        return square.scale_simple(SELECT_THUMB, SELECT_THUMB, GdkPixbuf.InterpType.BILINEAR)
+    except Exception:
+        return None
+
+
 # ─── Hoofdvenster ─────────────────────────────────────────────────────────────
 
 class ImporterWindow(Adw.ApplicationWindow):
@@ -311,9 +367,10 @@ class ImporterWindow(Adw.ApplicationWindow):
         tips_group.set_title("Controleer")
 
         for icon, title, subtitle in [
-            ("cable-connected-symbolic",  "USB-kabel",            "Gebruik bij voorkeur de originele Apple-kabel"),
-            ("changes-allow-symbolic",    "Vertrouw deze computer","Tik op 'Vertrouw' als je iPhone dat vraagt"),
-            ("system-lock-screen-symbolic","Ontgrendeld scherm",   "Zorg dat je iPhone ontgrendeld is tijdens de import"),
+            ("cable-connected-symbolic",   "USB-kabel",             "Gebruik bij voorkeur de originele Apple-kabel"),
+            ("changes-allow-symbolic",     "Vertrouw deze computer","Tik op 'Vertrouw' als je iPhone dat vraagt"),
+            ("system-lock-screen-symbolic","Ontgrendeld scherm",    "Zorg dat je iPhone ontgrendeld is tijdens de import"),
+            ("thunderbolt-symbolic",       "Gebruik een blauwe USB-poort", "USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten"),
         ]:
             row = Adw.ActionRow()
             row.set_title(title)
@@ -542,14 +599,14 @@ class ImporterWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._load_select_thumbs, args=(list(files),), daemon=True).start()
 
     def _make_select_card(self, fp: Path) -> tuple[Gtk.Widget, Gtk.CheckButton, Gtk.Overlay]:
-        """Maakt een thumbnail-kaart met vinkje. Geeft (widget, checkbutton) terug."""
+        """Maakt een vierkante thumbnail-kaart met vinkje. Geeft (widget, checkbutton, overlay) terug."""
         overlay = Gtk.Overlay()
-        overlay.set_size_request(120, 100)
+        overlay.set_size_request(SELECT_THUMB, SELECT_THUMB)
 
         # Placeholder terwijl thumbnail laadt
         placeholder = Gtk.Image.new_from_icon_name("image-loading-symbolic")
         placeholder.set_pixel_size(32)
-        placeholder.set_size_request(120, 100)
+        placeholder.set_size_request(SELECT_THUMB, SELECT_THUMB)
         placeholder.add_css_class("card")
         overlay.set_child(placeholder)
 
@@ -577,13 +634,14 @@ class ImporterWindow(Adw.ApplicationWindow):
         return overlay, check, overlay
 
     def _load_select_thumbs(self, files: list[Path]):
-        """Laad thumbnails op de achtergrond en update de UI via idle_add."""
-        for fp in files:
-            try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(fp), 120, 100, True)
-            except Exception:
-                continue
-            GLib.idle_add(self._set_select_thumb, str(fp), pixbuf)
+        """Laad thumbnails parallel (4 workers) en update de UI via idle_add."""
+        def load_one(fp: Path):
+            pixbuf = load_select_thumb(fp)
+            if pixbuf is not None:
+                GLib.idle_add(self._set_select_thumb, str(fp), pixbuf)
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            pool.map(load_one, files)
 
     def _set_select_thumb(self, path_str: str, pixbuf):
         """Vervang placeholder door echte thumbnail in de selectiekaart."""
@@ -591,9 +649,9 @@ class ImporterWindow(Adw.ApplicationWindow):
         if overlay is None:
             return
         pic = Gtk.Picture.new_for_pixbuf(pixbuf)
-        pic.set_can_shrink(True)
+        pic.set_can_shrink(False)
         pic.set_content_fit(Gtk.ContentFit.COVER)
-        pic.set_size_request(120, 100)
+        pic.set_size_request(SELECT_THUMB, SELECT_THUMB)
         pic.add_css_class("card")
         overlay.set_child(pic)
 
