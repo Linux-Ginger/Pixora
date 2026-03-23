@@ -91,6 +91,26 @@ def dest_path(base: Path, structure: str, filename: str, mtime: datetime) -> Pat
         return base / filename
 
 
+def ensure_services():
+    """Start usbmuxd en idevice services als ze niet draaien."""
+    try:
+        r = subprocess.run(["systemctl", "is-active", "usbmuxd"],
+                           capture_output=True, text=True, timeout=3)
+        if r.stdout.strip() != "active":
+            subprocess.run(["systemctl", "start", "usbmuxd"],
+                           capture_output=True, timeout=5)
+    except Exception:
+        pass
+    try:
+        r = subprocess.run(["pgrep", "-x", "usbmuxd"],
+                           capture_output=True, timeout=3)
+        if r.returncode != 0:
+            subprocess.Popen(["usbmuxd"], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+
 def detect_iphone() -> str | None:
     """Geeft UDID terug als een iPhone verbonden is, anders None."""
     try:
@@ -413,6 +433,7 @@ class ImporterPage(Gtk.Box):
         """Wordt aangeroepen als de pagina zichtbaar wordt."""
         self.settings = load_settings()
         self._show_state(STATE_WAITING)
+        threading.Thread(target=ensure_services, daemon=True).start()
         self._start_detection_poll()
 
     def deactivate(self):
