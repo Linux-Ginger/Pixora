@@ -407,11 +407,12 @@ class ImporterWindow(Adw.ApplicationWindow):
         tips_group.set_title("Controleer")
 
         for icon, title, subtitle in [
-            ("cable-connected-symbolic",   "USB-kabel",              "Gebruik bij voorkeur de originele Apple-kabel"),
-            ("changes-allow-symbolic",     "Vertrouw deze computer", "Tik op 'Vertrouw' als je iPhone dat vraagt"),
-            ("system-lock-screen-symbolic","Ontgrendeld scherm",     "Zorg dat je iPhone ontgrendeld is tijdens de import"),
-            ("thunderbolt-symbolic",       "Gebruik een blauwe USB-poort", "USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten"),
-            ("cloud-outline-symbolic",     "iCloud foto's",          "Niet alle foto's zijn zichtbaar? Zet op je iPhone: Instellingen → Foto's → 'Download and Keep Originals'"),
+            ("drive-removable-media-symbolic", "USB-kabel",              "Gebruik bij voorkeur de originele Apple-kabel"),
+            ("security-medium-symbolic",       "Vertrouw deze computer", "Tik op 'Vertrouw' als je iPhone dat vraagt"),
+            ("system-lock-screen-symbolic",    "Ontgrendeld scherm",     "Zorg dat je iPhone ontgrendeld is tijdens de import"),
+            ("media-flash-symbolic",           "Gebruik een blauwe USB-poort", "USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten"),
+            ("network-wireless-symbolic",      "iCloud foto's",          "Niet alle foto's zijn zichtbaar? Zet op je iPhone: Instellingen → Foto's → 'Download and Keep Originals'"),
+            ("document-save-symbolic",         "Bestandsformaat",        "Zet op je iPhone: Instellingen → Foto's → 'Zet over naar Mac of pc' → 'Behoud originelen'"),
         ]:
             row = Adw.ActionRow()
             row.set_title(title)
@@ -897,7 +898,7 @@ class ImporterWindow(Adw.ApplicationWindow):
         GLib.timeout_add(2000, self._poll_iphone)
 
     def _poll_iphone(self) -> bool:
-        if self.state not in (STATE_WAITING, STATE_DETECTED):
+        if self.state not in (STATE_WAITING, STATE_DETECTED, STATE_SELECTING, STATE_REVIEWING):
             return False
         threading.Thread(target=self._check_iphone, daemon=True).start()
         return True
@@ -907,6 +908,10 @@ class ImporterWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._on_detection_result, udid)
 
     def _on_detection_result(self, udid: str | None):
+        if self.state in (STATE_SELECTING, STATE_REVIEWING):
+            if not udid:
+                self._on_iphone_disconnected()
+            return
         if self.state not in (STATE_WAITING, STATE_DETECTED):
             return
         if udid and self.state == STATE_WAITING:
@@ -918,6 +923,30 @@ class ImporterWindow(Adw.ApplicationWindow):
         elif not udid and self.state == STATE_DETECTED:
             self.udid = None
             self._show_state(STATE_WAITING)
+
+    def _on_iphone_disconnected(self):
+        if getattr(self, "_disconnect_dialog_open", False):
+            return
+        self._disconnect_dialog_open = True
+        unmount_iphone(MOUNT_POINT)
+
+        dialog = Adw.MessageDialog.new(
+            self,
+            "iPhone losgekoppeld",
+            "Je iPhone is losgekoppeld tijdens het selecteren van foto's.\n"
+            "Sluit de iPhone opnieuw aan en probeer het opnieuw."
+        )
+        dialog.add_response("cancel", "Annuleren")
+        dialog.add_response("retry", "Opnieuw proberen")
+        dialog.set_default_response("retry")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_disconnect_response)
+        dialog.present()
+
+    def _on_disconnect_response(self, dialog, response: str):
+        self._disconnect_dialog_open = False
+        self._show_state(STATE_WAITING)
+        self._start_detection_poll()
 
     # ─── Import flow ─────────────────────────────────────────────────────────
 
