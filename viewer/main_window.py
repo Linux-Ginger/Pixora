@@ -781,9 +781,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
         self.maximize()
-        Gtk.Settings.get_default().set_property(
-            "gtk-decoration-layout", "appmenu:minimize,maximize,close"
-        )
 
         self.style_manager = Adw.StyleManager.get_default()
         self.style_manager.connect("notify::dark", self.on_dark_mode_changed)
@@ -856,7 +853,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.set_hide_on_close(False)
         btn_layout = Gtk.Settings.get_default()
-        btn_layout.set_property("gtk-decoration-layout", "icon:minimize,close")
+        btn_layout.set_property("gtk-decoration-layout", "icon:minimize,maximize,close")
 
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
