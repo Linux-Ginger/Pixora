@@ -1187,7 +1187,7 @@ class MainWindow(Adw.ApplicationWindow):
         status_page = Adw.StatusPage()
         status_page.set_icon_name("image-missing-symbolic")
         status_page.set_title("Geen foto's gevonden")
-        status_page.set_description("Sluit je iPhone aan om foto's te importeren")
+        status_page.set_description("Sluit je iPhone of iPad aan om foto's te importeren")
         status_page.set_vexpand(True)
         status_page.set_hexpand(True)
         self.content_stack.add_named(status_page, "empty")
@@ -1655,7 +1655,7 @@ class MainWindow(Adw.ApplicationWindow):
         normal_bar.pack_start(self.photo_count_label)
 
         if importer_installed():
-            import_btn = Gtk.Button(label="📱  Importeer van iPhone")
+            import_btn = Gtk.Button(label="📱  Importeer van iPhone of iPad")
             import_btn.add_css_class("suggested-action")
             import_btn.add_css_class("pill")
             import_btn.connect("clicked", self.open_importer)
