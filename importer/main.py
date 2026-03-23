@@ -281,12 +281,14 @@ def load_select_thumb(photo_path: Path):
     try:
         ext = photo_path.suffix.lower()
         if ext in {".mp4", ".mov", ".m4v"}:
-            # Video: haal eerste frame op via ffmpeg naar tijdelijk bestand
+            if not _cmd_available("ffmpeg"):
+                return None
+            # Eerste frame pakken zonder seek — betrouwbaarder op FUSE/USB
             tmp = cache.with_suffix(".tmp.jpg")
             result = subprocess.run(
-                ["ffmpeg", "-i", str(photo_path), "-ss", "00:00:01",
-                 "-vframes", "1", str(tmp), "-y"],
-                capture_output=True, timeout=15
+                ["ffmpeg", "-i", str(photo_path),
+                 "-frames:v", "1", str(tmp), "-y"],
+                capture_output=True, timeout=30
             )
             if result.returncode != 0 or not tmp.exists():
                 return None
