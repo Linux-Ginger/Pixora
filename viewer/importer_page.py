@@ -431,7 +431,7 @@ class ImporterPage(Gtk.Box):
 
         inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         inner.set_vexpand(True)
-        inner.set_valign(Gtk.Align.CENTER)
+        inner.set_valign(Gtk.Align.FILL)
         inner.set_margin_top(16)
         inner.set_margin_bottom(16)
         inner.set_margin_start(12)
