@@ -779,7 +779,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._fade_anim_id          = None
 
         self.set_title("Pixora")
-        self.set_default_size(1100, 700)
+        self.set_default_size(900, 600)
 
         self.style_manager = Adw.StyleManager.get_default()
         self.style_manager.connect("notify::dark", self.on_dark_mode_changed)
