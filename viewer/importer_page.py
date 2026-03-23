@@ -459,7 +459,7 @@ class ImporterPage(Gtk.Box):
             row.set_subtitle(subtitle)
             ic = Gtk.Image.new_from_icon_name(icon)
             ic.set_pixel_size(16)
-            row.add_prefix(ic)
+            row.add_suffix(ic)
             listbox.append(row)
 
         box.append(listbox)
