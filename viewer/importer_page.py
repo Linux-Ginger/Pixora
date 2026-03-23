@@ -36,7 +36,7 @@ HASH_CACHE   = CACHE_DIR / "hashes.json"
 MOUNT_POINT  = Path(tempfile.gettempdir()) / "pixora_iphone"
 
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
-SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".dng", ".mp4", ".mov", ".m4v", ".webp", ".gif", ".tiff", ".tif"}
+SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".dng", ".mp4", ".mov", ".m4v", ".webp", ".gif", ".tiff", ".tif", ".3gp", ".bmp"}
 
 # Duplicate threshold → maximale hash-afstand
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
@@ -450,13 +450,13 @@ class ImporterPage(Gtk.Box):
         icon.set_halign(Gtk.Align.CENTER)
         inner.append(icon)
 
-        title_lbl = Gtk.Label(label="Verbind je iPhone")
+        title_lbl = Gtk.Label(label="Verbind je iPhone of iPad")
         title_lbl.add_css_class("title-3")
         title_lbl.set_halign(Gtk.Align.CENTER)
         title_lbl.set_margin_top(4)
         inner.append(title_lbl)
 
-        desc_lbl = Gtk.Label(label="Sluit je iPhone aan via een USB-kabel en ontgrendel het scherm.\nAls je iPhone vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'.")
+        desc_lbl = Gtk.Label(label="Sluit je iPhone of iPad aan via een USB-kabel en ontgrendel het scherm.\nAls je apparaat vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'.")
         desc_lbl.add_css_class("dim-label")
         desc_lbl.set_halign(Gtk.Align.CENTER)
         desc_lbl.set_justify(Gtk.Justification.CENTER)
@@ -470,11 +470,11 @@ class ImporterPage(Gtk.Box):
 
         for ico_name, title, subtitle in [
             ("drive-removable-media-symbolic", "USB-kabel",              "Gebruik bij voorkeur de originele Apple-kabel"),
-            ("security-medium-symbolic",       "Vertrouw deze computer", "Tik op 'Vertrouw' als je iPhone dat vraagt"),
-            ("system-lock-screen-symbolic",    "Ontgrendeld scherm",     "Zorg dat je iPhone ontgrendeld is tijdens de import"),
+            ("security-medium-symbolic",       "Vertrouw deze computer", "Tik op 'Vertrouw' als je apparaat dat vraagt"),
+            ("system-lock-screen-symbolic",    "Ontgrendeld scherm",     "Zorg dat je apparaat ontgrendeld is tijdens de import"),
             ("media-flash-symbolic",           "Gebruik een blauwe USB-poort", "USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten"),
             ("weather-overcast-symbolic",      "iCloud foto's",          "iCloud Foto's uitgeschakeld? Dan staan alle foto's lokaal op je toestel en worden ze allemaal gevonden."),
-            ("document-save-symbolic",         "Bestandsformaat",        "Zet op je iPhone: Instellingen → Foto's → 'Zet over naar Mac of pc' → 'Behoud originelen'"),
+            ("document-save-symbolic",         "Bestandsformaat",        "Zet op je apparaat: Instellingen → Foto's → 'Zet over naar Mac of pc' → 'Behoud originelen'"),
         ]:
             row = Adw.ActionRow()
             row.set_title(title)
@@ -492,7 +492,7 @@ class ImporterPage(Gtk.Box):
         spin = Gtk.Spinner()
         spin.start()
         spinner_box.append(spin)
-        lbl = Gtk.Label(label="Zoeken naar iPhone…")
+        lbl = Gtk.Label(label="Zoeken naar apparaat…")
         lbl.add_css_class("dim-label")
         spinner_box.append(lbl)
         inner.append(spinner_box)
@@ -504,8 +504,8 @@ class ImporterPage(Gtk.Box):
     def _build_detected_page(self):
         status = Adw.StatusPage()
         status.set_icon_name("object-select-symbolic")
-        status.set_title("iPhone gevonden")
-        status.set_description("Je iPhone is verbonden en klaar om te importeren.")
+        status.set_title("Apparaat gevonden")
+        status.set_description("Je apparaat is verbonden en klaar om te importeren.")
 
         clamp = Adw.Clamp()
         clamp.set_maximum_size(420)
@@ -877,9 +877,9 @@ class ImporterPage(Gtk.Box):
 
         dialog = Adw.MessageDialog.new(
             window,
-            "iPhone losgekoppeld",
-            "Je iPhone is losgekoppeld tijdens het selecteren van foto's.\n"
-            "Sluit de iPhone opnieuw aan en probeer het opnieuw."
+            "Apparaat losgekoppeld",
+            "Je apparaat is losgekoppeld tijdens het selecteren van foto's.\n"
+            "Sluit het apparaat opnieuw aan en probeer het opnieuw."
         )
         dialog.add_response("cancel", "Annuleren")
         dialog.add_response("retry", "Opnieuw proberen")
@@ -896,7 +896,7 @@ class ImporterPage(Gtk.Box):
     # ─── Import flow ─────────────────────────────────────────────────────────
 
     def _on_import_clicked(self, _btn):
-        self._set_progress("iPhone koppelen…", "Even geduld, dit duurt maar even.")
+        self._set_progress("Apparaat koppelen…", "Even geduld, dit duurt maar even.")
         self._show_state(STATE_MOUNTING)
         threading.Thread(target=self._do_mount, daemon=True).start()
 
@@ -908,13 +908,13 @@ class ImporterPage(Gtk.Box):
             return
         if not mount_iphone(self.udid, MOUNT_POINT):
             GLib.idle_add(self._show_error,
-                "Kon de iPhone niet koppelen. Zorg dat het scherm ontgrendeld is "
+                "Kon het apparaat niet koppelen. Zorg dat het scherm ontgrendeld is "
                 "en tik op 'Vertrouw' als dat wordt gevraagd.", False)
             return
         GLib.idle_add(self._start_scan)
 
     def _start_scan(self):
-        self._set_progress("Foto's scannen…", "Zoeken naar foto's en video's op je iPhone.")
+        self._set_progress("Foto's scannen…", "Zoeken naar foto's en video's op je apparaat.")
         self._show_state(STATE_SCANNING)
         self._start_detection_poll()
         threading.Thread(target=self._do_scan, daemon=True).start()
@@ -930,7 +930,7 @@ class ImporterPage(Gtk.Box):
         if not files:
             unmount_iphone(MOUNT_POINT)
             self._show_error(
-                "Geen foto's of video's gevonden op de iPhone.\n"
+                "Geen foto's of video's gevonden op het apparaat.\n"
                 "Mogelijk zijn alle media al eerder geïmporteerd.", False)
             return
         self._show_selecting(files)
@@ -959,7 +959,7 @@ class ImporterPage(Gtk.Box):
 
         for i, fp in enumerate(iphone_files):
             frac = 0.5 + (i / total) * 0.5 if total > 0 else 0.5
-            GLib.idle_add(self._update_progress, frac, f"iPhone scannen: {i + 1}/{total}", fp.name)
+            GLib.idle_add(self._update_progress, frac, f"Apparaat scannen: {i + 1}/{total}", fp.name)
             ph = perceptual_hash(fp)
             if ph:
                 dup = find_duplicate(ph, library_hashes, max_dist)
