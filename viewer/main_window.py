@@ -780,7 +780,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.set_title("Pixora")
         self.set_default_size(1100, 700)
-        GLib.idle_add(self.maximize)
+        self.connect("map", lambda w: w.maximize())
 
         self.style_manager = Adw.StyleManager.get_default()
         self.style_manager.connect("notify::dark", self.on_dark_mode_changed)
