@@ -428,19 +428,10 @@ class ImporterPage(Gtk.Box):
             "Sluit je iPhone aan via een USB-kabel en ontgrendel het scherm.\n"
             "Als je iPhone vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'."
         )
-
-        clamp = Adw.Clamp()
-        clamp.set_maximum_size(420)
+        status.set_vexpand(True)
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_bottom(32)
-        box.set_margin_start(12)
-        box.set_margin_end(12)
-
-        header_lbl = Gtk.Label(label="Controleer")
-        header_lbl.set_halign(Gtk.Align.START)
-        header_lbl.add_css_class("heading")
-        box.append(header_lbl)
 
         listbox = Gtk.ListBox()
         listbox.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -459,7 +450,7 @@ class ImporterPage(Gtk.Box):
             row.set_subtitle(subtitle)
             ic = Gtk.Image.new_from_icon_name(icon)
             ic.set_pixel_size(16)
-            row.add_suffix(ic)
+            row.add_prefix(ic)
             listbox.append(row)
 
         box.append(listbox)
@@ -475,12 +466,8 @@ class ImporterPage(Gtk.Box):
         spinner_box.append(lbl)
         box.append(spinner_box)
 
-        clamp.set_child(box)
-
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        vbox.append(status)
-        vbox.append(clamp)
-        self.stack.add_named(vbox, "waiting")
+        status.set_child(box)
+        self.stack.add_named(status, "waiting")
 
     def _build_detected_page(self):
         status = Adw.StatusPage()
