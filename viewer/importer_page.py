@@ -468,12 +468,8 @@ class ImporterPage(Gtk.Box):
         clamp.set_maximum_size(480)
         clamp.set_child(box)
         status.set_child(clamp)
-
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_vexpand(True)
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroll.set_child(status)
-        self.stack.add_named(scroll, "waiting")
+        status.set_vexpand(True)
+        self.stack.add_named(status, "waiting")
 
     def _build_detected_page(self):
         status = Adw.StatusPage()
