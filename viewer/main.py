@@ -44,7 +44,6 @@ class PixoraApp(Adw.Application):
             from main_window import MainWindow
             win = MainWindow(app, settings)
 
-        win.maximize()
         win.present()
 
 
