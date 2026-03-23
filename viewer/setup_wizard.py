@@ -78,7 +78,7 @@ class SetupWizard(Adw.Window):
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
         self.stack.set_transition_duration(250)
-        self.stack.set_vexpand(True)
+        self.stack.set_vexpand(False)
 
         self.stack.add_named(self._scrolled(self._build_welcome()),   "welcome")
         self.stack.add_named(self._scrolled(self._build_folder()),    "folder")
@@ -131,7 +131,7 @@ class SetupWizard(Adw.Window):
     def _scrolled(self, child):
         sw = Gtk.ScrolledWindow()
         sw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        sw.set_vexpand(True)
+        sw.set_size_request(-1, 260)
         sw.set_child(child)
         return sw
 
