@@ -862,14 +862,6 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _start_services(self):
         try:
-            r = subprocess.run(["systemctl", "is-active", "usbmuxd"],
-                               capture_output=True, text=True, timeout=3)
-            if r.stdout.strip() != "active":
-                subprocess.run(["systemctl", "start", "usbmuxd"],
-                               capture_output=True, timeout=5)
-        except Exception:
-            pass
-        try:
             r = subprocess.run(["pgrep", "-x", "usbmuxd"],
                                capture_output=True, timeout=3)
             if r.returncode != 0:
