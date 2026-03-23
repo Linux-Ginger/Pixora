@@ -37,7 +37,7 @@ MOUNT_POINT  = Path(tempfile.gettempdir()) / "pixora_iphone"
 DOCS_DIR     = Path(__file__).parent.parent / "docs"
 
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
-SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".dng", ".mp4", ".mov", ".m4v"}
+SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".dng", ".mp4", ".mov", ".m4v", ".webp"}
 
 # Duplicate threshold → maximale hash-afstand
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
