@@ -69,7 +69,7 @@ class SetupWizard(Adw.Window):
         self.selected_backup_path = None
 
         self.set_title("Pixora — Instellen")
-        self.set_default_size(520, 480)
+        self.set_default_size(480, 400)
         self.set_resizable(False)
 
         self.style_manager = Adw.StyleManager.get_default()
@@ -138,10 +138,7 @@ class SetupWizard(Adw.Window):
     # ── Dark mode ────────────────────────────────────────────────────
 
     def _on_dark_mode_changed(self, manager, _):
-        if hasattr(self, "welcome_logo"):
-            path = self._logo_path()
-            if path:
-                self.welcome_logo.set_filename(path)
+        pass  # SVG icon werkt in beide thema's
 
     # ── Pagina: Welkom ───────────────────────────────────────────────
 
@@ -160,7 +157,7 @@ class SetupWizard(Adw.Window):
         logo_path = self._logo_path()
         if logo_path:
             self.welcome_logo.set_filename(logo_path)
-        self.welcome_logo.set_size_request(220, 56)
+        self.welcome_logo.set_size_request(64, 64)
         self.welcome_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
         self.welcome_logo.set_halign(Gtk.Align.CENTER)
         page.append(self.welcome_logo)
@@ -514,10 +511,8 @@ class SetupWizard(Adw.Window):
     # ── Helpers ──────────────────────────────────────────────────────
 
     def _logo_path(self):
-        dark = self.style_manager.get_dark()
-        filename = "pixora-logo-dark.png" if dark else "pixora-logo-light.png"
         base = os.path.dirname(os.path.abspath(__file__))
-        for rel in (f"../docs/{filename}", f"docs/{filename}"):
+        for rel in ("../docs/pixora-icon.svg", "docs/pixora-icon.svg"):
             path = os.path.normpath(os.path.join(base, rel))
             if os.path.exists(path):
                 return path

@@ -20,6 +20,7 @@ import urllib.request
 from pathlib import Path
 
 INSTALL_DIR  = Path.home() / ".local" / "share" / "pixora"
+ICON_PATH    = Path(__file__).parent / "docs" / "pixora-icon.svg"
 BIN_DIR      = Path.home() / ".local" / "bin"
 DESKTOP_DIR  = Path.home() / ".local" / "share" / "applications"
 REPO_URL     = "https://github.com/Linux-Ginger/Pixora.git"
@@ -84,9 +85,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         top.set_margin_bottom(16)
         top.set_halign(Gtk.Align.CENTER)
 
-        logo = Gtk.Image.new_from_icon_name("applications-graphics-symbolic")
-        logo.set_pixel_size(48)
-        top.append(logo)
+        top.append(self._make_logo(48))
 
         title = Gtk.Label(label="Pixora")
         title.add_css_class("title-1")
@@ -113,7 +112,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         listbox.add_css_class("boxed-list")
 
         self.version_model = Gtk.StringList()
-        self.version_model.append("Nieuwste versie (laden…)")
+        self.version_model.append("Nieuwste versie")
 
         self.version_combo = Gtk.DropDown(model=self.version_model)
         self.version_combo.set_size_request(220, -1)
@@ -163,9 +162,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         top.set_margin_bottom(12)
         top.set_halign(Gtk.Align.CENTER)
 
-        logo = Gtk.Image.new_from_icon_name("applications-graphics-symbolic")
-        logo.set_pixel_size(40)
-        top.append(logo)
+        top.append(self._make_logo(40))
 
         title = Gtk.Label(label="Pixora")
         title.add_css_class("title-1")
@@ -236,6 +233,17 @@ class InstallerWindow(Adw.ApplicationWindow):
 
     # ── Releases ophalen ──────────────────────────────────────────────
 
+    def _make_logo(self, size):
+        if ICON_PATH.exists():
+            pic = Gtk.Picture.new_for_filename(str(ICON_PATH))
+            pic.set_size_request(size, size)
+            pic.set_content_fit(Gtk.ContentFit.CONTAIN)
+            pic.set_halign(Gtk.Align.CENTER)
+            return pic
+        img = Gtk.Image.new_from_icon_name("applications-graphics-symbolic")
+        img.set_pixel_size(size)
+        return img
+
     def _fetch_releases(self):
         try:
             req = urllib.request.Request(
@@ -253,7 +261,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         while self.version_model.get_n_items() > 0:
             self.version_model.remove(0)
 
-        self.version_model.append("Nieuwste versie (main)")
+        self.version_model.append("Nieuwste versie")
         for tag in tags:
             self.version_model.append(tag)
 
