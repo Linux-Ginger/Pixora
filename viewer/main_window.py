@@ -1783,7 +1783,7 @@ class MainWindow(Adw.ApplicationWindow):
                 if len(batch) >= BATCH_SIZE:
                     GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
                     batch = []
-                    time.sleep(0.005)
+                    time.sleep(0.02)
             if batch and load_id == self._load_id:
                 GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
         GLib.idle_add(self._load_done, load_id, total)
@@ -2000,12 +2000,16 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _load_full_photo(self, path, load_id):
         if is_video(path):
+            # Toon video direct, geocode daarna
+            if load_id == self._viewer_load_id:
+                GLib.idle_add(self._show_video, path, self._photo_location.get(path) or "")
             location = self._photo_location.get(path)
             if location is None:
                 coords = get_video_gps_coords(path)
                 if coords:
                     location = reverse_geocode(coords[0], coords[1])
-                    self._photo_location[path] = location
+                    if location:
+                        self._photo_location[path] = location
                 else:
                     location = ""
                     try:
@@ -2013,19 +2017,24 @@ class MainWindow(Adw.ApplicationWindow):
                             self._photo_location[path] = location
                     except Exception:
                         pass
-            if load_id == self._viewer_load_id:
-                GLib.idle_add(self._show_video, path, location)
+            if location and load_id == self._viewer_load_id:
+                GLib.idle_add(self.viewer_location.set_text, f"📍 {location}")
             return
         try:
             pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
         except Exception:
             pixbuf = None
+        # Toon foto direct zonder te wachten op geocoding
+        if load_id == self._viewer_load_id:
+            GLib.idle_add(self._show_full_photo, pixbuf, path, self._photo_location.get(path) or "")
+        # Geocode daarna, update label als de gebruiker nog steeds deze foto bekijkt
         location = self._photo_location.get(path)
         if location is None:
             coords = get_gps_coords(path)
             if coords:
                 location = reverse_geocode(coords[0], coords[1])
-                self._photo_location[path] = location
+                if location:
+                    self._photo_location[path] = location
             else:
                 location = ""
                 try:
@@ -2033,8 +2042,8 @@ class MainWindow(Adw.ApplicationWindow):
                         self._photo_location[path] = location
                 except Exception:
                     pass
-        if load_id == self._viewer_load_id:
-            GLib.idle_add(self._show_full_photo, pixbuf, path, location)
+        if location and load_id == self._viewer_load_id:
+            GLib.idle_add(self.viewer_location.set_text, f"📍 {location}")
 
     def _show_full_photo(self, pixbuf, path, location=""):
         self._stop_video()
