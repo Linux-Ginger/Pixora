@@ -117,11 +117,19 @@ def get_device_name(udid: str) -> str:
 
 
 def mount_iphone(udid: str, mountpoint: Path) -> bool:
-    mountpoint.mkdir(parents=True, exist_ok=True)
+    # Unmount eerst (ook als de vorige mount kapot is)
     try:
         subprocess.run(["fusermount", "-uz", str(mountpoint)], capture_output=True, timeout=5)
     except Exception:
         pass
+    # Verwijder de map als die in een kapotte staat is
+    try:
+        if mountpoint.exists() or mountpoint.is_mount():
+            import shutil as _shutil
+            _shutil.rmtree(str(mountpoint), ignore_errors=True)
+    except OSError:
+        subprocess.run(["rm", "-rf", str(mountpoint)], capture_output=True)
+    mountpoint.mkdir(parents=True, exist_ok=True)
     try:
         result = subprocess.run(
             ["ifuse", "--udid", udid, str(mountpoint)],
