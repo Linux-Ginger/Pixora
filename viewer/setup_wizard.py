@@ -78,39 +78,62 @@ class SetupWizard(Adw.Window):
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
         self.stack.set_transition_duration(250)
+        self.stack.set_vexpand(True)
 
-        self.stack.add_named(self._build_welcome(),   "welcome")
-        self.stack.add_named(self._build_folder(),    "folder")
-        self.stack.add_named(self._build_backup(),    "backup")
-        self.stack.add_named(self._build_duplicate(), "duplicate")
+        self.stack.add_named(self._scrolled(self._build_welcome()),   "welcome")
+        self.stack.add_named(self._scrolled(self._build_folder()),    "folder")
+        self.stack.add_named(self._scrolled(self._build_backup()),    "backup")
+        self.stack.add_named(self._scrolled(self._build_duplicate()), "duplicate")
 
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
+        # Header — alleen titel en sluiten
         header = Adw.HeaderBar()
-        header.set_show_end_title_buttons(False)
         header.add_css_class("flat")
+        main_box.append(header)
+
+        # Inhoud
+        main_box.append(self.stack)
+
+        # Scheidingslijn
+        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        main_box.append(sep)
+
+        # Knoppen onderaan
+        btn_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        btn_bar.set_margin_top(12)
+        btn_bar.set_margin_bottom(12)
+        btn_bar.set_margin_start(16)
+        btn_bar.set_margin_end(16)
 
         self.back_btn = Gtk.Button(label="Terug")
         self.back_btn.connect("clicked", self.go_back)
         self.back_btn.set_visible(False)
-        header.pack_start(self.back_btn)
+        btn_bar.append(self.back_btn)
 
-        close_btn = Gtk.Button(icon_name="window-close-symbolic")
-        close_btn.add_css_class("flat")
-        close_btn.connect("clicked", lambda b: self.close())
-        header.pack_end(close_btn)
+        spacer = Gtk.Box()
+        spacer.set_hexpand(True)
+        btn_bar.append(spacer)
 
         self.next_btn = Gtk.Button(label="Volgende")
         self.next_btn.add_css_class("suggested-action")
         self.next_btn.connect("clicked", self.go_next)
-        header.pack_end(self.next_btn)
+        btn_bar.append(self.next_btn)
 
-        main_box.append(header)
-        main_box.append(self.stack)
+        main_box.append(btn_bar)
         self.set_content(main_box)
 
         self.pages = ["welcome", "folder", "backup", "duplicate"]
         self.current = 0
+
+    # ── Helper ───────────────────────────────────────────────────────
+
+    def _scrolled(self, child):
+        sw = Gtk.ScrolledWindow()
+        sw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        sw.set_vexpand(True)
+        sw.set_child(child)
+        return sw
 
     # ── Dark mode ────────────────────────────────────────────────────
 

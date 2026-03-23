@@ -317,21 +317,15 @@ class InstallerWindow(Adw.ApplicationWindow):
     def _clone_repo(self):
         try:
             if (INSTALL_DIR / ".git").exists():
-                if self.selected_version:
-                    subprocess.run(["git", "-C", str(INSTALL_DIR), "fetch", "--tags", "-q"],
-                                   check=True, capture_output=True)
-                    subprocess.run(["git", "-C", str(INSTALL_DIR), "checkout", self.selected_version, "-q"],
-                                   check=True, capture_output=True)
-                else:
-                    subprocess.run(["git", "-C", str(INSTALL_DIR), "checkout", "main", "-q"],
-                                   check=True, capture_output=True)
-                    subprocess.run(["git", "-C", str(INSTALL_DIR), "pull", "-q"],
-                                   check=True, capture_output=True)
+                subprocess.run(["git", "-C", str(INSTALL_DIR), "fetch", "--tags", "-q"],
+                               check=True, capture_output=True)
+                ref = self.selected_version if self.selected_version else "origin/main"
+                subprocess.run(["git", "-C", str(INSTALL_DIR), "reset", "--hard", ref, "-q"],
+                               check=True, capture_output=True)
             else:
                 if INSTALL_DIR.exists():
                     import shutil
                     shutil.rmtree(INSTALL_DIR)
-                INSTALL_DIR.mkdir(parents=True, exist_ok=True)
                 if self.selected_version:
                     subprocess.run(
                         ["git", "clone", "-q", "--branch", self.selected_version,
