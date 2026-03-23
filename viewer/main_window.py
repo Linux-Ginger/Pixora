@@ -738,7 +738,7 @@ class MapWidget(Gtk.DrawingArea):
 # ── Hoofdvenster ─────────────────────────────────────────────────────
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
-        super().__init__(application=app, maximized=True)
+        super().__init__(application=app)
         self.settings        = settings
         self.photos          = []
         self.thumb_widgets   = {}
@@ -853,6 +853,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_hide_on_close(False)
         Gtk.Settings.get_default().set_property("gtk-decoration-layout", "icon:minimize,close")
 
+        self.set_resizable(False)
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
         GLib.timeout_add(4000, self._check_for_update)
