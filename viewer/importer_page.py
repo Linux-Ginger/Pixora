@@ -437,15 +437,21 @@ class ImporterPage(Gtk.Box):
         box.set_margin_start(12)
         box.set_margin_end(12)
 
-        tips_group = Adw.PreferencesGroup()
-        tips_group.set_title("Controleer")
+        header_lbl = Gtk.Label(label="Controleer")
+        header_lbl.set_halign(Gtk.Align.START)
+        header_lbl.add_css_class("heading")
+        box.append(header_lbl)
+
+        listbox = Gtk.ListBox()
+        listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        listbox.add_css_class("boxed-list")
 
         for icon, title, subtitle in [
             ("drive-removable-media-symbolic", "USB-kabel",              "Gebruik bij voorkeur de originele Apple-kabel"),
             ("security-medium-symbolic",       "Vertrouw deze computer", "Tik op 'Vertrouw' als je iPhone dat vraagt"),
             ("system-lock-screen-symbolic",    "Ontgrendeld scherm",     "Zorg dat je iPhone ontgrendeld is tijdens de import"),
             ("media-flash-symbolic",           "Gebruik een blauwe USB-poort", "USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten"),
-            ("weather-overcast-symbolic",      "iCloud foto's",          "Niet alle foto's zijn zichtbaar? Zet op je iPhone: Instellingen → Foto's → 'Download and Keep Originals'"),
+            ("weather-overcast-symbolic",      "iCloud foto's",          "iCloud Foto's uitgeschakeld? Dan staan alle foto's lokaal op je toestel en worden ze allemaal gevonden."),
             ("document-save-symbolic",         "Bestandsformaat",        "Zet op je iPhone: Instellingen → Foto's → 'Zet over naar Mac of pc' → 'Behoud originelen'"),
         ]:
             row = Adw.ActionRow()
@@ -454,9 +460,9 @@ class ImporterPage(Gtk.Box):
             ic = Gtk.Image.new_from_icon_name(icon)
             ic.set_pixel_size(16)
             row.add_prefix(ic)
-            tips_group.add(row)
+            listbox.append(row)
 
-        box.append(tips_group)
+        box.append(listbox)
 
         spinner_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         spinner_box.set_halign(Gtk.Align.CENTER)
