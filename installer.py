@@ -128,11 +128,6 @@ class InstallerWindow(Adw.ApplicationWindow):
         ver_box.append(listbox)
         page.append(ver_box)
 
-        # Spacer
-        spacer = Gtk.Box()
-        spacer.set_vexpand(True)
-        page.append(spacer)
-
         # Installeren knop
         btn_box = Gtk.Box()
         btn_box.set_margin_start(24)

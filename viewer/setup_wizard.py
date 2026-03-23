@@ -150,7 +150,7 @@ class SetupWizard(Adw.Window):
         page.set_margin_end(40)
         page.set_halign(Gtk.Align.FILL)
         page.set_valign(Gtk.Align.CENTER)
-        page.set_vexpand(True)
+        page.set_valign(Gtk.Align.START)
 
         # Logo
         self.welcome_logo = Gtk.Picture()
@@ -187,7 +187,7 @@ class SetupWizard(Adw.Window):
         page.set_margin_bottom(24)
         page.set_margin_start(40)
         page.set_margin_end(40)
-        page.set_vexpand(True)
+        page.set_valign(Gtk.Align.START)
 
         title = Gtk.Label(label="Waar wil je je foto's opslaan?")
         title.add_css_class("title-2")
@@ -225,7 +225,7 @@ class SetupWizard(Adw.Window):
         page.set_margin_bottom(24)
         page.set_margin_start(40)
         page.set_margin_end(40)
-        page.set_vexpand(True)
+        page.set_valign(Gtk.Align.START)
 
         title = Gtk.Label(label="Automatische backup")
         title.add_css_class("title-2")
@@ -309,7 +309,7 @@ class SetupWizard(Adw.Window):
         page.set_margin_bottom(24)
         page.set_margin_start(40)
         page.set_margin_end(40)
-        page.set_vexpand(True)
+        page.set_valign(Gtk.Align.START)
 
         title = Gtk.Label(label="Duplicaat detectie")
         title.add_css_class("title-2")
