@@ -10,10 +10,9 @@
 
 set -e
 
-INSTALLER_URL="https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/installer.py"
-TMP_INSTALLER="/tmp/pixora_installer.py"
+REPO_URL="https://github.com/Linux-Ginger/Pixora.git"
+INSTALL_DIR="$HOME/.local/share/pixora"
 
-# ── Kleuren ──
 GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
 BOLD='\033[1m'
@@ -38,7 +37,7 @@ if ! command -v apt &> /dev/null; then
     exit 1
 fi
 
-# ── Minimale deps voor de installer-GUI ──
+# ── Minimale deps ──
 echo -e "  ${ORANGE}Voorbereiding…${NC}"
 sudo apt-get install -y -qq \
     python3 \
@@ -46,13 +45,21 @@ sudo apt-get install -y -qq \
     python3-gi-cairo \
     gir1.2-gtk-4.0 \
     gir1.2-adw-1 \
-    curl \
     git \
     2>/dev/null
+
+# ── Repo ophalen (altijd vers, geen cache) ──
+echo -e "  ${ORANGE}Pixora ophalen…${NC}"
+if [ -d "$INSTALL_DIR/.git" ]; then
+    git -C "$INSTALL_DIR" fetch -q origin
+    git -C "$INSTALL_DIR" reset --hard origin/main -q
+else
+    rm -rf "$INSTALL_DIR"
+    git clone -q "$REPO_URL" "$INSTALL_DIR"
+fi
 
 echo -e "  ${GREEN}✓ Klaar — installer openen…${NC}"
 echo ""
 
-# ── Installer downloaden en starten ──
-curl -fsSL "$INSTALLER_URL" -o "$TMP_INSTALLER"
-python3 "$TMP_INSTALLER"
+# ── Installer starten vanuit de repo (geen CDN caching) ──
+python3 "$INSTALL_DIR/installer.py"
