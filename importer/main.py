@@ -1,0 +1,1047 @@
+#!/usr/bin/env python3
+
+# ─────────────────────────────────────────────
+#  Pixora Importer — main.py
+#  by LinuxGinger
+# ─────────────────────────────────────────────
+
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk, Pango
+
+import os
+import sys
+import json
+import shutil
+import hashlib
+import subprocess
+import threading
+import tempfile
+from pathlib import Path
+from datetime import datetime
+
+try:
+    from PIL import Image
+    import imagehash
+    HAS_IMAGEHASH = True
+except ImportError:
+    HAS_IMAGEHASH = False
+
+# ─── Paden ───────────────────────────────────────────────────────────────────
+
+CONFIG_PATH  = Path.home() / ".config" / "pixora" / "settings.json"
+CACHE_DIR    = Path.home() / ".cache"  / "pixora"
+HASH_CACHE   = CACHE_DIR / "hashes.json"
+MOUNT_POINT  = Path(tempfile.gettempdir()) / "pixora_iphone"
+DOCS_DIR     = Path(__file__).parent.parent / "docs"
+
+BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
+SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".dng", ".mp4", ".mov", ".m4v", ".aae"}
+
+# Duplicate threshold → maximale hash-afstand
+THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
+
+# ─── States ──────────────────────────────────────────────────────────────────
+
+STATE_WAITING   = "waiting"
+STATE_DETECTED  = "detected"
+STATE_MOUNTING  = "mounting"
+STATE_SCANNING  = "scanning"
+STATE_HASHING   = "hashing"
+STATE_REVIEWING = "reviewing"
+STATE_IMPORTING = "importing"
+STATE_BACKUP    = "backup"
+STATE_DONE      = "done"
+STATE_ERROR     = "error"
+
+# ─── Hulpfuncties ────────────────────────────────────────────────────────────
+
+def load_settings() -> dict:
+    if CONFIG_PATH.exists():
+        try:
+            with open(CONFIG_PATH) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def perceptual_hash(path: Path) -> str | None:
+    if not HAS_IMAGEHASH:
+        return None
+    try:
+        img = Image.open(path).convert("RGB")
+        return str(imagehash.phash(img))
+    except Exception:
+        return None
+
+
+def dest_path(base: Path, structure: str, filename: str, mtime: datetime) -> Path:
+    if structure == "year":
+        return base / str(mtime.year) / filename
+    elif structure == "year_month":
+        month_dir = f"{mtime.year}-{mtime.month:02d}"
+        return base / str(mtime.year) / month_dir / filename
+    else:  # flat
+        return base / filename
+
+
+def detect_iphone() -> str | None:
+    """Geeft UDID terug als een iPhone verbonden is, anders None."""
+    try:
+        result = subprocess.run(
+            ["idevice_id", "-l"],
+            capture_output=True, text=True, timeout=3
+        )
+        lines = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+        return lines[0] if lines else None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+
+def get_device_name(udid: str) -> str:
+    try:
+        result = subprocess.run(
+            ["ideviceinfo", "-u", udid, "-k", "DeviceName"],
+            capture_output=True, text=True, timeout=3
+        )
+        name = result.stdout.strip()
+        return name if name else "iPhone"
+    except Exception:
+        return "iPhone"
+
+
+def mount_iphone(udid: str, mountpoint: Path) -> bool:
+    mountpoint.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(["fusermount", "-uz", str(mountpoint)], capture_output=True, timeout=5)
+    except Exception:
+        pass
+    try:
+        result = subprocess.run(
+            ["ifuse", "--udid", udid, str(mountpoint)],
+            capture_output=True, text=True, timeout=15
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+
+def unmount_iphone(mountpoint: Path):
+    try:
+        subprocess.run(["fusermount", "-uz", str(mountpoint)], capture_output=True, timeout=5)
+    except Exception:
+        pass
+
+
+def scan_dcim(mountpoint: Path) -> list[Path]:
+    dcim = mountpoint / "DCIM"
+    if not dcim.exists():
+        return []
+    files = []
+    for root, dirs, filenames in os.walk(dcim):
+        dirs.sort()
+        for fn in sorted(filenames):
+            if Path(fn).suffix.lower() in SUPPORTED_EXT:
+                files.append(Path(root) / fn)
+    return files
+
+
+def load_hash_cache() -> dict:
+    if HASH_CACHE.exists():
+        try:
+            with open(HASH_CACHE) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_hash_cache(cache: dict):
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    with open(HASH_CACHE, "w") as f:
+        json.dump(cache, f)
+
+
+def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
+    """Bouw een hash-index van alle foto's in het archief."""
+    cache = load_hash_cache()
+    hashes = {}
+
+    all_files = []
+    for root, _, files in os.walk(photo_path):
+        for fn in files:
+            if Path(fn).suffix.lower() in SUPPORTED_EXT:
+                all_files.append(Path(root) / fn)
+
+    for i, fp in enumerate(all_files):
+        if progress_cb:
+            progress_cb(i, len(all_files), fp.name)
+        try:
+            stat = fp.stat()
+        except OSError:
+            continue
+        cache_key = f"{fp}:{int(stat.st_mtime)}:{stat.st_size}"
+        if cache_key in cache:
+            ph = cache[cache_key]
+        else:
+            ph = perceptual_hash(fp)
+            if ph:
+                cache[cache_key] = ph
+        if ph:
+            hashes[str(fp)] = ph
+
+    save_hash_cache(cache)
+    return hashes
+
+
+def find_duplicate(ph_str: str, library_hashes: dict, max_dist: int) -> str | None:
+    if not ph_str or not HAS_IMAGEHASH:
+        return None
+    try:
+        ph = imagehash.hex_to_hash(ph_str)
+        for lib_path, lib_ph_str in library_hashes.items():
+            try:
+                if ph - imagehash.hex_to_hash(lib_ph_str) <= max_dist:
+                    return lib_path
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return None
+
+
+def get_backup_mountpoint(uuid: str) -> Path | None:
+    """Zoek het mountpoint van een schijf op UUID."""
+    try:
+        result = subprocess.run(
+            ["lsblk", "-o", "UUID,MOUNTPOINT", "-J"],
+            capture_output=True, text=True
+        )
+        data = json.loads(result.stdout)
+
+        def search(devices):
+            for dev in devices:
+                if (dev.get("uuid") or "").strip() == uuid:
+                    mp = (dev.get("mountpoint") or "").strip()
+                    if mp:
+                        return Path(mp)
+                for child in dev.get("children") or []:
+                    r = search([child])
+                    if r:
+                        return r
+            return None
+
+        return search(data.get("blockdevices", []))
+    except Exception:
+        return None
+
+
+# ─── Hoofdvenster ─────────────────────────────────────────────────────────────
+
+class ImporterWindow(Adw.ApplicationWindow):
+    def __init__(self, app, settings: dict):
+        super().__init__(application=app)
+        self.settings = settings
+        self.state = STATE_WAITING
+
+        # Import-staat
+        self.udid: str | None = None
+        self.device_name = "iPhone"
+        self.iphone_files: list[Path] = []
+        self.library_hashes: dict = {}
+        self.duplicates: list[tuple[Path, Path]] = []
+        self.to_import: list[Path] = []
+        self.duplicate_decisions: dict[str, str] = {}
+        self.import_count = 0
+
+        self.set_title("Pixora Importer")
+        self.set_default_size(680, 540)
+
+        self._build_ui()
+        self._start_detection_poll()
+
+    # ─── UI opbouw ───────────────────────────────────────────────────────────
+
+    def _build_ui(self):
+        toolbar_view = Adw.ToolbarView()
+
+        header = Adw.HeaderBar()
+        header.set_show_end_title_buttons(True)
+        toolbar_view.add_top_bar(header)
+
+        self.stack = Gtk.Stack()
+        self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.stack.set_transition_duration(200)
+        toolbar_view.set_content(self.stack)
+
+        self._build_waiting_page()
+        self._build_detected_page()
+        self._build_progress_page()
+        self._build_review_page()
+        self._build_done_page()
+        self._build_error_page()
+
+        self.set_content(toolbar_view)
+        self._show_state(STATE_WAITING)
+
+    def _build_waiting_page(self):
+        status = Adw.StatusPage()
+        status.set_icon_name("computer-symbolic")
+        status.set_title("Verbind je iPhone")
+        status.set_description(
+            "Sluit je iPhone aan via een USB-kabel en ontgrendel het scherm.\n"
+            "Als je iPhone vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'."
+        )
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(420)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_bottom(32)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+
+        tips_group = Adw.PreferencesGroup()
+        tips_group.set_title("Controleer")
+
+        for icon, title, subtitle in [
+            ("cable-connected-symbolic",  "USB-kabel",            "Gebruik bij voorkeur de originele Apple-kabel"),
+            ("changes-allow-symbolic",    "Vertrouw deze computer","Tik op 'Vertrouw' als je iPhone dat vraagt"),
+            ("system-lock-screen-symbolic","Ontgrendeld scherm",   "Zorg dat je iPhone ontgrendeld is tijdens de import"),
+        ]:
+            row = Adw.ActionRow()
+            row.set_title(title)
+            row.set_subtitle(subtitle)
+            ic = Gtk.Image.new_from_icon_name(icon)
+            ic.set_pixel_size(16)
+            row.add_prefix(ic)
+            tips_group.add(row)
+
+        box.append(tips_group)
+
+        spinner_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        spinner_box.set_halign(Gtk.Align.CENTER)
+        spinner_box.set_margin_top(8)
+        spin = Gtk.Spinner()
+        spin.start()
+        spinner_box.append(spin)
+        lbl = Gtk.Label(label="Zoeken naar iPhone…")
+        lbl.add_css_class("dim-label")
+        spinner_box.append(lbl)
+        box.append(spinner_box)
+
+        clamp.set_child(box)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox.append(status)
+        vbox.append(clamp)
+        self.stack.add_named(vbox, "waiting")
+
+    def _build_detected_page(self):
+        status = Adw.StatusPage()
+        status.set_icon_name("object-select-symbolic")
+        status.set_title("iPhone gevonden")
+        status.set_description("Je iPhone is verbonden en klaar om te importeren.")
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(420)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        box.set_margin_bottom(32)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+
+        info_group = Adw.PreferencesGroup()
+
+        self.device_row = Adw.ActionRow()
+        self.device_row.set_title("Apparaat")
+        self.device_row.set_subtitle("iPhone")
+        ic = Gtk.Image.new_from_icon_name("computer-symbolic")
+        ic.set_pixel_size(16)
+        self.device_row.add_prefix(ic)
+        info_group.add(self.device_row)
+
+        self.dest_row = Adw.ActionRow()
+        self.dest_row.set_title("Opslaan in")
+        self.dest_row.set_subtitle(self.settings.get("photo_path") or "~")
+        ic2 = Gtk.Image.new_from_icon_name("folder-symbolic")
+        ic2.set_pixel_size(16)
+        self.dest_row.add_prefix(ic2)
+        info_group.add(self.dest_row)
+
+        struct = self.settings.get("structure", "year_month")
+        struct_labels = {
+            "flat":       "Alles in één map",
+            "year":       "Per jaar",
+            "year_month": "Per jaar/maand",
+        }
+        self.struct_row = Adw.ActionRow()
+        self.struct_row.set_title("Mapstructuur")
+        self.struct_row.set_subtitle(struct_labels.get(struct, struct))
+        ic3 = Gtk.Image.new_from_icon_name("folder-open-symbolic")
+        ic3.set_pixel_size(16)
+        self.struct_row.add_prefix(ic3)
+        info_group.add(self.struct_row)
+
+        box.append(info_group)
+
+        import_btn = Gtk.Button(label="Importeren")
+        import_btn.add_css_class("suggested-action")
+        import_btn.add_css_class("pill")
+        import_btn.set_halign(Gtk.Align.CENTER)
+        import_btn.connect("clicked", self._on_import_clicked)
+        box.append(import_btn)
+
+        clamp.set_child(box)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox.append(status)
+        vbox.append(clamp)
+        self.stack.add_named(vbox, "detected")
+
+    def _build_progress_page(self):
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(480)
+        clamp.set_valign(Gtk.Align.CENTER)
+        clamp.set_vexpand(True)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        box.set_margin_top(48)
+        box.set_margin_bottom(48)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+
+        self.progress_spinner = Gtk.Spinner()
+        self.progress_spinner.set_size_request(48, 48)
+        self.progress_spinner.start()
+        self.progress_spinner.set_halign(Gtk.Align.CENTER)
+        box.append(self.progress_spinner)
+
+        self.progress_title = Gtk.Label()
+        self.progress_title.add_css_class("title-2")
+        self.progress_title.set_halign(Gtk.Align.CENTER)
+        box.append(self.progress_title)
+
+        self.progress_subtitle = Gtk.Label()
+        self.progress_subtitle.add_css_class("dim-label")
+        self.progress_subtitle.set_halign(Gtk.Align.CENTER)
+        self.progress_subtitle.set_wrap(True)
+        self.progress_subtitle.set_max_width_chars(52)
+        box.append(self.progress_subtitle)
+
+        self.progress_bar = Gtk.ProgressBar()
+        self.progress_bar.set_show_text(True)
+        box.append(self.progress_bar)
+
+        self.progress_detail = Gtk.Label()
+        self.progress_detail.add_css_class("dim-label")
+        self.progress_detail.add_css_class("caption")
+        self.progress_detail.set_halign(Gtk.Align.CENTER)
+        self.progress_detail.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+        self.progress_detail.set_max_width_chars(52)
+        box.append(self.progress_detail)
+
+        clamp.set_child(box)
+        self.stack.add_named(clamp, "progress")
+
+    def _build_review_page(self):
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+
+        header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        header_box.set_margin_top(24)
+        header_box.set_margin_bottom(12)
+        header_box.set_margin_start(24)
+        header_box.set_margin_end(24)
+
+        title_lbl = Gtk.Label(label="Mogelijke duplicaten")
+        title_lbl.add_css_class("title-1")
+        title_lbl.set_halign(Gtk.Align.START)
+        header_box.append(title_lbl)
+
+        self.review_subtitle = Gtk.Label()
+        self.review_subtitle.add_css_class("dim-label")
+        self.review_subtitle.set_halign(Gtk.Align.START)
+        self.review_subtitle.set_wrap(True)
+        header_box.append(self.review_subtitle)
+
+        outer.append(header_box)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        self.review_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.review_box.set_margin_start(24)
+        self.review_box.set_margin_end(24)
+        self.review_box.set_margin_bottom(12)
+        scroll.set_child(self.review_box)
+        outer.append(scroll)
+
+        action_bar = Gtk.ActionBar()
+
+        skip_all_btn = Gtk.Button(label="Alle overslaan")
+        skip_all_btn.connect("clicked", self._on_skip_all)
+        action_bar.pack_start(skip_all_btn)
+
+        import_all_btn = Gtk.Button(label="Alle importeren")
+        import_all_btn.connect("clicked", self._on_import_all)
+        action_bar.pack_start(import_all_btn)
+
+        continue_btn = Gtk.Button(label="Doorgaan met importeren")
+        continue_btn.add_css_class("suggested-action")
+        continue_btn.connect("clicked", self._on_review_continue)
+        action_bar.pack_end(continue_btn)
+
+        outer.append(action_bar)
+        self.stack.add_named(outer, "review")
+
+    def _build_done_page(self):
+        self.done_status = Adw.StatusPage()
+        self.done_status.set_icon_name("emblem-ok-symbolic")
+        self.done_status.set_title("Import voltooid")
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(420)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_bottom(32)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+
+        self.done_stats_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.append(self.done_stats_box)
+
+        close_btn = Gtk.Button(label="Sluiten")
+        close_btn.add_css_class("pill")
+        close_btn.set_halign(Gtk.Align.CENTER)
+        close_btn.connect("clicked", lambda _: self.close())
+        box.append(close_btn)
+
+        clamp.set_child(box)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox.append(self.done_status)
+        vbox.append(clamp)
+        self.stack.add_named(vbox, "done")
+
+    def _build_error_page(self):
+        self.error_status = Adw.StatusPage()
+        self.error_status.set_icon_name("dialog-error-symbolic")
+        self.error_status.set_title("Er is een fout opgetreden")
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(420)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_bottom(32)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+
+        self.error_deps_group = Adw.PreferencesGroup()
+        self.error_deps_group.set_title("Installeer vereiste pakketten")
+        self.error_deps_group.set_visible(False)
+
+        for pkg, cmd in [
+            ("libimobiledevice-utils", "sudo apt install libimobiledevice-utils"),
+            ("ifuse",                  "sudo apt install ifuse"),
+        ]:
+            row = Adw.ActionRow()
+            row.set_title(pkg)
+            row.set_subtitle(cmd)
+            row.set_subtitle_selectable(True)
+            ic = Gtk.Image.new_from_icon_name("terminal-symbolic")
+            ic.set_pixel_size(16)
+            row.add_prefix(ic)
+            self.error_deps_group.add(row)
+
+        box.append(self.error_deps_group)
+
+        retry_btn = Gtk.Button(label="Opnieuw proberen")
+        retry_btn.add_css_class("pill")
+        retry_btn.set_halign(Gtk.Align.CENTER)
+        retry_btn.connect("clicked", self._on_retry)
+        box.append(retry_btn)
+
+        clamp.set_child(box)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox.append(self.error_status)
+        vbox.append(clamp)
+        self.stack.add_named(vbox, "error")
+
+    # ─── Scherm wisselen ─────────────────────────────────────────────────────
+
+    def _show_state(self, state: str):
+        self.state = state
+        page_map = {
+            STATE_WAITING:   "waiting",
+            STATE_DETECTED:  "detected",
+            STATE_MOUNTING:  "progress",
+            STATE_SCANNING:  "progress",
+            STATE_HASHING:   "progress",
+            STATE_REVIEWING: "review",
+            STATE_IMPORTING: "progress",
+            STATE_BACKUP:    "progress",
+            STATE_DONE:      "done",
+            STATE_ERROR:     "error",
+        }
+        self.stack.set_visible_child_name(page_map.get(state, "waiting"))
+
+    # ─── iPhone detectie ─────────────────────────────────────────────────────
+
+    def _start_detection_poll(self):
+        GLib.timeout_add(2000, self._poll_iphone)
+
+    def _poll_iphone(self) -> bool:
+        if self.state not in (STATE_WAITING, STATE_DETECTED):
+            return False
+        threading.Thread(target=self._check_iphone, daemon=True).start()
+        return True
+
+    def _check_iphone(self):
+        udid = detect_iphone()
+        GLib.idle_add(self._on_detection_result, udid)
+
+    def _on_detection_result(self, udid: str | None):
+        if self.state not in (STATE_WAITING, STATE_DETECTED):
+            return
+        if udid and self.state == STATE_WAITING:
+            self.udid = udid
+            self.device_name = get_device_name(udid)
+            self.device_row.set_subtitle(self.device_name)
+            self.dest_row.set_subtitle(self.settings.get("photo_path") or "~")
+            self._show_state(STATE_DETECTED)
+        elif not udid and self.state == STATE_DETECTED:
+            self.udid = None
+            self._show_state(STATE_WAITING)
+
+    # ─── Import flow ─────────────────────────────────────────────────────────
+
+    def _on_import_clicked(self, _btn):
+        self._set_progress("iPhone koppelen…", "Even geduld, dit duurt maar even.")
+        self._show_state(STATE_MOUNTING)
+        threading.Thread(target=self._do_mount, daemon=True).start()
+
+    def _do_mount(self):
+        if not _cmd_available("ifuse") or not _cmd_available("idevice_id"):
+            GLib.idle_add(self._show_error,
+                "ifuse of libimobiledevice is niet geïnstalleerd. "
+                "Installeer de vereiste pakketten hieronder.", True)
+            return
+        if not mount_iphone(self.udid, MOUNT_POINT):
+            GLib.idle_add(self._show_error,
+                "Kon de iPhone niet koppelen. Zorg dat het scherm ontgrendeld is "
+                "en tik op 'Vertrouw' als dat wordt gevraagd.", False)
+            return
+        GLib.idle_add(self._start_scan)
+
+    def _start_scan(self):
+        self._set_progress("Foto's scannen…", "Zoeken naar foto's en video's op je iPhone.")
+        self._show_state(STATE_SCANNING)
+        threading.Thread(target=self._do_scan, daemon=True).start()
+
+    def _do_scan(self):
+        files = scan_dcim(MOUNT_POINT)
+        GLib.idle_add(self._on_scan_done, files)
+
+    def _on_scan_done(self, files: list[Path]):
+        self.iphone_files = files
+        if not files:
+            unmount_iphone(MOUNT_POINT)
+            self._show_error(
+                "Geen foto's of video's gevonden op de iPhone.\n"
+                "Mogelijk zijn alle media al eerder geïmporteerd.", False)
+            return
+        if not HAS_IMAGEHASH:
+            self.duplicates = []
+            self.to_import = list(files)
+            self._start_import()
+            return
+        self._start_hashing(files)
+
+    def _start_hashing(self, files: list[Path]):
+        self._set_progress("Duplicaten controleren…",
+                           "Foto's worden vergeleken met je bestaande archief.")
+        self._show_state(STATE_HASHING)
+        threading.Thread(target=self._do_hashing, args=(files,), daemon=True).start()
+
+    def _do_hashing(self, iphone_files: list[Path]):
+        photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
+        threshold_key = self.settings.get("duplicate_threshold", 2)
+        max_dist = THRESHOLD_MAP.get(threshold_key, 6)
+
+        def lib_progress(i, total, name):
+            frac = (i / total) * 0.5 if total > 0 else 0
+            GLib.idle_add(self._update_progress, frac, f"Archief scannen: {i}/{total}", name)
+
+        library_hashes = build_library_hashes(photo_path, lib_progress)
+        self.library_hashes = library_hashes
+
+        duplicates: list[tuple[Path, Path]] = []
+        new_files: list[Path] = []
+        total = len(iphone_files)
+
+        for i, fp in enumerate(iphone_files):
+            frac = 0.5 + (i / total) * 0.5 if total > 0 else 0.5
+            GLib.idle_add(self._update_progress, frac, f"iPhone scannen: {i + 1}/{total}", fp.name)
+            ph = perceptual_hash(fp)
+            if ph:
+                dup = find_duplicate(ph, library_hashes, max_dist)
+                if dup:
+                    duplicates.append((fp, Path(dup)))
+                else:
+                    new_files.append(fp)
+            else:
+                new_files.append(fp)
+
+        GLib.idle_add(self._on_hashing_done, duplicates, new_files)
+
+    def _on_hashing_done(self, duplicates: list, new_files: list):
+        self.duplicates = duplicates
+        self.to_import = new_files[:]
+        self.duplicate_decisions = {}
+        if duplicates:
+            self._show_review(duplicates)
+        else:
+            self._start_import()
+
+    # ─── Duplicate review ────────────────────────────────────────────────────
+
+    def _show_review(self, duplicates: list[tuple[Path, Path]]):
+        n = len(duplicates)
+        self.review_subtitle.set_text(
+            f"{n} foto{'\'s' if n != 1 else ''} lijken al in je archief te staan. "
+            "Kies per foto wat je wilt doen, of gebruik de knoppen onderaan voor alles tegelijk."
+        )
+
+        while child := self.review_box.get_first_child():
+            self.review_box.remove(child)
+
+        for iphone_path, lib_path in duplicates:
+            self.duplicate_decisions[str(iphone_path)] = "skip"
+            card = self._make_dup_card(iphone_path, lib_path)
+            self.review_box.append(card)
+
+        self._show_state(STATE_REVIEWING)
+
+    def _make_dup_card(self, iphone_path: Path, lib_path: Path) -> Gtk.Widget:
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        card.add_css_class("card")
+        card.set_margin_bottom(4)
+
+        # Bestandsnaam kop
+        name_lbl = Gtk.Label(label=iphone_path.name)
+        name_lbl.add_css_class("heading")
+        name_lbl.set_halign(Gtk.Align.START)
+        name_lbl.set_margin_top(12)
+        name_lbl.set_margin_start(14)
+        name_lbl.set_margin_bottom(8)
+        card.append(name_lbl)
+
+        # Twee thumbnails naast elkaar
+        img_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        img_row.set_margin_start(12)
+        img_row.set_margin_end(12)
+        img_row.set_margin_bottom(10)
+
+        for path, caption in [(iphone_path, "📱 iPhone — nieuw"),
+                               (lib_path,    "🗂️ Archief — bestaand")]:
+            col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            col.set_hexpand(True)
+
+            frame = Gtk.Frame()
+            frame.add_css_class("card")
+            widget = self._load_thumb(path, 240, 160)
+            frame.set_child(widget)
+            col.append(frame)
+
+            cap = Gtk.Label(label=caption)
+            cap.add_css_class("caption")
+            cap.add_css_class("dim-label")
+            cap.set_halign(Gtk.Align.CENTER)
+            col.append(cap)
+
+            img_row.append(col)
+
+        card.append(img_row)
+
+        # Knoppen
+        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        btn_row.set_margin_start(12)
+        btn_row.set_margin_end(12)
+        btn_row.set_margin_bottom(12)
+        btn_row.set_homogeneous(True)
+
+        keep_btn   = Gtk.ToggleButton(label="Bestaande behouden")
+        import_btn = Gtk.ToggleButton(label="Nieuwe importeren")
+        both_btn   = Gtk.ToggleButton(label="Beide bewaren")
+        keep_btn.set_active(True)
+
+        def on_keep(b, ip=iphone_path):
+            if b.get_active():
+                import_btn.set_active(False)
+                both_btn.set_active(False)
+                self.duplicate_decisions[str(ip)] = "skip"
+            elif not import_btn.get_active() and not both_btn.get_active():
+                b.set_active(True)
+
+        def on_import(b, ip=iphone_path):
+            if b.get_active():
+                keep_btn.set_active(False)
+                both_btn.set_active(False)
+                self.duplicate_decisions[str(ip)] = "import"
+            elif not keep_btn.get_active() and not both_btn.get_active():
+                b.set_active(True)
+
+        def on_both(b, ip=iphone_path):
+            if b.get_active():
+                keep_btn.set_active(False)
+                import_btn.set_active(False)
+                self.duplicate_decisions[str(ip)] = "both"
+            elif not keep_btn.get_active() and not import_btn.get_active():
+                b.set_active(True)
+
+        keep_btn.connect("toggled", on_keep)
+        import_btn.connect("toggled", on_import)
+        both_btn.connect("toggled", on_both)
+
+        btn_row.append(keep_btn)
+        btn_row.append(import_btn)
+        btn_row.append(both_btn)
+        card.append(btn_row)
+
+        return card
+
+    def _load_thumb(self, path: Path, w: int, h: int) -> Gtk.Widget:
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(path), w, h, True)
+            pic = Gtk.Picture.new_for_pixbuf(pixbuf)
+            pic.set_can_shrink(True)
+            pic.set_content_fit(Gtk.ContentFit.CONTAIN)
+            pic.set_size_request(w, h)
+            return pic
+        except Exception:
+            ph = Gtk.Image.new_from_icon_name("image-missing-symbolic")
+            ph.set_pixel_size(48)
+            ph.set_size_request(w, h)
+            return ph
+
+    def _on_skip_all(self, _btn):
+        for iphone_path, _ in self.duplicates:
+            self.duplicate_decisions[str(iphone_path)] = "skip"
+        self._on_review_continue(None)
+
+    def _on_import_all(self, _btn):
+        for iphone_path, _ in self.duplicates:
+            self.duplicate_decisions[str(iphone_path)] = "import"
+        self._on_review_continue(None)
+
+    def _on_review_continue(self, _btn):
+        for iphone_path, _ in self.duplicates:
+            decision = self.duplicate_decisions.get(str(iphone_path), "skip")
+            if decision in ("import", "both"):
+                self.to_import.append(iphone_path)
+        self._start_import()
+
+    # ─── Kopiëren ────────────────────────────────────────────────────────────
+
+    def _start_import(self):
+        total = len(self.to_import)
+        self._set_progress(
+            "Importeren…",
+            f"{total} bestand{'en' if total != 1 else ''} worden gekopieerd."
+        )
+        self._show_state(STATE_IMPORTING)
+        threading.Thread(target=self._do_import, daemon=True).start()
+
+    def _do_import(self):
+        photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
+        structure = self.settings.get("structure", "year_month")
+        total = len(self.to_import)
+        imported = 0
+
+        for i, src in enumerate(self.to_import):
+            try:
+                mtime = datetime.fromtimestamp(src.stat().st_mtime)
+                dst = dest_path(photo_path, structure, src.name, mtime)
+
+                # Bij "beide bewaren": unieke naam
+                if dst.exists():
+                    stem, suffix = dst.stem, dst.suffix
+                    counter = 1
+                    while dst.exists():
+                        dst = dst.parent / f"{stem}_{counter}{suffix}"
+                        counter += 1
+
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+                imported += 1
+            except Exception:
+                pass
+
+            frac = (i + 1) / total if total > 0 else 1.0
+            GLib.idle_add(self._update_progress, frac, f"{i + 1} / {total}", src.name)
+
+        self.import_count = imported
+        GLib.idle_add(self._on_import_done)
+
+    def _on_import_done(self):
+        unmount_iphone(MOUNT_POINT)
+        backup_uuid = self.settings.get("backup_uuid")
+        if backup_uuid:
+            self._start_backup()
+        else:
+            self._finish()
+
+    # ─── Back-up ─────────────────────────────────────────────────────────────
+
+    def _start_backup(self):
+        self._set_progress("Back-up maken…",
+                           "Foto's worden gesynchroniseerd naar je externe schijf.")
+        self._show_state(STATE_BACKUP)
+        threading.Thread(target=self._do_backup, daemon=True).start()
+
+    def _do_backup(self):
+        backup_uuid = self.settings.get("backup_uuid")
+        backup_path_str = self.settings.get("backup_path")
+        photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
+
+        drive_root = get_backup_mountpoint(backup_uuid)
+        if not drive_root:
+            GLib.idle_add(self._finish, "Back-upschijf niet gevonden. Sluit de schijf aan en probeer opnieuw via de instellingen.")
+            return
+
+        backup_dest = Path(backup_path_str) if backup_path_str else drive_root / "Pixora"
+        backup_dest.mkdir(parents=True, exist_ok=True)
+
+        def rsync_progress(line):
+            # rsync --info=progress2 geeft percentages
+            for part in line.split():
+                if part.endswith("%"):
+                    try:
+                        frac = int(part[:-1]) / 100
+                        GLib.idle_add(self._update_progress, frac, f"Back-up: {part}", "")
+                    except ValueError:
+                        pass
+
+        success = False
+        if _cmd_available("rsync"):
+            try:
+                proc = subprocess.Popen(
+                    ["rsync", "-a", "--info=progress2",
+                     str(photo_path) + "/", str(backup_dest) + "/"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    text=True
+                )
+                for line in proc.stdout:
+                    rsync_progress(line)
+                proc.wait(timeout=600)
+                success = proc.returncode == 0
+            except Exception:
+                success = False
+        else:
+            success = self._manual_backup(photo_path, backup_dest)
+
+        GLib.idle_add(self._finish, None if success else
+                      "Back-up gedeeltelijk mislukt. De import zelf is wel geslaagd.")
+
+    def _manual_backup(self, src: Path, dst: Path) -> bool:
+        try:
+            all_src = []
+            for root, _, files in os.walk(src):
+                for fn in files:
+                    all_src.append(Path(root) / fn)
+            total = len(all_src)
+            for i, sf in enumerate(all_src):
+                rel = sf.relative_to(src)
+                df = dst / rel
+                df.parent.mkdir(parents=True, exist_ok=True)
+                if not df.exists():
+                    shutil.copy2(sf, df)
+                frac = (i + 1) / total if total > 0 else 1.0
+                GLib.idle_add(self._update_progress, frac, f"{i + 1} / {total}", sf.name)
+            return True
+        except Exception:
+            return False
+
+    # ─── Afgerond / fout ─────────────────────────────────────────────────────
+
+    def _finish(self, note: str | None = None):
+        n = self.import_count
+        dup_n = len(self.duplicates)
+        skipped = sum(1 for d in self.duplicate_decisions.values() if d == "skip")
+
+        desc_parts = [f"{n} bestand{'en' if n != 1 else ''} geïmporteerd"]
+        if dup_n:
+            desc_parts.append(f"{dup_n} duplicaat{'s' if dup_n != 1 else ''} gevonden")
+        if skipped:
+            desc_parts.append(f"{skipped} overgeslagen")
+        if note:
+            desc_parts.append(note)
+
+        self.done_status.set_description(" · ".join(desc_parts))
+        self._show_state(STATE_DONE)
+
+    def _show_error(self, message: str, show_deps: bool = False):
+        unmount_iphone(MOUNT_POINT)
+        self.error_status.set_description(message)
+        self.error_deps_group.set_visible(show_deps)
+        self._show_state(STATE_ERROR)
+
+    def _on_retry(self, _btn):
+        self._show_state(STATE_WAITING)
+        self._start_detection_poll()
+
+    # ─── Voortgang helpers ───────────────────────────────────────────────────
+
+    def _set_progress(self, title: str, subtitle: str = ""):
+        self.progress_title.set_text(title)
+        self.progress_subtitle.set_text(subtitle)
+        self.progress_bar.set_fraction(0)
+        self.progress_bar.set_text("")
+        self.progress_detail.set_text("")
+
+    def _update_progress(self, fraction: float, text: str, detail: str = ""):
+        self.progress_bar.set_fraction(min(fraction, 1.0))
+        self.progress_bar.set_text(f"{int(fraction * 100)}%")
+        if text:
+            self.progress_subtitle.set_text(text)
+        if detail:
+            self.progress_detail.set_text(detail)
+
+    def do_close_request(self) -> bool:
+        unmount_iphone(MOUNT_POINT)
+        return False  # sta sluiten toe
+
+
+# ─── Hulp ─────────────────────────────────────────────────────────────────────
+
+def _cmd_available(cmd: str) -> bool:
+    return shutil.which(cmd) is not None
+
+
+# ─── App entry ────────────────────────────────────────────────────────────────
+
+class ImporterApp(Adw.Application):
+    def __init__(self, settings: dict):
+        super().__init__(
+            application_id="com.linuxginger.pixora.importer",
+            flags=Gio.ApplicationFlags.FLAGS_NONE,
+        )
+        self.settings = settings
+        self.connect("activate", self.on_activate)
+
+    def on_activate(self, app):
+        win = ImporterWindow(app, self.settings)
+        win.present()
+
+
+def main():
+    app = ImporterApp(load_settings())
+    return app.run(sys.argv)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
