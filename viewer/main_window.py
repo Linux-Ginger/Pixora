@@ -858,6 +858,25 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
         GLib.timeout_add(4000, self._check_for_update)
+        threading.Thread(target=self._start_services, daemon=True).start()
+
+    def _start_services(self):
+        try:
+            r = subprocess.run(["systemctl", "is-active", "usbmuxd"],
+                               capture_output=True, text=True, timeout=3)
+            if r.stdout.strip() != "active":
+                subprocess.run(["systemctl", "start", "usbmuxd"],
+                               capture_output=True, timeout=5)
+        except Exception:
+            pass
+        try:
+            r = subprocess.run(["pgrep", "-x", "usbmuxd"],
+                               capture_output=True, timeout=3)
+            if r.returncode != 0:
+                subprocess.Popen(["usbmuxd"], stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
 
     # ── Startup splash ───────────────────────────────────────────────
     def _prewarm_gstreamer(self):
