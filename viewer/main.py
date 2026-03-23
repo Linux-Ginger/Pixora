@@ -45,7 +45,8 @@ class PixoraApp(Adw.Application):
             win = MainWindow(app, settings)
 
         win.present()
-        win.maximize()
+        from gi.repository import GLib
+        GLib.timeout_add(300, win.maximize)
 
 
 def main():
