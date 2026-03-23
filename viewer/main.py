@@ -46,7 +46,20 @@ class PixoraApp(Adw.Application):
 
         win.present()
         from gi.repository import GLib
-        GLib.timeout_add(300, win.maximize)
+        import time as _time
+
+        # Op Wayland herstelt GNOME de vorige venstergrootte na present().
+        # We blijven re-maximaliseren totdat het lukt (max 2 seconden).
+        _start = _time.monotonic()
+
+        def _keep_maximized():
+            if not win.is_maximized():
+                win.maximize()
+            if _time.monotonic() - _start < 2.0:
+                return True   # blijf proberen
+            return False      # stop na 2s
+
+        GLib.timeout_add(100, _keep_maximized)
 
 
 def main():
