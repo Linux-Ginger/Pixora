@@ -47,7 +47,7 @@ class InstallerWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title("Pixora Installer")
-        self.set_default_size(500, 580)
+        self.set_default_size(460, 360)
         self.set_resizable(False)
 
         self.selected_version = None   # None = main/latest
@@ -79,13 +79,13 @@ class InstallerWindow(Adw.ApplicationWindow):
         page.set_vexpand(True)
 
         # Logo / titel
-        top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        top.set_margin_top(40)
-        top.set_margin_bottom(28)
+        top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        top.set_margin_top(20)
+        top.set_margin_bottom(16)
         top.set_halign(Gtk.Align.CENTER)
 
         logo = Gtk.Image.new_from_icon_name("applications-graphics-symbolic")
-        logo.set_pixel_size(64)
+        logo.set_pixel_size(48)
         top.append(logo)
 
         title = Gtk.Label(label="Pixora")
@@ -99,9 +99,9 @@ class InstallerWindow(Adw.ApplicationWindow):
         page.append(top)
 
         # Versie selectie
-        ver_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        ver_box.set_margin_start(32)
-        ver_box.set_margin_end(32)
+        ver_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        ver_box.set_margin_start(24)
+        ver_box.set_margin_end(24)
 
         ver_lbl = Gtk.Label(label="Versie")
         ver_lbl.add_css_class("heading")
@@ -136,9 +136,10 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         # Installeren knop
         btn_box = Gtk.Box()
-        btn_box.set_margin_start(32)
-        btn_box.set_margin_end(32)
-        btn_box.set_margin_bottom(32)
+        btn_box.set_margin_start(24)
+        btn_box.set_margin_end(24)
+        btn_box.set_margin_top(8)
+        btn_box.set_margin_bottom(20)
 
         self.install_btn = Gtk.Button(label="Installeren")
         self.install_btn.add_css_class("suggested-action")
@@ -157,13 +158,13 @@ class InstallerWindow(Adw.ApplicationWindow):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         page.set_vexpand(True)
 
-        top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        top.set_margin_top(28)
-        top.set_margin_bottom(20)
+        top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        top.set_margin_top(16)
+        top.set_margin_bottom(12)
         top.set_halign(Gtk.Align.CENTER)
 
         logo = Gtk.Image.new_from_icon_name("applications-graphics-symbolic")
-        logo.set_pixel_size(56)
+        logo.set_pixel_size(40)
         top.append(logo)
 
         title = Gtk.Label(label="Pixora")
@@ -178,9 +179,9 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         self.step_rows = {}
 
-        phases_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        phases_box.set_margin_start(32)
-        phases_box.set_margin_end(32)
+        phases_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        phases_box.set_margin_start(24)
+        phases_box.set_margin_end(24)
 
         for phase_label, steps in PHASES:
             phase_lbl = Gtk.Label(label=phase_label)
@@ -226,9 +227,9 @@ class InstallerWindow(Adw.ApplicationWindow):
         page.append(self.status_lbl)
 
         self.progress = Gtk.ProgressBar()
-        self.progress.set_margin_start(32)
-        self.progress.set_margin_end(32)
-        self.progress.set_margin_bottom(28)
+        self.progress.set_margin_start(24)
+        self.progress.set_margin_end(24)
+        self.progress.set_margin_bottom(16)
         page.append(self.progress)
 
         return page
