@@ -76,9 +76,12 @@ class InstallerWindow(Adw.ApplicationWindow):
     # ── Versie-kiezer pagina ───────────────────────────────────────────
 
     def _build_select_page(self):
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_vexpand(True)
+
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        page.set_valign(Gtk.Align.CENTER)
-        page.set_vexpand(True)
+        scroll.set_child(page)
 
         # Logo / titel
         top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -98,14 +101,11 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         page.append(top)
 
-        spacer_top = Gtk.Box()
-        spacer_top.set_vexpand(True)
-        page.append(spacer_top)
-
         # Versie selectie
         ver_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         ver_box.set_margin_start(24)
         ver_box.set_margin_end(24)
+        ver_box.set_margin_top(24)
 
         ver_lbl = Gtk.Label(label="Versie")
         ver_lbl.add_css_class("heading")
@@ -133,10 +133,6 @@ class InstallerWindow(Adw.ApplicationWindow):
         ver_box.append(listbox)
         page.append(ver_box)
 
-        spacer_bottom = Gtk.Box()
-        spacer_bottom.set_vexpand(True)
-        page.append(spacer_bottom)
-
         # Installeren knop
         btn_box = Gtk.Box()
         btn_box.set_margin_start(24)
@@ -153,7 +149,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         btn_box.append(self.install_btn)
 
         page.append(btn_box)
-        return page
+        return scroll
 
     # ── Installatie-voortgang pagina ───────────────────────────────────
 
