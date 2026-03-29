@@ -798,10 +798,17 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.add_named(self.build_map_page(),    "map")
         self.main_stack.add_named(self.importer_page,       "importer")
 
+        self.update_banner = Adw.Banner(title="", button_label="Bijwerken", use_markup=False)
+        self.update_banner.set_revealed(False)
+        self.update_banner.connect("button-clicked", self._on_update_banner_clicked)
+
         toolbar_view = Adw.ToolbarView()
+        toolbar_view.add_top_bar(self.update_banner)
         toolbar_view.add_top_bar(self.build_header())
         toolbar_view.set_content(self.main_stack)
         toolbar_view.add_bottom_bar(self.build_bottombar())
+
+        threading.Thread(target=self._check_for_update, daemon=True).start()
 
         # ── Startup splash overlay ────────────────────────────────────
         root_overlay = Gtk.Overlay()
@@ -870,6 +877,33 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     # ── Startup splash ───────────────────────────────────────────────
+    def _check_for_update(self):
+        try:
+            local_version_file = os.path.join(INSTALL_DIR, "version.txt")
+            if not os.path.exists(local_version_file):
+                return
+            with open(local_version_file) as f:
+                local_version = f.read().strip()
+            req = urllib.request.Request(
+                "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt",
+                headers={"User-Agent": "Pixora/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                remote_version = resp.read().decode().strip()
+            if remote_version and remote_version != local_version:
+                GLib.idle_add(self._show_update_banner, remote_version)
+        except Exception:
+            pass
+
+    def _show_update_banner(self, new_version):
+        self.update_banner.set_title(f"Pixora {new_version} is beschikbaar")
+        self.update_banner.set_revealed(True)
+        return False
+
+    def _on_update_banner_clicked(self, banner):
+        installer = os.path.join(INSTALL_DIR, "installer.py")
+        subprocess.Popen(["python3", installer])
+
     def _prewarm_gstreamer(self):
         """Initialize GStreamer pipeline in background so first video opens fast."""
         try:
