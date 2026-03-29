@@ -404,11 +404,6 @@ class InstallerWindow(Adw.ApplicationWindow):
                 else:
                     subprocess.run(["git", "clone", "-q", REPO_URL, str(INSTALL_DIR)],
                                    check=True, capture_output=True)
-            version_src = INSTALL_DIR / "version.txt"
-            installed_version_file = Path.home() / ".config" / "pixora" / "installed_version"
-            if version_src.exists():
-                installed_version_file.parent.mkdir(parents=True, exist_ok=True)
-                installed_version_file.write_text(version_src.read_text())
             return True, ""
         except subprocess.CalledProcessError:
             return False, "downloaden mislukt"
@@ -479,6 +474,12 @@ class InstallerWindow(Adw.ApplicationWindow):
 
     def _launch_app(self):
         try:
+            version_src = INSTALL_DIR / "version.txt"
+            installed_version_file = Path.home() / ".config" / "pixora" / "installed_version"
+            if version_src.exists():
+                installed_version_file.parent.mkdir(parents=True, exist_ok=True)
+                installed_version_file.write_text(version_src.read_text())
+
             main_py = INSTALL_DIR / "viewer" / "main.py"
             subprocess.Popen([sys.executable, str(main_py)])
             GLib.timeout_add(1500, self.get_application().quit)

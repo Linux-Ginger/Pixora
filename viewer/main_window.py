@@ -955,15 +955,18 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_update_dialog_response(self, dlg, response, new_version):
         if response == "bijwerken":
-            installer = os.path.join(INSTALL_DIR, "installer.py")
-            subprocess.Popen(["python3", installer])
+            self._open_installer()
         else:
             self.update_banner.set_title(f"Update beschikbaar: {new_version}")
             self.update_banner.set_revealed(True)
 
     def _on_update_banner_clicked(self, banner):
-        installer = os.path.join(INSTALL_DIR, "installer.py")
-        subprocess.Popen(["python3", installer])
+        self._open_installer()
+
+    def _open_installer(self):
+        from pathlib import Path
+        self.get_application().quit()
+        subprocess.Popen([sys.executable, str(Path.home() / ".local/share/pixora/installer.py")])
 
     # ── Dark mode ────────────────────────────────────────────────────
     def is_dark(self):
