@@ -78,8 +78,8 @@ class InstallerWindow(Adw.ApplicationWindow):
     def _build_select_page(self):
         install_dir = Path.home() / ".local" / "share" / "pixora"
         already_installed = (install_dir / ".git").exists()
-        version_file = install_dir / "version.txt"
-        current_version = version_file.read_text().strip() if already_installed and version_file.exists() else None
+        version_file = Path.home() / ".config" / "pixora" / "installed_version"
+        current_version = version_file.read_text().strip() if version_file.exists() else None
         self._already_installed = already_installed
         self._local_version = current_version
 
