@@ -421,8 +421,6 @@ class InstallerWindow(Adw.ApplicationWindow):
             "ffmpeg", "python3-pip",
         ]
         try:
-            subprocess.run(["sudo", "apt-get", "update", "-qq"],
-                           check=True, capture_output=True)
             subprocess.run(["sudo", "apt-get", "install", "-y", "-qq"] + packages,
                            check=True, capture_output=True)
             return True, ""
