@@ -292,12 +292,21 @@ class InstallerWindow(Adw.ApplicationWindow):
 
     def _update_install_status(self, remote_version):
         local = self._local_version or ""
+        icon = self.installed_row.get_first_child()
         if local == remote_version:
+            self.installed_row.set_title("Pixora is al geïnstalleerd")
             self.installed_row.set_subtitle(f"Versie {local} — up to date")
             self.install_btn.set_label("Opnieuw installeren")
+            icon.set_from_icon_name("emblem-ok-symbolic")
+            icon.remove_css_class("warning")
+            icon.add_css_class("success")
         else:
+            self.installed_row.set_title("Update beschikbaar")
             self.installed_row.set_subtitle(f"Update beschikbaar: {local} → {remote_version}")
             self.install_btn.set_label("Bijwerken")
+            icon.set_from_icon_name("emblem-important-symbolic")
+            icon.remove_css_class("success")
+            icon.add_css_class("warning")
         return False
 
     def _update_version_list(self, tags):
@@ -396,6 +405,11 @@ class InstallerWindow(Adw.ApplicationWindow):
                 else:
                     subprocess.run(["git", "clone", "-q", REPO_URL, str(INSTALL_DIR)],
                                    check=True, capture_output=True)
+            version_src = INSTALL_DIR / "version.txt"
+            installed_version_file = Path.home() / ".config" / "pixora" / "installed_version"
+            if version_src.exists():
+                installed_version_file.parent.mkdir(parents=True, exist_ok=True)
+                installed_version_file.write_text(version_src.read_text())
             return True, ""
         except subprocess.CalledProcessError:
             return False, "downloaden mislukt"
