@@ -923,7 +923,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _do_update_check(self):
         try:
-            local_version_file = os.path.join(INSTALL_DIR, "version.txt")
+            local_version_file = os.path.join(
+                os.path.expanduser("~"), ".config", "pixora", "installed_version"
+            )
             if not os.path.exists(local_version_file):
                 return
             with open(local_version_file) as f:

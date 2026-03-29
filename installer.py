@@ -335,6 +335,15 @@ class InstallerWindow(Adw.ApplicationWindow):
                 return
             GLib.idle_add(self._set_step_done, key)
 
+        try:
+            version_src = INSTALL_DIR / "version.txt"
+            installed_version_file = Path.home() / ".config" / "pixora" / "installed_version"
+            if version_src.exists():
+                installed_version_file.parent.mkdir(parents=True, exist_ok=True)
+                installed_version_file.write_text(version_src.read_text())
+        except Exception:
+            pass
+
         GLib.idle_add(self.progress.set_fraction, 1.0)
 
     # ── Installatie stappen ───────────────────────────────────────────
