@@ -80,6 +80,8 @@ class InstallerWindow(Adw.ApplicationWindow):
         already_installed = (install_dir / ".git").exists()
         version_file = install_dir / "version.txt"
         current_version = version_file.read_text().strip() if already_installed and version_file.exists() else None
+        self._already_installed = already_installed
+        self._local_version = current_version
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -122,14 +124,14 @@ class InstallerWindow(Adw.ApplicationWindow):
         listbox.add_css_class("boxed-list")
 
         if already_installed:
-            installed_row = Adw.ActionRow(
+            self.installed_row = Adw.ActionRow(
                 title="Pixora is al geïnstalleerd",
                 subtitle=current_version if current_version else ""
             )
             check_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
             check_icon.add_css_class("success")
-            installed_row.add_prefix(check_icon)
-            listbox.append(installed_row)
+            self.installed_row.add_prefix(check_icon)
+            listbox.append(self.installed_row)
 
         self.version_model = Gtk.StringList()
         self.version_model.append("Nieuwste versie")
@@ -155,7 +157,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         btn_box.set_margin_top(8)
         btn_box.set_margin_bottom(20)
 
-        btn_label = "Bijwerken" if already_installed else "Installeren"
+        btn_label = "Bijwerken" if already_installed else "Installeren"  # bijgewerkt door _fetch_releases
         self.install_btn = Gtk.Button(label=btn_label)
         self.install_btn.add_css_class("suggested-action")
         self.install_btn.add_css_class("pill")
@@ -261,6 +263,8 @@ class InstallerWindow(Adw.ApplicationWindow):
         return img
 
     def _fetch_releases(self):
+        tags = []
+        remote_version = None
         try:
             req = urllib.request.Request(
                 RELEASES_API,
@@ -269,9 +273,32 @@ class InstallerWindow(Adw.ApplicationWindow):
             with urllib.request.urlopen(req, timeout=6) as r:
                 releases = json.loads(r.read())
             tags = [rel["tag_name"] for rel in releases if not rel.get("draft")]
-            GLib.idle_add(self._update_version_list, tags)
         except Exception:
-            GLib.idle_add(self._update_version_list, [])
+            pass
+
+        try:
+            req = urllib.request.Request(
+                "https://raw.githubusercontent.com/Linux-Ginger/Pixora/refs/heads/main/version.txt",
+                headers={"User-Agent": "Pixora-Installer"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as r:
+                remote_version = r.read().decode().strip()
+        except Exception:
+            pass
+
+        GLib.idle_add(self._update_version_list, tags)
+        if self._already_installed and remote_version:
+            GLib.idle_add(self._update_install_status, remote_version)
+
+    def _update_install_status(self, remote_version):
+        local = self._local_version or ""
+        if local == remote_version:
+            self.installed_row.set_subtitle(f"Versie {local} — up to date")
+            self.install_btn.set_label("Opnieuw installeren")
+        else:
+            self.installed_row.set_subtitle(f"Update beschikbaar: {local} → {remote_version}")
+            self.install_btn.set_label("Bijwerken")
+        return False
 
     def _update_version_list(self, tags):
         while self.version_model.get_n_items() > 0:
