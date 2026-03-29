@@ -964,9 +964,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._open_installer()
 
     def _open_installer(self):
-        from pathlib import Path
         self.get_application().quit()
-        subprocess.Popen([sys.executable, str(Path.home() / ".local/share/pixora/installer.py")])
+        subprocess.Popen([
+            "bash", "-c",
+            "gnome-terminal -- bash -c 'curl -fsSL https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/install.sh | bash; exec bash'"
+        ])
 
     # ── Dark mode ────────────────────────────────────────────────────
     def is_dark(self):
