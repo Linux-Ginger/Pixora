@@ -301,7 +301,7 @@ class InstallerWindow(Adw.ApplicationWindow):
             self.installed_icon.add_css_class("success")
         else:
             self.installed_row.set_title("Update beschikbaar")
-            self.installed_row.set_subtitle(f"Update beschikbaar: {local} → {remote_version}")
+            self.installed_row.set_subtitle(f"Update beschikbaar: {remote_version} → {local}")
             self.install_btn.set_label("Bijwerken")
             self.installed_icon.set_from_icon_name("software-update-urgent-symbolic")
             self.installed_icon.remove_css_class("success")
