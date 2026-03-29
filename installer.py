@@ -76,6 +76,11 @@ class InstallerWindow(Adw.ApplicationWindow):
     # ── Versie-kiezer pagina ───────────────────────────────────────────
 
     def _build_select_page(self):
+        install_dir = Path.home() / ".local" / "share" / "pixora"
+        already_installed = (install_dir / ".git").exists()
+        version_file = install_dir / "version.txt"
+        current_version = version_file.read_text().strip() if already_installed and version_file.exists() else None
+
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         scroll.set_vexpand(True)
@@ -116,6 +121,16 @@ class InstallerWindow(Adw.ApplicationWindow):
         listbox.set_selection_mode(Gtk.SelectionMode.NONE)
         listbox.add_css_class("boxed-list")
 
+        if already_installed:
+            installed_row = Adw.ActionRow(
+                title="Pixora is al geïnstalleerd",
+                subtitle=current_version if current_version else ""
+            )
+            check_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+            check_icon.add_css_class("success")
+            installed_row.add_prefix(check_icon)
+            listbox.append(installed_row)
+
         self.version_model = Gtk.StringList()
         self.version_model.append("Nieuwste versie")
 
@@ -133,14 +148,15 @@ class InstallerWindow(Adw.ApplicationWindow):
         ver_box.append(listbox)
         page.append(ver_box)
 
-        # Installeren knop
+        # Installeren / bijwerken knop
         btn_box = Gtk.Box()
         btn_box.set_margin_start(24)
         btn_box.set_margin_end(24)
         btn_box.set_margin_top(8)
         btn_box.set_margin_bottom(20)
 
-        self.install_btn = Gtk.Button(label="Installeren")
+        btn_label = "Bijwerken" if already_installed else "Installeren"
+        self.install_btn = Gtk.Button(label=btn_label)
         self.install_btn.add_css_class("suggested-action")
         self.install_btn.add_css_class("pill")
         self.install_btn.set_hexpand(True)
