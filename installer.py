@@ -387,11 +387,12 @@ class InstallerWindow(Adw.ApplicationWindow):
             )
             launcher.chmod(0o755)
 
-            icon = INSTALL_DIR / "docs" / "pixora-logo-dark.png"
+            icon = INSTALL_DIR / "docs" / "pixora-icon.svg"
             desktop = DESKTOP_DIR / "pixora.desktop"
             desktop.write_text(
                 "[Desktop Entry]\n"
                 "Name=Pixora\n"
+                "GenericName=Foto & Video Manager\n"
                 "Comment=Foto & video manager door LinuxGinger\n"
                 f"Exec={launcher}\n"
                 f"Icon={icon}\n"
@@ -399,6 +400,7 @@ class InstallerWindow(Adw.ApplicationWindow):
                 "Type=Application\n"
                 "Categories=Graphics;Photography;\n"
                 "StartupNotify=true\n"
+                "StartupWMClass=pixora\n"
             )
             return True, ""
         except Exception as e:
