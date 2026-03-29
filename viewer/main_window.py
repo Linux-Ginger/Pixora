@@ -970,6 +970,63 @@ class MainWindow(Adw.ApplicationWindow):
             "gnome-terminal -- bash -c 'curl -fsSL https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/install.sh | bash; exec bash'"
         ])
 
+    def _on_settings_check_update(self, btn):
+        self._update_check_btn.set_visible(False)
+        self._update_check_spinner.set_visible(True)
+        self._update_check_spinner.start()
+        threading.Thread(target=self._do_settings_update_check, daemon=True).start()
+
+    def _do_settings_update_check(self):
+        try:
+            local_version_file = os.path.join(
+                os.path.expanduser("~"), ".config", "pixora", "installed_version"
+            )
+            local_version = open(local_version_file).read().strip() if os.path.exists(local_version_file) else ""
+            req = urllib.request.Request(
+                "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt",
+                headers={"User-Agent": "Pixora/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                remote_version = resp.read().decode().strip()
+        except Exception:
+            GLib.idle_add(self._settings_update_result, None, None)
+            return
+        GLib.idle_add(self._settings_update_result, local_version, remote_version)
+
+    def _settings_update_result(self, local_version, remote_version):
+        self._update_check_spinner.stop()
+        self._update_check_spinner.set_visible(False)
+
+        # verwijder eerder toegevoegde suffix widgets (behalve spinner/knop)
+        for w in list(self._update_check_row._extra_suffixes if hasattr(self._update_check_row, "_extra_suffixes") else []):
+            self._update_check_row.remove(w)
+        self._update_check_row._extra_suffixes = []
+
+        if remote_version is None:
+            self._update_check_row.set_subtitle("Controleren mislukt")
+            self._update_check_btn.set_visible(True)
+            return False
+
+        if local_version == remote_version:
+            self._update_check_row.set_subtitle("Je hebt de nieuwste versie")
+            ok_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+            ok_icon.add_css_class("success")
+            ok_icon.set_valign(Gtk.Align.CENTER)
+            self._update_check_row.add_suffix(ok_icon)
+            self._update_check_row._extra_suffixes = [ok_icon]
+        else:
+            self._update_check_row.set_subtitle(f"Versie {remote_version} beschikbaar")
+            warn_icon = Gtk.Image.new_from_icon_name("emblem-important-symbolic")
+            warn_icon.set_valign(Gtk.Align.CENTER)
+            self._update_check_row.add_suffix(warn_icon)
+            update_btn = Gtk.Button(label="Bijwerken")
+            update_btn.add_css_class("suggested-action")
+            update_btn.set_valign(Gtk.Align.CENTER)
+            update_btn.connect("clicked", lambda b: self._open_installer())
+            self._update_check_row.add_suffix(update_btn)
+            self._update_check_row._extra_suffixes = [warn_icon, update_btn]
+        return False
+
     # ── Dark mode ────────────────────────────────────────────────────
     def is_dark(self):
         return self.style_manager.get_dark()
@@ -3032,20 +3089,46 @@ class MainWindow(Adw.ApplicationWindow):
         backup_group.add(self.settings_backup_folder_row)
         page.add(backup_group)
 
-        update_group = Adw.PreferencesGroup()
-        update_group.set_title("Updates")
+        about_group = Adw.PreferencesGroup()
+        about_group.set_title("Over")
 
-        update_row = Adw.ActionRow(
-            title="Controleer op updates",
-            subtitle="Zoekt naar de nieuwste versie van Pixora"
+        # App info row
+        app_row = Adw.ActionRow(
+            title="Pixora",
+            subtitle="Foto & video manager door LinuxGinger"
         )
-        check_btn = Gtk.Button(label="Controleer")
-        check_btn.add_css_class("flat")
-        check_btn.set_valign(Gtk.Align.CENTER)
-        check_btn.connect("clicked", lambda b: self._check_for_update())
-        update_row.add_suffix(check_btn)
-        update_group.add(update_row)
-        page.add(update_group)
+        icon_path = os.path.join(DOCS_DIR, "pixora-icon.svg")
+        if os.path.exists(icon_path):
+            app_icon = Gtk.Image.new_from_file(icon_path)
+            app_icon.set_pixel_size(32)
+            app_row.add_prefix(app_icon)
+        about_group.add(app_row)
+
+        # Versie row
+        installed_version_path = os.path.join(os.path.expanduser("~"), ".config", "pixora", "installed_version")
+        try:
+            installed_ver = open(installed_version_path).read().strip()
+        except Exception:
+            installed_ver = "Onbekend"
+        version_row = Adw.ActionRow(title="Versie", subtitle=installed_ver)
+        about_group.add(version_row)
+
+        # Controleer op updates row
+        self._update_check_row = Adw.ActionRow(title="Controleer op updates")
+
+        self._update_check_btn = Gtk.Button(label="Controleer")
+        self._update_check_btn.add_css_class("flat")
+        self._update_check_btn.set_valign(Gtk.Align.CENTER)
+        self._update_check_btn.connect("clicked", self._on_settings_check_update)
+        self._update_check_row.add_suffix(self._update_check_btn)
+
+        self._update_check_spinner = Gtk.Spinner()
+        self._update_check_spinner.set_valign(Gtk.Align.CENTER)
+        self._update_check_spinner.set_visible(False)
+        self._update_check_row.add_suffix(self._update_check_spinner)
+
+        about_group.add(self._update_check_row)
+        page.add(about_group)
 
         dialog.add(page)
         dialog.present(self)
