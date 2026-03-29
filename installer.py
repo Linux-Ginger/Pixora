@@ -77,6 +77,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
     def _build_select_page(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        page.set_valign(Gtk.Align.CENTER)
         page.set_vexpand(True)
 
         # Logo / titel
@@ -96,6 +97,10 @@ class InstallerWindow(Adw.ApplicationWindow):
         top.append(sub)
 
         page.append(top)
+
+        spacer_top = Gtk.Box()
+        spacer_top.set_vexpand(True)
+        page.append(spacer_top)
 
         # Versie selectie
         ver_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -127,6 +132,10 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         ver_box.append(listbox)
         page.append(ver_box)
+
+        spacer_bottom = Gtk.Box()
+        spacer_bottom.set_vexpand(True)
+        page.append(spacer_bottom)
 
         # Installeren knop
         btn_box = Gtk.Box()
