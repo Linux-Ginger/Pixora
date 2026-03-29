@@ -128,9 +128,9 @@ class InstallerWindow(Adw.ApplicationWindow):
                 title="Pixora is al geïnstalleerd",
                 subtitle=current_version if current_version else ""
             )
-            check_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-            check_icon.add_css_class("success")
-            self.installed_row.add_prefix(check_icon)
+            self.installed_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+            self.installed_icon.add_css_class("success")
+            self.installed_row.add_prefix(self.installed_icon)
             listbox.append(self.installed_row)
 
         self.version_model = Gtk.StringList()
@@ -292,21 +292,20 @@ class InstallerWindow(Adw.ApplicationWindow):
 
     def _update_install_status(self, remote_version):
         local = self._local_version or ""
-        icon = self.installed_row.get_first_child()
         if local == remote_version:
             self.installed_row.set_title("Pixora is al geïnstalleerd")
             self.installed_row.set_subtitle(f"Versie {local} — up to date")
             self.install_btn.set_label("Opnieuw installeren")
-            icon.set_from_icon_name("emblem-ok-symbolic")
-            icon.remove_css_class("warning")
-            icon.add_css_class("success")
+            self.installed_icon.set_from_icon_name("emblem-ok-symbolic")
+            self.installed_icon.remove_css_class("warning")
+            self.installed_icon.add_css_class("success")
         else:
             self.installed_row.set_title("Update beschikbaar")
             self.installed_row.set_subtitle(f"Update beschikbaar: {local} → {remote_version}")
             self.install_btn.set_label("Bijwerken")
-            icon.set_from_icon_name("emblem-important-symbolic")
-            icon.remove_css_class("success")
-            icon.add_css_class("warning")
+            self.installed_icon.set_from_icon_name("software-update-urgent-symbolic")
+            self.installed_icon.remove_css_class("success")
+            self.installed_icon.add_css_class("warning")
         return False
 
     def _update_version_list(self, tags):
