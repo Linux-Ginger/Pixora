@@ -38,6 +38,7 @@ DOCS_DIR     = Path(__file__).parent.parent / "docs"
 
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
 SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".dng", ".mp4", ".mov", ".m4v", ".webp"}
+EXCLUDED_EXT   = {".aae"}
 SKIP_DIRS      = {".Trash", "Recently Deleted", "Onlangs verwijderd", ".recently-deleted"}
 
 # Duplicate threshold → maximale hash-afstand
@@ -145,6 +146,7 @@ def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
     """
     Scan de DCIM-map van de iPhone recursief.
     Slaat mappen over waarvan de naam in SKIP_DIRS staat (.Trash, Recently Deleted, …).
+    AAE-bestanden worden volledig uitgesloten en niet meegeteld.
     Gebruikt expliciete iteratie per map (geen os.walk) zodat een trage of
     falende submap de andere niet blokkeert.
     """
@@ -152,7 +154,8 @@ def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
     if not dcim.exists():
         return []
 
-    files: list[Path] = []
+    all_files: list[Path] = []   # alles inclusief AAE
+    files: list[Path] = []       # alleen bestanden die geïmporteerd worden
 
     def _walk(directory: Path) -> None:
         # Retry tot 3× bij FUSE-lees-errors
@@ -173,15 +176,25 @@ def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
             if entry.is_dir():
                 if entry.name not in SKIP_DIRS:
                     subdirs.append(entry)
-            elif entry.is_file() and entry.suffix.lower() in SUPPORTED_EXT:
-                files.append(entry)
-                if progress_cb:
-                    progress_cb(len(files))
+            elif entry.is_file():
+                ext = entry.suffix.lower()
+                if ext in EXCLUDED_EXT:
+                    all_files.append(entry)   # tellen maar niet importeren
+                elif ext in SUPPORTED_EXT:
+                    all_files.append(entry)
+                    files.append(entry)
+                    if progress_cb:
+                        progress_cb(len(files))
 
         for subdir in subdirs:
             _walk(subdir)
 
     _walk(dcim)
+
+    print(f"[Pixora scan] Totaal gevonden:       {len(all_files)} bestanden (inclusief AAE)")
+    print(f"[Pixora scan] Na uitsluiting AAE:    {len(files)} bestanden")
+    print(f"[Pixora scan] Meegenomen extensies:  {', '.join(sorted(SUPPORTED_EXT))}")
+
     return files
 
 
