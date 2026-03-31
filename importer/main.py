@@ -177,6 +177,7 @@ def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
 
     all_files: list[Path] = []   # alles inclusief AAE
     files: list[Path] = []       # alleen bestanden die geïmporteerd worden
+    skipped_exts: dict[str, int] = {}  # extensies die niet herkend worden
 
     def _walk(directory: Path) -> None:
         # Retry tot 3× bij FUSE-lees-errors
@@ -197,24 +198,37 @@ def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
             if entry.is_dir():
                 if entry.name not in SKIP_DIRS:
                     subdirs.append(entry)
+                else:
+                    print(f"[Pixora scan] Overgeslagen map: {entry}")
             elif entry.is_file():
                 ext = entry.suffix.lower()
                 if ext in EXCLUDED_EXT:
-                    all_files.append(entry)   # tellen maar niet importeren
+                    all_files.append(entry)
                 elif ext in SUPPORTED_EXT:
                     all_files.append(entry)
                     files.append(entry)
                     if progress_cb:
                         progress_cb(len(files))
+                else:
+                    skipped_exts[ext] = skipped_exts.get(ext, 0) + 1
 
         for subdir in subdirs:
             _walk(subdir)
+
+    # Toon ook wat er naast DCIM op het mountpoint staat
+    try:
+        root_entries = sorted(mountpoint.iterdir())
+        print(f"[Pixora scan] Mountpoint inhoud: {[e.name for e in root_entries]}")
+    except OSError:
+        pass
 
     _walk(dcim)
 
     print(f"[Pixora scan] Totaal gevonden:       {len(all_files)} bestanden (inclusief AAE)")
     print(f"[Pixora scan] Na uitsluiting AAE:    {len(files)} bestanden")
     print(f"[Pixora scan] Meegenomen extensies:  {', '.join(sorted(SUPPORTED_EXT))}")
+    if skipped_exts:
+        print(f"[Pixora scan] Overgeslagen extensies: {dict(sorted(skipped_exts.items()))}")
 
     return files
 
