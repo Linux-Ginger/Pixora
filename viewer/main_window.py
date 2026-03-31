@@ -176,6 +176,27 @@ def lat_lon_to_tile_float(lat, lon, zoom):
     y     = (1 - math.log(math.tan(lat_r) + 1 / math.cos(lat_r)) / math.pi) / 2 * n
     return x, y
 
+_EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, DateTimeDigitized, DateTime
+
+def get_photo_date(path: str) -> float:
+    """Geeft de fotodatum als timestamp. Probeert EXIF eerst, valt terug op mtime."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext in (".jpg", ".jpeg", ".heic", ".png", ".dng"):
+        try:
+            from PIL import Image
+            with Image.open(path) as img:
+                exif = img._getexif()
+            if exif:
+                for tag in _EXIF_DATE_TAGS:
+                    val = exif.get(tag)
+                    if val:
+                        dt = datetime.datetime.strptime(val[:19], "%Y:%m:%d %H:%M:%S")
+                        return dt.timestamp()
+        except Exception:
+            pass
+    return os.path.getmtime(path)
+
+
 def get_cache_path(photo_path):
     mtime = str(os.path.getmtime(photo_path))
     key   = hashlib.md5((photo_path + mtime).encode()).hexdigest()
@@ -1906,9 +1927,9 @@ class MainWindow(Adw.ApplicationWindow):
     def apply_sort(self):
         index = self.sort_combo.get_selected()
         if index == 0:
-            self.photos.sort(key=os.path.getmtime, reverse=True)
+            self.photos.sort(key=get_photo_date, reverse=True)
         elif index == 1:
-            self.photos.sort(key=os.path.getmtime)
+            self.photos.sort(key=get_photo_date)
         elif index == 2:
             self.photos.sort(key=lambda p: os.path.basename(p).lower())
         elif index == 3:
@@ -1933,9 +1954,9 @@ class MainWindow(Adw.ApplicationWindow):
     def _do_sort_bg(self, sort_index):
         photos = list(self.photos)
         if sort_index == 0:
-            photos.sort(key=os.path.getmtime, reverse=True)
+            photos.sort(key=get_photo_date, reverse=True)
         elif sort_index == 1:
-            photos.sort(key=os.path.getmtime)
+            photos.sort(key=get_photo_date)
         elif sort_index == 2:
             photos.sort(key=lambda p: os.path.basename(p).lower())
         elif sort_index == 3:
