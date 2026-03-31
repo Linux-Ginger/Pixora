@@ -22,6 +22,12 @@ from pathlib import Path
 from datetime import datetime
 
 try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    pass
+
+try:
     from PIL import Image
     import imagehash
     HAS_IMAGEHASH = True
@@ -149,12 +155,9 @@ def get_photo_date(path: Path) -> float:
     ext = path.suffix.lower()
     if ext in (".jpg", ".jpeg", ".heic", ".png", ".dng"):
         try:
-            if ext == ".heic":
-                import pillow_heif
-                pillow_heif.register_heif_opener()
             from PIL import Image
             with Image.open(path) as img:
-                exif = img._getexif() or {}
+                exif = img.getexif()
             for tag in _EXIF_DATE_TAGS:
                 val = exif.get(tag)
                 if val:
