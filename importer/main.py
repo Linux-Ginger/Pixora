@@ -1019,6 +1019,14 @@ class ImporterWindow(Adw.ApplicationWindow):
             GLib.idle_add(self.progress_subtitle.set_text, f"{count} bestanden gevonden…")
         files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
         files.sort(key=get_photo_date, reverse=True)
+
+        print("[Pixora sort] Eerste 5 bestanden na sortering:")
+        for f in files[:5]:
+            print(f"  {f.name} — datum: {get_photo_date(f)}")
+        print("[Pixora sort] Laatste 5 bestanden na sortering:")
+        for f in files[-5:]:
+            print(f"  {f.name} — datum: {get_photo_date(f)}")
+
         GLib.idle_add(self._on_scan_done, files)
 
     def _on_scan_done(self, files: list[Path]):
