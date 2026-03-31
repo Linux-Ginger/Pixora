@@ -946,6 +946,7 @@ class ImporterWindow(Adw.ApplicationWindow):
 
     def _check_iphone(self):
         udid = detect_iphone()
+        print(f"[Pixora detect] udid={udid!r}")
         GLib.idle_add(self._on_detection_result, udid)
 
     def _on_detection_result(self, udid: str | None):
@@ -997,12 +998,15 @@ class ImporterWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._do_mount, daemon=True).start()
 
     def _do_mount(self):
+        print(f"[Pixora mount] ifuse beschikbaar: {_cmd_available('ifuse')}, idevice_id: {_cmd_available('idevice_id')}")
         if not _cmd_available("ifuse") or not _cmd_available("idevice_id"):
             GLib.idle_add(self._show_error,
                 "ifuse of libimobiledevice is niet geïnstalleerd. "
                 "Installeer de vereiste pakketten hieronder.", True)
             return
-        if not mount_iphone(self.udid, MOUNT_POINT):
+        result = mount_iphone(self.udid, MOUNT_POINT)
+        print(f"[Pixora mount] mount_iphone resultaat: {result}")
+        if not result:
             GLib.idle_add(self._show_error,
                 "Kon de iPhone niet koppelen. Zorg dat het scherm ontgrendeld is "
                 "en tik op 'Vertrouw' als dat wordt gevraagd.", False)
