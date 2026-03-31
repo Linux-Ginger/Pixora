@@ -142,6 +142,27 @@ def unmount_iphone(mountpoint: Path):
         pass
 
 
+_EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, DateTimeDigitized, DateTime
+
+def get_photo_date(path: Path) -> float:
+    """Geeft de fotodatum als timestamp. Probeert EXIF eerst, valt terug op mtime."""
+    ext = path.suffix.lower()
+    if ext in (".jpg", ".jpeg", ".heic", ".png", ".dng"):
+        try:
+            from PIL import Image
+            with Image.open(path) as img:
+                exif = img._getexif()
+            if exif:
+                for tag in _EXIF_DATE_TAGS:
+                    val = exif.get(tag)
+                    if val:
+                        dt = datetime.strptime(val[:19], "%Y:%m:%d %H:%M:%S")
+                        return dt.timestamp()
+        except Exception:
+            pass
+    return path.stat().st_mtime
+
+
 def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
     """
     Scan de DCIM-map van de iPhone recursief.
@@ -997,6 +1018,7 @@ class ImporterWindow(Adw.ApplicationWindow):
         def on_progress(count):
             GLib.idle_add(self.progress_subtitle.set_text, f"{count} bestanden gevonden…")
         files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
+        files.sort(key=get_photo_date, reverse=True)
         GLib.idle_add(self._on_scan_done, files)
 
     def _on_scan_done(self, files: list[Path]):
