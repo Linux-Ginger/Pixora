@@ -38,6 +38,7 @@ DOCS_DIR     = Path(__file__).parent.parent / "docs"
 
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
 SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".dng", ".mp4", ".mov", ".m4v", ".webp"}
+SKIP_DIRS      = {".Trash", "Recently Deleted", "Onlangs verwijderd", ".recently-deleted"}
 
 # Duplicate threshold → maximale hash-afstand
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
@@ -142,39 +143,45 @@ def unmount_iphone(mountpoint: Path):
 
 def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
     """
-    Scan de DCIM-map van de iPhone.
-    Gebruikt expliciete 2-level iteratie (DCIM/100APPLE/files) in plaats van
-    os.walk zodat een trage of falende submap de andere niet blokkeert.
+    Scan de DCIM-map van de iPhone recursief.
+    Slaat mappen over waarvan de naam in SKIP_DIRS staat (.Trash, Recently Deleted, …).
+    Gebruikt expliciete iteratie per map (geen os.walk) zodat een trage of
+    falende submap de andere niet blokkeert.
     """
     dcim = mountpoint / "DCIM"
     if not dcim.exists():
         return []
 
-    # Verzamel submappen (bijv. 100APPLE, 101APPLE, ...)
-    try:
-        subdirs = sorted(p for p in dcim.iterdir() if p.is_dir())
-    except OSError:
-        return []
+    files: list[Path] = []
 
-    files = []
-    for subdir in subdirs:
-        # Retry tot 3× per submap bij FUSE-lees-errors
+    def _walk(directory: Path) -> None:
+        # Retry tot 3× bij FUSE-lees-errors
         for attempt in range(3):
             try:
-                entries = sorted(subdir.iterdir())
-                for entry in entries:
-                    if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXT:
-                        files.append(entry)
-                    if progress_cb:
-                        progress_cb(len(files))
-                break  # Gelukt, ga naar volgende submap
+                entries = sorted(directory.iterdir())
+                break
             except OSError:
                 if attempt == 2:
-                    pass  # Geef op na 3 pogingen, ga door met de rest
-                else:
-                    import time as _time
-                    _time.sleep(0.3)  # Kort wachten voor retry
+                    return  # Geef op na 3 pogingen
+                import time as _time
+                _time.sleep(0.3)
+        else:
+            return
 
+        subdirs: list[Path] = []
+        for entry in entries:
+            if entry.is_dir():
+                if entry.name not in SKIP_DIRS:
+                    subdirs.append(entry)
+            elif entry.is_file() and entry.suffix.lower() in SUPPORTED_EXT:
+                files.append(entry)
+                if progress_cb:
+                    progress_cb(len(files))
+
+        for subdir in subdirs:
+            _walk(subdir)
+
+    _walk(dcim)
     return files
 
 
