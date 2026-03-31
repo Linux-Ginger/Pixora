@@ -423,7 +423,7 @@ class InstallerWindow(Adw.ApplicationWindow):
             return False, "apt mislukt"
 
     def _install_pip(self):
-        packages = ["Pillow", "imagehash", "watchdog"]
+        packages = ["Pillow", "pillow-heif", "imagehash", "watchdog"]
         try:
             subprocess.run(
                 [sys.executable, "-m", "pip", "install", "-q",

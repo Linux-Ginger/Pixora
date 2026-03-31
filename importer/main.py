@@ -149,15 +149,17 @@ def get_photo_date(path: Path) -> float:
     ext = path.suffix.lower()
     if ext in (".jpg", ".jpeg", ".heic", ".png", ".dng"):
         try:
+            if ext == ".heic":
+                import pillow_heif
+                pillow_heif.register_heif_opener()
             from PIL import Image
             with Image.open(path) as img:
-                exif = img._getexif()
-            if exif:
-                for tag in _EXIF_DATE_TAGS:
-                    val = exif.get(tag)
-                    if val:
-                        dt = datetime.strptime(val[:19], "%Y:%m:%d %H:%M:%S")
-                        return dt.timestamp()
+                exif = img._getexif() or {}
+            for tag in _EXIF_DATE_TAGS:
+                val = exif.get(tag)
+                if val:
+                    dt = datetime.strptime(val[:19], "%Y:%m:%d %H:%M:%S")
+                    return dt.timestamp()
         except Exception:
             pass
     return path.stat().st_mtime
