@@ -646,7 +646,7 @@ class ImporterWindow(Adw.ApplicationWindow):
 
         self.select_flow = Gtk.FlowBox()
         self.select_flow.set_homogeneous(True)
-        self.select_flow.set_sort_func(None)
+        self.select_flow.set_sort_func(lambda a, b, *_: 0)
         self.select_flow.set_filter_func(None)
         self.select_flow.set_max_children_per_line(6)
         self.select_flow.set_min_children_per_line(2)
