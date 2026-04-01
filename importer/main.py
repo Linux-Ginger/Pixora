@@ -682,6 +682,9 @@ class ImporterWindow(Adw.ApplicationWindow):
         self.stack.add_named(outer, "selecting")
 
     def _show_selecting(self, files: list[Path]):
+        if files:
+            print("[sort debug] Eerste foto:", files[0].name, get_photo_date(files[0]))
+            print("[sort debug] Laatste foto:", files[-1].name, get_photo_date(files[-1]))
         n = len(files)
         self.select_title.set_text(f"{n} bestand{'en' if n != 1 else ''} gevonden")
         self.select_subtitle.set_text("Kies welke foto's en video's je wilt importeren.")
