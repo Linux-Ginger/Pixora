@@ -700,11 +700,12 @@ class ImporterWindow(Adw.ApplicationWindow):
         # Voeg kaarten toe en laad thumbnails in achtergrond
         self._select_cards: dict[str, Gtk.CheckButton] = {}
         self._select_overlays: dict[str, Gtk.Overlay] = {}
-        for fp in files:
+        for i, fp in enumerate(files):
             card, check, overlay = self._make_select_card(fp)
             self._select_cards[str(fp)] = check
             self._select_overlays[str(fp)] = overlay
             self.select_flow.append(card)
+            print(f"[ui debug] Kaart toegevoegd op positie {i}: {fp.name}")
 
         self._show_state(STATE_SELECTING)
 
