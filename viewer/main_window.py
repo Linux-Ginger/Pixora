@@ -640,7 +640,17 @@ class MapWidget(Gtk.DrawingArea):
 
     def _load_hover_thumb(self, path):
         try:
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 160, 120, True)
+            if is_video(path):
+                pixbuf = load_thumbnail(path)
+                if pixbuf:
+                    # Schaal naar hover-formaat
+                    w, h = pixbuf.get_width(), pixbuf.get_height()
+                    scale = min(160 / w, 120 / h)
+                    pixbuf = pixbuf.scale_simple(
+                        int(w * scale), int(h * scale),
+                        GdkPixbuf.InterpType.BILINEAR)
+            else:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 160, 120, True)
         except Exception:
             pixbuf = None
         GLib.idle_add(self._hover_thumb_loaded, path, pixbuf)
@@ -2320,7 +2330,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._stop_video_poll()
         self._cancel_fade()
         if self._video_seek_pending_id:
-            GLib.source_remove(self._video_seek_pending_id)
+            try:
+                GLib.source_remove(self._video_seek_pending_id)
+            except Exception:
+                pass
             self._video_seek_pending_id = None
         self.video_spinner.set_visible(False)
         self.video_spinner.stop()
@@ -2360,6 +2373,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         if self._video_media.get_ended():
             self.video_play_btn.set_icon_name("media-playback-start-symbolic")
+            self._video_poll_id = None
             return False
         return True
 
@@ -2389,7 +2403,10 @@ class MainWindow(Adw.ApplicationWindow):
             return
         self._trigger_scrub_preview(scale.get_value())
         if self._video_seek_pending_id:
-            GLib.source_remove(self._video_seek_pending_id)
+            try:
+                GLib.source_remove(self._video_seek_pending_id)
+            except Exception:
+                pass
         self._video_seek_pending_id = GLib.timeout_add(80, self._do_video_seek)
 
     def _do_video_seek(self):
@@ -2459,16 +2476,25 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _reset_fade_timer(self):
         if self._fade_timer_id:
-            GLib.source_remove(self._fade_timer_id)
+            try:
+                GLib.source_remove(self._fade_timer_id)
+            except Exception:
+                pass
         delay = 800 if self._video_media else 10_000
         self._fade_timer_id = GLib.timeout_add(delay, self._start_fade)
 
     def _cancel_fade(self):
         if self._fade_timer_id:
-            GLib.source_remove(self._fade_timer_id)
+            try:
+                GLib.source_remove(self._fade_timer_id)
+            except Exception:
+                pass
             self._fade_timer_id = None
         if self._fade_anim_id:
-            GLib.source_remove(self._fade_anim_id)
+            try:
+                GLib.source_remove(self._fade_anim_id)
+            except Exception:
+                pass
             self._fade_anim_id = None
 
     def _start_fade(self):
