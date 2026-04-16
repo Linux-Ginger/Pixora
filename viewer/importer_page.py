@@ -177,11 +177,33 @@ def unmount_iphone(mountpoint: Path):
 
 
 _EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, DateTimeDigitized, DateTime
+_VIDEO_EXT = {".mp4", ".mov", ".m4v", ".3gp"}
+
+def _get_video_date(path: Path) -> float | None:
+    """Haal creation_time uit video metadata via ffprobe."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json",
+             "-show_entries", "format_tags=creation_time", str(path)],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            import json as _json
+            info = _json.loads(result.stdout)
+            ct = info.get("format", {}).get("tags", {}).get("creation_time", "")
+            if ct:
+                # Formaat: "2024-03-15T14:30:00.000000Z"
+                dt = datetime.strptime(ct[:19], "%Y-%m-%dT%H:%M:%S")
+                return dt.timestamp()
+    except Exception:
+        pass
+    return None
 
 def get_photo_date(path: Path) -> float:
-    """Geeft de fotodatum als timestamp. Probeert EXIF eerst, valt terug op mtime."""
+    """Geeft de fotodatum als timestamp. Probeert EXIF/ffprobe eerst, valt terug op bestandsnaam."""
     ext = path.suffix.lower()
-    if ext in (".jpg", ".jpeg", ".heic", ".png", ".dng"):
+    # Foto's: EXIF
+    if ext in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng", ".tiff", ".tif"):
         try:
             from PIL import Image
             with Image.open(path) as img:
@@ -193,6 +215,17 @@ def get_photo_date(path: Path) -> float:
                     return dt.timestamp()
         except Exception:
             pass
+    # Video's: ffprobe
+    elif ext in _VIDEO_EXT:
+        ts = _get_video_date(path)
+        if ts:
+            return ts
+    # Fallback: iPhone-bestandsnamen (IMG_1234, IMG_E1234) zijn chronologisch.
+    # Gebruik het nummer als sorteersleutel zodat we niet afhankelijk zijn van mtime.
+    import re
+    m = re.search(r'(\d{4,})', path.stem)
+    if m:
+        return float(m.group(1))
     return path.stat().st_mtime
 
 
@@ -983,6 +1016,8 @@ class ImporterPage(Gtk.Box):
         def on_progress(count):
             GLib.idle_add(self.progress_subtitle.set_text, f"{count} bestanden gevonden…")
         files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
+        GLib.idle_add(self.progress_subtitle.set_text,
+                      f"{len(files)} bestanden gevonden, sorteren op datum…")
         files.sort(key=get_photo_date, reverse=True)  # Nieuwste eerst
         GLib.idle_add(self._on_scan_done, files)
 
