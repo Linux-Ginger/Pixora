@@ -199,6 +199,27 @@ def _get_video_date(path: Path) -> float | None:
         pass
     return None
 
+def _get_video_duration(path: Path) -> str | None:
+    """Haal videoduur op via ffprobe. Geeft string terug zoals '1:23' of '0:05'."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json",
+             "-show_entries", "format=duration", str(path)],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            import json as _json
+            info = _json.loads(result.stdout)
+            secs = float(info.get("format", {}).get("duration", 0))
+            if secs > 0:
+                mins = int(secs) // 60
+                sec = int(secs) % 60
+                return f"{mins}:{sec:02d}"
+    except Exception:
+        pass
+    return None
+
+
 def get_photo_date(path: Path) -> float:
     """Geeft de fotodatum als timestamp. Probeert EXIF/ffprobe eerst, valt terug op bestandsnaam."""
     ext = path.suffix.lower()
@@ -1095,6 +1116,7 @@ class ImporterPage(Gtk.Box):
         # Voeg kaarten toe en laad thumbnails in achtergrond
         self._select_cards: dict[str, Gtk.CheckButton] = {}
         self._select_overlays: dict[str, Gtk.Overlay] = {}
+        self._video_duration_labels: dict[str, Gtk.Label] = {}
         for fp in files:
             card, check, overlay = self._make_select_card(fp)
             self._select_cards[str(fp)] = check
@@ -1135,9 +1157,9 @@ class ImporterPage(Gtk.Box):
         check.set_focusable(False)
         overlay.add_overlay(check)
 
-        # Video-indicator rechtsonder
+        # Video-indicator rechtsonder met duur
         ext = fp.suffix.lower()
-        if ext in {".mp4", ".mov", ".m4v"}:
+        if ext in {".mp4", ".mov", ".m4v", ".3gp"}:
             video_lbl = Gtk.Label(label="▶")
             video_lbl.add_css_class("caption")
             video_lbl.set_halign(Gtk.Align.END)
@@ -1145,6 +1167,7 @@ class ImporterPage(Gtk.Box):
             video_lbl.set_margin_end(4)
             video_lbl.set_margin_bottom(4)
             overlay.add_overlay(video_lbl)
+            self._video_duration_labels[str(fp)] = video_lbl
 
         return overlay, check, overlay
 
@@ -1154,6 +1177,11 @@ class ImporterPage(Gtk.Box):
             pixbuf = load_select_thumb(fp)
             if pixbuf is not None:
                 GLib.idle_add(self._set_select_thumb, str(fp), pixbuf)
+            # Videoduur ophalen
+            if fp.suffix.lower() in _VIDEO_EXT:
+                dur = _get_video_duration(fp)
+                if dur:
+                    GLib.idle_add(self._set_video_duration, str(fp), dur)
 
     def _set_select_thumb(self, path_str: str, pixbuf):
         """Vervang placeholder door echte thumbnail in de selectiekaart."""
@@ -1165,6 +1193,12 @@ class ImporterPage(Gtk.Box):
         pic.set_content_fit(Gtk.ContentFit.COVER)
         pic.set_size_request(SELECT_THUMB, SELECT_THUMB)
         overlay.set_child(pic)
+
+    def _set_video_duration(self, path_str: str, duration: str):
+        """Update de video-indicator met de duur (bijv. '▶ 1:23')."""
+        lbl = self._video_duration_labels.get(path_str)
+        if lbl:
+            lbl.set_text(f"▶ {duration}")
 
     def _on_card_click(self, path_str: str):
         """Klik ergens op de kaart togglet het vinkje (enige toggle-handler)."""
