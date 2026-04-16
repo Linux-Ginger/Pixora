@@ -46,7 +46,7 @@ CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
 TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
 THUMB_SIZE       = 180
 FILM_THUMB       = 70
-BATCH_SIZE       = 30
+BATCH_SIZE       = 15
 TILE_SIZE        = 256
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
 VIDEO_EXTENSIONS = {".mp4", ".mov"}
@@ -125,6 +125,8 @@ def get_gps_coords(photo_path):
         from PIL import Image
         from PIL.ExifTags import TAGS, GPSTAGS
         img  = Image.open(photo_path)
+        if img.mode == "P" and "transparency" in img.info:
+            img = img.convert("RGBA")
         exif = img._getexif()
         if not exif:
             return None
@@ -1687,7 +1689,40 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _update_thumb_visual(self, index, widget):
         btn, check_box = widget
-        check_box.set_visible(index in self._selected)
+        selected = index in self._selected
+        if check_box is None and selected:
+            # Lazy: maak check_box pas aan wanneer nodig
+            if not hasattr(self, '_thumb_css'):
+                return
+            tc = self._thumb_css
+            overlay = btn.get_child()
+            if not isinstance(overlay, Gtk.Overlay):
+                # Wrap picture in overlay voor check_box
+                picture = btn.get_child()
+                btn.set_child(None)
+                overlay = Gtk.Overlay()
+                overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
+                overlay.set_child(picture)
+                btn.set_child(overlay)
+            check_box = Gtk.Box()
+            check_box.set_size_request(22, 22)
+            check_box.set_halign(Gtk.Align.END)
+            check_box.set_valign(Gtk.Align.END)
+            check_box.set_margin_end(6)
+            check_box.set_margin_bottom(6)
+            check_box.get_style_context().add_provider(tc['check_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            check_icon = Gtk.Image.new_from_icon_name("object-select-symbolic")
+            check_icon.set_pixel_size(14)
+            check_icon.set_halign(Gtk.Align.CENTER)
+            check_icon.set_valign(Gtk.Align.CENTER)
+            check_icon.set_hexpand(True)
+            check_icon.set_vexpand(True)
+            check_icon.get_style_context().add_provider(tc['white_icon'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            check_box.append(check_icon)
+            overlay.add_overlay(check_box)
+            self.thumb_widgets[index] = (btn, check_box)
+        if check_box is not None:
+            check_box.set_visible(selected)
 
     # ── Foto's laden ──────────────────────────────────────────────────
     def load_photos(self):
@@ -1764,7 +1799,7 @@ class MainWindow(Adw.ApplicationWindow):
                 if len(batch) >= BATCH_SIZE:
                     GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
                     batch = []
-                    time.sleep(0.02)
+                    time.sleep(0.05)
             if batch and load_id == self._load_id:
                 GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
         GLib.idle_add(self._load_done, load_id, total)
@@ -1830,12 +1865,12 @@ class MainWindow(Adw.ApplicationWindow):
             picture.set_size_request(THUMB_SIZE, THUMB_SIZE)
             picture.set_content_fit(Gtk.ContentFit.COVER)
 
-            overlay = Gtk.Overlay()
-            overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
-            overlay.set_child(picture)
-
-            # Video overlay: play icon + duration
+            # Alleen overlay aanmaken als er video-indicatoren nodig zijn
             if duration > 0:
+                overlay = Gtk.Overlay()
+                overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
+                overlay.set_child(picture)
+
                 play_box = Gtk.Box()
                 play_box.set_halign(Gtk.Align.CENTER)
                 play_box.set_valign(Gtk.Align.CENTER)
@@ -1856,29 +1891,12 @@ class MainWindow(Adw.ApplicationWindow):
                 dur_label.get_style_context().add_provider(tc['dur_label'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
                 dur_box.append(dur_label)
                 overlay.add_overlay(dur_box)
-
-            check_box = Gtk.Box()
-            check_box.set_size_request(22, 22)
-            check_box.set_halign(Gtk.Align.END)
-            check_box.set_valign(Gtk.Align.END)
-            check_box.set_margin_end(6)
-            check_box.set_margin_bottom(6)
-            check_box.set_visible(False)
-            check_box.get_style_context().add_provider(tc['check_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
-            check_icon = Gtk.Image.new_from_icon_name("object-select-symbolic")
-            check_icon.set_pixel_size(14)
-            check_icon.set_halign(Gtk.Align.CENTER)
-            check_icon.set_valign(Gtk.Align.CENTER)
-            check_icon.set_hexpand(True)
-            check_icon.set_vexpand(True)
-            check_icon.get_style_context().add_provider(tc['white_icon'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
-            check_box.append(check_icon)
-            overlay.add_overlay(check_box)
+                btn_child = overlay
+            else:
+                btn_child = picture
 
             btn = Gtk.Button()
-            btn.set_child(overlay)
+            btn.set_child(btn_child)
             btn.set_overflow(Gtk.Overflow.HIDDEN)
             btn.set_size_request(THUMB_SIZE, THUMB_SIZE)
             btn.get_style_context().add_provider(tc['btn'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
@@ -1886,7 +1904,8 @@ class MainWindow(Adw.ApplicationWindow):
             idx = index
             btn.connect("clicked", lambda b, i=idx: self.on_thumb_clicked(i))
             self._current_flow.append(btn)
-            self.thumb_widgets[index] = (btn, check_box)
+            # check_box wordt lazy aangemaakt bij selectie-modus
+            self.thumb_widgets[index] = (btn, None)
         return False
 
     def _load_done(self, load_id, total):
@@ -2002,7 +2021,9 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self.viewer_location.set_text, f"📍 {location}")
             return
         try:
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
+            # Laad geschaald naar 2x schermgrootte (genoeg voor zoom, veel minder RAM)
+            max_dim = 3840  # 4K max, ruim genoeg voor elk scherm
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, max_dim, max_dim, True)
         except Exception:
             pixbuf = None
         # Toon foto direct zonder te wachten op geocoding
@@ -2246,8 +2267,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_spinner.set_visible(True)
         self.video_spinner.start()
         self._video_media = Gtk.MediaFile.new_for_filename(path)
+        self._video_media.set_loop(False)
         self.video_display.set_paintable(self._video_media)
-        GLib.idle_add(self._video_media.play)
+        # Start playback zodra de stream prepared is (voorkomt UI-blokkade)
+        self._video_media.connect("notify::prepared", lambda m, *_: m.play() if m.is_prepared() else None)
+        self._video_media.play()
         self.video_play_btn.set_icon_name("media-playback-pause-symbolic")
         self.video_mute_btn.set_icon_name("audio-volume-high-symbolic")
         self.video_vol_scale.set_value(1.0)
@@ -2280,15 +2304,19 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _start_video_poll(self):
         self._stop_video_poll()
-        self._video_poll_id = GLib.timeout_add(250, self._update_video_position)
+        self._video_poll_id = GLib.timeout_add(500, self._update_video_position)
 
     def _stop_video_poll(self):
-        if self._video_poll_id:
-            GLib.source_remove(self._video_poll_id)
+        if self._video_poll_id is not None:
+            try:
+                GLib.source_remove(self._video_poll_id)
+            except Exception:
+                pass
             self._video_poll_id = None
 
     def _update_video_position(self):
         if not self._video_media:
+            self._video_poll_id = None
             return False
         dur = self._video_media.get_duration()
         pos = self._video_media.get_timestamp()
@@ -2823,6 +2851,8 @@ class MainWindow(Adw.ApplicationWindow):
                 old_cache = get_cache_path(path)
                 from PIL import ImageOps
                 img = Image.open(path)
+                if img.mode == "P" and "transparency" in img.info:
+                    img = img.convert("RGBA")
                 ext = os.path.splitext(path)[1].lower()
                 is_jpeg = ext in (".jpg", ".jpeg")
 
