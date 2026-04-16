@@ -100,13 +100,22 @@ def dest_path(base: Path, structure: str, filename: str, mtime: datetime) -> Pat
 
 
 def ensure_services():
-    """Start usbmuxd als het niet draait."""
+    """Start usbmuxd als het niet draait. Wacht kort tot het klaar is."""
     try:
         r = subprocess.run(["pgrep", "-x", "usbmuxd"],
                            capture_output=True, timeout=3)
         if r.returncode != 0:
-            subprocess.Popen(["usbmuxd"], stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
+            # Probeer eerst zonder sudo, dan met sudo
+            try:
+                subprocess.run(["usbmuxd"], capture_output=True, timeout=5)
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                try:
+                    subprocess.run(["sudo", "-n", "usbmuxd"],
+                                   capture_output=True, timeout=5)
+                except Exception:
+                    pass
+            import time as _time
+            _time.sleep(1)  # Geef usbmuxd even om op te starten
     except Exception:
         pass
 
@@ -892,6 +901,7 @@ class ImporterPage(Gtk.Box):
         return True
 
     def _check_iphone(self):
+        ensure_services()
         udid = detect_iphone()
         GLib.idle_add(self._on_detection_result, udid)
 
