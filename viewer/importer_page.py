@@ -250,6 +250,93 @@ def get_photo_date(path: Path) -> float:
     return path.stat().st_mtime
 
 
+def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
+    """
+    Past crop en rotatie uit een AAE-bestand toe op de geïmporteerde foto.
+    Geeft True terug als er bewerkingen zijn toegepast.
+    """
+    try:
+        import plistlib
+        import zlib
+
+        with open(aae_path, "rb") as f:
+            plist = plistlib.load(f)
+
+        raw = plist.get("adjustmentData")
+        if not raw:
+            return False
+
+        # adjustmentData is base64-decoded door plistlib, maar zlib-gecomprimeerd
+        try:
+            json_str = zlib.decompress(raw)
+        except zlib.error:
+            json_str = raw  # Sommige zijn niet gecomprimeerd
+
+        import json as _json
+        data = _json.loads(json_str)
+        adjustments = data.get("adjustments", [])
+        if not adjustments:
+            return False
+
+        from PIL import Image
+        img = Image.open(image_path)
+        modified = False
+
+        for adj in adjustments:
+            if not adj.get("enabled", True):
+                continue
+            identifier = adj.get("identifier", "")
+            settings = adj.get("settings", {})
+
+            if identifier == "Crop":
+                # cropOrigin = [x, y] en cropSize = [w, h] als fractie van het origineel
+                origin = settings.get("cropOrigin")
+                size = settings.get("cropSize")
+                angle = settings.get("straightenAngle", 0)
+
+                if angle and angle != 0:
+                    img = img.rotate(-angle, expand=True, resample=Image.BICUBIC)
+                    modified = True
+
+                if origin and size:
+                    w, h = img.size
+                    left = int(origin[0] * w)
+                    top = int(origin[1] * h)
+                    right = int((origin[0] + size[0]) * w)
+                    bottom = int((origin[1] + size[1]) * h)
+                    img = img.crop((left, top, right, bottom))
+                    modified = True
+
+            elif identifier == "Straighten":
+                angle = settings.get("straightenAngle", 0)
+                if angle and angle != 0:
+                    img = img.rotate(-angle, expand=True, resample=Image.BICUBIC)
+                    modified = True
+
+        if modified:
+            # Bewaar met originele kwaliteit
+            ext = image_path.suffix.lower()
+            if ext in (".jpg", ".jpeg"):
+                img.save(image_path, "JPEG", quality=95, exif=img.info.get("exif", b""))
+            elif ext in (".heic", ".heif"):
+                # HEIC opslaan als JPEG (Pillow kan niet naar HEIC schrijven)
+                jpeg_path = image_path.with_suffix(".jpg")
+                img.save(jpeg_path, "JPEG", quality=95)
+                image_path.unlink()
+                jpeg_path.rename(image_path.with_suffix(".jpg"))
+            elif ext == ".png":
+                img.save(image_path, "PNG")
+            else:
+                img.save(image_path)
+            img.close()
+            return True
+
+        img.close()
+    except Exception:
+        pass
+    return False
+
+
 def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
     """
     Scan de DCIM-map van de iPhone recursief.
@@ -1103,7 +1190,10 @@ class ImporterPage(Gtk.Box):
     def _show_selecting(self, files: list[Path]):
         n = len(files)
         self.select_title.set_text(f"{n} bestand{'en' if n != 1 else ''} gevonden")
-        self.select_subtitle.set_text("Kies welke foto's en video's je wilt importeren.")
+        self.select_subtitle.set_text(
+            "Kies welke foto's en video's je wilt importeren.\n"
+            "💡 Tip: leeg eerst de prullenbak op je iPhone om verwijderde foto's uit te sluiten."
+        )
 
         # Alles standaard geselecteerd
         self.selected_files = {str(f) for f in files}
@@ -1410,6 +1500,14 @@ class ImporterPage(Gtk.Box):
 
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
+
+                # Pas AAE-bewerkingen toe (crop/rotatie) als die bestaan
+                aae = src.with_suffix(".AAE")
+                if not aae.exists():
+                    aae = src.with_suffix(".aae")
+                if aae.exists() and dst.suffix.lower() in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng"):
+                    apply_aae_edits(dst, aae)
+
                 imported += 1
             except Exception:
                 pass
