@@ -37,7 +37,6 @@ try:
 except ImportError:
     WATCHDOG_AVAILABLE = False
 
-IMPORTER_PATH    = os.path.join(os.path.dirname(__file__), "..", "importer", "main.py")
 DOCS_DIR         = os.path.join(os.path.dirname(__file__), "..", "docs")
 VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
 INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
@@ -66,9 +65,6 @@ MONTHS_NL = [
     "jul", "aug", "sep", "okt", "nov", "dec"
 ]
 
-
-def importer_installed():
-    return os.path.exists(IMPORTER_PATH)
 
 def get_logo_path(dark_mode):
     return os.path.join(DOCS_DIR, f"pixora-logo-{'dark' if dark_mode else 'light'}.png")
@@ -1632,12 +1628,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
 
-        if importer_installed():
-            import_btn = Gtk.Button(label="📱  Importeer van iPhone of iPad")
-            import_btn.add_css_class("suggested-action")
-            import_btn.add_css_class("pill")
-            import_btn.connect("clicked", self.open_importer)
-            normal_bar.pack_end(import_btn)
+        import_btn = Gtk.Button(label="📱  Importeer van iPhone of iPad")
+        import_btn.add_css_class("suggested-action")
+        import_btn.add_css_class("pill")
+        import_btn.connect("clicked", self.open_importer)
+        normal_bar.pack_end(import_btn)
 
         self.bottom_stack.add_named(normal_bar, "normal")
 

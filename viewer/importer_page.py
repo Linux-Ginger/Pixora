@@ -22,6 +22,12 @@ from pathlib import Path
 from datetime import datetime
 
 try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    pass
+
+try:
     from PIL import Image
     import imagehash
     HAS_IMAGEHASH = True
@@ -37,6 +43,8 @@ MOUNT_POINT  = Path(tempfile.gettempdir()) / "pixora_iphone"
 
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
 SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".dng", ".mp4", ".mov", ".m4v", ".webp", ".gif", ".tiff", ".tif", ".3gp", ".bmp"}
+EXCLUDED_EXT   = {".aae"}
+SKIP_DIRS      = {".Trash", "Recently Deleted", "Onlangs verwijderd", ".recently-deleted"}
 
 # Duplicate threshold → maximale hash-afstand
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
@@ -159,41 +167,69 @@ def unmount_iphone(mountpoint: Path):
         pass
 
 
+_EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, DateTimeDigitized, DateTime
+
+def get_photo_date(path: Path) -> float:
+    """Geeft de fotodatum als timestamp. Probeert EXIF eerst, valt terug op mtime."""
+    ext = path.suffix.lower()
+    if ext in (".jpg", ".jpeg", ".heic", ".png", ".dng"):
+        try:
+            from PIL import Image
+            with Image.open(path) as img:
+                exif = img.getexif()
+            for tag in _EXIF_DATE_TAGS:
+                val = exif.get(tag)
+                if val:
+                    dt = datetime.strptime(val[:19], "%Y:%m:%d %H:%M:%S")
+                    return dt.timestamp()
+        except Exception:
+            pass
+    return path.stat().st_mtime
+
+
 def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
     """
-    Scan de DCIM-map van de iPhone.
-    Gebruikt expliciete 2-level iteratie (DCIM/100APPLE/files) in plaats van
-    os.walk zodat een trage of falende submap de andere niet blokkeert.
+    Scan de DCIM-map van de iPhone recursief.
+    Slaat mappen over waarvan de naam in SKIP_DIRS staat (.Trash, Recently Deleted, …).
+    AAE-bestanden worden volledig uitgesloten en niet meegeteld.
     """
     dcim = mountpoint / "DCIM"
     if not dcim.exists():
         return []
 
-    # Verzamel submappen (bijv. 100APPLE, 101APPLE, ...)
-    try:
-        subdirs = sorted(p for p in dcim.iterdir() if p.is_dir())
-    except OSError:
-        return []
+    files: list[Path] = []
 
-    files = []
-    for subdir in subdirs:
-        # Retry tot 3× per submap bij FUSE-lees-errors
+    def _walk(directory: Path) -> None:
         for attempt in range(3):
             try:
-                entries = sorted(subdir.iterdir())
-                for entry in entries:
-                    if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXT:
-                        files.append(entry)
-                    if progress_cb:
-                        progress_cb(len(files))
-                break  # Gelukt, ga naar volgende submap
+                entries = sorted(directory.iterdir())
+                break
             except OSError:
                 if attempt == 2:
-                    pass  # Geef op na 3 pogingen, ga door met de rest
-                else:
-                    import time as _time
-                    _time.sleep(0.3)  # Kort wachten voor retry
+                    return
+                import time as _time
+                _time.sleep(0.3)
+        else:
+            return
 
+        subdirs: list[Path] = []
+        for entry in entries:
+            if entry.is_dir():
+                if entry.name not in SKIP_DIRS:
+                    subdirs.append(entry)
+            elif entry.is_file():
+                ext = entry.suffix.lower()
+                if ext in EXCLUDED_EXT:
+                    pass  # AAE overslaan
+                elif ext in SUPPORTED_EXT:
+                    files.append(entry)
+                    if progress_cb:
+                        progress_cb(len(files))
+
+        for subdir in subdirs:
+            _walk(subdir)
+
+    _walk(dcim)
     return files
 
 
@@ -658,6 +694,7 @@ class ImporterPage(Gtk.Box):
 
         self.select_flow = Gtk.FlowBox()
         self.select_flow.set_homogeneous(True)
+        self.select_flow.set_sort_func(lambda a, b, *_: 0)  # Behoud insertion-order
         self.select_flow.set_max_children_per_line(6)
         self.select_flow.set_min_children_per_line(2)
         self.select_flow.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -936,6 +973,7 @@ class ImporterPage(Gtk.Box):
         def on_progress(count):
             GLib.idle_add(self.progress_subtitle.set_text, f"{count} bestanden gevonden…")
         files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
+        files.sort(key=get_photo_date, reverse=True)  # Nieuwste eerst
         GLib.idle_add(self._on_scan_done, files)
 
     def _on_scan_done(self, files: list[Path]):
