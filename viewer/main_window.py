@@ -1242,7 +1242,10 @@ class MainWindow(Adw.ApplicationWindow):
     def _load_gps_and_show_map(self):
         markers = []
         for path in self.photos:
-            coords = get_gps_coords(path)
+            if is_video(path):
+                coords = get_video_gps_coords(path)
+            else:
+                coords = get_gps_coords(path)
             if coords:
                 lat, lon = coords
                 filename = os.path.basename(path)
@@ -2076,31 +2079,34 @@ class MainWindow(Adw.ApplicationWindow):
         if self.current_index > 0:
             self._stop_video()
             self.current_index -= 1
-            self._viewer_load_id += 1
-            load_id = self._viewer_load_id
-            self.viewer_location.set_text("")
-            self.filmstrip_area.queue_draw()
-            self._scroll_filmstrip_to_current()
-            threading.Thread(
-                target=self._load_full_photo,
-                args=(self.photos[self.current_index], load_id),
-                daemon=True
-            ).start()
+            self._schedule_photo_load()
 
     def next_photo(self, btn=None):
         if self.current_index < len(self.photos) - 1:
             self._stop_video()
             self.current_index += 1
-            self._viewer_load_id += 1
-            load_id = self._viewer_load_id
-            self.viewer_location.set_text("")
-            self.filmstrip_area.queue_draw()
-            self._scroll_filmstrip_to_current()
-            threading.Thread(
-                target=self._load_full_photo,
-                args=(self.photos[self.current_index], load_id),
-                daemon=True
-            ).start()
+            self._schedule_photo_load()
+
+    def _schedule_photo_load(self):
+        """Debounce: wacht 150ms voordat de foto geladen wordt bij snel navigeren."""
+        self._viewer_load_id += 1
+        self.viewer_location.set_text("")
+        self.filmstrip_area.queue_draw()
+        self._scroll_filmstrip_to_current()
+        # Annuleer een eventuele eerder geplande load
+        if hasattr(self, '_nav_debounce_id') and self._nav_debounce_id:
+            GLib.source_remove(self._nav_debounce_id)
+        self._nav_debounce_id = GLib.timeout_add(150, self._do_scheduled_load)
+
+    def _do_scheduled_load(self):
+        self._nav_debounce_id = None
+        load_id = self._viewer_load_id
+        threading.Thread(
+            target=self._load_full_photo,
+            args=(self.photos[self.current_index], load_id),
+            daemon=True
+        ).start()
+        return False
 
     def close_viewer(self, btn=None):
         self._stop_video()
@@ -2291,8 +2297,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._video_media = Gtk.MediaFile.new_for_filename(path)
         self._video_media.set_loop(False)
         self.video_display.set_paintable(self._video_media)
-        # Start playback zodra de stream prepared is (voorkomt UI-blokkade)
-        self._video_media.connect("notify::prepared", lambda m, *_: m.play() if m.is_prepared() else None)
         self._video_media.play()
         self.video_play_btn.set_icon_name("media-playback-pause-symbolic")
         self.video_mute_btn.set_icon_name("audio-volume-high-symbolic")
@@ -2470,17 +2474,17 @@ class MainWindow(Adw.ApplicationWindow):
     def _start_fade(self):
         self._fade_timer_id = None
         self._fade_step = 0
-        self._fade_anim_id = GLib.timeout_add(30, self._fade_tick)
+        self._fade_anim_id = GLib.timeout_add(50, self._fade_tick)
         return False
 
     def _fade_tick(self):
         self._fade_step += 1
-        opacity = max(0.0, 1.0 - self._fade_step / 20)  # ~600ms
-        for w in self._video_fade_widgets():
+        opacity = max(0.0, 1.0 - self._fade_step / 8)  # ~400ms, minder stappen
+        widgets = self._video_fade_widgets()
+        for w in widgets:
             w.set_opacity(opacity)
         if opacity <= 0.0:
-            # Remove faded widgets from render tree to eliminate GPU compositing overhead
-            for w in self._video_fade_widgets():
+            for w in widgets:
                 w.set_visible(False)
                 w.set_can_target(False)
             self._fade_anim_id = None
