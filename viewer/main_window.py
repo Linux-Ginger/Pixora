@@ -3111,7 +3111,7 @@ class MainWindow(Adw.ApplicationWindow):
         # App info row
         app_row = Adw.ActionRow(
             title="Pixora",
-            subtitle="Foto & video manager door LinuxGinger"
+            subtitle="Foto &amp; video manager door LinuxGinger"
         )
         icon_path = os.path.join(DOCS_DIR, "pixora-icon.svg")
         if os.path.exists(icon_path):
