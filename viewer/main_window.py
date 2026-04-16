@@ -2139,11 +2139,26 @@ class MainWindow(Adw.ApplicationWindow):
         ).start()
 
     def _load_filmstrip_bg(self, photos, load_id):
-        for i, path in enumerate(photos):
+        n = len(photos)
+        if n == 0:
+            return
+        # Laad eerst rond de huidige foto, dan naar buiten toe
+        center = min(self.current_index, n - 1)
+        order = [center]
+        for dist in range(1, n):
+            if load_id != self._filmstrip_load_id:
+                return
+            if center - dist >= 0:
+                order.append(center - dist)
+            if center + dist < n:
+                order.append(center + dist)
+
+        for i in order:
             if load_id != self._filmstrip_load_id:
                 return
             if i in self._filmstrip_thumbs:
                 continue
+            path = photos[i]
             try:
                 if is_video(path):
                     pb = load_thumbnail(path)  # uses ffmpeg cache
@@ -2160,9 +2175,10 @@ class MainWindow(Adw.ApplicationWindow):
             if load_id != self._filmstrip_load_id:
                 return
             self._filmstrip_thumbs[i] = pb
-            if i % 5 == 0:
+            if i % 5 == 0 and self.filmstrip_scroll.get_visible():
                 GLib.idle_add(self.filmstrip_area.queue_draw)
-        GLib.idle_add(self.filmstrip_area.queue_draw)
+        if self.filmstrip_scroll.get_visible():
+            GLib.idle_add(self.filmstrip_area.queue_draw)
 
     @staticmethod
     def _film_rounded_rect(cr, x, y, w, h, r=6):
@@ -2182,7 +2198,13 @@ class MainWindow(Adw.ApplicationWindow):
         cr.set_source_rgba(0, 0, 0, 0.65)
         cr.rectangle(0, 0, width, height)
         cr.fill()
-        for i in range(n):
+        # Alleen zichtbare items tekenen
+        adj = self.filmstrip_scroll.get_hadjustment()
+        scroll_x = adj.get_value() if adj else 0
+        visible_w = adj.get_page_size() if adj else width
+        first_visible = max(0, int(scroll_x / cell) - 1)
+        last_visible = min(n, int((scroll_x + visible_w) / cell) + 2)
+        for i in range(first_visible, last_visible):
             x = i * cell + 2
             y = (height - FILM_THUMB) // 2
             pb = self._filmstrip_thumbs.get(i)
