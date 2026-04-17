@@ -1464,9 +1464,42 @@ class MainWindow(Adw.ApplicationWindow):
             self._udev_client = None
         except Exception:
             pass
-        # Stop video playback (daemon-threads dien anders nog even door te lopen)
+        # Stop video playback + MediaFile explicitly (GStreamer-threads loslaten)
         try:
             self._stop_video()
+            if getattr(self, "_video_media", None):
+                try:
+                    self._video_media.unprepare() if hasattr(self._video_media, "unprepare") else None
+                except Exception:
+                    pass
+                self._video_media = None
+        except Exception:
+            pass
+        # Laat grote structuren los zodat RAM vrijkomt
+        try:
+            self.photos = []
+            self.thumb_widgets = {}
+            self.date_widgets = {}
+            self._filmstrip_thumbs = {}
+            self._preview_cache.clear()
+            self._photo_location.clear()
+            if hasattr(self, "_viewer_pixbuf"):
+                self._viewer_pixbuf = None
+            if hasattr(self, "_editor_display_pixbuf"):
+                self._editor_display_pixbuf = None
+            if hasattr(self, "_map_widget") and self._map_widget:
+                try:
+                    self._map_widget.tile_cache.clear()
+                    self._map_widget._hover_pixbufs.clear()
+                except Exception:
+                    pass
+                self._map_widget = None
+        except Exception as e:
+            log_error(f"Cleanup-fout: {e}")
+        # Trigger garbage collect
+        try:
+            import gc
+            gc.collect()
         except Exception:
             pass
         # Sluit dev-terminal als die open staat
@@ -1488,6 +1521,16 @@ class MainWindow(Adw.ApplicationWindow):
                 open(_LOG_PATH, "w").close()
         except Exception:
             pass
+        # Forceer exit als Python niet binnen 2s stopt — voorkomt dat
+        # lingering non-daemon-threads (GStreamer, PIL, gvfs-workers) het
+        # proces in geheugen houden.
+        def _force_exit():
+            try:
+                print("Pixora proces forceert exit (lingering threads)", flush=True)
+            except Exception:
+                pass
+            os._exit(0)
+        threading.Timer(2.0, _force_exit).start()
         return False
 
     # ── Header ───────────────────────────────────────────────────────

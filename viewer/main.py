@@ -170,7 +170,15 @@ class PixoraApp(Adw.Application):
 def main():
     global _PIXORA_APP
     _PIXORA_APP = PixoraApp()
-    return _PIXORA_APP.run(sys.argv)
+    rc = _PIXORA_APP.run(sys.argv)
+    # Als we hier komen zonder _force_exit, is dat goed. Log het zodat je
+    # in dev-mode ziet dat Pixora cleanly afgesloten is.
+    try:
+        if PIXORA_DEV_MODE:
+            print("Pixora clean exit (rc=" + str(rc) + ")", flush=True)
+    except Exception:
+        pass
+    return rc
 
 
 if __name__ == "__main__":
