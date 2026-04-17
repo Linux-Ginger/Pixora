@@ -21,7 +21,6 @@
 - ✂️ **Built-in editor** — rotate and crop without leaving the app
 - 🗺️ **Map view** — see where your photos were taken, with GPS support for videos too
 - ❤️ **Favorites** — heart photos and videos, filter by favorites only
-- 🎞️ **Ken Burns slideshow** — F5 for a cinematic auto-advancing slideshow
 - ⚙️ **First-time setup wizard** — up and running in minutes
 - 🔌 **Importer add-on** — the importer can be installed separately and launched from the viewer
 

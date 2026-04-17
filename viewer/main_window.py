@@ -46,7 +46,7 @@ CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
 FAVORITES_PATH   = os.path.expanduser("~/.config/pixora/favorites.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
 TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
-THUMB_SIZE       = 180
+THUMB_SIZE       = 320
 FILM_THUMB       = 70
 BATCH_SIZE       = 15
 TILE_SIZE        = 256
@@ -216,7 +216,7 @@ def get_photo_date(path: str) -> float:
 
 def get_cache_path(photo_path):
     mtime = str(os.path.getmtime(photo_path))
-    key   = hashlib.md5((photo_path + mtime).encode()).hexdigest()
+    key   = hashlib.md5((photo_path + mtime + str(THUMB_SIZE)).encode()).hexdigest()
     return os.path.join(CACHE_DIR, key + ".png")
 
 def get_video_duration(path):
@@ -831,10 +831,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._fade_anim_id          = None
         self._favorites             = load_favorites()
         self._favorites_only        = False
-        self._slideshow_active      = False
-        self._slideshow_paused      = False
-        self._kb_anim_id            = None
-        self._kb_next_timer_id      = None
 
         self.set_title("Pixora")
         self.set_default_size(9999, 9999)
@@ -1140,12 +1136,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.sort_combo.set_size_request(180, -1)
         self.sort_combo.connect("notify::selected", self.on_sort_changed)
         self.header.pack_start(self.sort_combo)
-
-        self.slideshow_btn = Gtk.Button(icon_name="media-playback-start-symbolic")
-        self.slideshow_btn.add_css_class("flat")
-        self.slideshow_btn.set_tooltip_text("Slideshow starten (F5)")
-        self.slideshow_btn.connect("clicked", self.start_slideshow)
-        self.header.pack_end(self.slideshow_btn)
 
         self.favorites_toggle = Gtk.ToggleButton()
         self.favorites_toggle.set_icon_name("starred-symbolic")
@@ -1908,7 +1898,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.date_widgets[date_str] = label
         flow = Gtk.FlowBox()
         flow.set_valign(Gtk.Align.START)
-        flow.set_max_children_per_line(12)
+        flow.set_max_children_per_line(6)
         flow.set_min_children_per_line(1)
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
         flow.set_row_spacing(4)
@@ -2138,14 +2128,12 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_full_photo(self, pixbuf, path, location=""):
         self._stop_video()
-        if not self._slideshow_active:
-            self._show_viewer_ui()   # reset opacity/visibility from any previous fade
+        self._show_viewer_ui()   # reset opacity/visibility from any previous fade
         self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
         self.photo_picture.set_visible(True)
-        if not self._slideshow_active:
-            self.edit_btn.set_visible(True)
-            self._update_favorite_btn()
+        self.edit_btn.set_visible(True)
+        self._update_favorite_btn()
         self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 16)
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
@@ -2519,8 +2507,6 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_viewer_motion(self, ctrl, x, y):
         if self.main_stack.get_visible_child_name() != "viewer":
             return
-        if self._slideshow_active:
-            return
         new_pos = (round(x), round(y))
         if getattr(self, '_last_viewer_mouse', None) == new_pos:
             return
@@ -2747,28 +2733,10 @@ class MainWindow(Adw.ApplicationWindow):
         if self.main_stack.get_visible_child_name() != "viewer":
             return False
         if keyval == 65307:  # Escape
-            if self._slideshow_active:
-                self.stop_slideshow()
-            elif self._editor_active:
+            if self._editor_active:
                 self.on_editor_cancel()
             else:
                 self.close_viewer()
-            return True
-        if self._slideshow_active:
-            if keyval == Gdk.KEY_space:
-                self._slideshow_paused = not self._slideshow_paused
-                if not self._slideshow_paused:
-                    # Hervat: reset starttijd op basis van huidige voortgang
-                    self._kb_start_time = time.monotonic()
-                    self._slideshow_start_frame()
-                return True
-            if keyval in (Gdk.KEY_Right, 65363):
-                if self._kb_anim_id:
-                    try: GLib.source_remove(self._kb_anim_id)
-                    except Exception: pass
-                    self._kb_anim_id = None
-                self._slideshow_advance()
-                return True
             return True
         if self._editor_active:
             return False
@@ -2784,9 +2752,6 @@ class MainWindow(Adw.ApplicationWindow):
             return True
         if keyval in (Gdk.KEY_f, Gdk.KEY_F):
             self.on_toggle_favorite(None)
-            return True
-        if keyval == Gdk.KEY_F5:
-            self.start_slideshow()
             return True
         return False
 
@@ -2872,148 +2837,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._favorites_only = btn.get_active()
         self.load_photos()
 
-    # ── Slideshow (Ken Burns) ─────────────────────────────────────────
-    def start_slideshow(self, btn=None):
-        if not self.photos:
-            return
-        # Open viewer als deze nog niet open is
-        if self.main_stack.get_visible_child_name() != "viewer":
-            self.open_photo(self.current_index if self._slideshow_active else 0)
-        self._slideshow_active = True
-        self._slideshow_paused = False
-        self._cancel_fade()
-        for w in self._video_fade_widgets():
-            w.set_visible(False)
-        # Bouw een "stop slideshow" knop als die nog niet bestaat
-        if not hasattr(self, 'slideshow_stop_btn'):
-            self.slideshow_stop_btn = Gtk.Button(icon_name="media-playback-stop-symbolic")
-            self.slideshow_stop_btn.add_css_class("osd")
-            self.slideshow_stop_btn.add_css_class("circular")
-            self.slideshow_stop_btn.set_halign(Gtk.Align.END)
-            self.slideshow_stop_btn.set_valign(Gtk.Align.START)
-            self.slideshow_stop_btn.set_margin_top(16)
-            self.slideshow_stop_btn.set_margin_end(16)
-            self.slideshow_stop_btn.set_size_request(40, 40)
-            self.slideshow_stop_btn.set_tooltip_text("Stop slideshow (Esc)")
-            self.slideshow_stop_btn.connect("clicked", self.stop_slideshow)
-            # viewer_area is de overlay container; vind via parent van photo_picture
-            overlay = self.photo_picture.get_parent()
-            if isinstance(overlay, Gtk.Overlay):
-                overlay.add_overlay(self.slideshow_stop_btn)
-        self.slideshow_stop_btn.set_visible(True)
-        self.slideshow_stop_btn.set_opacity(1.0)
-        self._slideshow_start_frame()
-
-    def stop_slideshow(self, btn=None):
-        self._slideshow_active = False
-        self._slideshow_paused = False
-        if self._kb_anim_id:
-            try:
-                GLib.source_remove(self._kb_anim_id)
-            except Exception:
-                pass
-            self._kb_anim_id = None
-        if self._kb_next_timer_id:
-            try:
-                GLib.source_remove(self._kb_next_timer_id)
-            except Exception:
-                pass
-            self._kb_next_timer_id = None
-        if hasattr(self, 'slideshow_stop_btn'):
-            self.slideshow_stop_btn.set_visible(False)
-        # Reset transform
-        self._viewer_zoom = 1.0
-        self._viewer_offset = [0.0, 0.0]
-        self._apply_viewer_transform()
-        self._show_viewer_ui()
-
-    def _slideshow_start_frame(self):
-        if not self._slideshow_active:
-            return
-        if not self.photos:
-            self.stop_slideshow()
-            return
-        path = self.photos[self.current_index]
-        if is_video(path):
-            # Skip video's: direct door naar volgende
-            self._slideshow_schedule_next(delay_ms=50)
-            return
-        import random
-        # Willekeurig zoom-richting en pan-offset
-        self._kb_start_zoom = random.choice([1.0, 1.18])
-        self._kb_end_zoom = 1.18 if self._kb_start_zoom == 1.0 else 1.0
-        self._kb_pan_dx = random.uniform(-40, 40)
-        self._kb_pan_dy = random.uniform(-25, 25)
-        self._kb_start_time = time.monotonic()
-        self._kb_duration = float(self.settings.get("slideshow_duration", 6.0))
-        if self._kb_anim_id:
-            try:
-                GLib.source_remove(self._kb_anim_id)
-            except Exception:
-                pass
-        self._kb_anim_id = GLib.timeout_add(33, self._kb_tick)
-
-    def _kb_tick(self):
-        if not self._slideshow_active or self._slideshow_paused:
-            self._kb_anim_id = None
-            return False
-        elapsed = time.monotonic() - self._kb_start_time
-        t = min(1.0, elapsed / self._kb_duration)
-        # Ease-in-out
-        ease = t * t * (3 - 2 * t)
-        z = self._kb_start_zoom + (self._kb_end_zoom - self._kb_start_zoom) * ease
-        dx = self._kb_pan_dx * ease
-        dy = self._kb_pan_dy * ease
-        if not hasattr(self, '_viewer_css_provider'):
-            self._viewer_css_provider = Gtk.CssProvider()
-            self.photo_picture.get_style_context().add_provider(
-                self._viewer_css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
-            )
-        self._viewer_css_provider.load_from_string(
-            f"picture {{ transform: scale({z:.4f}) translate({dx:.2f}px, {dy:.2f}px);"
-            f" transform-origin: center center; }}"
-        )
-        if t >= 1.0:
-            self._kb_anim_id = None
-            self._slideshow_schedule_next(delay_ms=400)
-            return False
-        return True
-
-    def _slideshow_schedule_next(self, delay_ms=400):
-        if self._kb_next_timer_id:
-            try:
-                GLib.source_remove(self._kb_next_timer_id)
-            except Exception:
-                pass
-        self._kb_next_timer_id = GLib.timeout_add(delay_ms, self._slideshow_advance)
-
-    def _slideshow_advance(self):
-        self._kb_next_timer_id = None
-        if not self._slideshow_active:
-            return False
-        # Zoek volgende foto (sla video's over)
-        n = len(self.photos)
-        if n == 0:
-            self.stop_slideshow()
-            return False
-        start = self.current_index
-        for _ in range(n):
-            self.current_index = (self.current_index + 1) % n
-            if not is_video(self.photos[self.current_index]):
-                break
-            if self.current_index == start:
-                self.stop_slideshow()
-                return False
-        self._viewer_load_id += 1
-        load_id = self._viewer_load_id
-        path = self.photos[self.current_index]
-        threading.Thread(
-            target=self._load_full_photo,
-            args=(path, load_id),
-            daemon=True
-        ).start()
-        GLib.timeout_add(80, self._slideshow_start_frame)
-        return False
 
     # ── Foto editor ───────────────────────────────────────────────────
     def on_edit_current(self, btn):
@@ -3532,25 +3355,6 @@ class MainWindow(Adw.ApplicationWindow):
         backup_group.add(self.settings_backup_folder_row)
         page.add(backup_group)
 
-        slideshow_group = Adw.PreferencesGroup()
-        slideshow_group.set_title("Slideshow")
-        slideshow_group.set_description("Ken Burns slideshow (sneltoets F5)")
-
-        duration_row = Adw.ActionRow(
-            title="Seconden per foto",
-            subtitle="Hoe lang elke foto in beeld blijft"
-        )
-        duration_adj = Gtk.Adjustment(
-            value=float(self.settings.get("slideshow_duration", 6.0)),
-            lower=2.0, upper=20.0, step_increment=1.0
-        )
-        duration_spin = Gtk.SpinButton(adjustment=duration_adj, digits=0)
-        duration_spin.set_valign(Gtk.Align.CENTER)
-        duration_spin.connect("value-changed", self._on_slideshow_duration_changed)
-        duration_row.add_suffix(duration_spin)
-        slideshow_group.add(duration_row)
-        page.add(slideshow_group)
-
         about_group = Adw.PreferencesGroup()
         about_group.set_title("Over")
 
@@ -3594,10 +3398,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         dialog.add(page)
         dialog.present(self)
-
-    def _on_slideshow_duration_changed(self, spin):
-        self.settings["slideshow_duration"] = float(spin.get_value())
-        save_settings(self.settings)
 
     def on_structure_changed(self, value, btn):
         if btn.get_active():
