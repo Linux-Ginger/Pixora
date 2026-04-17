@@ -1163,16 +1163,15 @@ class ImporterPage(Gtk.Box):
             files.sort(key=get_photo_date, reverse=True)
             GLib.idle_add(self._update_progress, 1.0, f"Sorteren klaar ({total})", "")
         else:
-            # Bereken datums met voortgang, dan eenmalig sorteren op voorgecachte waardes
+            # Bereken datums met voortgang per foto, dan eenmalig sorteren op voorgecachte waardes
             date_cache = {}
             for i, f in enumerate(files):
                 date_cache[f] = get_photo_date(f)
-                if i % 50 == 0 or i == total - 1:
-                    frac = (i + 1) / total
-                    GLib.idle_add(
-                        self._update_progress, frac,
-                        f"Sorteren: {i + 1} / {total}", f.name
-                    )
+                frac = (i + 1) / total
+                GLib.idle_add(
+                    self._update_progress, frac,
+                    f"Sorteren: {i + 1} / {total}", f.name
+                )
             files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
         GLib.idle_add(self._on_scan_done, files)
 
