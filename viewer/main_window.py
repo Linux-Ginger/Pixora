@@ -20,6 +20,11 @@ from collections import defaultdict, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 # ── Dev-mode logging ─────────────────────────────────────────────────
+# Alleen actief in dev mode — main.py zet PIXORA_DEV_MODE bij startup.
+try:
+    from main import PIXORA_DEV_MODE as _DEV_MODE
+except Exception:
+    _DEV_MODE = False
 _LOG_COLOR = sys.stdout.isatty()
 _LOG_PATH = os.path.expanduser("~/.cache/pixora/pixora.log")
 _LOG_FILE = None
@@ -32,9 +37,11 @@ def _ensure_log_file():
         os.makedirs(os.path.dirname(_LOG_PATH), exist_ok=True)
         _LOG_FILE = open(_LOG_PATH, "a", buffering=1)
     except Exception:
-        _LOG_FILE = False  # markeer als niet-beschikbaar
+        _LOG_FILE = False
 
 def _log(level, color_code, msg):
+    if not _DEV_MODE:
+        return  # no-op in normal mode
     frame = inspect.currentframe().f_back.f_back
     loc = f"{os.path.basename(frame.f_code.co_filename)}:{frame.f_lineno}"
     ts = datetime.datetime.now().strftime("%H:%M:%S")
