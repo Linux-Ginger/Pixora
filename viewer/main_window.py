@@ -3396,6 +3396,37 @@ class MainWindow(Adw.ApplicationWindow):
         display_group.add(thumb_row)
         page.add(display_group)
 
+        iphone_group = Adw.PreferencesGroup()
+        iphone_group.set_title("iPhone / iPad verbinding")
+        iphone_group.set_description(
+            "Werkt usbmuxd niet meer? Herstart de verbinding hier."
+        )
+
+        self._usbmuxd_row = Adw.ActionRow(
+            title="USB-verbinding herstellen",
+            subtitle="Herstart usbmuxd als de iPhone niet meer wordt herkend"
+        )
+        reset_usbmuxd_btn = Gtk.Button(label="Herstart")
+        reset_usbmuxd_btn.add_css_class("flat")
+        reset_usbmuxd_btn.set_valign(Gtk.Align.CENTER)
+        reset_usbmuxd_btn.connect("clicked", self._on_reset_usbmuxd)
+        self._usbmuxd_row.add_suffix(reset_usbmuxd_btn)
+        self._usbmuxd_reset_btn = reset_usbmuxd_btn
+
+        self._usbmuxd_pair_row = Adw.ActionRow(
+            title="Koppeling wissen",
+            subtitle="Verwijder oude iPhone pair-records (tap Trust daarna opnieuw)"
+        )
+        clear_pair_btn = Gtk.Button(label="Wissen")
+        clear_pair_btn.add_css_class("flat")
+        clear_pair_btn.set_valign(Gtk.Align.CENTER)
+        clear_pair_btn.connect("clicked", self._on_clear_pair_records)
+        self._usbmuxd_pair_row.add_suffix(clear_pair_btn)
+
+        iphone_group.add(self._usbmuxd_row)
+        iphone_group.add(self._usbmuxd_pair_row)
+        page.add(iphone_group)
+
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title("Mapstructuur")
         structure_group.set_description("Hoe worden je foto's georganiseerd")
@@ -3593,6 +3624,101 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings["thumbnail_size"] = new_size
         save_settings(self.settings)
         self.load_photos()
+        return False
+
+    def _on_reset_usbmuxd(self, btn):
+        btn.set_sensitive(False)
+        btn.set_label("Bezig…")
+
+        def do():
+            result_msg = ""
+            ok = False
+            try:
+                r = subprocess.run(
+                    ["pkexec", "sh", "-c",
+                     "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
+                    capture_output=True, text=True, timeout=30
+                )
+                if r.returncode == 0:
+                    ok = True
+                    result_msg = "usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust."
+                elif r.returncode == 126 or r.returncode == 127:
+                    result_msg = "Wachtwoord geannuleerd of pkexec niet beschikbaar."
+                else:
+                    result_msg = f"Herstart mislukt (code {r.returncode}).\n{r.stderr.strip()[:200]}"
+            except FileNotFoundError:
+                result_msg = ("pkexec niet gevonden. Voer handmatig uit:\n"
+                              "  sudo killall usbmuxd; sudo usbmuxd")
+            except subprocess.TimeoutExpired:
+                result_msg = "Herstart duurde te lang (timeout)."
+            except Exception as e:
+                result_msg = f"Onverwachte fout: {e}"
+            GLib.idle_add(self._after_usbmuxd_reset, btn, ok, result_msg)
+
+        threading.Thread(target=do, daemon=True).start()
+
+    def _after_usbmuxd_reset(self, btn, ok, msg):
+        btn.set_label("Herstart")
+        btn.set_sensitive(True)
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading="USB-verbinding herstart" if ok else "Herstart mislukt",
+            body=msg
+        )
+        dialog.add_response("ok", "OK")
+        dialog.present()
+        if ok:
+            GLib.timeout_add(500, self._poll_import_device)
+        return False
+
+    def _on_clear_pair_records(self, btn):
+        confirm = Adw.MessageDialog(
+            transient_for=self,
+            heading="Pair-records wissen?",
+            body=("Dit verwijdert alle bestaande iPhone-koppelingen in "
+                  "/var/lib/lockdown/. Je iPhone vraagt de volgende keer "
+                  "opnieuw om Trust.")
+        )
+        confirm.add_response("cancel", "Annuleren")
+        confirm.add_response("clear", "Wissen")
+        confirm.set_response_appearance("clear", Adw.ResponseAppearance.DESTRUCTIVE)
+        confirm.set_default_response("cancel")
+        confirm.connect("response", self._do_clear_pair_records)
+        confirm.present()
+
+    def _do_clear_pair_records(self, dialog, response):
+        if response != "clear":
+            return
+
+        def do():
+            result_msg = ""
+            ok = False
+            try:
+                r = subprocess.run(
+                    ["pkexec", "sh", "-c",
+                     "rm -rf /var/lib/lockdown/* && "
+                     "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
+                    capture_output=True, text=True, timeout=30
+                )
+                if r.returncode == 0:
+                    ok = True
+                    result_msg = ("Pair-records gewist en usbmuxd opnieuw gestart. "
+                                  "Sluit je iPhone aan en tap Trust.")
+                else:
+                    result_msg = f"Wissen mislukt (code {r.returncode})."
+            except FileNotFoundError:
+                result_msg = "pkexec niet gevonden."
+            except Exception as e:
+                result_msg = f"Fout: {e}"
+            GLib.idle_add(self._show_info_dialog,
+                          "Klaar" if ok else "Mislukt", result_msg)
+
+        threading.Thread(target=do, daemon=True).start()
+
+    def _show_info_dialog(self, heading, body):
+        d = Adw.MessageDialog(transient_for=self, heading=heading, body=body)
+        d.add_response("ok", "OK")
+        d.present()
         return False
 
     def on_structure_changed(self, value, btn):
