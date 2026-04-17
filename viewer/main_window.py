@@ -949,7 +949,7 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._start_services, daemon=True).start()
         self._ios_device_present = False
         GLib.idle_add(self._poll_import_device)
-        GLib.timeout_add_seconds(5, self._poll_import_device)
+        GLib.timeout_add_seconds(10, self._poll_import_device)
 
     def _start_services(self):
         try:
@@ -962,7 +962,24 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _poll_import_device(self):
+        # Niet pollen terwijl de importer open is — voorkomt interferentie
+        # met pair/mount van libimobiledevice
+        try:
+            if self.main_stack.get_visible_child_name() == "importer":
+                return True
+        except Exception:
+            pass
+
         def check():
+            # Zorg dat usbmuxd loopt — als die is gecrasht werkt de iPhone niet
+            try:
+                r = subprocess.run(["pgrep", "-x", "usbmuxd"],
+                                   capture_output=True, timeout=2)
+                if r.returncode != 0:
+                    subprocess.Popen(["usbmuxd"], stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
             has_device = False
             try:
                 result = subprocess.run(
