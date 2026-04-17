@@ -1009,6 +1009,12 @@ class ImporterPage(Gtk.Box):
 
     def _show_state(self, state: str):
         self.state = state
+        # Stop eventuele pulse-animatie als we geen scan-state zijn
+        if state != STATE_SCANNING:
+            try:
+                self._stop_progress_pulse()
+            except Exception:
+                pass
         page_map = {
             STATE_WAITING:   "waiting",
             STATE_DETECTED:  "detected",
@@ -1118,16 +1124,63 @@ class ImporterPage(Gtk.Box):
         self._set_progress("Foto's scannen…", "Zoeken naar foto's en video's op je apparaat.")
         self._show_state(STATE_SCANNING)
         self._start_detection_poll()
+        self._start_progress_pulse()
         threading.Thread(target=self._do_scan, daemon=True).start()
+
+    def _start_progress_pulse(self):
+        """Toon een indeterminate 'bezig' animatie als we geen totaal weten."""
+        self._stop_progress_pulse()
+        self.progress_bar.set_show_text(False)
+        self.progress_bar.set_pulse_step(0.08)
+        self._pulse_timer = GLib.timeout_add(80, self._pulse_tick)
+
+    def _pulse_tick(self):
+        try:
+            self.progress_bar.pulse()
+        except Exception:
+            return False
+        return True
+
+    def _stop_progress_pulse(self):
+        if getattr(self, "_pulse_timer", None):
+            try:
+                GLib.source_remove(self._pulse_timer)
+            except Exception:
+                pass
+            self._pulse_timer = None
+        self.progress_bar.set_show_text(True)
 
     def _do_scan(self):
         def on_progress(count):
             GLib.idle_add(self.progress_subtitle.set_text, f"{count} bestanden gevonden…")
         files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
+        total = len(files)
         GLib.idle_add(self.progress_subtitle.set_text,
-                      f"{len(files)} bestanden gevonden, sorteren op datum…")
-        files.sort(key=get_photo_date, reverse=True)  # Nieuwste eerst
+                      f"{total} bestanden gevonden, sorteren op datum…")
+        # Sorteren met tussentijdse voortgang (laat 'm chunk-gewijs lopen zodat UI reageert)
+        GLib.idle_add(self._begin_sort_progress, total)
+        if total <= 500:
+            files.sort(key=get_photo_date, reverse=True)
+            GLib.idle_add(self._update_progress, 1.0, f"Sorteren klaar ({total})", "")
+        else:
+            # Bereken datums met voortgang, dan eenmalig sorteren op voorgecachte waardes
+            date_cache = {}
+            for i, f in enumerate(files):
+                date_cache[f] = get_photo_date(f)
+                if i % 50 == 0 or i == total - 1:
+                    frac = (i + 1) / total
+                    GLib.idle_add(
+                        self._update_progress, frac,
+                        f"Sorteren: {i + 1} / {total}", f.name
+                    )
+            files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
         GLib.idle_add(self._on_scan_done, files)
+
+    def _begin_sort_progress(self, total):
+        self._stop_progress_pulse()
+        self.progress_bar.set_fraction(0)
+        self.progress_bar.set_text("0%")
+        return False
 
     def _on_scan_done(self, files: list[Path]):
         self.iphone_files = files
