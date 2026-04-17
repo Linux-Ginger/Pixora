@@ -16,7 +16,12 @@
 - 🔍 **Perceptual duplicate detection** — compares actual image content, not just filename or date
 - 💾 **Automatic backup** — syncs to your external USB/HDD after every import
 - 📊 **Progress bars** — always know what Pixora is doing
-- 🖼️ **Photo viewer** — browse your collection by folder
+- 🖼️ **Photo & video viewer** — grid with date headers, timeline scrollbar, filmstrip navigation
+- 🎬 **Video playback** — inline player with scrubber and frame previews
+- ✂️ **Built-in editor** — rotate and crop without leaving the app
+- 🗺️ **Map view** — see where your photos were taken, with GPS support for videos too
+- ❤️ **Favorites** — heart photos and videos, filter by favorites only
+- 🎞️ **Ken Burns slideshow** — F5 for a cinematic auto-advancing slideshow
 - ⚙️ **First-time setup wizard** — up and running in minutes
 - 🔌 **Importer add-on** — the importer can be installed separately and launched from the viewer
 
@@ -34,11 +39,12 @@ Requires **Ubuntu 24.04 LTS** or newer.
 
 ## 📋 Requirements
 
-- Ubuntu 24.04 LTS
+- Ubuntu 24.04 LTS (or Debian-based)
 - iPhone (Lightning or USB-C)
 - Python 3.12+
-- PyQt6
+- GTK 4 + libadwaita (`python3-gi`, `gir1.2-gtk-4.0`, `gir1.2-adw-1`)
 - ifuse + libimobiledevice
+- ffmpeg (voor video thumbnails en previews)
 
 All dependencies are installed automatically by the install script.
 
@@ -52,7 +58,13 @@ This project is licensed under the **GNU General Public License v3.0** — see t
 
 ## 🌐 Website
 
-[pixora.linuxginger.com](https://pixora.linuxginger.com)
+[linuxginger.com/pixora](https://linuxginger.com/pixora)
+
+---
+
+## 🤖 Vibecoded
+
+Pixora is vibecoded door **LinuxGinger** samen met **Claude** (Anthropic) — een mens met een idee, een AI als pair-programmer, en heel veel koffie. ☕
 
 ---
 
