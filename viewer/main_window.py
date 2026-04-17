@@ -947,6 +947,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.connect("close-request", self.on_close)
         GLib.idle_add(self._check_for_update)
         threading.Thread(target=self._start_services, daemon=True).start()
+        self._ios_device_present = False
+        GLib.idle_add(self._poll_import_device)
+        GLib.timeout_add_seconds(5, self._poll_import_device)
 
     def _start_services(self):
         try:
@@ -957,6 +960,36 @@ class MainWindow(Adw.ApplicationWindow):
                                  stderr=subprocess.DEVNULL)
         except Exception:
             pass
+
+    def _poll_import_device(self):
+        def check():
+            has_device = False
+            try:
+                result = subprocess.run(
+                    ["idevice_id", "-l"],
+                    capture_output=True, text=True, timeout=3
+                )
+                has_device = any(l.strip() for l in result.stdout.splitlines())
+            except Exception:
+                has_device = False
+            GLib.idle_add(self._update_import_btn_state, has_device)
+        threading.Thread(target=check, daemon=True).start()
+        return True
+
+    def _update_import_btn_state(self, has_device):
+        if has_device == self._ios_device_present:
+            return False
+        self._ios_device_present = has_device
+        ctx = self.import_btn.get_style_context()
+        if has_device:
+            ctx.add_class("pixora-import-active")
+            self.import_btn.set_tooltip_text(
+                "iPhone of iPad gedetecteerd — klik om te importeren"
+            )
+        else:
+            ctx.remove_class("pixora-import-active")
+            self.import_btn.set_tooltip_text("Importeer van iPhone of iPad")
+        return False
 
     # ── Startup splash ───────────────────────────────────────────────
     def _prewarm_gstreamer(self):
@@ -1179,6 +1212,25 @@ class MainWindow(Adw.ApplicationWindow):
         self.map_btn.set_tooltip_text("Kaartweergave")
         self.map_btn.connect("clicked", self.open_map)
         self.header.pack_end(self.map_btn)
+
+        self.import_btn = Gtk.Button(icon_name="phone-symbolic")
+        self.import_btn.add_css_class("flat")
+        self.import_btn.set_tooltip_text("Importeer van iPhone of iPad")
+        self.import_btn.connect("clicked", self.open_importer)
+        self._import_btn_css = Gtk.CssProvider()
+        self._import_btn_css.load_from_string(
+            "button.pixora-import-active {"
+            "  background-color: #e95420;"
+            "  color: white;"
+            "}"
+            "button.pixora-import-active:hover {"
+            "  background-color: #d84a15;"
+            "}"
+        )
+        self.import_btn.get_style_context().add_provider(
+            self._import_btn_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        self.header.pack_end(self.import_btn)
 
         self.select_btn = Gtk.Button(label="Selecteren")
         self.select_btn.add_css_class("flat")
@@ -1723,12 +1775,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label = Gtk.Label(label="0 foto's")
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
-
-        import_btn = Gtk.Button(label="📱  Importeer van iPhone of iPad")
-        import_btn.add_css_class("suggested-action")
-        import_btn.add_css_class("pill")
-        import_btn.connect("clicked", self.open_importer)
-        normal_bar.pack_end(import_btn)
 
         self.bottom_stack.add_named(normal_bar, "normal")
 
