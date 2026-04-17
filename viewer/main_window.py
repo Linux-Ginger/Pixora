@@ -842,17 +842,17 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
         self.settings        = settings
-        if settings.get("dev_mode"):
-            log_info("═══ Pixora gestart in Developer Mode ═══")
-            log_info(f"Config: {CONFIG_PATH}")
-            log_info(f"Cache:  {CACHE_DIR}")
-            log_info(f"Thumbs: {THUMB_SIZE}px — favorieten: {len(load_favorites())}")
         # Thumbnail-grootte uit instellingen (globale constante wordt hier overschreven)
         global THUMB_SIZE
         try:
             THUMB_SIZE = max(200, min(500, int(settings.get("thumbnail_size", 200))))
         except Exception:
             THUMB_SIZE = 200
+        if settings.get("dev_mode"):
+            log_info("═══ Pixora gestart in Developer Mode ═══")
+            log_info(f"Config: {CONFIG_PATH}")
+            log_info(f"Cache:  {CACHE_DIR}")
+            log_info(f"Thumbs: {THUMB_SIZE}px — favorieten: {len(load_favorites())}")
         self.photos          = []
         self.thumb_widgets   = {}
         self.date_widgets    = {}
