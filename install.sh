@@ -45,6 +45,7 @@ sudo apt-get install -y -qq \
     python3-gi-cairo \
     gir1.2-gtk-4.0 \
     gir1.2-adw-1 \
+    gir1.2-gudev-1.0 \
     git \
     2>/dev/null
 

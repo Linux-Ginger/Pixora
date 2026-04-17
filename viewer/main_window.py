@@ -38,6 +38,13 @@ try:
 except ImportError:
     WATCHDOG_AVAILABLE = False
 
+try:
+    gi.require_version("GUdev", "1.0")
+    from gi.repository import GUdev
+    GUDEV_AVAILABLE = True
+except (ValueError, ImportError):
+    GUDEV_AVAILABLE = False
+
 DOCS_DIR         = os.path.join(os.path.dirname(__file__), "..", "docs")
 VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
 INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
@@ -948,8 +955,11 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._check_for_update)
         threading.Thread(target=self._start_services, daemon=True).start()
         self._ios_device_present = False
+        self._recovery_prompt_active = False
+        self._recovery_cooldown_until = 0.0
         GLib.idle_add(self._poll_import_device)
         GLib.timeout_add_seconds(10, self._poll_import_device)
+        self._setup_usb_monitor()
 
     def _start_services(self):
         try:
@@ -960,6 +970,106 @@ class MainWindow(Adw.ApplicationWindow):
                                  stderr=subprocess.DEVNULL)
         except Exception:
             pass
+
+    def _setup_usb_monitor(self):
+        """Luister naar udev USB-events voor automatische iPhone-detectie."""
+        self._udev_client = None
+        if not GUDEV_AVAILABLE:
+            return
+        try:
+            self._udev_client = GUdev.Client(subsystems=["usb"])
+            self._udev_client.connect("uevent", self._on_usb_event)
+        except Exception as e:
+            print(f"GUdev monitor kon niet starten: {e}")
+            self._udev_client = None
+
+    def _on_usb_event(self, client, action, device):
+        if action != "add":
+            return
+        try:
+            vendor = device.get_property("ID_VENDOR_ID")
+        except Exception:
+            vendor = None
+        if vendor != "05ac":  # Apple
+            return
+        # Wacht kort zodat usbmuxd het device kan zien, daarna controleren
+        GLib.timeout_add(2500, self._post_apple_plugin_check)
+
+    def _post_apple_plugin_check(self):
+        # Niet storen als importer open staat of dialog al actief is
+        try:
+            if self.main_stack.get_visible_child_name() == "importer":
+                return False
+        except Exception:
+            pass
+        if self._recovery_prompt_active:
+            return False
+
+        def check():
+            has_device = False
+            try:
+                result = subprocess.run(
+                    ["idevice_id", "-l"],
+                    capture_output=True, text=True, timeout=3
+                )
+                has_device = any(l.strip() for l in result.stdout.splitlines())
+            except Exception:
+                has_device = False
+            if has_device:
+                GLib.idle_add(self._update_import_btn_state, True)
+            else:
+                GLib.idle_add(self._maybe_prompt_usbmuxd_recovery)
+        threading.Thread(target=check, daemon=True).start()
+        return False
+
+    def _maybe_prompt_usbmuxd_recovery(self):
+        if self._recovery_prompt_active:
+            return False
+        if time.time() < self._recovery_cooldown_until:
+            return False
+        self._recovery_prompt_active = True
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading="iPhone/iPad gedetecteerd",
+            body=("Er is een Apple-apparaat aangesloten, maar usbmuxd "
+                  "herkent het niet. Wil je de USB-verbinding automatisch "
+                  "resetten?")
+        )
+        dialog.add_response("no", "Niet nu")
+        dialog.add_response("yes", "Ja, resetten")
+        dialog.set_response_appearance("yes", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("yes")
+        dialog.connect("response", self._on_recovery_dialog_response)
+        dialog.present()
+        return False
+
+    def _on_recovery_dialog_response(self, dialog, response):
+        self._recovery_prompt_active = False
+        if response != "yes":
+            # 10 min cooldown als gebruiker "Niet nu" kiest
+            self._recovery_cooldown_until = time.time() + 600
+            return
+
+        def do():
+            try:
+                r = subprocess.run(
+                    ["pkexec", "sh", "-c",
+                     "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
+                    capture_output=True, text=True, timeout=30
+                )
+                ok = (r.returncode == 0)
+            except Exception:
+                ok = False
+            if ok:
+                GLib.timeout_add(1500, self._poll_import_device)
+            else:
+                GLib.idle_add(
+                    self._show_info_dialog,
+                    "Herstart mislukt",
+                    "usbmuxd kon niet automatisch worden herstart. "
+                    "Probeer Instellingen > iPhone-verbinding > Herstart."
+                )
+        threading.Thread(target=do, daemon=True).start()
 
     def _poll_import_device(self):
         # Niet pollen terwijl de importer open is — voorkomt interferentie
