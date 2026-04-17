@@ -281,6 +281,9 @@ def load_thumbnail(photo_path):
             return None
     try:
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(photo_path, THUMB_SIZE, THUMB_SIZE, True)
+        oriented = pixbuf.apply_embedded_orientation()
+        if oriented is not None:
+            pixbuf = oriented
         pixbuf.savev(cache_path, "png", [], [])
         return pixbuf
     except Exception:
@@ -1953,9 +1956,17 @@ class MainWindow(Adw.ApplicationWindow):
                 width_at_thumb = THUMB_SIZE
             picture.set_size_request(width_at_thumb, THUMB_SIZE)
             picture.set_content_fit(Gtk.ContentFit.CONTAIN)
+            picture.set_hexpand(False)
+            picture.set_vexpand(False)
+            picture.set_halign(Gtk.Align.CENTER)
+            picture.set_valign(Gtk.Align.CENTER)
 
             overlay = Gtk.Overlay()
             overlay.set_size_request(width_at_thumb, THUMB_SIZE)
+            overlay.set_hexpand(False)
+            overlay.set_vexpand(False)
+            overlay.set_halign(Gtk.Align.CENTER)
+            overlay.set_valign(Gtk.Align.CENTER)
             overlay.set_child(picture)
 
             if duration > 0:
@@ -1984,6 +1995,10 @@ class MainWindow(Adw.ApplicationWindow):
             btn.set_child(overlay)
             btn.set_overflow(Gtk.Overflow.HIDDEN)
             btn.set_size_request(width_at_thumb, THUMB_SIZE)
+            btn.set_hexpand(False)
+            btn.set_vexpand(False)
+            btn.set_halign(Gtk.Align.CENTER)
+            btn.set_valign(Gtk.Align.CENTER)
             btn.get_style_context().add_provider(tc['btn'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
             idx = index
