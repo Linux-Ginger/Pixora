@@ -214,7 +214,7 @@ def get_photo_date(path: str) -> float:
     return os.path.getmtime(path)
 
 
-CACHE_VERSION = "v2"
+CACHE_VERSION = "v3"
 
 def get_cache_path(photo_path, thumb_size=None):
     if thumb_size is None:
@@ -276,9 +276,10 @@ def load_thumbnail(photo_path, thumb_size=None):
     os.makedirs(CACHE_DIR, exist_ok=True)
     if is_video(photo_path):
         try:
+            # Vaste hoogte, breedte volgt aspect (-2 = deelbaar door 2)
             subprocess.run(
                 ["ffmpeg", "-i", photo_path, "-ss", "00:00:01", "-vframes", "1",
-                 "-vf", f"scale={thumb_size}:{thumb_size}:force_original_aspect_ratio=decrease",
+                 "-vf", f"scale=-2:{thumb_size}",
                  cache_path, "-y"],
                 capture_output=True, timeout=15
             )
@@ -291,7 +292,11 @@ def load_thumbnail(photo_path, thumb_size=None):
             img = ImageOps.exif_transpose(img)  # Respecteer EXIF-rotatie
             if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGB")
-            img.thumbnail((thumb_size, thumb_size), Image.LANCZOS)
+            # Schaal naar vaste hoogte, breedte volgt aspect
+            w, h = img.size
+            if h > 0:
+                new_w = max(1, int(w * thumb_size / h))
+                img = img.resize((new_w, thumb_size), Image.LANCZOS)
             img.save(cache_path, "PNG")
         return GdkPixbuf.Pixbuf.new_from_file(cache_path)
     except Exception:
@@ -1920,7 +1925,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.date_widgets[date_str] = label
         flow = Gtk.FlowBox()
         flow.set_valign(Gtk.Align.START)
-        flow.set_max_children_per_line(30)
+        flow.set_halign(Gtk.Align.START)
+        flow.set_hexpand(False)
+        flow.set_max_children_per_line(100)
         flow.set_min_children_per_line(1)
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
         flow.set_row_spacing(4)
@@ -3278,11 +3285,20 @@ class MainWindow(Adw.ApplicationWindow):
             orientation=Gtk.Orientation.HORIZONTAL,
             adjustment=thumb_adj
         )
-        thumb_scale.set_size_request(240, -1)
+        thumb_scale.set_size_request(200, -1)
         thumb_scale.set_draw_value(False)
         thumb_scale.set_valign(Gtk.Align.CENTER)
         thumb_scale.connect("value-changed", self._on_thumb_size_changed, thumb_row)
         thumb_row.add_suffix(thumb_scale)
+
+        thumb_reset_btn = Gtk.Button(icon_name="edit-undo-symbolic")
+        thumb_reset_btn.add_css_class("flat")
+        thumb_reset_btn.add_css_class("circular")
+        thumb_reset_btn.set_valign(Gtk.Align.CENTER)
+        thumb_reset_btn.set_tooltip_text("Terug naar standaard (320 px)")
+        thumb_reset_btn.connect("clicked", lambda b: thumb_adj.set_value(320.0))
+        thumb_row.add_suffix(thumb_reset_btn)
+
         display_group.add(thumb_row)
         page.add(display_group)
 
