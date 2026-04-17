@@ -15,7 +15,8 @@ import hashlib
 import time
 import datetime
 import urllib.request
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -42,6 +43,7 @@ VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
 INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
 GITHUB_RELEASES_API = "https://api.github.com/repos/Linux-Ginger/pixora/releases/latest"
 CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
+FAVORITES_PATH   = os.path.expanduser("~/.config/pixora/favorites.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
 TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
 THUMB_SIZE       = 180
@@ -73,6 +75,23 @@ def save_settings(settings):
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         json.dump(settings, f, indent=2)
+
+
+def load_favorites():
+    try:
+        with open(FAVORITES_PATH, "r") as f:
+            return set(json.load(f))
+    except Exception:
+        return set()
+
+
+def save_favorites(favorites):
+    try:
+        os.makedirs(os.path.dirname(FAVORITES_PATH), exist_ok=True)
+        with open(FAVORITES_PATH, "w") as f:
+            json.dump(sorted(favorites), f, indent=2)
+    except Exception:
+        pass
 
 def get_available_drives():
     drives = []
@@ -409,7 +428,8 @@ class MapWidget(Gtk.DrawingArea):
         self.markers        = markers
         self.open_photo_cb  = open_photo_cb
         self.zoom           = 10.0 if markers else 7.0
-        self.tile_cache     = {}
+        self.tile_cache     = OrderedDict()
+        self._tile_cache_max = 200
         self._drag_start    = None
         self._mouse_x       = 450.0
         self._mouse_y       = 325.0
@@ -522,6 +542,9 @@ class MapWidget(Gtk.DrawingArea):
 
     def _tile_loaded(self, key, surface):
         self.tile_cache[key] = surface
+        self.tile_cache.move_to_end(key)
+        while len(self.tile_cache) > self._tile_cache_max:
+            self.tile_cache.popitem(last=False)
         self.queue_draw()
         return False
 
@@ -800,12 +823,18 @@ class MainWindow(Adw.ApplicationWindow):
         self._video_poll_id         = None
         self._video_scrubbing_lock  = False
         self._video_seek_pending_id = None
-        self._preview_cache         = {}   # timestamp_s -> pixbuf | None (loading)
+        self._preview_cache         = OrderedDict()  # LRU: timestamp_s -> pixbuf | None
         self._preview_debounce_id   = None
         self._preview_extracting    = False
         self._preview_pending_ts    = None
         self._fade_timer_id         = None
         self._fade_anim_id          = None
+        self._favorites             = load_favorites()
+        self._favorites_only        = False
+        self._slideshow_active      = False
+        self._slideshow_paused      = False
+        self._kb_anim_id            = None
+        self._kb_next_timer_id      = None
 
         self.set_title("Pixora")
         self.set_default_size(9999, 9999)
@@ -1112,6 +1141,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.sort_combo.connect("notify::selected", self.on_sort_changed)
         self.header.pack_start(self.sort_combo)
 
+        self.slideshow_btn = Gtk.Button(icon_name="media-playback-start-symbolic")
+        self.slideshow_btn.add_css_class("flat")
+        self.slideshow_btn.set_tooltip_text("Slideshow starten (F5)")
+        self.slideshow_btn.connect("clicked", self.start_slideshow)
+        self.header.pack_end(self.slideshow_btn)
+
+        self.favorites_toggle = Gtk.ToggleButton()
+        self.favorites_toggle.set_icon_name("starred-symbolic")
+        self.favorites_toggle.add_css_class("flat")
+        self.favorites_toggle.set_tooltip_text("Alleen favorieten tonen")
+        self.favorites_toggle.connect("toggled", self.toggle_favorites_filter)
+        self.header.pack_end(self.favorites_toggle)
+
         self.map_btn = Gtk.Button(label="🗺")
         self.map_btn.add_css_class("flat")
         self.map_btn.set_tooltip_text("Kaartweergave")
@@ -1369,6 +1411,25 @@ class MainWindow(Adw.ApplicationWindow):
         self.edit_btn.set_tooltip_text("Foto bewerken")
         self.edit_btn.connect("clicked", self.on_edit_current)
         viewer_area.add_overlay(self.edit_btn)
+
+        self.favorite_btn = Gtk.Button(icon_name="emblem-favorite-symbolic")
+        self.favorite_btn.add_css_class("osd")
+        self.favorite_btn.add_css_class("circular")
+        self.favorite_btn.set_halign(Gtk.Align.END)
+        self.favorite_btn.set_valign(Gtk.Align.START)
+        self.favorite_btn.set_margin_top(16)
+        self.favorite_btn.set_margin_end(172)
+        self.favorite_btn.set_size_request(40, 40)
+        self.favorite_btn.set_tooltip_text("Markeer als favoriet (F)")
+        self.favorite_btn.connect("clicked", self.on_toggle_favorite)
+        self._favorite_css = Gtk.CssProvider()
+        self._favorite_css.load_from_string(
+            "button.pixora-fav { color: #e95420; }"
+        )
+        self.favorite_btn.get_style_context().add_provider(
+            self._favorite_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        viewer_area.add_overlay(self.favorite_btn)
 
         # ── Editor toolbar (verborgen tot editor modus) ────────────────
         self.editor_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
@@ -1748,16 +1809,28 @@ class MainWindow(Adw.ApplicationWindow):
             for file in files:
                 if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
                     photos.append(os.path.join(root, file))
+        if self._favorites_only:
+            photos = [p for p in photos if p in self._favorites]
         if not photos:
-            self.show_empty_state()
+            if self._favorites_only:
+                self._show_empty_favorites()
+            else:
+                self.show_empty_state()
             self.start_watcher(photo_path)
             return False
         self.photos = photos
         self.apply_sort()
-        self.photo_count_label.set_text(f"{len(self.photos)} foto's")
+        suffix = " (favorieten)" if self._favorites_only else ""
+        self.photo_count_label.set_text(f"{len(self.photos)} foto's{suffix}")
         self.start_load()
         self.start_watcher(photo_path)
         return False
+
+    def _show_empty_favorites(self):
+        self.spinner.stop()
+        self.content_stack.set_visible_child_name("empty")
+        self.photo_count_label.set_text("0 favorieten")
+        self._loading = False
 
     def start_load(self):
         self._load_id += 1
@@ -1797,24 +1870,29 @@ class MainWindow(Adw.ApplicationWindow):
         total  = len(photos)
         groups = self._group_by_date(photos)
         loaded = 0
-        for date_str, date_obj, indices in groups:
-            if load_id != self._load_id:
-                return
-            GLib.idle_add(self._add_date_group, load_id, date_str)
-            batch = []
-            for idx in indices:
+
+        def fetch(idx):
+            path = photos[idx]
+            pb = load_thumbnail(path)
+            dur = get_video_duration(path) if is_video(path) else 0.0
+            return (idx, path, pb, dur)
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            for date_str, date_obj, indices in groups:
                 if load_id != self._load_id:
                     return
-                pixbuf = load_thumbnail(photos[idx])
-                dur = get_video_duration(photos[idx]) if is_video(photos[idx]) else 0.0
-                batch.append((idx, photos[idx], pixbuf, dur))
-                loaded += 1
-                if len(batch) >= BATCH_SIZE:
+                GLib.idle_add(self._add_date_group, load_id, date_str)
+                batch = []
+                for result in pool.map(fetch, indices):
+                    if load_id != self._load_id:
+                        return
+                    batch.append(result)
+                    loaded += 1
+                    if len(batch) >= BATCH_SIZE:
+                        GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
+                        batch = []
+                if batch and load_id == self._load_id:
                     GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
-                    batch = []
-                    time.sleep(0.05)
-            if batch and load_id == self._load_id:
-                GLib.idle_add(self._apply_batch, load_id, list(batch), loaded, total)
         GLib.idle_add(self._load_done, load_id, total)
 
     def _add_date_group(self, load_id, date_str):
@@ -1878,12 +1956,11 @@ class MainWindow(Adw.ApplicationWindow):
             picture.set_size_request(THUMB_SIZE, THUMB_SIZE)
             picture.set_content_fit(Gtk.ContentFit.COVER)
 
-            # Alleen overlay aanmaken als er video-indicatoren nodig zijn
-            if duration > 0:
-                overlay = Gtk.Overlay()
-                overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
-                overlay.set_child(picture)
+            overlay = Gtk.Overlay()
+            overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
+            overlay.set_child(picture)
 
+            if duration > 0:
                 play_box = Gtk.Box()
                 play_box.set_halign(Gtk.Align.CENTER)
                 play_box.set_valign(Gtk.Align.CENTER)
@@ -1904,12 +1981,9 @@ class MainWindow(Adw.ApplicationWindow):
                 dur_label.get_style_context().add_provider(tc['dur_label'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
                 dur_box.append(dur_label)
                 overlay.add_overlay(dur_box)
-                btn_child = overlay
-            else:
-                btn_child = picture
 
             btn = Gtk.Button()
-            btn.set_child(btn_child)
+            btn.set_child(overlay)
             btn.set_overflow(Gtk.Overflow.HIDDEN)
             btn.set_size_request(THUMB_SIZE, THUMB_SIZE)
             btn.get_style_context().add_provider(tc['btn'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
@@ -1919,6 +1993,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._current_flow.append(btn)
             # check_box wordt lazy aangemaakt bij selectie-modus
             self.thumb_widgets[index] = (btn, None)
+            if path in self._favorites:
+                self._refresh_thumb_favorite(index)
         return False
 
     def _load_done(self, load_id, total):
@@ -2062,11 +2138,14 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_full_photo(self, pixbuf, path, location=""):
         self._stop_video()
-        self._show_viewer_ui()   # reset opacity/visibility from any previous fade
+        if not self._slideshow_active:
+            self._show_viewer_ui()   # reset opacity/visibility from any previous fade
         self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
         self.photo_picture.set_visible(True)
-        self.edit_btn.set_visible(True)
+        if not self._slideshow_active:
+            self.edit_btn.set_visible(True)
+            self._update_favorite_btn()
         self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 16)
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
@@ -2168,16 +2247,13 @@ class MainWindow(Adw.ApplicationWindow):
                 order.append(center - dist)
             if center + dist < n:
                 order.append(center + dist)
+        order = [i for i in order if i not in self._filmstrip_thumbs]
 
-        for i in order:
-            if load_id != self._filmstrip_load_id:
-                return
-            if i in self._filmstrip_thumbs:
-                continue
+        def load_one(i):
             path = photos[i]
             try:
                 if is_video(path):
-                    pb = load_thumbnail(path)  # uses ffmpeg cache
+                    pb = load_thumbnail(path)
                     if pb:
                         pb = pb.scale_simple(
                             min(FILM_THUMB, pb.get_width()),
@@ -2188,11 +2264,15 @@ class MainWindow(Adw.ApplicationWindow):
                         path, FILM_THUMB, FILM_THUMB, True)
             except Exception:
                 pb = None
-            if load_id != self._filmstrip_load_id:
-                return
-            self._filmstrip_thumbs[i] = pb
-            if i % 5 == 0 and self.filmstrip_scroll.get_visible():
-                GLib.idle_add(self.filmstrip_area.queue_draw)
+            return i, pb
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            for count, (i, pb) in enumerate(pool.map(load_one, order)):
+                if load_id != self._filmstrip_load_id:
+                    return
+                self._filmstrip_thumbs[i] = pb
+                if count % 5 == 0 and self.filmstrip_scroll.get_visible():
+                    GLib.idle_add(self.filmstrip_area.queue_draw)
         if self.filmstrip_scroll.get_visible():
             GLib.idle_add(self.filmstrip_area.queue_draw)
 
@@ -2291,12 +2371,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_video(self, path, location=""):
         self._stop_video()
-        self._preview_cache = {}
+        self._preview_cache = OrderedDict()
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
         self._show_viewer_ui()   # reset opacity/visibility from any previous fade
         self.photo_picture.set_visible(False)
         self.edit_btn.set_visible(False)
+        self._update_favorite_btn()
         self.video_display.set_visible(True)
         self.video_controls.set_visible(True)
         self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 8 + 56)
@@ -2368,9 +2449,10 @@ class MainWindow(Adw.ApplicationWindow):
             self._video_scrubbing_lock = False
         pos_s = pos // 1_000_000
         dur_s = dur // 1_000_000
-        self.video_time_label.set_text(
-            f"{format_duration(pos_s)} / {format_duration(dur_s)}"
-        )
+        new_text = f"{format_duration(pos_s)} / {format_duration(dur_s)}"
+        if getattr(self, '_last_video_time_text', None) != new_text:
+            self.video_time_label.set_text(new_text)
+            self._last_video_time_text = new_text
         if self._video_media.get_ended():
             self.video_play_btn.set_icon_name("media-playback-start-symbolic")
             self._video_poll_id = None
@@ -2437,6 +2519,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_viewer_motion(self, ctrl, x, y):
         if self.main_stack.get_visible_child_name() != "viewer":
             return
+        if self._slideshow_active:
+            return
         new_pos = (round(x), round(y))
         if getattr(self, '_last_viewer_mouse', None) == new_pos:
             return
@@ -2470,6 +2554,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.viewer_close_btn,
             self.viewer_delete_btn,
             self.edit_btn,
+            self.favorite_btn,
             self.prev_btn,
             self.next_btn,
         ]
@@ -2587,10 +2672,10 @@ class MainWindow(Adw.ApplicationWindow):
             )
             pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(tmp, 160, 90, True)
             os.unlink(tmp)
-            if len(self._preview_cache) > 60:
-                # drop oldest entry to cap memory
-                del self._preview_cache[next(iter(self._preview_cache))]
             self._preview_cache[ts_s] = pb
+            self._preview_cache.move_to_end(ts_s)
+            while len(self._preview_cache) > 25:
+                self._preview_cache.popitem(last=False)
             GLib.idle_add(self._apply_preview_frame, ts_s)
         except Exception:
             pass
@@ -2599,8 +2684,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _apply_preview_frame(self, ts_s):
         pb = self._preview_cache.get(ts_s)
-        if pb and self._preview_popover.get_visible():
-            self._preview_picture.set_pixbuf(pb)
+        if pb:
+            self._preview_cache.move_to_end(ts_s)
+            if self._preview_popover.get_visible():
+                self._preview_picture.set_pixbuf(pb)
         return False
 
     def _apply_viewer_transform(self):
@@ -2660,10 +2747,28 @@ class MainWindow(Adw.ApplicationWindow):
         if self.main_stack.get_visible_child_name() != "viewer":
             return False
         if keyval == 65307:  # Escape
-            if self._editor_active:
+            if self._slideshow_active:
+                self.stop_slideshow()
+            elif self._editor_active:
                 self.on_editor_cancel()
             else:
                 self.close_viewer()
+            return True
+        if self._slideshow_active:
+            if keyval == Gdk.KEY_space:
+                self._slideshow_paused = not self._slideshow_paused
+                if not self._slideshow_paused:
+                    # Hervat: reset starttijd op basis van huidige voortgang
+                    self._kb_start_time = time.monotonic()
+                    self._slideshow_start_frame()
+                return True
+            if keyval in (Gdk.KEY_Right, 65363):
+                if self._kb_anim_id:
+                    try: GLib.source_remove(self._kb_anim_id)
+                    except Exception: pass
+                    self._kb_anim_id = None
+                self._slideshow_advance()
+                return True
             return True
         if self._editor_active:
             return False
@@ -2677,6 +2782,237 @@ class MainWindow(Adw.ApplicationWindow):
         elif keyval == 65363:
             self.next_photo()
             return True
+        if keyval in (Gdk.KEY_f, Gdk.KEY_F):
+            self.on_toggle_favorite(None)
+            return True
+        if keyval == Gdk.KEY_F5:
+            self.start_slideshow()
+            return True
+        return False
+
+    # ── Favorieten ────────────────────────────────────────────────────
+    def _current_photo_path(self):
+        if 0 <= self.current_index < len(self.photos):
+            return self.photos[self.current_index]
+        return None
+
+    def _update_favorite_btn(self):
+        path = self._current_photo_path()
+        if not path:
+            return
+        is_fav = path in self._favorites
+        self.favorite_btn.set_icon_name(
+            "starred-symbolic" if is_fav else "non-starred-symbolic"
+        )
+        ctx = self.favorite_btn.get_style_context()
+        if is_fav:
+            ctx.add_class("pixora-fav")
+        else:
+            ctx.remove_class("pixora-fav")
+        self.favorite_btn.set_tooltip_text(
+            "Verwijder uit favorieten (F)" if is_fav else "Markeer als favoriet (F)"
+        )
+
+    def on_toggle_favorite(self, btn):
+        path = self._current_photo_path()
+        if not path:
+            return
+        if path in self._favorites:
+            self._favorites.discard(path)
+        else:
+            self._favorites.add(path)
+        save_favorites(self._favorites)
+        self._update_favorite_btn()
+        # refresh thumbnail badge if visible
+        widget = self.thumb_widgets.get(self.current_index)
+        if widget:
+            self._refresh_thumb_favorite(self.current_index)
+
+    def _refresh_thumb_favorite(self, index):
+        entry = self.thumb_widgets.get(index)
+        if not entry:
+            return
+        btn, _cb = entry
+        path = self.photos[index] if index < len(self.photos) else None
+        if not path:
+            return
+        is_fav = path in self._favorites
+        overlay = btn.get_child()
+        if not isinstance(overlay, Gtk.Overlay):
+            return
+        existing = getattr(btn, "_fav_badge", None)
+        if is_fav and not existing:
+            tc = getattr(self, '_thumb_css', {})
+            if 'fav_box' not in tc:
+                p = Gtk.CssProvider()
+                p.load_from_string(
+                    "box { background-color: rgba(0,0,0,0.55); border-radius: 50%; padding: 5px; }"
+                    "image { color: #e95420; }"
+                )
+                tc['fav_box'] = p
+                self._thumb_css = tc
+            badge = Gtk.Box()
+            badge.set_halign(Gtk.Align.START)
+            badge.set_valign(Gtk.Align.START)
+            badge.set_margin_start(6)
+            badge.set_margin_top(6)
+            badge.get_style_context().add_provider(
+                tc['fav_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+            icon = Gtk.Image.new_from_icon_name("starred-symbolic")
+            icon.set_pixel_size(14)
+            badge.append(icon)
+            overlay.add_overlay(badge)
+            btn._fav_badge = badge
+        elif not is_fav and existing:
+            overlay.remove_overlay(existing)
+            btn._fav_badge = None
+
+    def toggle_favorites_filter(self, btn):
+        self._favorites_only = btn.get_active()
+        self.load_photos()
+
+    # ── Slideshow (Ken Burns) ─────────────────────────────────────────
+    def start_slideshow(self, btn=None):
+        if not self.photos:
+            return
+        # Open viewer als deze nog niet open is
+        if self.main_stack.get_visible_child_name() != "viewer":
+            self.open_photo(self.current_index if self._slideshow_active else 0)
+        self._slideshow_active = True
+        self._slideshow_paused = False
+        self._cancel_fade()
+        for w in self._video_fade_widgets():
+            w.set_visible(False)
+        # Bouw een "stop slideshow" knop als die nog niet bestaat
+        if not hasattr(self, 'slideshow_stop_btn'):
+            self.slideshow_stop_btn = Gtk.Button(icon_name="media-playback-stop-symbolic")
+            self.slideshow_stop_btn.add_css_class("osd")
+            self.slideshow_stop_btn.add_css_class("circular")
+            self.slideshow_stop_btn.set_halign(Gtk.Align.END)
+            self.slideshow_stop_btn.set_valign(Gtk.Align.START)
+            self.slideshow_stop_btn.set_margin_top(16)
+            self.slideshow_stop_btn.set_margin_end(16)
+            self.slideshow_stop_btn.set_size_request(40, 40)
+            self.slideshow_stop_btn.set_tooltip_text("Stop slideshow (Esc)")
+            self.slideshow_stop_btn.connect("clicked", self.stop_slideshow)
+            # viewer_area is de overlay container; vind via parent van photo_picture
+            overlay = self.photo_picture.get_parent()
+            if isinstance(overlay, Gtk.Overlay):
+                overlay.add_overlay(self.slideshow_stop_btn)
+        self.slideshow_stop_btn.set_visible(True)
+        self.slideshow_stop_btn.set_opacity(1.0)
+        self._slideshow_start_frame()
+
+    def stop_slideshow(self, btn=None):
+        self._slideshow_active = False
+        self._slideshow_paused = False
+        if self._kb_anim_id:
+            try:
+                GLib.source_remove(self._kb_anim_id)
+            except Exception:
+                pass
+            self._kb_anim_id = None
+        if self._kb_next_timer_id:
+            try:
+                GLib.source_remove(self._kb_next_timer_id)
+            except Exception:
+                pass
+            self._kb_next_timer_id = None
+        if hasattr(self, 'slideshow_stop_btn'):
+            self.slideshow_stop_btn.set_visible(False)
+        # Reset transform
+        self._viewer_zoom = 1.0
+        self._viewer_offset = [0.0, 0.0]
+        self._apply_viewer_transform()
+        self._show_viewer_ui()
+
+    def _slideshow_start_frame(self):
+        if not self._slideshow_active:
+            return
+        if not self.photos:
+            self.stop_slideshow()
+            return
+        path = self.photos[self.current_index]
+        if is_video(path):
+            # Skip video's: direct door naar volgende
+            self._slideshow_schedule_next(delay_ms=50)
+            return
+        import random
+        # Willekeurig zoom-richting en pan-offset
+        self._kb_start_zoom = random.choice([1.0, 1.18])
+        self._kb_end_zoom = 1.18 if self._kb_start_zoom == 1.0 else 1.0
+        self._kb_pan_dx = random.uniform(-40, 40)
+        self._kb_pan_dy = random.uniform(-25, 25)
+        self._kb_start_time = time.monotonic()
+        self._kb_duration = float(self.settings.get("slideshow_duration", 6.0))
+        if self._kb_anim_id:
+            try:
+                GLib.source_remove(self._kb_anim_id)
+            except Exception:
+                pass
+        self._kb_anim_id = GLib.timeout_add(33, self._kb_tick)
+
+    def _kb_tick(self):
+        if not self._slideshow_active or self._slideshow_paused:
+            self._kb_anim_id = None
+            return False
+        elapsed = time.monotonic() - self._kb_start_time
+        t = min(1.0, elapsed / self._kb_duration)
+        # Ease-in-out
+        ease = t * t * (3 - 2 * t)
+        z = self._kb_start_zoom + (self._kb_end_zoom - self._kb_start_zoom) * ease
+        dx = self._kb_pan_dx * ease
+        dy = self._kb_pan_dy * ease
+        if not hasattr(self, '_viewer_css_provider'):
+            self._viewer_css_provider = Gtk.CssProvider()
+            self.photo_picture.get_style_context().add_provider(
+                self._viewer_css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
+            )
+        self._viewer_css_provider.load_from_string(
+            f"picture {{ transform: scale({z:.4f}) translate({dx:.2f}px, {dy:.2f}px);"
+            f" transform-origin: center center; }}"
+        )
+        if t >= 1.0:
+            self._kb_anim_id = None
+            self._slideshow_schedule_next(delay_ms=400)
+            return False
+        return True
+
+    def _slideshow_schedule_next(self, delay_ms=400):
+        if self._kb_next_timer_id:
+            try:
+                GLib.source_remove(self._kb_next_timer_id)
+            except Exception:
+                pass
+        self._kb_next_timer_id = GLib.timeout_add(delay_ms, self._slideshow_advance)
+
+    def _slideshow_advance(self):
+        self._kb_next_timer_id = None
+        if not self._slideshow_active:
+            return False
+        # Zoek volgende foto (sla video's over)
+        n = len(self.photos)
+        if n == 0:
+            self.stop_slideshow()
+            return False
+        start = self.current_index
+        for _ in range(n):
+            self.current_index = (self.current_index + 1) % n
+            if not is_video(self.photos[self.current_index]):
+                break
+            if self.current_index == start:
+                self.stop_slideshow()
+                return False
+        self._viewer_load_id += 1
+        load_id = self._viewer_load_id
+        path = self.photos[self.current_index]
+        threading.Thread(
+            target=self._load_full_photo,
+            args=(path, load_id),
+            daemon=True
+        ).start()
+        GLib.timeout_add(80, self._slideshow_start_frame)
         return False
 
     # ── Foto editor ───────────────────────────────────────────────────
@@ -2984,6 +3320,9 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             print(f"Verwijderen mislukt: {e}")
             return
+        if path in self._favorites:
+            self._favorites.discard(path)
+            save_favorites(self._favorites)
         self.photos.remove(path)
         if not self.photos:
             self.close_viewer()
@@ -3021,6 +3360,7 @@ class MainWindow(Adw.ApplicationWindow):
         if response != "delete":
             return
         paths_to_delete = [self.photos[i] for i in self._selected if i < len(self.photos)]
+        fav_changed = False
         for path in paths_to_delete:
             try:
                 os.remove(path)
@@ -3029,6 +3369,11 @@ class MainWindow(Adw.ApplicationWindow):
                     os.remove(cache_path)
             except Exception as e:
                 print(f"Verwijderen mislukt: {e}")
+            if path in self._favorites:
+                self._favorites.discard(path)
+                fav_changed = True
+        if fav_changed:
+            save_favorites(self._favorites)
         self.toggle_select_mode()
         self.load_photos()
 
@@ -3187,6 +3532,25 @@ class MainWindow(Adw.ApplicationWindow):
         backup_group.add(self.settings_backup_folder_row)
         page.add(backup_group)
 
+        slideshow_group = Adw.PreferencesGroup()
+        slideshow_group.set_title("Slideshow")
+        slideshow_group.set_description("Ken Burns slideshow (sneltoets F5)")
+
+        duration_row = Adw.ActionRow(
+            title="Seconden per foto",
+            subtitle="Hoe lang elke foto in beeld blijft"
+        )
+        duration_adj = Gtk.Adjustment(
+            value=float(self.settings.get("slideshow_duration", 6.0)),
+            lower=2.0, upper=20.0, step_increment=1.0
+        )
+        duration_spin = Gtk.SpinButton(adjustment=duration_adj, digits=0)
+        duration_spin.set_valign(Gtk.Align.CENTER)
+        duration_spin.connect("value-changed", self._on_slideshow_duration_changed)
+        duration_row.add_suffix(duration_spin)
+        slideshow_group.add(duration_row)
+        page.add(slideshow_group)
+
         about_group = Adw.PreferencesGroup()
         about_group.set_title("Over")
 
@@ -3230,6 +3594,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         dialog.add(page)
         dialog.present(self)
+
+    def _on_slideshow_duration_changed(self, spin):
+        self.settings["slideshow_duration"] = float(spin.get_value())
+        save_settings(self.settings)
 
     def on_structure_changed(self, value, btn):
         if btn.get_active():
