@@ -214,9 +214,13 @@ def get_photo_date(path: str) -> float:
     return os.path.getmtime(path)
 
 
-def get_cache_path(photo_path):
+CACHE_VERSION = "v2"
+
+def get_cache_path(photo_path, thumb_size=None):
+    if thumb_size is None:
+        thumb_size = THUMB_SIZE
     mtime = str(os.path.getmtime(photo_path))
-    key   = hashlib.md5((photo_path + mtime + str(THUMB_SIZE)).encode()).hexdigest()
+    key   = hashlib.md5((photo_path + mtime + str(thumb_size) + CACHE_VERSION).encode()).hexdigest()
     return os.path.join(CACHE_DIR, key + ".png")
 
 def get_video_duration(path):
@@ -260,8 +264,10 @@ def get_video_gps_coords(path):
     return None
 
 
-def load_thumbnail(photo_path):
-    cache_path = get_cache_path(photo_path)
+def load_thumbnail(photo_path, thumb_size=None):
+    if thumb_size is None:
+        thumb_size = THUMB_SIZE
+    cache_path = get_cache_path(photo_path, thumb_size)
     if os.path.exists(cache_path):
         try:
             return GdkPixbuf.Pixbuf.new_from_file(cache_path)
@@ -272,7 +278,7 @@ def load_thumbnail(photo_path):
         try:
             subprocess.run(
                 ["ffmpeg", "-i", photo_path, "-ss", "00:00:01", "-vframes", "1",
-                 "-vf", f"scale={THUMB_SIZE}:{THUMB_SIZE}:force_original_aspect_ratio=decrease",
+                 "-vf", f"scale={thumb_size}:{thumb_size}:force_original_aspect_ratio=decrease",
                  cache_path, "-y"],
                 capture_output=True, timeout=15
             )
@@ -280,14 +286,21 @@ def load_thumbnail(photo_path):
         except Exception:
             return None
     try:
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(photo_path, THUMB_SIZE, THUMB_SIZE, True)
-        oriented = pixbuf.apply_embedded_orientation()
-        if oriented is not None:
-            pixbuf = oriented
-        pixbuf.savev(cache_path, "png", [], [])
-        return pixbuf
+        from PIL import Image, ImageOps
+        with Image.open(photo_path) as img:
+            img = ImageOps.exif_transpose(img)  # Respecteer EXIF-rotatie
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGB")
+            img.thumbnail((thumb_size, thumb_size), Image.LANCZOS)
+            img.save(cache_path, "PNG")
+        return GdkPixbuf.Pixbuf.new_from_file(cache_path)
     except Exception:
-        return None
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(photo_path, thumb_size, thumb_size, True)
+            pixbuf.savev(cache_path, "png", [], [])
+            return pixbuf
+        except Exception:
+            return None
 
 
 # ── File watcher ─────────────────────────────────────────────────────
@@ -795,6 +808,12 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
         self.settings        = settings
+        # Thumbnail-grootte uit instellingen (globale constante wordt hier overschreven)
+        global THUMB_SIZE
+        try:
+            THUMB_SIZE = max(200, min(500, int(settings.get("thumbnail_size", 320))))
+        except Exception:
+            THUMB_SIZE = 320
         self.photos          = []
         self.thumb_widgets   = {}
         self.date_widgets    = {}
@@ -1958,15 +1977,11 @@ class MainWindow(Adw.ApplicationWindow):
             picture.set_content_fit(Gtk.ContentFit.CONTAIN)
             picture.set_hexpand(False)
             picture.set_vexpand(False)
-            picture.set_halign(Gtk.Align.CENTER)
-            picture.set_valign(Gtk.Align.CENTER)
 
             overlay = Gtk.Overlay()
             overlay.set_size_request(width_at_thumb, THUMB_SIZE)
             overlay.set_hexpand(False)
             overlay.set_vexpand(False)
-            overlay.set_halign(Gtk.Align.CENTER)
-            overlay.set_valign(Gtk.Align.CENTER)
             overlay.set_child(picture)
 
             if duration > 0:
@@ -1997,8 +2012,6 @@ class MainWindow(Adw.ApplicationWindow):
             btn.set_size_request(width_at_thumb, THUMB_SIZE)
             btn.set_hexpand(False)
             btn.set_vexpand(False)
-            btn.set_halign(Gtk.Align.CENTER)
-            btn.set_valign(Gtk.Align.CENTER)
             btn.get_style_context().add_provider(tc['btn'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
             idx = index
@@ -3248,6 +3261,31 @@ class MainWindow(Adw.ApplicationWindow):
         folder_group.add(self.folder_row)
         page.add(folder_group)
 
+        display_group = Adw.PreferencesGroup()
+        display_group.set_title("Weergave")
+        display_group.set_description("Hoe foto's in het grid worden getoond")
+
+        thumb_row = Adw.ActionRow(
+            title="Thumbnail grootte",
+            subtitle=f"{THUMB_SIZE} px"
+        )
+        thumb_adj = Gtk.Adjustment(
+            value=float(THUMB_SIZE),
+            lower=200.0, upper=500.0,
+            step_increment=20.0, page_increment=40.0
+        )
+        thumb_scale = Gtk.Scale(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            adjustment=thumb_adj
+        )
+        thumb_scale.set_size_request(240, -1)
+        thumb_scale.set_draw_value(False)
+        thumb_scale.set_valign(Gtk.Align.CENTER)
+        thumb_scale.connect("value-changed", self._on_thumb_size_changed, thumb_row)
+        thumb_row.add_suffix(thumb_scale)
+        display_group.add(thumb_row)
+        page.add(display_group)
+
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title("Mapstructuur")
         structure_group.set_description("Hoe worden je foto's georganiseerd")
@@ -3421,6 +3459,31 @@ class MainWindow(Adw.ApplicationWindow):
 
         dialog.add(page)
         dialog.present(self)
+
+    def _on_thumb_size_changed(self, scale, row):
+        new_size = int(scale.get_value())
+        # Snap naar stappen van 20
+        new_size = (new_size // 20) * 20
+        row.set_subtitle(f"{new_size} px")
+        self._pending_thumb_size = new_size
+        if hasattr(self, '_thumb_size_timer') and self._thumb_size_timer:
+            try:
+                GLib.source_remove(self._thumb_size_timer)
+            except Exception:
+                pass
+        self._thumb_size_timer = GLib.timeout_add(400, self._apply_thumb_size_change)
+
+    def _apply_thumb_size_change(self):
+        self._thumb_size_timer = None
+        new_size = self._pending_thumb_size
+        global THUMB_SIZE
+        if new_size == THUMB_SIZE:
+            return False
+        THUMB_SIZE = new_size
+        self.settings["thumbnail_size"] = new_size
+        save_settings(self.settings)
+        self.load_photos()
+        return False
 
     def on_structure_changed(self, value, btn):
         if btn.get_active():
