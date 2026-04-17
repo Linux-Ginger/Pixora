@@ -3966,10 +3966,24 @@ class MainWindow(Adw.ApplicationWindow):
             script = os.path.abspath(os.path.join(
                 os.path.dirname(__file__), "main.py"
             ))
+            # Wacht 1.2s zodat de huidige (unique) GApplication volledig
+            # verdwenen is voor de nieuwe instance z'n D-Bus-registratie doet.
+            # Zonder sleep kaatst de nieuwe instance terug naar de stervende
+            # oude en sluit zichzelf.
+            env = {
+                k: v for k, v in os.environ.items()
+                if k != "PIXORA_IN_TERMINAL"  # relaunch bepaalt dit zelf
+            }
+            env["PIXORA_RESTARTING"] = "1"
             subprocess.Popen(
-                [sys.executable, script],
-                env={**os.environ, "PIXORA_RESTARTING": "1"}
+                ["bash", "-c",
+                 f"sleep 1.2 && exec {sys.executable!s} {script!s}"],
+                env=env,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
+            log_info("Restart gepland (1.2s delay voor GApplication unregister)")
         except Exception as e:
             log_error(f"Restart fout: {e}")
         self.get_application().quit()
