@@ -858,6 +858,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._fade_anim_id          = None
         self._favorites             = load_favorites()
         self._favorites_only        = False
+        self._current_flow          = None
+        self._current_row_hbox      = None
+        self._current_row_width     = 0
 
         self.set_title("Pixora")
         self.set_default_size(9999, 9999)
@@ -1923,22 +1926,45 @@ class MainWindow(Adw.ApplicationWindow):
         label.set_margin_start(4)
         self.grid_box.append(label)
         self.date_widgets[date_str] = label
-        flow = Gtk.FlowBox()
-        flow.set_valign(Gtk.Align.START)
-        flow.set_halign(Gtk.Align.FILL)
-        flow.set_hexpand(True)
-        flow.set_max_children_per_line(100)
-        flow.set_min_children_per_line(1)
-        flow.set_selection_mode(Gtk.SelectionMode.NONE)
-        flow.set_row_spacing(4)
-        flow.set_column_spacing(4)
-        flow.set_homogeneous(False)
-        self._current_flow = flow
-        self.grid_box.append(flow)
+        rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        rows_box.set_halign(Gtk.Align.START)
+        rows_box.set_hexpand(True)
+        self._current_flow = rows_box
+        self._current_row_hbox = None
+        self._current_row_width = 0
+        self.grid_box.append(rows_box)
         if self.content_stack.get_visible_child_name() == "loading":
             self.spinner.stop()
             self.content_stack.set_visible_child_name("grid")
         return False
+
+    def _available_grid_width(self):
+        try:
+            w = self.scroll.get_width()
+        except Exception:
+            w = 0
+        if w <= 0:
+            try:
+                w = self.get_width()
+            except Exception:
+                w = 0
+        if w <= 0:
+            w = 1280
+        # marge + scrollbar-reserve
+        return max(200, w - 40)
+
+    def _append_thumb_to_row(self, btn, thumb_width):
+        spacing = 4
+        avail = self._available_grid_width()
+        needed = thumb_width + (spacing if self._current_row_hbox is not None else 0)
+        if self._current_row_hbox is None or self._current_row_width + needed > avail:
+            self._current_row_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=spacing)
+            self._current_row_hbox.set_halign(Gtk.Align.START)
+            self._current_flow.append(self._current_row_hbox)
+            self._current_row_width = 0
+            needed = thumb_width
+        self._current_row_hbox.append(btn)
+        self._current_row_width += needed
 
     def _apply_batch(self, load_id, batch, loaded, total):
         if load_id != self._load_id:
@@ -2023,7 +2049,7 @@ class MainWindow(Adw.ApplicationWindow):
 
             idx = index
             btn.connect("clicked", lambda b, i=idx: self.on_thumb_clicked(i))
-            self._current_flow.append(btn)
+            self._append_thumb_to_row(btn, width_at_thumb)
             # check_box wordt lazy aangemaakt bij selectie-modus
             self.thumb_widgets[index] = (btn, None)
             if path in self._favorites:
