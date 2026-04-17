@@ -6,6 +6,7 @@
 # ─────────────────────────────────────────────
 
 import os
+import re
 import sys
 import threading
 import subprocess
@@ -15,7 +16,9 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, Gio
 
-INSTALL_URL = "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/install.sh"
+UPDATE_URL = "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/update.sh"
+
+ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
 
 
 class UpdaterWindow(Adw.ApplicationWindow):
@@ -88,27 +91,38 @@ class UpdaterWindow(Adw.ApplicationWindow):
         return True
 
     def _append_log(self, line):
+        # strip ANSI escape codes (colors, clear, cursor) voor schone output
+        clean = ANSI_ESCAPE.sub("", line)
         end = self._log_buf.get_end_iter()
-        self._log_buf.insert(end, line)
+        self._log_buf.insert(end, clean)
         # auto-scroll
         mark = self._log_buf.create_mark(None, self._log_buf.get_end_iter(), False)
         self._log_view.scroll_to_mark(mark, 0.0, False, 0.0, 0.0)
         return False
 
     def _run_update(self):
+        # Download update.sh en draai 'm via pkexec. PKEXEC_UID vertelt het
+        # script naar welke user-home het Pixora moet schrijven.
+        uid = str(os.getuid())
         cmd = [
-            "pkexec", "bash", "-c",
+            "pkexec",
+            "env",
+            f"PKEXEC_UID={uid}",
+            "bash", "-c",
             f"set -e; "
             f"TMP=$(mktemp -d); "
             f"cd $TMP && "
-            f"curl -fsSL {INSTALL_URL} -o install.sh && "
-            f"bash install.sh 2>&1; "
+            f"curl -fsSL '{UPDATE_URL}' -o update.sh && "
+            f"bash update.sh 2>&1; "
             f"RC=$?; rm -rf $TMP; exit $RC"
         ]
+        GLib.idle_add(self._append_log,
+                      f"→ update.sh downloaden en uitvoeren via pkexec…\n\n")
         try:
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1
+                text=True, bufsize=1,
+                env={**os.environ, "TERM": "dumb"}
             )
         except FileNotFoundError:
             GLib.idle_add(self._finish,
@@ -120,7 +134,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
         proc.wait()
         ok = (proc.returncode == 0)
         GLib.idle_add(self._finish, ok,
-                      "Update voltooid!" if ok
+                      "Pixora is bijgewerkt!" if ok
                       else "Update mislukt. Zie de log hierboven.")
 
     def _finish(self, ok, message):
