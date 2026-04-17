@@ -893,8 +893,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.update_banner.set_revealed(False)
         self.update_banner.connect("button-clicked", self._on_update_banner_clicked)
 
+        self.iphone_banner = Adw.Banner(title="", use_markup=False)
+        self.iphone_banner.set_revealed(False)
+
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(self.update_banner)
+        toolbar_view.add_top_bar(self.iphone_banner)
         toolbar_view.add_top_bar(self.build_header())
         toolbar_view.set_content(self.main_stack)
         toolbar_view.add_bottom_bar(self.build_bottombar())
@@ -996,7 +1000,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add(2500, self._post_apple_plugin_check)
 
     def _post_apple_plugin_check(self):
-        # Niet storen als importer open staat of dialog al actief is
+        # Niet storen als importer open staat
         try:
             if self.main_stack.get_visible_child_name() == "importer":
                 return False
@@ -1004,72 +1008,78 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         if self._recovery_prompt_active:
             return False
-
-        def check():
-            has_device = False
-            try:
-                result = subprocess.run(
-                    ["idevice_id", "-l"],
-                    capture_output=True, text=True, timeout=3
-                )
-                has_device = any(l.strip() for l in result.stdout.splitlines())
-            except Exception:
-                has_device = False
-            if has_device:
-                GLib.idle_add(self._update_import_btn_state, True)
-            else:
-                GLib.idle_add(self._maybe_prompt_usbmuxd_recovery)
-        threading.Thread(target=check, daemon=True).start()
-        return False
-
-    def _maybe_prompt_usbmuxd_recovery(self):
-        if self._recovery_prompt_active:
-            return False
-        if time.time() < self._recovery_cooldown_until:
-            return False
         self._recovery_prompt_active = True
-        dialog = Adw.MessageDialog(
-            transient_for=self,
-            heading="iPhone/iPad gedetecteerd",
-            body=("Er is een Apple-apparaat aangesloten, maar usbmuxd "
-                  "herkent het niet. Wil je de USB-verbinding automatisch "
-                  "resetten?")
-        )
-        dialog.add_response("no", "Niet nu")
-        dialog.add_response("yes", "Ja, resetten")
-        dialog.set_response_appearance("yes", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("yes")
-        dialog.connect("response", self._on_recovery_dialog_response)
-        dialog.present()
+        self._set_iphone_banner("📱 iPhone gedetecteerd, even geduld…")
+        threading.Thread(target=self._iphone_recovery_flow, daemon=True).start()
         return False
 
-    def _on_recovery_dialog_response(self, dialog, response):
-        self._recovery_prompt_active = False
-        if response != "yes":
-            # 10 min cooldown als gebruiker "Niet nu" kiest
-            self._recovery_cooldown_until = time.time() + 600
+    def _iphone_recovery_flow(self):
+        """Volledig automatische recovery: eerst check, dan reset bij falen."""
+        # Eerste check
+        has_device = self._idevice_check()
+        if has_device:
+            GLib.idle_add(self._iphone_flow_success, False)
             return
+        # Niet herkend — automatisch reset
+        GLib.idle_add(self._set_iphone_banner,
+                      "🔧 Verbinding herstellen, even geduld…")
+        reset_ok = False
+        try:
+            r = subprocess.run(
+                ["pkexec", "sh", "-c",
+                 "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
+                capture_output=True, text=True, timeout=40
+            )
+            reset_ok = (r.returncode == 0)
+        except Exception:
+            reset_ok = False
+        if not reset_ok:
+            GLib.idle_add(self._iphone_flow_fail)
+            return
+        # Wacht opnieuw tot usbmuxd + device klaar zijn
+        time.sleep(2.5)
+        has_device = self._idevice_check()
+        if has_device:
+            GLib.idle_add(self._iphone_flow_success, True)
+        else:
+            GLib.idle_add(self._iphone_flow_fail)
 
-        def do():
-            try:
-                r = subprocess.run(
-                    ["pkexec", "sh", "-c",
-                     "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
-                    capture_output=True, text=True, timeout=30
-                )
-                ok = (r.returncode == 0)
-            except Exception:
-                ok = False
-            if ok:
-                GLib.timeout_add(1500, self._poll_import_device)
-            else:
-                GLib.idle_add(
-                    self._show_info_dialog,
-                    "Herstart mislukt",
-                    "usbmuxd kon niet automatisch worden herstart. "
-                    "Probeer Instellingen > iPhone-verbinding > Herstart."
-                )
-        threading.Thread(target=do, daemon=True).start()
+    def _idevice_check(self):
+        try:
+            result = subprocess.run(
+                ["idevice_id", "-l"],
+                capture_output=True, text=True, timeout=4
+            )
+            return any(l.strip() for l in result.stdout.splitlines())
+        except Exception:
+            return False
+
+    def _iphone_flow_success(self, was_reset):
+        self._recovery_prompt_active = False
+        self._update_import_btn_state(True)
+        self._set_iphone_banner(
+            "✅ iPhone klaar — tap Trust op je iPhone indien gevraagd"
+            if was_reset else "✅ iPhone verbonden"
+        )
+        GLib.timeout_add_seconds(4, self._clear_iphone_banner)
+        return False
+
+    def _iphone_flow_fail(self):
+        self._recovery_prompt_active = False
+        self._set_iphone_banner(
+            "⚠️ iPhone niet herkend — probeer Instellingen > iPhone-verbinding"
+        )
+        GLib.timeout_add_seconds(8, self._clear_iphone_banner)
+        return False
+
+    def _set_iphone_banner(self, text):
+        self.iphone_banner.set_title(text)
+        self.iphone_banner.set_revealed(True)
+        return False
+
+    def _clear_iphone_banner(self):
+        self.iphone_banner.set_revealed(False)
+        return False
 
     def _poll_import_device(self):
         # Niet pollen terwijl de importer open is — voorkomt interferentie
