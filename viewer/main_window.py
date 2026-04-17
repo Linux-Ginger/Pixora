@@ -1898,12 +1898,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.date_widgets[date_str] = label
         flow = Gtk.FlowBox()
         flow.set_valign(Gtk.Align.START)
-        flow.set_max_children_per_line(6)
+        flow.set_max_children_per_line(30)
         flow.set_min_children_per_line(1)
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
         flow.set_row_spacing(4)
         flow.set_column_spacing(4)
-        flow.set_homogeneous(True)
+        flow.set_homogeneous(False)
         self._current_flow = flow
         self.grid_box.append(flow)
         if self.content_stack.get_visible_child_name() == "loading":
@@ -1941,13 +1941,21 @@ class MainWindow(Adw.ApplicationWindow):
         for index, path, pixbuf, duration in batch:
             if pixbuf:
                 picture = Gtk.Picture.new_for_pixbuf(pixbuf)
+                pb_w = pixbuf.get_width()
+                pb_h = pixbuf.get_height()
+                # Fix height, laat breedte meeschalen met aspect ratio
+                if pb_h > 0:
+                    width_at_thumb = max(1, int(pb_w * THUMB_SIZE / pb_h))
+                else:
+                    width_at_thumb = THUMB_SIZE
             else:
                 picture = Gtk.Picture()
-            picture.set_size_request(THUMB_SIZE, THUMB_SIZE)
-            picture.set_content_fit(Gtk.ContentFit.COVER)
+                width_at_thumb = THUMB_SIZE
+            picture.set_size_request(width_at_thumb, THUMB_SIZE)
+            picture.set_content_fit(Gtk.ContentFit.CONTAIN)
 
             overlay = Gtk.Overlay()
-            overlay.set_size_request(THUMB_SIZE, THUMB_SIZE)
+            overlay.set_size_request(width_at_thumb, THUMB_SIZE)
             overlay.set_child(picture)
 
             if duration > 0:
@@ -1975,7 +1983,7 @@ class MainWindow(Adw.ApplicationWindow):
             btn = Gtk.Button()
             btn.set_child(overlay)
             btn.set_overflow(Gtk.Overflow.HIDDEN)
-            btn.set_size_request(THUMB_SIZE, THUMB_SIZE)
+            btn.set_size_request(width_at_thumb, THUMB_SIZE)
             btn.get_style_context().add_provider(tc['btn'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
             idx = index
