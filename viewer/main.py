@@ -38,7 +38,11 @@ def _maybe_relaunch_in_terminal():
         ("xfce4-terminal", ["-e", f"{sys.executable} {os.path.abspath(__file__)}"]),
     ]:
         if shutil.which(term):
-            env = {**os.environ, "PIXORA_IN_TERMINAL": "1"}
+            env = {
+                **os.environ,
+                "PIXORA_IN_TERMINAL": "1",
+                "PYTHONUNBUFFERED": "1",
+            }
             try:
                 subprocess.Popen([term] + args, env=env)
                 return True

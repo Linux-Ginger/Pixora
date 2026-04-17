@@ -15,8 +15,30 @@ import hashlib
 import time
 import datetime
 import urllib.request
+import inspect
 from collections import defaultdict, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
+
+# ── Dev-mode logging ─────────────────────────────────────────────────
+_LOG_COLOR = sys.stdout.isatty()
+
+def _log(level, color_code, msg):
+    frame = inspect.currentframe().f_back.f_back
+    loc = f"{os.path.basename(frame.f_code.co_filename)}:{frame.f_lineno}"
+    ts = datetime.datetime.now().strftime("%H:%M:%S")
+    if _LOG_COLOR:
+        print(
+            f"\033[2m{ts}\033[0m "
+            f"\033[{color_code}m[{level}]\033[0m "
+            f"\033[2m{loc}\033[0m  {msg}",
+            flush=True,
+        )
+    else:
+        print(f"{ts} [{level}] {loc}  {msg}", flush=True)
+
+def log_info(msg):  _log("INFO",  "36", msg)
+def log_warn(msg):  _log("WARN",  "33", msg)
+def log_error(msg): _log("ERROR", "1;31", msg)
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -128,7 +150,7 @@ def get_available_drives():
         for device in data.get("blockdevices", []):
             process_device(device)
     except Exception as e:
-        print(f"Drive detectie fout: {e}")
+        log_error(f"Drive detectie fout: {e}")
     return drives
 
 def get_mountpoint_for_uuid(uuid):
@@ -820,6 +842,11 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
         self.settings        = settings
+        if settings.get("dev_mode"):
+            log_info("═══ Pixora gestart in Developer Mode ═══")
+            log_info(f"Config: {CONFIG_PATH}")
+            log_info(f"Cache:  {CACHE_DIR}")
+            log_info(f"Thumbs: {THUMB_SIZE}px — favorieten: {len(load_favorites())}")
         # Thumbnail-grootte uit instellingen (globale constante wordt hier overschreven)
         global THUMB_SIZE
         try:
@@ -984,7 +1011,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._udev_client = GUdev.Client(subsystems=["usb"])
             self._udev_client.connect("uevent", self._on_usb_event)
         except Exception as e:
-            print(f"GUdev monitor kon niet starten: {e}")
+            log_error(f"GUdev monitor kon niet starten: {e}")
             self._udev_client = None
 
     def _on_usb_event(self, client, action, device):
@@ -996,6 +1023,7 @@ class MainWindow(Adw.ApplicationWindow):
             vendor = None
         if vendor != "05ac":  # Apple
             return
+        log_info("Apple USB-device aangesloten (vendor=05ac) — check na 2.5s")
         # Wacht kort zodat usbmuxd het device kan zien, daarna controleren
         GLib.timeout_add(2500, self._post_apple_plugin_check)
 
@@ -1018,9 +1046,11 @@ class MainWindow(Adw.ApplicationWindow):
         # Eerste check
         has_device = self._idevice_check()
         if has_device:
+            log_info("iPhone direct herkend door usbmuxd")
             GLib.idle_add(self._iphone_flow_success, False)
             return
         # Niet herkend — automatisch reset
+        log_warn("iPhone niet herkend door usbmuxd — start auto-recovery")
         GLib.idle_add(self._set_iphone_banner,
                       "🔧 Verbinding herstellen, even geduld…")
         reset_ok = False
@@ -1031,7 +1061,9 @@ class MainWindow(Adw.ApplicationWindow):
                 capture_output=True, text=True, timeout=40
             )
             reset_ok = (r.returncode == 0)
-        except Exception:
+            log_info(f"usbmuxd reset rc={r.returncode}")
+        except Exception as e:
+            log_error(f"usbmuxd reset fout: {e}")
             reset_ok = False
         if not reset_ok:
             GLib.idle_add(self._iphone_flow_fail)
@@ -1040,8 +1072,10 @@ class MainWindow(Adw.ApplicationWindow):
         time.sleep(2.5)
         has_device = self._idevice_check()
         if has_device:
+            log_info("iPhone herkend na reset")
             GLib.idle_add(self._iphone_flow_success, True)
         else:
+            log_warn("iPhone blijft onherkenbaar na reset")
             GLib.idle_add(self._iphone_flow_fail)
 
     def _idevice_check(self):
@@ -1235,7 +1269,7 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             subprocess.Popen([sys.executable, updater_path])
         except Exception as e:
-            print(f"GUI-updater kon niet starten: {e}")
+            log_error(f"GUI-updater kon niet starten: {e}")
 
     def _on_settings_check_update(self, btn):
         self._update_check_btn.set_visible(False)
@@ -1504,6 +1538,7 @@ class MainWindow(Adw.ApplicationWindow):
         return box
 
     def open_map(self, btn=None):
+        log_info(f"Kaart geopend ({len(self.photos)} foto's gaan naar GPS-scan)")
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
         self.map_btn.set_label("🗺 laden...")
@@ -2271,7 +2306,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Thumbnail klik ────────────────────────────────────────────────
     def on_thumb_clicked(self, index):
+        path = self.photos[index] if 0 <= index < len(self.photos) else "?"
         if self._select_mode:
+            action = "deselecteer" if index in self._selected else "selecteer"
+            log_info(f"Thumbnail {action}: idx={index} path={path}")
             if index in self._selected:
                 self._selected.discard(index)
             else:
@@ -2279,6 +2317,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._update_thumb_visual(index, self.thumb_widgets[index])
             self.select_count_label.set_text(f"{len(self._selected)} geselecteerd")
         else:
+            log_info(f"Thumbnail geklikt → open foto: idx={index} path={path}")
             self.open_photo(index)
 
     # ── Sorteren ──────────────────────────────────────────────────────
@@ -2324,6 +2363,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Foto viewer ───────────────────────────────────────────────────
     def open_photo(self, index):
+        path = self.photos[index] if 0 <= index < len(self.photos) else "?"
+        kind = "video" if is_video(path) else "foto"
+        log_info(f"open_photo: {kind} idx={index} path={path}")
         self.current_index = index
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
@@ -2451,6 +2493,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def close_viewer(self, btn=None):
+        log_info("Viewer gesloten → terug naar grid")
         self._stop_video()
         self._viewer_load_id += 1
         self.header.set_visible(True)
@@ -3049,8 +3092,10 @@ class MainWindow(Adw.ApplicationWindow):
             return
         if path in self._favorites:
             self._favorites.discard(path)
+            log_info(f"Favoriet verwijderd: {path}")
         else:
             self._favorites.add(path)
+            log_info(f"Favoriet toegevoegd: {path}")
         save_favorites(self._favorites)
         self._update_favorite_btn()
         # refresh thumbnail badge if visible
@@ -3100,6 +3145,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def toggle_favorites_filter(self, btn):
         self._favorites_only = btn.get_active()
+        log_info(f"Favorieten-filter: {'aan' if self._favorites_only else 'uit'}")
         self.load_photos()
 
 
@@ -3144,11 +3190,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_rect_origin = None
 
     def on_editor_rotate_left(self, btn):
+        log_info("Editor: draaien links (-90°)")
         self._editor_rotation = (self._editor_rotation + 90) % 360
         self._reset_crop()
         self._editor_apply_preview()
 
     def on_editor_rotate_right(self, btn):
+        log_info("Editor: draaien rechts (+90°)")
         self._editor_rotation = (self._editor_rotation - 90) % 360
         self._reset_crop()
         self._editor_apply_preview()
@@ -3307,6 +3355,7 @@ class MainWindow(Adw.ApplicationWindow):
     def on_editor_save(self, btn):
         path     = self.photos[self.current_index]
         rotation = self._editor_rotation
+        log_info(f"Editor opslaan: rotation={rotation}° crop={bool(self._crop_rect)} path={path}")
 
         crop_box = None
         if self._editor_crop_mode and self._crop_rect:
@@ -3357,7 +3406,7 @@ class MainWindow(Adw.ApplicationWindow):
                 os.utime(path, (original_mtime, original_mtime))
                 GLib.idle_add(_after_save)
             except Exception as e:
-                print(f"Editor opslaan mislukt: {e}")
+                log_error(f"Editor opslaan mislukt: {e}")
                 GLib.idle_add(_save_error, str(e))
 
         def _after_save():
@@ -3384,6 +3433,7 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Verwijderen ───────────────────────────────────────────────────
     def on_delete_current(self, btn):
         path = self.photos[self.current_index]
+        log_info(f"Verwijder bevestiging gevraagd: {path}")
         dialog = Adw.MessageDialog(
             transient_for=self,
             heading="Foto verwijderen?",
@@ -3399,14 +3449,16 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_delete_current_response(self, dialog, response, path):
         if response != "delete":
+            log_info(f"Verwijderen geannuleerd: {path}")
             return
         try:
             os.remove(path)
             cache_path = get_cache_path(path)
             if os.path.exists(cache_path):
                 os.remove(cache_path)
+            log_info(f"Foto verwijderd: {path}")
         except Exception as e:
-            print(f"Verwijderen mislukt: {e}")
+            log_error(f"Verwijderen mislukt: {e}")
             return
         if path in self._favorites:
             self._favorites.discard(path)
@@ -3456,7 +3508,7 @@ class MainWindow(Adw.ApplicationWindow):
                 if os.path.exists(cache_path):
                     os.remove(cache_path)
             except Exception as e:
-                print(f"Verwijderen mislukt: {e}")
+                log_error(f"Verwijderen mislukt: {e}")
             if path in self._favorites:
                 self._favorites.discard(path)
                 fav_changed = True
@@ -3899,9 +3951,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _apply_dev_mode(self, dialog, response, target, row, btn):
         if response != "apply":
+            log_info(f"Dev-mode toggle geannuleerd (was: {self.settings.get('dev_mode', False)})")
             return
         self.settings["dev_mode"] = target
         save_settings(self.settings)
+        log_info(f"Dev-mode {'geactiveerd' if target else 'gedeactiveerd'} → herstarten…")
         row.set_subtitle("Actief" if target else "Inactief")
         btn.set_label("Deactiveren" if target else "Activeren")
         # Herstart de app
@@ -3917,7 +3971,7 @@ class MainWindow(Adw.ApplicationWindow):
                 env={**os.environ, "PIXORA_RESTARTING": "1"}
             )
         except Exception as e:
-            print(f"Restart fout: {e}")
+            log_error(f"Restart fout: {e}")
         self.get_application().quit()
         return False
 
@@ -4005,12 +4059,14 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def open_importer(self, btn=None):
+        log_info(f"Importer geopend (iOS device {'aanwezig' if self._ios_device_present else 'niet gedetecteerd'})")
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
         self.main_stack.set_visible_child_name("importer")
         self.importer_page.activate()
 
     def close_importer(self):
+        log_info("Importer gesloten")
         self.importer_page.deactivate()
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
