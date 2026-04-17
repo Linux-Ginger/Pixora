@@ -46,7 +46,7 @@ CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
 FAVORITES_PATH   = os.path.expanduser("~/.config/pixora/favorites.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
 TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
-THUMB_SIZE       = 320
+THUMB_SIZE       = 200
 FILM_THUMB       = 70
 BATCH_SIZE       = 15
 TILE_SIZE        = 256
@@ -816,9 +816,9 @@ class MainWindow(Adw.ApplicationWindow):
         # Thumbnail-grootte uit instellingen (globale constante wordt hier overschreven)
         global THUMB_SIZE
         try:
-            THUMB_SIZE = max(200, min(500, int(settings.get("thumbnail_size", 320))))
+            THUMB_SIZE = max(200, min(500, int(settings.get("thumbnail_size", 200))))
         except Exception:
-            THUMB_SIZE = 320
+            THUMB_SIZE = 200
         self.photos          = []
         self.thumb_widgets   = {}
         self.date_widgets    = {}
@@ -3321,12 +3321,12 @@ class MainWindow(Adw.ApplicationWindow):
         thumb_reset_btn.add_css_class("flat")
         thumb_reset_btn.add_css_class("circular")
         thumb_reset_btn.set_valign(Gtk.Align.CENTER)
-        thumb_reset_btn.set_tooltip_text("Terug naar standaard (320 px)")
-        thumb_reset_btn.set_sensitive(int(thumb_adj.get_value()) != 320)
-        thumb_reset_btn.connect("clicked", lambda b: thumb_adj.set_value(320.0))
+        thumb_reset_btn.set_tooltip_text("Terug naar standaard (200 px)")
+        thumb_reset_btn.set_sensitive(int(thumb_adj.get_value()) != 200)
+        thumb_reset_btn.connect("clicked", lambda b: thumb_adj.set_value(200.0))
         thumb_adj.connect(
             "value-changed",
-            lambda a: thumb_reset_btn.set_sensitive(int(a.get_value()) != 320)
+            lambda a: thumb_reset_btn.set_sensitive(int(a.get_value()) != 200)
         )
         thumb_row.add_suffix(thumb_reset_btn)
 
