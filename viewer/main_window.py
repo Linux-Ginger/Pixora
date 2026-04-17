@@ -869,7 +869,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._current_row_hbox      = None
         self._current_row_width     = 0
 
-        self.set_title("Pixora")
+        self.set_title("Pixora (Dev Mode)" if self.settings.get("dev_mode") else "Pixora")
         self.set_default_size(9999, 9999)
 
         self.style_manager = Adw.StyleManager.get_default()
@@ -1218,11 +1218,24 @@ class MainWindow(Adw.ApplicationWindow):
         self._open_installer()
 
     def _open_installer(self):
+        if self.settings.get("dev_mode"):
+            # Terminal-update (zodat output zichtbaar is)
+            self.get_application().quit()
+            subprocess.Popen([
+                "bash", "-c",
+                "gnome-terminal -- bash -c 'curl -fsSL "
+                "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/install.sh | bash; exec bash'"
+            ])
+            return
+        # GUI-updater
         self.get_application().quit()
-        subprocess.Popen([
-            "bash", "-c",
-            "gnome-terminal -- bash -c 'curl -fsSL https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/install.sh | bash; exec bash'"
-        ])
+        updater_path = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), "updater.py"
+        ))
+        try:
+            subprocess.Popen([sys.executable, updater_path])
+        except Exception as e:
+            print(f"GUI-updater kon niet starten: {e}")
 
     def _on_settings_check_update(self, btn):
         self._update_check_btn.set_visible(False)
@@ -3547,6 +3560,28 @@ class MainWindow(Adw.ApplicationWindow):
         iphone_group.add(self._usbmuxd_pair_row)
         page.add(iphone_group)
 
+        dev_group = Adw.PreferencesGroup()
+        dev_group.set_title("Geavanceerd")
+        dev_group.set_description(
+            "Developer mode toont Pixora met terminal-output en gebruikt "
+            "de terminal-updater. Alleen aanzetten als je weet wat je doet."
+        )
+        current_dev = bool(self.settings.get("dev_mode", False))
+        dev_row = Adw.ActionRow(
+            title="Developer mode",
+            subtitle="Actief" if current_dev else "Inactief"
+        )
+        dev_btn = Gtk.Button(
+            label="Deactiveren" if current_dev else "Activeren"
+        )
+        dev_btn.add_css_class("flat")
+        dev_btn.set_valign(Gtk.Align.CENTER)
+        dev_btn.connect("clicked", self._on_toggle_dev_mode, dev_row)
+        dev_row.add_suffix(dev_btn)
+        self._dev_btn = dev_btn
+        dev_group.add(dev_row)
+        page.add(dev_group)
+
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title("Mapstructuur")
         structure_group.set_description("Hoe worden je foto's georganiseerd")
@@ -3839,6 +3874,51 @@ class MainWindow(Adw.ApplicationWindow):
         d = Adw.MessageDialog(transient_for=self, heading=heading, body=body)
         d.add_response("ok", "OK")
         d.present()
+        return False
+
+    def _on_toggle_dev_mode(self, btn, row):
+        currently_active = bool(self.settings.get("dev_mode", False))
+        target = not currently_active
+        if target:
+            heading = "Developer mode activeren?"
+            body = ("Bij dev mode start Pixora in een terminal en gaan "
+                    "updates via de terminal zodat je output kunt zien. "
+                    "Pixora herstart direct.")
+        else:
+            heading = "Developer mode deactiveren?"
+            body = "Pixora start daarna zonder terminal en gebruikt de GUI-updater."
+        dialog = Adw.MessageDialog(
+            transient_for=self, heading=heading, body=body
+        )
+        dialog.add_response("cancel", "Nee")
+        dialog.add_response("apply", "Ja")
+        dialog.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("cancel")
+        dialog.connect("response", self._apply_dev_mode, target, row, btn)
+        dialog.present()
+
+    def _apply_dev_mode(self, dialog, response, target, row, btn):
+        if response != "apply":
+            return
+        self.settings["dev_mode"] = target
+        save_settings(self.settings)
+        row.set_subtitle("Actief" if target else "Inactief")
+        btn.set_label("Deactiveren" if target else "Activeren")
+        # Herstart de app
+        GLib.timeout_add(300, self._restart_app)
+
+    def _restart_app(self):
+        try:
+            script = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), "main.py"
+            ))
+            subprocess.Popen(
+                [sys.executable, script],
+                env={**os.environ, "PIXORA_RESTARTING": "1"}
+            )
+        except Exception as e:
+            print(f"Restart fout: {e}")
+        self.get_application().quit()
         return False
 
     def on_structure_changed(self, value, btn):
