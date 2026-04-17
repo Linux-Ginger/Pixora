@@ -1925,8 +1925,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.date_widgets[date_str] = label
         flow = Gtk.FlowBox()
         flow.set_valign(Gtk.Align.START)
-        flow.set_halign(Gtk.Align.START)
-        flow.set_hexpand(False)
+        flow.set_halign(Gtk.Align.FILL)
+        flow.set_hexpand(True)
         flow.set_max_children_per_line(100)
         flow.set_min_children_per_line(1)
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -3296,7 +3296,12 @@ class MainWindow(Adw.ApplicationWindow):
         thumb_reset_btn.add_css_class("circular")
         thumb_reset_btn.set_valign(Gtk.Align.CENTER)
         thumb_reset_btn.set_tooltip_text("Terug naar standaard (320 px)")
+        thumb_reset_btn.set_sensitive(int(thumb_adj.get_value()) != 320)
         thumb_reset_btn.connect("clicked", lambda b: thumb_adj.set_value(320.0))
+        thumb_adj.connect(
+            "value-changed",
+            lambda a: thumb_reset_btn.set_sensitive(int(a.get_value()) != 320)
+        )
         thumb_row.add_suffix(thumb_reset_btn)
 
         display_group.add(thumb_row)
