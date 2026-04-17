@@ -2110,7 +2110,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.grid_box.append(label)
         self.date_widgets[date_str] = label
         rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        rows_box.set_halign(Gtk.Align.START)
+        rows_box.set_halign(Gtk.Align.CENTER)
         rows_box.set_hexpand(True)
         self._current_flow = rows_box
         self._current_row_hbox = None
@@ -2142,7 +2142,7 @@ class MainWindow(Adw.ApplicationWindow):
         needed = thumb_width + (spacing if self._current_row_hbox is not None else 0)
         if self._current_row_hbox is None or self._current_row_width + needed > avail:
             self._current_row_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=spacing)
-            self._current_row_hbox.set_halign(Gtk.Align.START)
+            self._current_row_hbox.set_halign(Gtk.Align.CENTER)
             self._current_flow.append(self._current_row_hbox)
             self._current_row_width = 0
             needed = thumb_width
