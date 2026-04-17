@@ -21,11 +21,24 @@ from concurrent.futures import ThreadPoolExecutor
 
 # ── Dev-mode logging ─────────────────────────────────────────────────
 _LOG_COLOR = sys.stdout.isatty()
+_LOG_PATH = os.path.expanduser("~/.cache/pixora/pixora.log")
+_LOG_FILE = None
+
+def _ensure_log_file():
+    global _LOG_FILE
+    if _LOG_FILE is not None:
+        return
+    try:
+        os.makedirs(os.path.dirname(_LOG_PATH), exist_ok=True)
+        _LOG_FILE = open(_LOG_PATH, "a", buffering=1)
+    except Exception:
+        _LOG_FILE = False  # markeer als niet-beschikbaar
 
 def _log(level, color_code, msg):
     frame = inspect.currentframe().f_back.f_back
     loc = f"{os.path.basename(frame.f_code.co_filename)}:{frame.f_lineno}"
     ts = datetime.datetime.now().strftime("%H:%M:%S")
+    plain = f"{ts} [{level}] {loc}  {msg}"
     if _LOG_COLOR:
         print(
             f"\033[2m{ts}\033[0m "
@@ -34,7 +47,13 @@ def _log(level, color_code, msg):
             flush=True,
         )
     else:
-        print(f"{ts} [{level}] {loc}  {msg}", flush=True)
+        print(plain, flush=True)
+    _ensure_log_file()
+    if _LOG_FILE:
+        try:
+            _LOG_FILE.write(plain + "\n")
+        except Exception:
+            pass
 
 def log_info(msg):  _log("INFO",  "36", msg)
 def log_warn(msg):  _log("WARN",  "33", msg)
@@ -3966,15 +3985,12 @@ class MainWindow(Adw.ApplicationWindow):
             script = os.path.abspath(os.path.join(
                 os.path.dirname(__file__), "main.py"
             ))
-            # Wacht 1.2s zodat de huidige (unique) GApplication volledig
-            # verdwenen is voor de nieuwe instance z'n D-Bus-registratie doet.
-            # Zonder sleep kaatst de nieuwe instance terug naar de stervende
-            # oude en sluit zichzelf.
+            # Wacht 1.2s zodat de unique GApplication volledig verdwenen is
+            # voor de nieuwe instance zich via D-Bus registreert
             env = {
                 k: v for k, v in os.environ.items()
-                if k != "PIXORA_IN_TERMINAL"  # relaunch bepaalt dit zelf
+                if k != "PIXORA_DEV_LOG_OPENED"  # nieuw main.py mag tail-venster opnieuw openen
             }
-            env["PIXORA_RESTARTING"] = "1"
             subprocess.Popen(
                 ["bash", "-c",
                  f"sleep 1.2 && exec {sys.executable!s} {script!s}"],

@@ -12,6 +12,7 @@ import shutil
 import subprocess
 
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
+LOG_PATH = os.path.expanduser("~/.cache/pixora/pixora.log")
 
 
 def load_settings():
@@ -21,39 +22,43 @@ def load_settings():
     return None
 
 
-def _maybe_relaunch_in_terminal():
-    """In dev mode: herstart Pixora binnen een terminal zodat stdout/stderr
-    zichtbaar zijn. Wordt alleen gedaan als we niet al in een terminal-context
-    zitten (PIXORA_IN_TERMINAL env var)."""
-    if os.environ.get("PIXORA_IN_TERMINAL"):
-        return False
+def _launch_dev_log_terminal():
+    """In dev mode: start een apart terminal-venster dat live de log-file
+    volgt via 'tail -f'. Pixora zelf start gewoon snel door."""
     settings = load_settings()
     if not settings or not settings.get("dev_mode"):
-        return False
-    # Zoek een beschikbare terminal
+        return
+    if os.environ.get("PIXORA_DEV_LOG_OPENED"):
+        return
+    # Zorg dat de log-file bestaat zodat tail niet meteen stopt
+    try:
+        os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+        if not os.path.exists(LOG_PATH):
+            open(LOG_PATH, "a").close()
+    except Exception as e:
+        print(f"Kon log-file niet aanmaken: {e}")
+        return
+    tail_cmd = f"echo '─── Pixora dev-log ({LOG_PATH}) ───'; tail -F -n 200 '{LOG_PATH}'"
     for term, args in [
-        ("gnome-terminal", ["--", sys.executable, os.path.abspath(__file__)]),
-        ("konsole", ["-e", sys.executable, os.path.abspath(__file__)]),
-        ("xterm", ["-e", sys.executable, os.path.abspath(__file__)]),
-        ("xfce4-terminal", ["-e", f"{sys.executable} {os.path.abspath(__file__)}"]),
+        ("gnome-terminal", ["--title=Pixora dev-log", "--", "bash", "-c", tail_cmd]),
+        ("konsole",        ["--title", "Pixora dev-log", "-e", "bash", "-c", tail_cmd]),
+        ("xfce4-terminal", ["--title=Pixora dev-log", "-e", f"bash -c \"{tail_cmd}\""]),
+        ("xterm",          ["-T", "Pixora dev-log", "-e", "bash", "-c", tail_cmd]),
     ]:
         if shutil.which(term):
-            env = {
-                **os.environ,
-                "PIXORA_IN_TERMINAL": "1",
-                "PYTHONUNBUFFERED": "1",
-            }
             try:
-                subprocess.Popen([term] + args, env=env)
-                return True
+                subprocess.Popen(
+                    [term] + args,
+                    env={**os.environ, "PIXORA_DEV_LOG_OPENED": "1"},
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                )
+                return
             except Exception as e:
                 print(f"Kon {term} niet starten: {e}")
-    # Geen terminal gevonden — gewoon doorstarten zonder
-    return False
 
 
-if _maybe_relaunch_in_terminal():
-    sys.exit(0)
+_launch_dev_log_terminal()
 
 
 import gi
