@@ -1312,15 +1312,31 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _open_installer(self):
         if self.settings.get("dev_mode"):
-            # Terminal-update (zodat output zichtbaar is)
+            # Dev-terminal update: toon live output via update.sh
+            # (install.sh zou installer.py openen wat voor updates niet nodig is)
+            log_info("Dev-mode update via terminal gestart")
+            script = (
+                "set -e;"
+                "TMP=$(mktemp -d);"
+                "cd $TMP;"
+                "echo '→ update.sh downloaden…';"
+                "curl -fsSL https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/update.sh -o update.sh;"
+                "echo '→ update.sh uitvoeren (sudo vraagt wachtwoord)…';"
+                "sudo bash update.sh;"
+                "rm -rf $TMP;"
+                "echo '';"
+                "echo '✓ Update klaar. Druk op enter om Pixora opnieuw te starten.';"
+                "read;"
+                f"{sys.executable} ~/.local/share/pixora/viewer/main.py &"
+            )
             self.get_application().quit()
             subprocess.Popen([
-                "bash", "-c",
-                "gnome-terminal -- bash -c 'curl -fsSL "
-                "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/install.sh | bash; exec bash'"
+                "gnome-terminal", "--wait", "--title=Pixora update",
+                "--", "bash", "-c", script
             ])
             return
         # GUI-updater
+        log_info("GUI-updater gestart")
         self.get_application().quit()
         updater_path = os.path.abspath(os.path.join(
             os.path.dirname(__file__), "updater.py"
@@ -1418,7 +1434,24 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def on_close(self, window):
+        log_info("Pixora wordt afgesloten — opruimen…")
         self.stop_watcher()
+        # Stop USB-monitor
+        try:
+            self._udev_client = None
+        except Exception:
+            pass
+        # Stop video playback (daemon-threads dien anders nog even door te lopen)
+        try:
+            self._stop_video()
+        except Exception:
+            pass
+        # Sluit dev-terminal als die open staat
+        try:
+            import main as _main_mod
+            _main_mod.kill_dev_terminal()
+        except Exception:
+            pass
         return False
 
     # ── Header ───────────────────────────────────────────────────────

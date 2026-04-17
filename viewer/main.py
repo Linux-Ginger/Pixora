@@ -9,6 +9,7 @@ import sys
 import os
 import json
 import time
+import signal
 import shutil
 import threading
 import subprocess
@@ -99,6 +100,35 @@ def _quit_pixora_app():
     if _PIXORA_APP is not None:
         _PIXORA_APP.quit()
     return False
+
+
+def kill_dev_terminal():
+    """Zet de tail-terminal stop — aangeroepen als Pixora afsluit.
+    Kill de hele process-group zodat tail + bash + terminal-emulator
+    samen sluiten (anders blijft gnome-terminal-server tail in leven)."""
+    global _DEV_TERM_PROC
+    if _DEV_TERM_PROC is None:
+        return
+    try:
+        if _DEV_TERM_PROC.poll() is None:
+            try:
+                os.killpg(os.getpgid(_DEV_TERM_PROC.pid), signal.SIGTERM)
+            except Exception:
+                _DEV_TERM_PROC.terminate()
+            try:
+                _DEV_TERM_PROC.wait(timeout=1.5)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(os.getpgid(_DEV_TERM_PROC.pid), signal.SIGKILL)
+                except Exception:
+                    _DEV_TERM_PROC.kill()
+    except Exception:
+        pass
+    _DEV_TERM_PROC = None
+
+
+import atexit
+atexit.register(kill_dev_terminal)
 
 
 # Alleen de échte opstart (command-line) mag de terminal openen.
