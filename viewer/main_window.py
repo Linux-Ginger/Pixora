@@ -1452,6 +1452,19 @@ class MainWindow(Adw.ApplicationWindow):
             _main_mod.kill_dev_terminal()
         except Exception:
             pass
+        # Wis de dev-log file zodat volgende sessie fris begint
+        global _LOG_FILE
+        try:
+            if _LOG_FILE:
+                try:
+                    _LOG_FILE.close()
+                except Exception:
+                    pass
+                _LOG_FILE = None
+            if os.path.exists(_LOG_PATH):
+                open(_LOG_PATH, "w").close()
+        except Exception:
+            pass
         return False
 
     # ── Header ───────────────────────────────────────────────────────
