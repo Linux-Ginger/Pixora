@@ -101,7 +101,11 @@ def _quit_pixora_app():
     return False
 
 
-_launch_dev_log_terminal()
+# Alleen de échte opstart (command-line) mag de terminal openen.
+# Bij `from main import ...` (geïmporteerd vanuit main_window) wordt deze
+# module opnieuw uitgevoerd onder de naam "main"; dan skippen we dit.
+if __name__ == "__main__":
+    _launch_dev_log_terminal()
 
 
 import gi

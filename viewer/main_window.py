@@ -20,9 +20,13 @@ from collections import defaultdict, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 # ── Dev-mode logging ─────────────────────────────────────────────────
-# Alleen actief in dev mode — main.py zet PIXORA_DEV_MODE bij startup.
+# Lees dev_mode direct uit settings.json — we importeren NIET uit main.py
+# omdat dat main's module-level code opnieuw zou uitvoeren (en een tweede
+# tail-terminal zou openen).
+_CFG = os.path.expanduser("~/.config/pixora/settings.json")
 try:
-    from main import PIXORA_DEV_MODE as _DEV_MODE
+    with open(_CFG, "r") as _f:
+        _DEV_MODE = bool(json.load(_f).get("dev_mode", False))
 except Exception:
     _DEV_MODE = False
 _LOG_COLOR = sys.stdout.isatty()
@@ -65,6 +69,35 @@ def _log(level, color_code, msg):
 def log_info(msg):  _log("INFO",  "36", msg)
 def log_warn(msg):  _log("WARN",  "33", msg)
 def log_error(msg): _log("ERROR", "1;31", msg)
+
+# Vang ongevangen uitzonderingen zodat ze in de terminal/log opvallen met
+# bestand:regel + traceback.
+if _DEV_MODE:
+    import traceback
+    def _excepthook(exc_type, exc_val, exc_tb):
+        tb_lines = traceback.format_exception(exc_type, exc_val, exc_tb)
+        # Zoek de laatste frame uit ons eigen project voor file:line
+        frames = traceback.extract_tb(exc_tb)
+        loc = "?"
+        if frames:
+            f = frames[-1]
+            loc = f"{os.path.basename(f.filename)}:{f.lineno}"
+        header = f"{exc_type.__name__}: {exc_val}"
+        if _LOG_COLOR:
+            print(f"\033[1;31m[ERROR] {loc}  {header}\033[0m", flush=True)
+        else:
+            print(f"[ERROR] {loc}  {header}", flush=True)
+        for line in tb_lines:
+            print(line.rstrip(), flush=True)
+        _ensure_log_file()
+        if _LOG_FILE:
+            try:
+                _LOG_FILE.write(f"[ERROR] {loc}  {header}\n")
+                for line in tb_lines:
+                    _LOG_FILE.write(line)
+            except Exception:
+                pass
+    sys.excepthook = _excepthook
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -1630,6 +1663,7 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self.start_load)
 
     def close_map(self, btn=None):
+        log_info("Kaart gesloten")
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
         self.main_stack.set_visible_child_name("grid")
@@ -2022,6 +2056,7 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Selectie modus ────────────────────────────────────────────────
     def toggle_select_mode(self, btn=None):
         self._select_mode = not self._select_mode
+        log_info(f"Selectie-modus: {'aan' if self._select_mode else 'uit'}")
         self._selected.clear()
         if self._select_mode:
             self.select_btn.set_label("Annuleren")
@@ -2361,6 +2396,9 @@ class MainWindow(Adw.ApplicationWindow):
     def on_sort_changed(self, combo, _):
         if not self.photos:
             return
+        options = ["Datum nieuwste", "Datum oudste", "Naam A-Z", "Naam Z-A"]
+        idx = combo.get_selected()
+        log_info(f"Sortering gewijzigd: {options[idx] if idx < len(options) else idx}")
         if self._sort_timer:
             GLib.source_remove(self._sort_timer)
         self._sort_timer = GLib.timeout_add(400, self._do_sort)
@@ -2489,12 +2527,16 @@ class MainWindow(Adw.ApplicationWindow):
         if self.current_index > 0:
             self._stop_video()
             self.current_index -= 1
+            new_path = self.photos[self.current_index] if self.photos else "?"
+            log_info(f"Vorige foto: idx={self.current_index} → {os.path.basename(new_path)}")
             self._schedule_photo_load()
 
     def next_photo(self, btn=None):
         if self.current_index < len(self.photos) - 1:
             self._stop_video()
             self.current_index += 1
+            new_path = self.photos[self.current_index] if self.photos else "?"
+            log_info(f"Volgende foto: idx={self.current_index} → {os.path.basename(new_path)}")
             self._schedule_photo_load()
 
     def _schedule_photo_load(self):
@@ -3177,6 +3219,8 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Foto editor ───────────────────────────────────────────────────
     def on_edit_current(self, btn):
+        path = self._current_photo_path() or "?"
+        log_info(f"Editor geopend voor: {os.path.basename(path)}")
         self._editor_active         = True
         self._editor_rotation       = 0
         self._editor_crop_mode      = False
@@ -3191,6 +3235,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.set_sensitive(False)
 
     def on_editor_cancel(self, btn=None):
+        log_info("Editor geannuleerd")
         self._editor_active         = False
         self._editor_rotation       = 0
         self._editor_crop_mode      = False
@@ -3246,6 +3291,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_editor_toggle_crop(self, btn):
         self._editor_crop_mode = btn.get_active()
+        log_info(f"Editor crop-modus: {'aan' if self._editor_crop_mode else 'uit'}")
         self._crop_rect        = None
         self._crop_handle      = None
         self._crop_rect_origin = None
@@ -3545,6 +3591,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Instellingen ──────────────────────────────────────────────────
     def on_settings_clicked(self, btn):
+        log_info("Instellingen geopend")
         dialog = Adw.PreferencesDialog()
         dialog.set_title("Instellingen")
 
@@ -3853,6 +3900,7 @@ class MainWindow(Adw.ApplicationWindow):
         global THUMB_SIZE
         if new_size == THUMB_SIZE:
             return False
+        log_info(f"Thumbnail-grootte gewijzigd: {THUMB_SIZE}px → {new_size}px")
         THUMB_SIZE = new_size
         self.settings["thumbnail_size"] = new_size
         save_settings(self.settings)
@@ -3860,6 +3908,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_reset_usbmuxd(self, btn):
+        log_info("Reset usbmuxd aangeroepen (settings)")
         btn.set_sensitive(False)
         btn.set_label("Bezig…")
 
@@ -3905,6 +3954,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_clear_pair_records(self, btn):
+        log_info("Pair-records wissen — bevestiging gevraagd")
         confirm = Adw.MessageDialog(
             transient_for=self,
             heading="Pair-records wissen?",
