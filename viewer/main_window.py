@@ -70,6 +70,24 @@ def log_info(msg):  _log("INFO",  "36", msg)
 def log_warn(msg):  _log("WARN",  "33", msg)
 def log_error(msg): _log("ERROR", "1;31", msg)
 
+# In dev mode: enable faulthandler zodat hangs/crashes altijd een thread-
+# stackdump produceren. Gebruiker kan 'kill -USR1 <pid>' uitvoeren als
+# Pixora vastzit om te zien waar.
+if _DEV_MODE:
+    import faulthandler
+    try:
+        _fh_log = open(_LOG_PATH, "a", buffering=1)
+        faulthandler.enable(file=_fh_log, all_threads=True)
+        try:
+            faulthandler.register(
+                __import__("signal").SIGUSR1,
+                file=_fh_log, all_threads=True
+            )
+        except Exception:
+            pass
+    except Exception:
+        faulthandler.enable(all_threads=True)
+
 # Vang ongevangen uitzonderingen zodat ze in de terminal/log opvallen met
 # bestand:regel + traceback.
 if _DEV_MODE:
@@ -912,6 +930,8 @@ class MainWindow(Adw.ApplicationWindow):
             log_info(f"Config: {CONFIG_PATH}")
             log_info(f"Cache:  {CACHE_DIR}")
             log_info(f"Thumbs: {THUMB_SIZE}px — favorieten: {len(load_favorites())}")
+            log_info(f"PID: {os.getpid()} — bij hangs: 'kill -USR1 {os.getpid()}' dumpt thread-stacks")
+        log_info("Startup fase 1: MainWindow __init__ begonnen")
         self.photos          = []
         self.thumb_widgets   = {}
         self.date_widgets    = {}
@@ -967,6 +987,7 @@ class MainWindow(Adw.ApplicationWindow):
             on_done_cb=self.on_import_done,
         )
 
+        log_info("Startup fase 2: pages opbouwen…")
         self.main_stack = Gtk.Stack()
         self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.main_stack.set_transition_duration(200)
@@ -974,6 +995,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
         self.main_stack.add_named(self.build_map_page(),    "map")
         self.main_stack.add_named(self.importer_page,       "importer")
+        log_info("Startup fase 3: pages klaar")
 
         self.update_banner = Adw.Banner(title="", button_label="Bijwerken", use_markup=False)
         self.update_banner.set_revealed(False)
@@ -1040,6 +1062,7 @@ class MainWindow(Adw.ApplicationWindow):
         Gtk.Settings.get_default().set_property("gtk-decoration-layout", "icon:minimize,close")
 
         self.set_resizable(False)
+        log_info("Startup fase 4: foto's laden gepland via idle_add")
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
         GLib.idle_add(self._check_for_update)
@@ -2159,7 +2182,9 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Foto's laden ──────────────────────────────────────────────────
     def load_photos(self):
         photo_path = self.settings.get("photo_path", "")
+        log_info(f"load_photos: scannen in {photo_path}")
         if not photo_path or not os.path.exists(photo_path):
+            log_warn("load_photos: photo_path leeg of bestaat niet — empty state")
             self.show_empty_state()
             return False
         photos = []
@@ -2167,6 +2192,7 @@ class MainWindow(Adw.ApplicationWindow):
             for file in files:
                 if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
                     photos.append(os.path.join(root, file))
+        log_info(f"load_photos: {len(photos)} bestanden gevonden")
         if self._favorites_only:
             photos = [p for p in photos if p in self._favorites]
         if not photos:
@@ -2397,6 +2423,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _load_done(self, load_id, total):
         if load_id != self._load_id:
             return False
+        log_info(f"Thumbnail-load klaar: {total} foto's — UI is klaar voor input")
         self.spinner.stop()
         self.content_stack.set_visible_child_name("grid")
         cluster_lbl = getattr(self, '_cluster_location_label', None)
