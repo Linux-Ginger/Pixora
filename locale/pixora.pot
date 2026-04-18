@@ -51,6 +51,9 @@ msgstr ""
 msgid "Apparaat gevonden"
 msgstr ""
 
+msgid "Apple USB-device aangesloten (vendor=05ac) — check na 2.5s"
+msgstr ""
+
 msgid "Automatische backup"
 msgstr ""
 
@@ -75,6 +78,15 @@ msgstr ""
 msgid "Bladeren…"
 msgstr ""
 
+msgid "Cluster-filter uitgezet → alle foto's"
+msgstr ""
+
+msgid "Configuratie + services"
+msgstr ""
+
+msgid "Configuratie en services"
+msgstr ""
+
 msgid "Controleer"
 msgstr ""
 
@@ -93,6 +105,9 @@ msgstr ""
 msgid "Doorgaan met importeren"
 msgstr ""
 
+msgid "Downloaden"
+msgstr ""
+
 msgid "Draaien links"
 msgstr ""
 
@@ -103,6 +118,15 @@ msgid "Duplicaat detectie"
 msgstr ""
 
 msgid "Duplicate detectie"
+msgstr ""
+
+msgid "Editor geannuleerd"
+msgstr ""
+
+msgid "Editor: draaien links (-90°)"
+msgstr ""
+
+msgid "Editor: draaien rechts (+90°)"
 msgstr ""
 
 msgid "Er is een fout opgetreden"
@@ -120,10 +144,16 @@ msgstr ""
 msgid "Foto's laden..."
 msgstr ""
 
+msgid "GUI-updater gestart"
+msgstr ""
+
 msgid "Geavanceerd"
 msgstr ""
 
 msgid "Geen foto's gevonden"
+msgstr ""
+
+msgid "Geen terminal gevonden voor dev-mode; Pixora start zonder."
 msgstr ""
 
 msgid "Herstart"
@@ -156,13 +186,34 @@ msgstr ""
 msgid "Installeer vereiste pakketten"
 msgstr ""
 
+msgid "Installeren"
+msgstr ""
+
 msgid "Instellingen"
+msgstr ""
+
+msgid "Instellingen geopend"
+msgstr ""
+
+msgid "Ja"
 msgstr ""
 
 msgid "Je apparaat is verbonden en klaar om te importeren."
 msgstr ""
 
 msgid "Je hebt de nieuwste versie"
+msgstr ""
+
+msgid "Kaart gesloten"
+msgstr ""
+
+msgid "Kaart → eerste tiles geladen"
+msgstr ""
+
+msgid "Kaart → offline / tile-errors"
+msgstr ""
+
+msgid "Kaart-ready timeout — toon kaart alsnog"
 msgstr ""
 
 msgid "Kaartweergave"
@@ -180,6 +231,12 @@ msgstr ""
 msgid "Kiezen…"
 msgstr ""
 
+msgid "Later"
+msgstr ""
+
+msgid "Launcher aanmaken"
+msgstr ""
+
 msgid "Map op backup schijf"
 msgstr ""
 
@@ -192,6 +249,12 @@ msgstr ""
 msgid "Mogelijke duplicaten"
 msgstr ""
 
+msgid "Nee"
+msgstr ""
+
+msgid "Nieuwste versie"
+msgstr ""
+
 msgid "Nog geen map gekozen"
 msgstr ""
 
@@ -199,6 +262,9 @@ msgid "Nog geen schijf geselecteerd"
 msgstr ""
 
 msgid "Normaal"
+msgstr ""
+
+msgid "OK"
 msgstr ""
 
 msgid "Ook licht bewerkte foto's worden gedetecteerd"
@@ -219,6 +285,9 @@ msgstr ""
 msgid "Over"
 msgstr ""
 
+msgid "Pair-records wissen — bevestiging gevraagd"
+msgstr ""
+
 msgid "Per jaar"
 msgstr ""
 
@@ -234,13 +303,22 @@ msgstr ""
 msgid "Pixora Updater"
 msgstr ""
 
+msgid "Pixora bestanden downloaden"
+msgstr ""
+
 msgid "Pixora bijwerken"
 msgstr ""
 
 msgid "Pixora is al geïnstalleerd"
 msgstr ""
 
+msgid "Pixora ophalen van GitHub"
+msgstr ""
+
 msgid "Pixora starten"
+msgstr ""
+
+msgid "Pixora wordt afgesloten — opruimen…"
 msgstr ""
 
 msgid "Pixora wordt gestart…"
@@ -252,7 +330,16 @@ msgstr ""
 msgid "Plat"
 msgstr ""
 
+msgid "Python packages installeren"
+msgstr ""
+
 msgid "Reisverhaal samenstellen…"
+msgstr ""
+
+msgid "Reset usbmuxd aangeroepen (settings)"
+msgstr ""
+
+msgid "Restart gepland (1.2s delay voor GApplication unregister)"
 msgstr ""
 
 msgid "Selecteer alles"
@@ -262,6 +349,9 @@ msgid "Selecteer welke versie je wilt installeren"
 msgstr ""
 
 msgid "Selecteren"
+msgstr ""
+
+msgid "Services activeren"
 msgstr ""
 
 msgid "Sluit dit venster om Pixora te sluiten."
@@ -279,6 +369,21 @@ msgstr ""
 msgid "Sorteren..."
 msgstr ""
 
+msgid "Starten"
+msgstr ""
+
+msgid "Startup fase 1: MainWindow __init__ begonnen"
+msgstr ""
+
+msgid "Startup fase 2: pages opbouwen…"
+msgstr ""
+
+msgid "Startup fase 3: pages klaar"
+msgstr ""
+
+msgid "Startup fase 4: foto's laden gepland via idle_add"
+msgstr ""
+
 msgid "Streng"
 msgstr ""
 
@@ -286,6 +391,12 @@ msgid "Synchroniseert na elke import"
 msgstr ""
 
 msgid "Synchroniseert na elke import naar externe schijf"
+msgstr ""
+
+msgid "Systeem packages controleren"
+msgstr ""
+
+msgid "Systeem packages installeren"
 msgstr ""
 
 msgid "Taal"
@@ -324,7 +435,13 @@ msgstr ""
 msgid "Verwijderen"
 msgstr ""
 
+msgid "Viewer gesloten → terug naar grid"
+msgstr ""
+
 msgid "Volgende"
+msgstr ""
+
+msgid "Voorbereiden"
 msgstr ""
 
 msgid "Waar wil je je foto's opslaan?"
@@ -336,6 +453,9 @@ msgstr ""
 msgid "Wachten op sudo…"
 msgstr ""
 
+msgid "WebKit typelib installeren"
+msgstr ""
+
 msgid "Weergave"
 msgstr ""
 
@@ -345,13 +465,37 @@ msgstr ""
 msgid "Wijzigen"
 msgstr ""
 
+msgid "Wissen"
+msgstr ""
+
 msgid "Zoeken naar apparaat…"
+msgstr ""
+
+msgid "iPhone blijft onherkenbaar na reset"
+msgstr ""
+
+msgid "iPhone direct herkend door usbmuxd"
+msgstr ""
+
+msgid "iPhone herkend na reset"
+msgstr ""
+
+msgid "iPhone niet herkend door usbmuxd — start auto-recovery"
+msgstr ""
+
+msgid "load_photos: photo_path leeg of bestaat niet — empty state"
+msgstr ""
+
+msgid "register_script_message_handler mislukt met alle varianten"
 msgstr ""
 
 msgid "signal"
 msgstr ""
 
 msgid "─── Pixora (dev mode) ───"
+msgstr ""
+
+msgid "═══ Pixora gestart in Developer Mode ═══"
 msgstr ""
 
 msgid "✕ Toon alle foto's"

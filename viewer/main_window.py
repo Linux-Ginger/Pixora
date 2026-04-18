@@ -819,7 +819,7 @@ class MapWidget(Gtk.Box):
                 except Exception:
                     continue
             if not registered:
-                log_error("register_script_message_handler mislukt met alle varianten")
+                log_error(_("register_script_message_handler mislukt met alle varianten"))
             ucm.connect("script-message-received::pixora", self._on_js_message)
         except Exception as e:
             log_error(f"WebView bridge setup fout: {e}")
@@ -895,11 +895,11 @@ class MapWidget(Gtk.Box):
             if path:
                 GLib.idle_add(self.open_photo_cb, [path])
         elif msg_type == "map-ready":
-            log_info("Kaart → eerste tiles geladen")
+            log_info(_("Kaart → eerste tiles geladen"))
             if self.status_cb:
                 GLib.idle_add(self.status_cb, "ready")
         elif msg_type == "map-offline":
-            log_warn("Kaart → offline / tile-errors")
+            log_warn(_("Kaart → offline / tile-errors"))
             if self.status_cb:
                 GLib.idle_add(self.status_cb, "offline")
 
@@ -916,12 +916,12 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             THUMB_SIZE = 200
         if settings.get("dev_mode"):
-            log_info("═══ Pixora gestart in Developer Mode ═══")
+            log_info(_("═══ Pixora gestart in Developer Mode ═══"))
             log_info(f"Config: {CONFIG_PATH}")
             log_info(f"Cache:  {CACHE_DIR}")
             log_info(f"Thumbs: {THUMB_SIZE}px — favorieten: {len(load_favorites())}")
             log_info(f"PID: {os.getpid()} — bij hangs: 'kill -USR1 {os.getpid()}' dumpt thread-stacks")
-        log_info("Startup fase 1: MainWindow __init__ begonnen")
+        log_info(_("Startup fase 1: MainWindow __init__ begonnen"))
         self.photos          = []
         self.thumb_widgets   = {}
         self.date_widgets    = {}
@@ -979,7 +979,7 @@ class MainWindow(Adw.ApplicationWindow):
             on_done_cb=self.on_import_done,
         )
 
-        log_info("Startup fase 2: pages opbouwen…")
+        log_info(_("Startup fase 2: pages opbouwen…"))
         self.main_stack = Gtk.Stack()
         self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.main_stack.set_transition_duration(200)
@@ -987,7 +987,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
         self.main_stack.add_named(self.build_map_page(),    "map")
         self.main_stack.add_named(self.importer_page,       "importer")
-        log_info("Startup fase 3: pages klaar")
+        log_info(_("Startup fase 3: pages klaar"))
 
         self.update_banner = Adw.Banner(title="", button_label="Bijwerken", use_markup=False)
         self.update_banner.set_revealed(False)
@@ -1055,7 +1055,7 @@ class MainWindow(Adw.ApplicationWindow):
         Gtk.Settings.get_default().set_property("gtk-decoration-layout", "icon:minimize,close")
 
         self.set_resizable(False)
-        log_info("Startup fase 4: foto's laden gepland via idle_add")
+        log_info(_("Startup fase 4: foto's laden gepland via idle_add"))
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
         GLib.idle_add(self._check_for_update)
@@ -1098,7 +1098,7 @@ class MainWindow(Adw.ApplicationWindow):
             vendor = None
         if vendor != "05ac":  # Apple
             return
-        log_info("Apple USB-device aangesloten (vendor=05ac) — check na 2.5s")
+        log_info(_("Apple USB-device aangesloten (vendor=05ac) — check na 2.5s"))
         # Wacht kort zodat usbmuxd het device kan zien, daarna controleren
         GLib.timeout_add(2500, self._post_apple_plugin_check)
 
@@ -1121,11 +1121,11 @@ class MainWindow(Adw.ApplicationWindow):
         # Eerste check
         has_device = self._idevice_check()
         if has_device:
-            log_info("iPhone direct herkend door usbmuxd")
+            log_info(_("iPhone direct herkend door usbmuxd"))
             GLib.idle_add(self._iphone_flow_success, False)
             return
         # Niet herkend — automatisch reset
-        log_warn("iPhone niet herkend door usbmuxd — start auto-recovery")
+        log_warn(_("iPhone niet herkend door usbmuxd — start auto-recovery"))
         GLib.idle_add(self._set_iphone_banner,
                       "🔧 Verbinding herstellen, even geduld…")
         reset_ok = False
@@ -1147,10 +1147,10 @@ class MainWindow(Adw.ApplicationWindow):
         time.sleep(2.5)
         has_device = self._idevice_check()
         if has_device:
-            log_info("iPhone herkend na reset")
+            log_info(_("iPhone herkend na reset"))
             GLib.idle_add(self._iphone_flow_success, True)
         else:
-            log_warn("iPhone blijft onherkenbaar na reset")
+            log_warn(_("iPhone blijft onherkenbaar na reset"))
             GLib.idle_add(self._iphone_flow_fail)
 
     def _idevice_check(self):
@@ -1309,8 +1309,8 @@ class MainWindow(Adw.ApplicationWindow):
             heading="Update beschikbaar",
             body=f"Pixora {new_version} is beschikbaar. Wil je nu bijwerken?",
         )
-        dlg.add_response("later", "Later")
-        dlg.add_response("bijwerken", "Bijwerken")
+        dlg.add_response("later", _("Later"))
+        dlg.add_response("bijwerken", _("Bijwerken"))
         dlg.set_response_appearance("bijwerken", Adw.ResponseAppearance.SUGGESTED)
         dlg.connect("response", self._on_update_dialog_response, new_version)
         dlg.present(self)
@@ -1327,7 +1327,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._open_installer()
 
     def _open_installer(self):
-        log_info("GUI-updater gestart")
+        log_info(_("GUI-updater gestart"))
         updater_path = os.path.abspath(os.path.join(
             os.path.dirname(__file__), "updater.py"
         ))
@@ -1447,7 +1447,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def on_close(self, window):
-        log_info("Pixora wordt afgesloten — opruimen…")
+        log_info(_("Pixora wordt afgesloten — opruimen…"))
         try:
             self._load_id += 1
             self._viewer_load_id += 1
@@ -1805,7 +1805,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_map_ready_timeout(self):
         # Fallback: na 12s tonen we de kaart sowieso, ook zonder tile-load.
-        log_warn("Kaart-ready timeout — toon kaart alsnog")
+        log_warn(_("Kaart-ready timeout — toon kaart alsnog"))
         self._map_ready_fallback_id = None
         try:
             self.map_spinner.stop()
@@ -1845,7 +1845,7 @@ class MainWindow(Adw.ApplicationWindow):
     def on_clear_cluster_filter(self, btn=None):
         if not hasattr(self, "_photos_before_cluster") or not self._photos_before_cluster:
             return
-        log_info("Cluster-filter uitgezet → alle foto's")
+        log_info(_("Cluster-filter uitgezet → alle foto's"))
         self.photos = self._photos_before_cluster
         self._photos_before_cluster = None
         self._cluster_location_label = None
@@ -1857,7 +1857,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self.start_load)
 
     def close_map(self, btn=None):
-        log_info("Kaart gesloten")
+        log_info(_("Kaart gesloten"))
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
         try:
@@ -2320,7 +2320,7 @@ class MainWindow(Adw.ApplicationWindow):
         photo_path = self.settings.get("photo_path", "")
         log_info(f"load_photos: scannen in {photo_path}")
         if not photo_path or not os.path.exists(photo_path):
-            log_warn("load_photos: photo_path leeg of bestaat niet — empty state")
+            log_warn(_("load_photos: photo_path leeg of bestaat niet — empty state"))
             self.show_empty_state()
             return False
         photos = []
@@ -2985,7 +2985,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def close_viewer(self, btn=None):
-        log_info("Viewer gesloten → terug naar grid")
+        log_info(_("Viewer gesloten → terug naar grid"))
         self._stop_video()
         self._viewer_load_id += 1
         self.header.set_visible(True)
@@ -3641,7 +3641,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.set_sensitive(False)
 
     def on_editor_cancel(self, btn=None):
-        log_info("Editor geannuleerd")
+        log_info(_("Editor geannuleerd"))
         self._editor_active         = False
         self._editor_rotation       = 0
         self._editor_crop_mode      = False
@@ -3667,13 +3667,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_rect_origin = None
 
     def on_editor_rotate_left(self, btn):
-        log_info("Editor: draaien links (-90°)")
+        log_info(_("Editor: draaien links (-90°)"))
         self._editor_rotation = (self._editor_rotation + 90) % 360
         self._reset_crop()
         self._editor_apply_preview()
 
     def on_editor_rotate_right(self, btn):
-        log_info("Editor: draaien rechts (+90°)")
+        log_info(_("Editor: draaien rechts (+90°)"))
         self._editor_rotation = (self._editor_rotation - 90) % 360
         self._reset_crop()
         self._editor_apply_preview()
@@ -3903,7 +3903,7 @@ class MainWindow(Adw.ApplicationWindow):
                 heading="Opslaan mislukt",
                 body=msg
             )
-            dialog.add_response("ok", "OK")
+            dialog.add_response("ok", _("OK"))
             dialog.present()
 
         threading.Thread(target=_do_save, daemon=True).start()
@@ -3917,8 +3917,8 @@ class MainWindow(Adw.ApplicationWindow):
             heading="Foto verwijderen?",
             body=f"Weet je zeker dat je '{os.path.basename(path)}' wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
         )
-        dialog.add_response("cancel", "Annuleren")
-        dialog.add_response("delete", "Verwijderen")
+        dialog.add_response("cancel", _("Annuleren"))
+        dialog.add_response("delete", _("Verwijderen"))
         dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
@@ -3966,7 +3966,7 @@ class MainWindow(Adw.ApplicationWindow):
             heading=f"{count} foto's verwijderen?",
             body=f"Weet je zeker dat je {count} foto's wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
         )
-        dialog.add_response("cancel", "Annuleren")
+        dialog.add_response("cancel", _("Annuleren"))
         dialog.add_response("delete", f"{count} verwijderen")
         dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
@@ -3997,7 +3997,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Instellingen ──────────────────────────────────────────────────
     def on_settings_clicked(self, btn):
-        log_info("Instellingen geopend")
+        log_info(_("Instellingen geopend"))
         dialog = Adw.PreferencesDialog()
         dialog.set_title(_("Instellingen"))
 
@@ -4319,7 +4319,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_reset_usbmuxd(self, btn):
-        log_info("Reset usbmuxd aangeroepen (settings)")
+        log_info(_("Reset usbmuxd aangeroepen (settings)"))
         btn.set_sensitive(False)
         btn.set_label(_("Bezig…"))
 
@@ -4358,14 +4358,14 @@ class MainWindow(Adw.ApplicationWindow):
             heading="USB-verbinding herstart" if ok else "Herstart mislukt",
             body=msg
         )
-        dialog.add_response("ok", "OK")
+        dialog.add_response("ok", _("OK"))
         dialog.present()
         if ok:
             GLib.timeout_add(500, self._poll_import_device)
         return False
 
     def _on_clear_pair_records(self, btn):
-        log_info("Pair-records wissen — bevestiging gevraagd")
+        log_info(_("Pair-records wissen — bevestiging gevraagd"))
         confirm = Adw.MessageDialog(
             transient_for=self,
             heading="Pair-records wissen?",
@@ -4373,8 +4373,8 @@ class MainWindow(Adw.ApplicationWindow):
                   "/var/lib/lockdown/. Je iPhone vraagt de volgende keer "
                   "opnieuw om Trust.")
         )
-        confirm.add_response("cancel", "Annuleren")
-        confirm.add_response("clear", "Wissen")
+        confirm.add_response("cancel", _("Annuleren"))
+        confirm.add_response("clear", _("Wissen"))
         confirm.set_response_appearance("clear", Adw.ResponseAppearance.DESTRUCTIVE)
         confirm.set_default_response("cancel")
         confirm.connect("response", self._do_clear_pair_records)
@@ -4411,7 +4411,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_info_dialog(self, heading, body):
         d = Adw.MessageDialog(transient_for=self, heading=heading, body=body)
-        d.add_response("ok", "OK")
+        d.add_response("ok", _("OK"))
         d.present()
         return False
 
@@ -4503,8 +4503,8 @@ class MainWindow(Adw.ApplicationWindow):
         dialog = Adw.MessageDialog(
             transient_for=self, heading=heading, body=body
         )
-        dialog.add_response("cancel", "Nee")
-        dialog.add_response("apply", "Ja")
+        dialog.add_response("cancel", _("Nee"))
+        dialog.add_response("apply", _("Ja"))
         dialog.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
         dialog.set_default_response("cancel")
         dialog.connect("response", self._apply_dev_mode, target, row, btn)
@@ -4541,7 +4541,7 @@ class MainWindow(Adw.ApplicationWindow):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            log_info("Restart gepland (1.2s delay voor GApplication unregister)")
+            log_info(_("Restart gepland (1.2s delay voor GApplication unregister)"))
         except Exception as e:
             log_error(f"Restart fout: {e}")
         self.get_application().quit()

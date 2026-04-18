@@ -1103,8 +1103,8 @@ class ImporterPage(Gtk.Box):
             "Je apparaat is losgekoppeld tijdens het selecteren van foto's.\n"
             "Sluit het apparaat opnieuw aan en probeer het opnieuw."
         )
-        dialog.add_response("cancel", "Annuleren")
-        dialog.add_response("retry", "Opnieuw proberen")
+        dialog.add_response("cancel", _("Annuleren"))
+        dialog.add_response("retry", _("Opnieuw proberen"))
         dialog.set_default_response("retry")
         dialog.set_close_response("cancel")
         dialog.connect("response", self._on_disconnect_response)

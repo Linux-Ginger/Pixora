@@ -217,7 +217,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         phases_box.set_margin_end(24)
 
         for phase_label, steps in PHASES:
-            phase_lbl = Gtk.Label(label=phase_label)
+            phase_lbl = Gtk.Label(label=_(phase_label))
             phase_lbl.add_css_class("heading")
             phase_lbl.set_halign(Gtk.Align.START)
             phase_lbl.set_margin_top(4)
@@ -229,7 +229,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
             for step_label, key in steps:
                 row = Adw.ActionRow()
-                row.set_title(step_label)
+                row.set_title(_(step_label))
 
                 spinner = Gtk.Spinner()
                 spinner.set_size_request(20, 20)
@@ -360,7 +360,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         stack.set_visible_child_name("spinner")
         idx = next(i for i, (_, k) in enumerate(ALL_STEPS) if k == key)
         self.progress.set_fraction(idx / len(ALL_STEPS))
-        self.status_lbl.set_text(label + "…")
+        self.status_lbl.set_text(_(label) + "…")
 
     def _set_step_done(self, key):
         row, stack, spinner, check = self.step_rows[key]

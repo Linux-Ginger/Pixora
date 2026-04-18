@@ -91,7 +91,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
         phases_box.set_margin_end(24)
 
         for phase_label, steps in PHASES:
-            phase_lbl = Gtk.Label(label=phase_label)
+            phase_lbl = Gtk.Label(label=_(phase_label))
             phase_lbl.add_css_class("heading")
             phase_lbl.set_halign(Gtk.Align.START)
             phase_lbl.set_margin_top(4)
@@ -103,7 +103,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
 
             for step_label, key in steps:
                 row = Adw.ActionRow()
-                row.set_title(step_label)
+                row.set_title(_(step_label))
                 spinner = Gtk.Spinner()
                 spinner.set_size_request(20, 20)
                 check = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
@@ -185,7 +185,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
         row, stack, spinner, check = entry
         spinner.start()
         stack.set_visible_child_name("spinner")
-        self.status_lbl.set_text(label + "…")
+        self.status_lbl.set_text(_(label) + "…")
 
     def _set_step_done(self, key):
         entry = self.step_rows.get(key)

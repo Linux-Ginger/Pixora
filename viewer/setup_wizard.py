@@ -377,7 +377,7 @@ class SetupWizard(Adw.Window):
                     heading="Geen map gekozen",
                     body="Kies een map waar je foto's opgeslagen worden."
                 )
-                dialog.add_response("ok", "OK")
+                dialog.add_response("ok", _("OK"))
                 dialog.present()
                 return
 
