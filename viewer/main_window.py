@@ -4095,6 +4095,22 @@ class MainWindow(Adw.ApplicationWindow):
         dev_row.add_suffix(dev_btn)
         self._dev_btn = dev_btn
         dev_group.add(dev_row)
+
+        # Test-log knop — alleen zichtbaar in dev-mode. Toont INFO/WARN/
+        # ERROR/uncaught-exception in de dev-terminal zodat je de kleuren
+        # en formatting kunt verifieren.
+        if current_dev:
+            testlog_row = Adw.ActionRow(
+                title="Test dev-logs",
+                subtitle="Schrijft INFO, WARN en ERROR naar de dev-terminal"
+            )
+            testlog_btn = Gtk.Button(label="Triggeren")
+            testlog_btn.add_css_class("flat")
+            testlog_btn.set_valign(Gtk.Align.CENTER)
+            testlog_btn.connect("clicked", self._on_test_dev_logs)
+            testlog_row.add_suffix(testlog_btn)
+            dev_group.add(testlog_row)
+
         advanced_page.add(dev_group)
 
         structure_group = Adw.PreferencesGroup()
@@ -4396,6 +4412,18 @@ class MainWindow(Adw.ApplicationWindow):
         d.add_response("ok", "OK")
         d.present()
         return False
+
+    def _on_test_dev_logs(self, btn):
+        log_info("Test INFO — dit is een cyan infobericht")
+        log_warn("Test WARN — dit is een gele waarschuwing")
+        log_error("Test ERROR — dit is een rode foutmelding")
+        # Trigger ook een uncaught exception zodat excepthook zichtbaar is
+        def _bg_raise():
+            try:
+                raise RuntimeError("Test uitzondering vanuit dev-knop")
+            except Exception as e:
+                log_error(f"Test exception: {e}")
+        threading.Thread(target=_bg_raise, daemon=True).start()
 
     def _on_toggle_dev_mode(self, btn, row):
         currently_active = bool(self.settings.get("dev_mode", False))
