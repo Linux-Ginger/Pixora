@@ -595,23 +595,36 @@ class MapWidget(Gtk.Box):
         self._pending_markers = list(markers) if markers else []
 
         if not WEBKIT_AVAILABLE:
-            msg = (
+            self._show_fallback(
                 "WebKitGTK kon niet geladen worden.\n\n"
                 "Installeer een van:\n"
                 "  sudo apt install gir1.2-webkit-6.0\n"
                 "  sudo apt install gir1.2-webkit2-4.1\n"
+                + (f"\nTechnische fout: {_webkit_load_error}" if _webkit_load_error else "")
             )
-            if _webkit_load_error:
-                msg += f"\nTechnische fout: {_webkit_load_error}"
-            lbl = Gtk.Label(label=msg)
-            lbl.set_vexpand(True)
-            lbl.set_hexpand(True)
-            lbl.set_justify(Gtk.Justification.CENTER)
-            lbl.set_wrap(True)
-            self.append(lbl)
             log_error(f"WebKit niet beschikbaar: {_webkit_load_error}")
             return
 
+        try:
+            self._init_webview()
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            log_error(f"WebView init crashte:\n{tb}")
+            self._show_fallback(
+                "Kaart-weergave kon niet starten.\n\n"
+                f"Fout: {e}\n\nCheck /home/beau/.cache/pixora/pixora.log voor meer."
+            )
+
+    def _show_fallback(self, msg):
+        lbl = Gtk.Label(label=msg)
+        lbl.set_vexpand(True)
+        lbl.set_hexpand(True)
+        lbl.set_justify(Gtk.Justification.CENTER)
+        lbl.set_wrap(True)
+        self.append(lbl)
+
+    def _init_webview(self):
         self.web = WebKit2.WebView()
         self.web.set_vexpand(True)
         self.web.set_hexpand(True)
@@ -621,15 +634,21 @@ class MapWidget(Gtk.Box):
             wk_settings.set_enable_javascript(True)
             wk_settings.set_javascript_can_access_clipboard(False)
             wk_settings.set_enable_developer_extras(False)
-        except Exception:
-            pass
+        except Exception as e:
+            log_warn(f"WebView settings niet volledig gezet: {e}")
 
         try:
             ucm = self.web.get_user_content_manager()
-            try:
-                ucm.register_script_message_handler("pixora")
-            except TypeError:
-                ucm.register_script_message_handler("pixora", None)
+            registered = False
+            for args in (("pixora",), ("pixora", None), ("pixora", "")):
+                try:
+                    ucm.register_script_message_handler(*args)
+                    registered = True
+                    break
+                except Exception:
+                    continue
+            if not registered:
+                log_error("register_script_message_handler mislukt met alle varianten")
             ucm.connect("script-message-received::pixora", self._on_js_message)
         except Exception as e:
             log_error(f"WebView bridge setup fout: {e}")
@@ -641,10 +660,7 @@ class MapWidget(Gtk.Box):
         )
         map_html_path = os.path.abspath(os.path.join(assets_dir, "map.html"))
         if not os.path.exists(map_html_path):
-            lbl = Gtk.Label(label=f"Leaflet-assets niet gevonden:\n{map_html_path}")
-            lbl.set_vexpand(True)
-            lbl.set_hexpand(True)
-            self.append(lbl)
+            self._show_fallback(f"Leaflet-assets niet gevonden:\n{map_html_path}")
             return
 
         self.web.load_uri("file://" + map_html_path)
@@ -1480,7 +1496,7 @@ class MainWindow(Adw.ApplicationWindow):
         map_spinner_box.set_vexpand(True)
         self.map_spinner = Gtk.Spinner()
         self.map_spinner.set_size_request(48, 48)
-        map_spinner_label = Gtk.Label(label="GPS locaties laden...")
+        map_spinner_label = Gtk.Label(label="Reisverhaal samenstellen…")
         map_spinner_label.add_css_class("dim-label")
         map_spinner_box.append(self.map_spinner)
         map_spinner_box.append(map_spinner_label)
