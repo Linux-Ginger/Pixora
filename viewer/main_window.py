@@ -1321,7 +1321,11 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_error(f"GUI-updater kon niet starten: {e}")
             return
-        self.get_application().quit()
+        # Trigger on_close (met z'n 2s force-exit fallback) i.p.v.
+        # app.quit() dat de GTK-loop wel stopt maar non-daemon threads +
+        # WebKit-subprocess kan laten hangen. Als dat gebeurt blijft
+        # Pixora als zombie in process-lijst en blokkeert nieuwe launches.
+        GLib.idle_add(self.close)
 
     def _on_settings_check_update(self, btn):
         self._update_check_btn.set_visible(False)
