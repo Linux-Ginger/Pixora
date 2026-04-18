@@ -4063,37 +4063,6 @@ class MainWindow(Adw.ApplicationWindow):
         display_group.add(thumb_row)
         page.add(display_group)
 
-        iphone_group = Adw.PreferencesGroup()
-        iphone_group.set_title("iPhone / iPad verbinding")
-        iphone_group.set_description(
-            "Werkt usbmuxd niet meer? Herstart de verbinding hier."
-        )
-
-        self._usbmuxd_row = Adw.ActionRow(
-            title="USB-verbinding herstellen",
-            subtitle="Herstart usbmuxd als de iPhone niet meer wordt herkend"
-        )
-        reset_usbmuxd_btn = Gtk.Button(label="Herstart")
-        reset_usbmuxd_btn.add_css_class("flat")
-        reset_usbmuxd_btn.set_valign(Gtk.Align.CENTER)
-        reset_usbmuxd_btn.connect("clicked", self._on_reset_usbmuxd)
-        self._usbmuxd_row.add_suffix(reset_usbmuxd_btn)
-        self._usbmuxd_reset_btn = reset_usbmuxd_btn
-
-        self._usbmuxd_pair_row = Adw.ActionRow(
-            title="Koppeling wissen",
-            subtitle="Verwijder oude iPhone pair-records (tap Trust daarna opnieuw)"
-        )
-        clear_pair_btn = Gtk.Button(label="Wissen")
-        clear_pair_btn.add_css_class("flat")
-        clear_pair_btn.set_valign(Gtk.Align.CENTER)
-        clear_pair_btn.connect("clicked", self._on_clear_pair_records)
-        self._usbmuxd_pair_row.add_suffix(clear_pair_btn)
-
-        iphone_group.add(self._usbmuxd_row)
-        iphone_group.add(self._usbmuxd_pair_row)
-        page.add(iphone_group)
-
         dev_group = Adw.PreferencesGroup()
         dev_group.set_title("Geavanceerd")
         dev_group.set_description(
