@@ -53,9 +53,15 @@
     markerZoomAnimation: false,
     inertia: false,
     preferCanvas: true,
-    wheelDebounceTime: 80,
-    zoomSnap: 1
+    wheelDebounceTime: 30,
+    wheelPxPerZoomLevel: 100,
+    zoomSnap: 1,
+    minZoom: 2,
+    maxBoundsViscosity: 1.0
   }).setView([52.3, 5.3], 7);
+
+  // Voorkom herhaalde werelden bij ver uitzoomen
+  map.setMaxBounds([[-85.05, -180], [85.05, 180]]);
 
   L.control.attribution({
     prefix: '<a href="https://leafletjs.com/" target="_blank">Leaflet</a>'
@@ -68,27 +74,47 @@
     crossOrigin: true,
     updateWhenIdle: true,
     updateWhenZooming: false,
-    keepBuffer: 1
+    keepBuffer: 1,
+    noWrap: true
   });
   tileLayer.addTo(map);
 
+  // Laat Pixora weten wanneer de eerste tiles klaar zijn, zodat de
+  // spinner kan wisselen naar de kaart.
+  let firstTileLoaded = false;
+  tileLayer.on('load', function() {
+    if (!firstTileLoaded) {
+      firstTileLoaded = true;
+      sendToPixora({ type: 'map-ready' });
+    }
+  });
+
   let tileErrorCount = 0;
+  let offlineNotified = false;
   tileLayer.on('tileerror', function() {
     tileErrorCount += 1;
-    if (tileErrorCount > 4 || !navigator.onLine) {
+    if ((tileErrorCount > 4 || !navigator.onLine) && !offlineNotified) {
+      offlineNotified = true;
       document.getElementById('offline-banner').style.display = 'block';
+      sendToPixora({ type: 'map-offline' });
     }
   });
   tileLayer.on('tileload', function() {
     tileErrorCount = 0;
+    offlineNotified = false;
     document.getElementById('offline-banner').style.display = 'none';
   });
 
   window.addEventListener('offline', function() {
     document.getElementById('offline-banner').style.display = 'block';
+    if (!offlineNotified) {
+      offlineNotified = true;
+      sendToPixora({ type: 'map-offline' });
+    }
   });
   window.addEventListener('online', function() {
     document.getElementById('offline-banner').style.display = 'none';
+    offlineNotified = false;
   });
 
   const cluster = L.markerClusterGroup({

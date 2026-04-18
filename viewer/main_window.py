@@ -593,10 +593,11 @@ class TimelineBar(Gtk.DrawingArea):
 
 # ── Kaart widget (Leaflet in WebView) ────────────────────────────────
 class MapWidget(Gtk.Box):
-    def __init__(self, markers, open_photo_cb):
+    def __init__(self, markers, open_photo_cb, status_cb=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.markers = markers
         self.open_photo_cb = open_photo_cb
+        self.status_cb = status_cb
         self.set_vexpand(True)
         self.set_hexpand(True)
         self._pending_markers = list(markers) if markers else []
@@ -769,6 +770,14 @@ class MapWidget(Gtk.Box):
             log_info(f"Kaart → open_photo: {path}")
             if path:
                 GLib.idle_add(self.open_photo_cb, [path])
+        elif msg_type == "map-ready":
+            log_info("Kaart → eerste tiles geladen")
+            if self.status_cb:
+                GLib.idle_add(self.status_cb, "ready")
+        elif msg_type == "map-offline":
+            log_warn("Kaart → offline / tile-errors")
+            if self.status_cb:
+                GLib.idle_add(self.status_cb, "offline")
 
 
 # ── Hoofdvenster ─────────────────────────────────────────────────────
@@ -1559,10 +1568,10 @@ class MainWindow(Adw.ApplicationWindow):
         map_spinner_box.set_vexpand(True)
         self.map_spinner = Gtk.Spinner()
         self.map_spinner.set_size_request(48, 48)
-        map_spinner_label = Gtk.Label(label="Reisverhaal samenstellen…")
-        map_spinner_label.add_css_class("dim-label")
+        self.map_spinner_label = Gtk.Label(label="Reisverhaal samenstellen…")
+        self.map_spinner_label.add_css_class("dim-label")
         map_spinner_box.append(self.map_spinner)
-        map_spinner_box.append(map_spinner_label)
+        map_spinner_box.append(self.map_spinner_label)
         self.map_container.add_named(map_spinner_box, "loading")
 
         self.map_content = Gtk.Box()
@@ -1620,13 +1629,65 @@ class MainWindow(Adw.ApplicationWindow):
             self.map_content.remove(self._map_widget)
             self._map_widget = None
 
-        self._map_widget = MapWidget(markers, self._open_photo_from_map)
+        # Spinner blijft, label naar "Verbinden..." tot eerste tiles binnen zijn.
+        try:
+            self.map_spinner_label.set_text("Verbinden met kaart-server…")
+        except Exception:
+            pass
+
+        self._map_widget = MapWidget(
+            markers, self._open_photo_from_map,
+            status_cb=self._on_map_status
+        )
         self.map_content.append(self._map_widget)
-        self.map_spinner.stop()
-        self.map_container.set_visible_child_name("map")
+        # NIET switchen naar "map" view; wacht op map-ready status-callback.
+        # Als er na 12s nog niks is → fallback zodat Pixora niet oneindig hangt.
+        self._map_ready_fallback_id = GLib.timeout_add_seconds(
+            12, self._on_map_ready_timeout
+        )
         self.map_title_label.set_text("Kaartweergave")
         self.map_btn.set_label("🗺")
         self.map_btn.set_sensitive(True)
+        return False
+
+    def _on_map_status(self, status):
+        if status == "ready":
+            if getattr(self, "_map_ready_fallback_id", None):
+                try:
+                    GLib.source_remove(self._map_ready_fallback_id)
+                except Exception:
+                    pass
+                self._map_ready_fallback_id = None
+            try:
+                self.map_spinner.stop()
+                self.map_container.set_visible_child_name("map")
+            except Exception:
+                pass
+        elif status == "offline":
+            # Toon alsnog de kaart — de JS-banner in map.html vertelt de user
+            # dat tiles niet geladen kunnen. Markers blijven zichtbaar.
+            if getattr(self, "_map_ready_fallback_id", None):
+                try:
+                    GLib.source_remove(self._map_ready_fallback_id)
+                except Exception:
+                    pass
+                self._map_ready_fallback_id = None
+            try:
+                self.map_spinner.stop()
+                self.map_container.set_visible_child_name("map")
+            except Exception:
+                pass
+        return False
+
+    def _on_map_ready_timeout(self):
+        # Fallback: na 12s tonen we de kaart sowieso, ook zonder tile-load.
+        log_warn("Kaart-ready timeout — toon kaart alsnog")
+        self._map_ready_fallback_id = None
+        try:
+            self.map_spinner.stop()
+            self.map_container.set_visible_child_name("map")
+        except Exception:
+            pass
         return False
 
     def _open_photo_from_map(self, paths):
