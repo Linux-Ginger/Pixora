@@ -4440,13 +4440,16 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             msg = _("Taal wordt gewijzigd…")
 
-        # Modale overlay met spinner + tekst
+        # Modale overlay met spinner + tekst — niet sluitbaar, user
+        # moet wachten tot relaunch.
         overlay = Gtk.Window()
         overlay.set_modal(True)
         overlay.set_transient_for(self)
         overlay.set_title(_("Pixora"))
         overlay.set_default_size(320, 140)
         overlay.set_resizable(False)
+        overlay.set_deletable(False)
+        overlay.connect("close-request", lambda *_: True)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         box.set_margin_top(24)
         box.set_margin_bottom(24)
@@ -4468,12 +4471,17 @@ class MainWindow(Adw.ApplicationWindow):
             pixora_bin = os.path.expanduser("~/.local/bin/pixora")
             cmd = [pixora_bin] if os.path.exists(pixora_bin) else \
                   [sys.executable, os.path.join(INSTALL_DIR, "viewer", "main.py")]
+            # Strip PIXORA_IN_DEV_TERM zodat de relaunch opnieuw een
+            # dev-terminal kan spawnen als dev-mode actief is.
+            child_env = {k: v for k, v in os.environ.items()
+                         if k != "PIXORA_IN_DEV_TERM"}
             try:
                 subprocess.Popen(
                     cmd, start_new_session=True,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,
+                    env=child_env,
                 )
             except Exception as e:
                 log_error(f"Relaunch na taal-wissel fout: {e}")
