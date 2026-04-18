@@ -1,46 +1,228 @@
-# Nederlands — de originele taal (identity translation).
+# Nederlands — de originele taal.
 msgid ""
 msgstr ""
 "Project-Id-Version: Pixora\n"
-"POT-Creation-Date: 2026-04-18 00:00+0000\n"
-"PO-Revision-Date: 2026-04-18 00:00+0000\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "Instellingen"
-msgstr "Instellingen"
+msgid "0 foto's"
+msgstr "0 foto's"
 
-msgid "Weergave"
-msgstr "Weergave"
+msgid "0 geselecteerd"
+msgstr "0 geselecteerd"
 
-msgid "Importeren"
-msgstr "Importeren"
+msgid "0:00 / 0:00"
+msgstr "0:00 / 0:00"
 
-msgid "Geavanceerd"
-msgstr "Geavanceerd"
+msgid "2024/   2025/"
+msgstr "2024/   2025/"
 
-msgid "Over"
-msgstr "Over"
+msgid "2024/2024-03/   2024/2024-04/"
+msgstr "2024/2024-03/   2024/2024-04/"
 
-msgid "Foto map"
-msgstr "Foto map"
+msgid "Alleen exact dezelfde foto's"
+msgstr "Alleen exact dezelfde foto's"
 
-msgid "Waar worden je foto's opgeslagen"
-msgstr "Waar worden je foto's opgeslagen"
+msgid "Alleen externe schijven"
+msgstr "Alleen externe schijven"
 
-msgid "Hoe foto's in het grid worden getoond"
-msgstr "Hoe foto's in het grid worden getoond"
+msgid "Alleen favorieten tonen"
+msgstr "Alleen favorieten tonen"
 
-msgid "Mapstructuur"
-msgstr "Mapstructuur"
+msgid "Alles in één map"
+msgstr "Alles in één map"
 
-msgid "Duplicate detectie"
-msgstr "Duplicate detectie"
+msgid "Annuleren"
+msgstr "Annuleren"
 
 msgid "Automatische backup"
 msgstr "Automatische backup"
 
+msgid "Backup naar externe USB schijf na elke import"
+msgstr "Backup naar externe USB schijf na elke import"
+
+msgid "Backup schijf"
+msgstr "Backup schijf"
+
+msgid "Bezig…"
+msgstr "Bezig…"
+
+msgid "Bijna identieke foto's worden gedetecteerd"
+msgstr "Bijna identieke foto's worden gedetecteerd"
+
+msgid "Bijsnijden"
+msgstr "Bijsnijden"
+
+msgid "Bijwerken"
+msgstr "Bijwerken"
+
+msgid "Controleer"
+msgstr "Controleer"
+
+msgid "Controleer op updates"
+msgstr "Controleer op updates"
+
+msgid "Controleren mislukt"
+msgstr "Controleren mislukt"
+
+msgid "Draaien links"
+msgstr "Draaien links"
+
+msgid "Draaien rechts"
+msgstr "Draaien rechts"
+
+msgid "Duplicate detectie"
+msgstr "Duplicate detectie"
+
+msgid "Foto &amp; video manager door LinuxGinger"
+msgstr "Foto &amp; video manager door LinuxGinger"
+
+msgid "Foto bewerken"
+msgstr "Foto bewerken"
+
+msgid "Foto map"
+msgstr "Foto map"
+
+msgid "Foto's laden..."
+msgstr "Foto's laden..."
+
+msgid "Geavanceerd"
+msgstr "Geavanceerd"
+
+msgid "Geen foto's gevonden"
+msgstr "Geen foto's gevonden"
+
+msgid "Herstart"
+msgstr "Herstart"
+
+msgid "Herstart van Pixora is nodig om een nieuwe taal te laden"
+msgstr "Herstart van Pixora is nodig om een nieuwe taal te laden"
+
+msgid "Hoe foto's in het grid worden getoond"
+msgstr "Hoe foto's in het grid worden getoond"
+
+msgid "Hoe streng worden duplicaten gedetecteerd"
+msgstr "Hoe streng worden duplicaten gedetecteerd"
+
+msgid "Hoe worden je foto's georganiseerd"
+msgstr "Hoe worden je foto's georganiseerd"
+
+msgid "Huidige map"
+msgstr "Huidige map"
+
+msgid "Importeer van iPhone of iPad"
+msgstr "Importeer van iPhone of iPad"
+
+msgid "Importeren"
+msgstr "Importeren"
+
+msgid "Instellingen"
+msgstr "Instellingen"
+
+msgid "Je hebt de nieuwste versie"
+msgstr "Je hebt de nieuwste versie"
+
 msgid "Kaartweergave"
 msgstr "Kaartweergave"
+
+msgid "Kies foto map"
+msgstr "Kies foto map"
+
+msgid "Kies map op backup schijf"
+msgstr "Kies map op backup schijf"
+
+msgid "Mapstructuur"
+msgstr "Mapstructuur"
+
+msgid "Markeer als favoriet (F)"
+msgstr "Markeer als favoriet (F)"
+
+msgid "Normaal"
+msgstr "Normaal"
+
+msgid "Ook licht bewerkte foto's worden gedetecteerd"
+msgstr "Ook licht bewerkte foto's worden gedetecteerd"
+
+msgid "Opslaan"
+msgstr "Opslaan"
+
+msgid "Over"
+msgstr "Over"
+
+msgid "Per jaar"
+msgstr "Per jaar"
+
+msgid "Per jaar/maand"
+msgstr "Per jaar/maand"
+
+msgid "Pixora"
+msgstr "Pixora"
+
+msgid "Pixora wordt gestart…"
+msgstr "Pixora wordt gestart…"
+
+msgid "Plat"
+msgstr "Plat"
+
+msgid "Reisverhaal samenstellen…"
+msgstr "Reisverhaal samenstellen…"
+
+msgid "Selecteren"
+msgstr "Selecteren"
+
+msgid "Sluit je iPhone of iPad aan om foto's te importeren"
+msgstr "Sluit je iPhone of iPad aan om foto's te importeren"
+
+msgid "Soepel"
+msgstr "Soepel"
+
+msgid "Streng"
+msgstr "Streng"
+
+msgid "Synchroniseert na elke import"
+msgstr "Synchroniseert na elke import"
+
+msgid "Taal"
+msgstr "Taal"
+
+msgid "Taal wordt gewijzigd…"
+msgstr "Taal wordt gewijzigd…"
+
+msgid "Terug"
+msgstr "Terug"
+
+msgid "Terug naar standaard (200 px)"
+msgstr "Terug naar standaard (200 px)"
+
+msgid "Verwijderen"
+msgstr "Verwijderen"
+
+msgid "Waar worden je foto's opgeslagen"
+msgstr "Waar worden je foto's opgeslagen"
+
+msgid "Weergave"
+msgstr "Weergave"
+
+msgid "Wijzigen"
+msgstr "Wijzigen"
+
+msgid "signal"
+msgstr "signal"
+
+msgid "✕ Toon alle foto's"
+msgstr "✕ Toon alle foto's"
+
+msgid "🗺"
+msgstr "🗺"
+
+msgid "🗺 laden..."
+msgstr "🗺 laden..."
+
+msgid "─── Pixora (dev mode) ───"
+msgstr "─── Pixora (dev mode) ───"
+
+msgid "Sluit dit venster om Pixora te sluiten."
+msgstr "Sluit dit venster om Pixora te sluiten."
+

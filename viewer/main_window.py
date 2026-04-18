@@ -1026,7 +1026,7 @@ class MainWindow(Adw.ApplicationWindow):
         splash_spinner.set_halign(Gtk.Align.CENTER)
         splash_spinner.start()
 
-        splash_lbl = Gtk.Label(label="Pixora wordt gestart…")
+        splash_lbl = Gtk.Label(label=_("Pixora wordt gestart…"))
         splash_lbl.add_css_class("title-2")
 
         self._splash_bar = Gtk.ProgressBar()
@@ -1234,7 +1234,7 @@ class MainWindow(Adw.ApplicationWindow):
             )
         else:
             ctx.remove_class("pixora-import-active")
-            self.import_btn.set_tooltip_text("Importeer van iPhone of iPad")
+            self.import_btn.set_tooltip_text(_("Importeer van iPhone of iPad"))
         return False
 
     # ── Startup splash ───────────────────────────────────────────────
@@ -1376,12 +1376,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._update_check_row._extra_suffixes = []
 
         if remote_version is None:
-            self._update_check_row.set_subtitle("Controleren mislukt")
+            self._update_check_row.set_subtitle(_("Controleren mislukt"))
             self._update_check_btn.set_visible(True)
             return False
 
         if local_version == remote_version:
-            self._update_check_row.set_subtitle("Je hebt de nieuwste versie")
+            self._update_check_row.set_subtitle(_("Je hebt de nieuwste versie"))
             ok_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
             ok_icon.add_css_class("success")
             ok_icon.set_valign(Gtk.Align.CENTER)
@@ -1392,7 +1392,7 @@ class MainWindow(Adw.ApplicationWindow):
             warn_icon = Gtk.Image.new_from_icon_name("emblem-important-symbolic")
             warn_icon.set_valign(Gtk.Align.CENTER)
             self._update_check_row.add_suffix(warn_icon)
-            update_btn = Gtk.Button(label="Bijwerken")
+            update_btn = Gtk.Button(label=_("Bijwerken"))
             update_btn.add_css_class("suggested-action")
             update_btn.set_valign(Gtk.Align.CENTER)
             update_btn.connect("clicked", lambda b: self._open_installer())
@@ -1562,19 +1562,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.favorites_toggle = Gtk.ToggleButton()
         self.favorites_toggle.set_icon_name("starred-symbolic")
         self.favorites_toggle.add_css_class("flat")
-        self.favorites_toggle.set_tooltip_text("Alleen favorieten tonen")
+        self.favorites_toggle.set_tooltip_text(_("Alleen favorieten tonen"))
         self.favorites_toggle.connect("toggled", self.toggle_favorites_filter)
         self.header.pack_end(self.favorites_toggle)
 
-        self.map_btn = Gtk.Button(label="🗺")
+        self.map_btn = Gtk.Button(label=_("🗺"))
         self.map_btn.add_css_class("flat")
-        self.map_btn.set_tooltip_text("Kaartweergave")
+        self.map_btn.set_tooltip_text(_("Kaartweergave"))
         self.map_btn.connect("clicked", self.open_map)
         self.header.pack_end(self.map_btn)
 
         self.import_btn = Gtk.Button(icon_name="phone-symbolic")
         self.import_btn.add_css_class("flat")
-        self.import_btn.set_tooltip_text("Importeer van iPhone of iPad")
+        self.import_btn.set_tooltip_text(_("Importeer van iPhone of iPad"))
         self.import_btn.connect("clicked", self.open_importer)
         self._import_btn_css = Gtk.CssProvider()
         self._import_btn_css.load_from_string(
@@ -1591,14 +1591,14 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self.header.pack_end(self.import_btn)
 
-        self.select_btn = Gtk.Button(label="Selecteren")
+        self.select_btn = Gtk.Button(label=_("Selecteren"))
         self.select_btn.add_css_class("flat")
         self.select_btn.connect("clicked", self.toggle_select_mode)
         self.header.pack_end(self.select_btn)
 
         settings_btn = Gtk.Button(icon_name="preferences-system-symbolic")
         settings_btn.add_css_class("flat")
-        settings_btn.set_tooltip_text("Instellingen")
+        settings_btn.set_tooltip_text(_("Instellingen"))
         settings_btn.connect("clicked", self.on_settings_clicked)
         self.header.pack_end(settings_btn)
 
@@ -1623,7 +1623,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.spinner = Gtk.Spinner()
         self.spinner.set_size_request(48, 48)
-        self.spinner_label = Gtk.Label(label="Foto's laden...")
+        self.spinner_label = Gtk.Label(label=_("Foto's laden..."))
         self.spinner_label.add_css_class("dim-label")
         spinner_box.append(self.spinner)
         spinner_box.append(self.spinner_label)
@@ -1651,8 +1651,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         status_page = Adw.StatusPage()
         status_page.set_icon_name("image-missing-symbolic")
-        status_page.set_title("Geen foto's gevonden")
-        status_page.set_description("Sluit je iPhone of iPad aan om foto's te importeren")
+        status_page.set_title(_("Geen foto's gevonden"))
+        status_page.set_description(_("Sluit je iPhone of iPad aan om foto's te importeren"))
         status_page.set_vexpand(True)
         status_page.set_hexpand(True)
         self.content_stack.add_named(status_page, "empty")
@@ -1672,7 +1672,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         back_btn = Gtk.Button(icon_name="go-previous-symbolic")
         back_btn.add_css_class("flat")
-        back_btn.set_tooltip_text("Terug")
+        back_btn.set_tooltip_text(_("Terug"))
         back_btn.connect("clicked", self.close_map)
         map_header.pack_start(back_btn)
 
@@ -1692,7 +1692,7 @@ class MainWindow(Adw.ApplicationWindow):
         map_spinner_box.set_vexpand(True)
         self.map_spinner = Gtk.Spinner()
         self.map_spinner.set_size_request(48, 48)
-        self.map_spinner_label = Gtk.Label(label="Reisverhaal samenstellen…")
+        self.map_spinner_label = Gtk.Label(label=_("Reisverhaal samenstellen…"))
         self.map_spinner_label.add_css_class("dim-label")
         map_spinner_box.append(self.map_spinner)
         map_spinner_box.append(self.map_spinner_label)
@@ -1717,7 +1717,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.toolbar_view.set_reveal_bottom_bars(False)
         except Exception:
             pass
-        self.map_btn.set_label("🗺 laden...")
+        self.map_btn.set_label(_("🗺 laden..."))
         self.map_btn.set_sensitive(False)
         self.map_container.set_visible_child_name("loading")
         self.map_spinner.start()
@@ -1770,7 +1770,7 @@ class MainWindow(Adw.ApplicationWindow):
             12, self._on_map_ready_timeout
         )
         self.map_title_label.set_text("Kaartweergave")
-        self.map_btn.set_label("🗺")
+        self.map_btn.set_label(_("🗺"))
         self.map_btn.set_sensitive(True)
         return False
 
@@ -1924,7 +1924,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.edit_btn.set_margin_top(16)
         self.edit_btn.set_margin_end(120)
         self.edit_btn.set_size_request(40, 40)
-        self.edit_btn.set_tooltip_text("Foto bewerken")
+        self.edit_btn.set_tooltip_text(_("Foto bewerken"))
         self.edit_btn.connect("clicked", self.on_edit_current)
         viewer_area.add_overlay(self.edit_btn)
 
@@ -1936,7 +1936,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.favorite_btn.set_margin_top(16)
         self.favorite_btn.set_margin_end(172)
         self.favorite_btn.set_size_request(40, 40)
-        self.favorite_btn.set_tooltip_text("Markeer als favoriet (F)")
+        self.favorite_btn.set_tooltip_text(_("Markeer als favoriet (F)"))
         self.favorite_btn.connect("clicked", self.on_toggle_favorite)
         self._favorite_css = Gtk.CssProvider()
         self._favorite_css.load_from_string(
@@ -1958,7 +1958,7 @@ class MainWindow(Adw.ApplicationWindow):
         rot_left_btn.add_css_class("osd")
         rot_left_btn.add_css_class("circular")
         rot_left_btn.set_size_request(48, 48)
-        rot_left_btn.set_tooltip_text("Draaien links")
+        rot_left_btn.set_tooltip_text(_("Draaien links"))
         rot_left_btn.connect("clicked", self.on_editor_rotate_left)
         self.editor_bar.append(rot_left_btn)
 
@@ -1966,7 +1966,7 @@ class MainWindow(Adw.ApplicationWindow):
         rot_right_btn.add_css_class("osd")
         rot_right_btn.add_css_class("circular")
         rot_right_btn.set_size_request(48, 48)
-        rot_right_btn.set_tooltip_text("Draaien rechts")
+        rot_right_btn.set_tooltip_text(_("Draaien rechts"))
         rot_right_btn.connect("clicked", self.on_editor_rotate_right)
         self.editor_bar.append(rot_right_btn)
 
@@ -1974,7 +1974,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.crop_toggle_btn.add_css_class("osd")
         self.crop_toggle_btn.add_css_class("circular")
         self.crop_toggle_btn.set_size_request(48, 48)
-        self.crop_toggle_btn.set_tooltip_text("Bijsnijden")
+        self.crop_toggle_btn.set_tooltip_text(_("Bijsnijden"))
         self.crop_toggle_btn.connect("toggled", self.on_editor_toggle_crop)
         self.editor_bar.append(self.crop_toggle_btn)
 
@@ -1983,7 +1983,7 @@ class MainWindow(Adw.ApplicationWindow):
         save_btn.add_css_class("circular")
         save_btn.add_css_class("suggested-action")
         save_btn.set_size_request(48, 48)
-        save_btn.set_tooltip_text("Opslaan")
+        save_btn.set_tooltip_text(_("Opslaan"))
         save_btn.connect("clicked", self.on_editor_save)
         self.editor_bar.append(save_btn)
 
@@ -1991,7 +1991,7 @@ class MainWindow(Adw.ApplicationWindow):
         cancel_editor_btn.add_css_class("osd")
         cancel_editor_btn.add_css_class("circular")
         cancel_editor_btn.set_size_request(48, 48)
-        cancel_editor_btn.set_tooltip_text("Annuleren")
+        cancel_editor_btn.set_tooltip_text(_("Annuleren"))
         cancel_editor_btn.connect("clicked", self.on_editor_cancel)
         self.editor_bar.append(cancel_editor_btn)
 
@@ -2145,7 +2145,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.video_controls.append(self.video_scrubber)
 
-        self.video_time_label = Gtk.Label(label="0:00 / 0:00")
+        self.video_time_label = Gtk.Label(label=_("0:00 / 0:00"))
         self.video_time_label.set_width_chars(13)
         self.video_controls.append(self.video_time_label)
 
@@ -2216,11 +2216,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.bottom_stack.set_transition_duration(150)
 
         normal_bar = Gtk.ActionBar()
-        self.photo_count_label = Gtk.Label(label="0 foto's")
+        self.photo_count_label = Gtk.Label(label=_("0 foto's"))
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
 
-        self.clear_filter_btn = Gtk.Button(label="✕ Toon alle foto's")
+        self.clear_filter_btn = Gtk.Button(label=_("✕ Toon alle foto's"))
         self.clear_filter_btn.add_css_class("flat")
         self.clear_filter_btn.set_visible(False)
         self.clear_filter_btn.connect("clicked", self.on_clear_cluster_filter)
@@ -2229,11 +2229,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.bottom_stack.add_named(normal_bar, "normal")
 
         select_bar = Gtk.ActionBar()
-        self.select_count_label = Gtk.Label(label="0 geselecteerd")
+        self.select_count_label = Gtk.Label(label=_("0 geselecteerd"))
         self.select_count_label.add_css_class("dim-label")
         select_bar.pack_start(self.select_count_label)
 
-        delete_selected_btn = Gtk.Button(label="Verwijderen")
+        delete_selected_btn = Gtk.Button(label=_("Verwijderen"))
         delete_selected_btn.add_css_class("destructive-action")
         delete_selected_btn.add_css_class("pill")
         delete_selected_btn.connect("clicked", self.on_delete_selected)
@@ -2264,12 +2264,12 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(f"Selectie-modus: {'aan' if self._select_mode else 'uit'}")
         self._selected.clear()
         if self._select_mode:
-            self.select_btn.set_label("Annuleren")
+            self.select_btn.set_label(_("Annuleren"))
             self.select_btn.add_css_class("suggested-action")
             self.bottom_stack.set_visible_child_name("select")
             self.select_count_label.set_text("0 geselecteerd")
         else:
-            self.select_btn.set_label("Selecteren")
+            self.select_btn.set_label(_("Selecteren"))
             self.select_btn.remove_css_class("suggested-action")
             self.bottom_stack.set_visible_child_name("normal")
             self._update_all_selection_visuals()
@@ -4022,10 +4022,10 @@ class MainWindow(Adw.ApplicationWindow):
         folder_group.set_description(_("Waar worden je foto's opgeslagen"))
 
         self.folder_row = Adw.ActionRow()
-        self.folder_row.set_title("Huidige map")
+        self.folder_row.set_title(_("Huidige map"))
         self.folder_row.set_subtitle(self.settings.get("photo_path", "Niet ingesteld"))
 
-        change_folder_btn = Gtk.Button(label="Wijzigen")
+        change_folder_btn = Gtk.Button(label=_("Wijzigen"))
         change_folder_btn.add_css_class("flat")
         change_folder_btn.set_valign(Gtk.Align.CENTER)
         change_folder_btn.connect("clicked", lambda b: self.change_folder(dialog))
@@ -4060,7 +4060,7 @@ class MainWindow(Adw.ApplicationWindow):
         thumb_reset_btn.add_css_class("flat")
         thumb_reset_btn.add_css_class("circular")
         thumb_reset_btn.set_valign(Gtk.Align.CENTER)
-        thumb_reset_btn.set_tooltip_text("Terug naar standaard (200 px)")
+        thumb_reset_btn.set_tooltip_text(_("Terug naar standaard (200 px)"))
         thumb_reset_btn.set_sensitive(int(thumb_adj.get_value()) != 200)
         thumb_reset_btn.connect("clicked", lambda b: thumb_adj.set_value(200.0))
         thumb_adj.connect(
@@ -4118,13 +4118,13 @@ class MainWindow(Adw.ApplicationWindow):
 
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title(_("Mapstructuur"))
-        structure_group.set_description("Hoe worden je foto's georganiseerd")
+        structure_group.set_description(_("Hoe worden je foto's georganiseerd"))
         current_structure = self.settings.get("structure", "year_month")
 
         self.radio_flat = Gtk.CheckButton()
         self.radio_flat.set_active(current_structure == "flat")
         self.radio_flat.connect("toggled", lambda b: self.on_structure_changed("flat", b))
-        flat_row = Adw.ActionRow(title="Plat", subtitle="Alles in één map")
+        flat_row = Adw.ActionRow(title=_("Plat"), subtitle=_("Alles in één map"))
         flat_row.add_prefix(Gtk.Image.new_from_icon_name("folder-symbolic"))
         flat_row.add_prefix(self.radio_flat)
         flat_row.set_activatable_widget(self.radio_flat)
@@ -4134,7 +4134,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_year.set_group(self.radio_flat)
         self.radio_year.set_active(current_structure == "year")
         self.radio_year.connect("toggled", lambda b: self.on_structure_changed("year", b))
-        year_row = Adw.ActionRow(title="Per jaar", subtitle="2024/   2025/")
+        year_row = Adw.ActionRow(title=_("Per jaar"), subtitle=_("2024/   2025/"))
         year_row.add_prefix(Gtk.Image.new_from_icon_name("folder-open-symbolic"))
         year_row.add_prefix(self.radio_year)
         year_row.set_activatable_widget(self.radio_year)
@@ -4144,7 +4144,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_month.set_group(self.radio_flat)
         self.radio_month.set_active(current_structure == "year_month")
         self.radio_month.connect("toggled", lambda b: self.on_structure_changed("year_month", b))
-        month_row = Adw.ActionRow(title="Per jaar/maand", subtitle="2024/2024-03/   2024/2024-04/")
+        month_row = Adw.ActionRow(title=_("Per jaar/maand"), subtitle=_("2024/2024-03/   2024/2024-04/"))
         month_row.add_prefix(Gtk.Image.new_from_icon_name("view-list-symbolic"))
         month_row.add_prefix(self.radio_month)
         month_row.set_activatable_widget(self.radio_month)
@@ -4153,13 +4153,13 @@ class MainWindow(Adw.ApplicationWindow):
 
         dup_group = Adw.PreferencesGroup()
         dup_group.set_title(_("Duplicate detectie"))
-        dup_group.set_description("Hoe streng worden duplicaten gedetecteerd")
+        dup_group.set_description(_("Hoe streng worden duplicaten gedetecteerd"))
         current_threshold = self.settings.get("duplicate_threshold", 2)
 
         self.radio_strict = Gtk.CheckButton()
         self.radio_strict.set_active(current_threshold == 1)
         self.radio_strict.connect("toggled", lambda b: self.on_threshold_changed(1, b))
-        strict_row = Adw.ActionRow(title="Streng", subtitle="Alleen exact dezelfde foto's")
+        strict_row = Adw.ActionRow(title=_("Streng"), subtitle=_("Alleen exact dezelfde foto's"))
         strict_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
         strict_row.add_prefix(self.radio_strict)
         strict_row.set_activatable_widget(self.radio_strict)
@@ -4169,7 +4169,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_normal.set_group(self.radio_strict)
         self.radio_normal.set_active(current_threshold == 2)
         self.radio_normal.connect("toggled", lambda b: self.on_threshold_changed(2, b))
-        normal_row = Adw.ActionRow(title="Normaal", subtitle="Bijna identieke foto's worden gedetecteerd")
+        normal_row = Adw.ActionRow(title=_("Normaal"), subtitle=_("Bijna identieke foto's worden gedetecteerd"))
         normal_row.add_prefix(Gtk.Image.new_from_icon_name("security-medium-symbolic"))
         normal_row.add_prefix(self.radio_normal)
         normal_row.set_activatable_widget(self.radio_normal)
@@ -4179,7 +4179,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_loose.set_group(self.radio_strict)
         self.radio_loose.set_active(current_threshold == 3)
         self.radio_loose.connect("toggled", lambda b: self.on_threshold_changed(3, b))
-        loose_row = Adw.ActionRow(title="Soepel", subtitle="Ook licht bewerkte foto's worden gedetecteerd")
+        loose_row = Adw.ActionRow(title=_("Soepel"), subtitle=_("Ook licht bewerkte foto's worden gedetecteerd"))
         loose_row.add_prefix(Gtk.Image.new_from_icon_name("security-low-symbolic"))
         loose_row.add_prefix(self.radio_loose)
         loose_row.set_activatable_widget(self.radio_loose)
@@ -4188,14 +4188,14 @@ class MainWindow(Adw.ApplicationWindow):
 
         backup_group = Adw.PreferencesGroup()
         backup_group.set_title(_("Automatische backup"))
-        backup_group.set_description("Backup naar externe USB schijf na elke import")
+        backup_group.set_description(_("Backup naar externe USB schijf na elke import"))
 
         self.settings_backup_switch = Gtk.Switch()
         self.settings_backup_switch.set_valign(Gtk.Align.CENTER)
         self.settings_backup_switch.set_active(bool(self.settings.get("backup_uuid")))
         self.settings_backup_switch.connect("notify::active", self.on_settings_backup_toggle)
 
-        backup_toggle_row = Adw.ActionRow(title="Automatische backup", subtitle="Synchroniseert na elke import")
+        backup_toggle_row = Adw.ActionRow(title=_("Automatische backup"), subtitle=_("Synchroniseert na elke import"))
         backup_toggle_row.add_suffix(self.settings_backup_switch)
         backup_toggle_row.set_activatable_widget(self.settings_backup_switch)
         backup_group.add(backup_toggle_row)
@@ -4225,7 +4225,7 @@ class MainWindow(Adw.ApplicationWindow):
         settings_refresh_btn.set_valign(Gtk.Align.CENTER)
         settings_refresh_btn.connect("clicked", self.on_settings_refresh_drives)
 
-        self.settings_drive_row = Adw.ActionRow(title="Backup schijf", subtitle="Alleen externe schijven")
+        self.settings_drive_row = Adw.ActionRow(title=_("Backup schijf"), subtitle=_("Alleen externe schijven"))
         self.settings_drive_row.add_suffix(settings_refresh_btn)
         self.settings_drive_row.add_suffix(self.settings_drive_combo)
         self.settings_drive_row.set_sensitive(bool(self.settings.get("backup_uuid")))
@@ -4238,7 +4238,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self.settings_backup_folder_row.set_sensitive(bool(self.settings.get("backup_uuid")))
 
-        change_backup_folder_btn = Gtk.Button(label="Wijzigen")
+        change_backup_folder_btn = Gtk.Button(label=_("Wijzigen"))
         change_backup_folder_btn.add_css_class("flat")
         change_backup_folder_btn.set_valign(Gtk.Align.CENTER)
         change_backup_folder_btn.connect("clicked", self.on_settings_change_backup_folder)
@@ -4251,9 +4251,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         # App info row
         app_row = Adw.ActionRow(
-            title="Pixora",
-            subtitle="Foto &amp; video manager door LinuxGinger"
-        )
+            title=_("Pixora"),
+            subtitle=_("Foto &amp; video manager door LinuxGinger"))
         icon_path = os.path.join(DOCS_DIR, "pixora-icon.svg")
         if os.path.exists(icon_path):
             app_icon = Gtk.Image.new_from_file(icon_path)
@@ -4271,9 +4270,9 @@ class MainWindow(Adw.ApplicationWindow):
         about_group.add(version_row)
 
         # Controleer op updates row
-        self._update_check_row = Adw.ActionRow(title="Controleer op updates")
+        self._update_check_row = Adw.ActionRow(title=_("Controleer op updates"))
 
-        self._update_check_btn = Gtk.Button(label="Controleer")
+        self._update_check_btn = Gtk.Button(label=_("Controleer"))
         self._update_check_btn.add_css_class("flat")
         self._update_check_btn.set_valign(Gtk.Align.CENTER)
         self._update_check_btn.connect("clicked", self._on_settings_check_update)
@@ -4322,7 +4321,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_reset_usbmuxd(self, btn):
         log_info("Reset usbmuxd aangeroepen (settings)")
         btn.set_sensitive(False)
-        btn.set_label("Bezig…")
+        btn.set_label(_("Bezig…"))
 
         def do():
             result_msg = ""
@@ -4352,7 +4351,7 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=do, daemon=True).start()
 
     def _after_usbmuxd_reset(self, btn, ok, msg):
-        btn.set_label("Herstart")
+        btn.set_label(_("Herstart"))
         btn.set_sensitive(True)
         dialog = Adw.MessageDialog(
             transient_for=self,
@@ -4418,14 +4417,69 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_language_changed(self, combo, _pspec):
         idx = combo.get_selected()
-        if 0 <= idx < len(self._lang_codes):
-            new_lang = self._lang_codes[idx]
-            self.settings["language"] = new_lang
+        if not (0 <= idx < len(self._lang_codes)):
+            return
+        new_lang = self._lang_codes[idx]
+        current_lang = self.settings.get("language", "nl")
+        if new_lang == current_lang:
+            return
+        self.settings["language"] = new_lang
+        try:
+            save_settings(self.settings)
+        except Exception:
+            pass
+        log_info(f"Taal gewijzigd naar: {new_lang} — Pixora wordt herstart")
+
+        # Laad translation in NIEUWE taal voor de overlay-tekst
+        try:
+            new_trans = _gettext_mod.translation(
+                "pixora", localedir=_LOCALE_DIR,
+                languages=[new_lang], fallback=True
+            )
+            msg = new_trans.gettext("Taal wordt gewijzigd…")
+        except Exception:
+            msg = _("Taal wordt gewijzigd…")
+
+        # Modale overlay met spinner + tekst
+        overlay = Gtk.Window()
+        overlay.set_modal(True)
+        overlay.set_transient_for(self)
+        overlay.set_title(_("Pixora"))
+        overlay.set_default_size(320, 140)
+        overlay.set_resizable(False)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        box.set_margin_top(24)
+        box.set_margin_bottom(24)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+        box.set_halign(Gtk.Align.CENTER)
+        box.set_valign(Gtk.Align.CENTER)
+        spinner = Gtk.Spinner()
+        spinner.set_size_request(36, 36)
+        spinner.start()
+        box.append(spinner)
+        lbl = Gtk.Label(label=msg)
+        lbl.add_css_class("title-3")
+        box.append(lbl)
+        overlay.set_child(box)
+        overlay.present()
+
+        def _relaunch():
+            pixora_bin = os.path.expanduser("~/.local/bin/pixora")
+            cmd = [pixora_bin] if os.path.exists(pixora_bin) else \
+                  [sys.executable, os.path.join(INSTALL_DIR, "viewer", "main.py")]
             try:
-                save_settings(self.settings)
-            except Exception:
-                pass
-            log_info(f"Taal gewijzigd naar: {new_lang}")
+                subprocess.Popen(
+                    cmd, start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                )
+            except Exception as e:
+                log_error(f"Relaunch na taal-wissel fout: {e}")
+            self.close()
+            return False
+        GLib.timeout_add(1000, _relaunch)
 
     def _on_toggle_dev_mode(self, btn, row):
         currently_active = bool(self.settings.get("dev_mode", False))
@@ -4525,7 +4579,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_settings_change_backup_folder(self, btn):
         dialog = Gtk.FileDialog()
-        dialog.set_title("Kies map op backup schijf")
+        dialog.set_title(_("Kies map op backup schijf"))
         current_uuid = self.settings.get("backup_uuid")
         if current_uuid:
             mountpoint = get_mountpoint_for_uuid(current_uuid)
@@ -4551,7 +4605,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def change_folder(self, parent_dialog):
         file_dialog = Gtk.FileDialog()
-        file_dialog.set_title("Kies foto map")
+        file_dialog.set_title(_("Kies foto map"))
         file_dialog.select_folder(self, None, self.on_folder_changed)
 
     def on_folder_changed(self, dialog, result):

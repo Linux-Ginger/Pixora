@@ -1,52 +1,227 @@
-# Pixora - Translation template
-# Copyright (C) 2026 LinuxGinger
-# This file is distributed under the same license as the Pixora package.
-#
+# Pixora translation template.
 msgid ""
 msgstr ""
 "Project-Id-Version: Pixora\n"
-"Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-18 00:00+0000\n"
-"PO-Revision-Date: 2026-04-18 00:00+0000\n"
-"Last-Translator: \n"
-"Language-Team: \n"
-"Language: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "Instellingen"
+msgid "0 foto's"
 msgstr ""
 
-msgid "Weergave"
+msgid "0 geselecteerd"
 msgstr ""
 
-msgid "Importeren"
+msgid "0:00 / 0:00"
 msgstr ""
 
-msgid "Geavanceerd"
+msgid "2024/   2025/"
 msgstr ""
 
-msgid "Over"
+msgid "2024/2024-03/   2024/2024-04/"
 msgstr ""
 
-msgid "Foto map"
+msgid "Alleen exact dezelfde foto's"
 msgstr ""
 
-msgid "Waar worden je foto's opgeslagen"
+msgid "Alleen externe schijven"
 msgstr ""
 
-msgid "Hoe foto's in het grid worden getoond"
+msgid "Alleen favorieten tonen"
 msgstr ""
 
-msgid "Mapstructuur"
+msgid "Alles in één map"
 msgstr ""
 
-msgid "Duplicate detectie"
+msgid "Annuleren"
 msgstr ""
 
 msgid "Automatische backup"
 msgstr ""
 
+msgid "Backup naar externe USB schijf na elke import"
+msgstr ""
+
+msgid "Backup schijf"
+msgstr ""
+
+msgid "Bezig…"
+msgstr ""
+
+msgid "Bijna identieke foto's worden gedetecteerd"
+msgstr ""
+
+msgid "Bijsnijden"
+msgstr ""
+
+msgid "Bijwerken"
+msgstr ""
+
+msgid "Controleer"
+msgstr ""
+
+msgid "Controleer op updates"
+msgstr ""
+
+msgid "Controleren mislukt"
+msgstr ""
+
+msgid "Draaien links"
+msgstr ""
+
+msgid "Draaien rechts"
+msgstr ""
+
+msgid "Duplicate detectie"
+msgstr ""
+
+msgid "Foto &amp; video manager door LinuxGinger"
+msgstr ""
+
+msgid "Foto bewerken"
+msgstr ""
+
+msgid "Foto map"
+msgstr ""
+
+msgid "Foto's laden..."
+msgstr ""
+
+msgid "Geavanceerd"
+msgstr ""
+
+msgid "Geen foto's gevonden"
+msgstr ""
+
+msgid "Herstart"
+msgstr ""
+
+msgid "Herstart van Pixora is nodig om een nieuwe taal te laden"
+msgstr ""
+
+msgid "Hoe foto's in het grid worden getoond"
+msgstr ""
+
+msgid "Hoe streng worden duplicaten gedetecteerd"
+msgstr ""
+
+msgid "Hoe worden je foto's georganiseerd"
+msgstr ""
+
+msgid "Huidige map"
+msgstr ""
+
+msgid "Importeer van iPhone of iPad"
+msgstr ""
+
+msgid "Importeren"
+msgstr ""
+
+msgid "Instellingen"
+msgstr ""
+
+msgid "Je hebt de nieuwste versie"
+msgstr ""
+
 msgid "Kaartweergave"
 msgstr ""
+
+msgid "Kies foto map"
+msgstr ""
+
+msgid "Kies map op backup schijf"
+msgstr ""
+
+msgid "Mapstructuur"
+msgstr ""
+
+msgid "Markeer als favoriet (F)"
+msgstr ""
+
+msgid "Normaal"
+msgstr ""
+
+msgid "Ook licht bewerkte foto's worden gedetecteerd"
+msgstr ""
+
+msgid "Opslaan"
+msgstr ""
+
+msgid "Over"
+msgstr ""
+
+msgid "Per jaar"
+msgstr ""
+
+msgid "Per jaar/maand"
+msgstr ""
+
+msgid "Pixora"
+msgstr ""
+
+msgid "Pixora wordt gestart…"
+msgstr ""
+
+msgid "Plat"
+msgstr ""
+
+msgid "Reisverhaal samenstellen…"
+msgstr ""
+
+msgid "Selecteren"
+msgstr ""
+
+msgid "Sluit je iPhone of iPad aan om foto's te importeren"
+msgstr ""
+
+msgid "Soepel"
+msgstr ""
+
+msgid "Streng"
+msgstr ""
+
+msgid "Synchroniseert na elke import"
+msgstr ""
+
+msgid "Taal"
+msgstr ""
+
+msgid "Taal wordt gewijzigd…"
+msgstr ""
+
+msgid "Terug"
+msgstr ""
+
+msgid "Terug naar standaard (200 px)"
+msgstr ""
+
+msgid "Verwijderen"
+msgstr ""
+
+msgid "Waar worden je foto's opgeslagen"
+msgstr ""
+
+msgid "Weergave"
+msgstr ""
+
+msgid "Wijzigen"
+msgstr ""
+
+msgid "signal"
+msgstr ""
+
+msgid "✕ Toon alle foto's"
+msgstr ""
+
+msgid "🗺"
+msgstr ""
+
+msgid "🗺 laden..."
+msgstr ""
+
+msgid "─── Pixora (dev mode) ───"
+msgstr ""
+
+msgid "Sluit dit venster om Pixora te sluiten."
+msgstr ""
+

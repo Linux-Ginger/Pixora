@@ -2,45 +2,227 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Pixora\n"
-"POT-Creation-Date: 2026-04-18 00:00+0000\n"
-"PO-Revision-Date: 2026-04-18 00:00+0000\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "Instellingen"
-msgstr "Settings"
+msgid "0 foto's"
+msgstr "0 photos"
 
-msgid "Weergave"
-msgstr "Display"
+msgid "0 geselecteerd"
+msgstr "0 selected"
 
-msgid "Importeren"
-msgstr "Import"
+msgid "0:00 / 0:00"
+msgstr "0:00 / 0:00"
 
-msgid "Geavanceerd"
-msgstr "Advanced"
+msgid "2024/   2025/"
+msgstr "2024/   2025/"
 
-msgid "Over"
-msgstr "About"
+msgid "2024/2024-03/   2024/2024-04/"
+msgstr "2024/2024-03/   2024/2024-04/"
 
-msgid "Foto map"
-msgstr "Photo folder"
+msgid "Alleen exact dezelfde foto's"
+msgstr "Only exactly identical photos"
 
-msgid "Waar worden je foto's opgeslagen"
-msgstr "Where your photos are stored"
+msgid "Alleen externe schijven"
+msgstr "External drives only"
 
-msgid "Hoe foto's in het grid worden getoond"
-msgstr "How photos are displayed in the grid"
+msgid "Alleen favorieten tonen"
+msgstr "Show only favorites"
 
-msgid "Mapstructuur"
-msgstr "Folder structure"
+msgid "Alles in één map"
+msgstr "Everything in one folder"
 
-msgid "Duplicate detectie"
-msgstr "Duplicate detection"
+msgid "Annuleren"
+msgstr "Cancel"
 
 msgid "Automatische backup"
 msgstr "Automatic backup"
 
+msgid "Backup naar externe USB schijf na elke import"
+msgstr "Backup to external USB drive after each import"
+
+msgid "Backup schijf"
+msgstr "Backup drive"
+
+msgid "Bezig…"
+msgstr "Working…"
+
+msgid "Bijna identieke foto's worden gedetecteerd"
+msgstr "Near-identical photos are detected"
+
+msgid "Bijsnijden"
+msgstr "Crop"
+
+msgid "Bijwerken"
+msgstr "Update"
+
+msgid "Controleer"
+msgstr "Check"
+
+msgid "Controleer op updates"
+msgstr "Check for updates"
+
+msgid "Controleren mislukt"
+msgstr "Check failed"
+
+msgid "Draaien links"
+msgstr "Rotate left"
+
+msgid "Draaien rechts"
+msgstr "Rotate right"
+
+msgid "Duplicate detectie"
+msgstr "Duplicate detection"
+
+msgid "Foto &amp; video manager door LinuxGinger"
+msgstr "Photo &amp; video manager by LinuxGinger"
+
+msgid "Foto bewerken"
+msgstr "Edit photo"
+
+msgid "Foto map"
+msgstr "Photo folder"
+
+msgid "Foto's laden..."
+msgstr "Loading photos..."
+
+msgid "Geavanceerd"
+msgstr "Advanced"
+
+msgid "Geen foto's gevonden"
+msgstr "No photos found"
+
+msgid "Herstart"
+msgstr "Restart"
+
+msgid "Herstart van Pixora is nodig om een nieuwe taal te laden"
+msgstr "Pixora must be restarted to load a new language"
+
+msgid "Hoe foto's in het grid worden getoond"
+msgstr "How photos are displayed in the grid"
+
+msgid "Hoe streng worden duplicaten gedetecteerd"
+msgstr "How strict duplicate detection is"
+
+msgid "Hoe worden je foto's georganiseerd"
+msgstr "How your photos are organized"
+
+msgid "Huidige map"
+msgstr "Current folder"
+
+msgid "Importeer van iPhone of iPad"
+msgstr "Import from iPhone or iPad"
+
+msgid "Importeren"
+msgstr "Import"
+
+msgid "Instellingen"
+msgstr "Settings"
+
+msgid "Je hebt de nieuwste versie"
+msgstr "You have the latest version"
+
 msgid "Kaartweergave"
 msgstr "Map view"
+
+msgid "Kies foto map"
+msgstr "Choose photo folder"
+
+msgid "Kies map op backup schijf"
+msgstr "Choose folder on backup drive"
+
+msgid "Mapstructuur"
+msgstr "Folder structure"
+
+msgid "Markeer als favoriet (F)"
+msgstr "Mark as favorite (F)"
+
+msgid "Normaal"
+msgstr "Normal"
+
+msgid "Ook licht bewerkte foto's worden gedetecteerd"
+msgstr "Lightly edited photos are also detected"
+
+msgid "Opslaan"
+msgstr "Save"
+
+msgid "Over"
+msgstr "About"
+
+msgid "Per jaar"
+msgstr "By year"
+
+msgid "Per jaar/maand"
+msgstr "By year/month"
+
+msgid "Pixora"
+msgstr "Pixora"
+
+msgid "Pixora wordt gestart…"
+msgstr "Pixora is starting…"
+
+msgid "Plat"
+msgstr "Flat"
+
+msgid "Reisverhaal samenstellen…"
+msgstr "Building travel story…"
+
+msgid "Selecteren"
+msgstr "Select"
+
+msgid "Sluit je iPhone of iPad aan om foto's te importeren"
+msgstr "Connect your iPhone or iPad to import photos"
+
+msgid "Soepel"
+msgstr "Loose"
+
+msgid "Streng"
+msgstr "Strict"
+
+msgid "Synchroniseert na elke import"
+msgstr "Synchronizes after each import"
+
+msgid "Taal"
+msgstr "Language"
+
+msgid "Taal wordt gewijzigd…"
+msgstr "Changing language…"
+
+msgid "Terug"
+msgstr "Back"
+
+msgid "Terug naar standaard (200 px)"
+msgstr "Reset to default (200 px)"
+
+msgid "Verwijderen"
+msgstr "Delete"
+
+msgid "Waar worden je foto's opgeslagen"
+msgstr "Where your photos are stored"
+
+msgid "Weergave"
+msgstr "Display"
+
+msgid "Wijzigen"
+msgstr "Change"
+
+msgid "signal"
+msgstr "signal"
+
+msgid "✕ Toon alle foto's"
+msgstr "✕ Show all photos"
+
+msgid "🗺"
+msgstr "🗺"
+
+msgid "🗺 laden..."
+msgstr "🗺 loading..."
+
+msgid "─── Pixora (dev mode) ───"
+msgstr "─── Pixora (dev mode) ───"
+
+msgid "Sluit dit venster om Pixora te sluiten."
+msgstr "Close this window to quit Pixora."
+

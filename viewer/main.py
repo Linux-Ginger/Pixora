@@ -52,14 +52,28 @@ def _launch_dev_terminal():
         run_cmd = f'"{pixora_bin}"'
     else:
         run_cmd = f'python3 "{os.path.abspath(__file__)}"'
+
+    # Dev-terminal tekst lokaliseren o.b.v. gekozen taal in settings
+    import gettext as _gt
+    _locale_dir = os.path.abspath(os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "locale"
+    ))
+    _lang = settings.get("language", "nl") if settings else "nl"
+    try:
+        _t = _gt.translation("pixora", localedir=_locale_dir,
+                             languages=[_lang], fallback=True)
+        header = _t.gettext("─── Pixora (dev mode) ───")
+        hint = _t.gettext("Sluit dit venster om Pixora te sluiten.")
+    except Exception:
+        header = "─── Pixora (dev mode) ───"
+        hint = "Sluit dit venster om Pixora te sluiten."
+
     # Zet PIXORA_IN_DEV_TERM ín het bash-commando i.p.v. via Popen env —
-    # gnome-terminal-server neemt env niet altijd mee naar z'n child-shell,
-    # waardoor de child zonder marker recursief weer een terminal zou
-    # spawnen en alles zou exitten.
+    # gnome-terminal-server neemt env niet altijd mee naar z'n child-shell.
     bash_cmd = (
         "export PIXORA_IN_DEV_TERM=1; "
-        "echo '─── Pixora (dev mode) ───'; "
-        "echo 'Sluit dit venster om Pixora te sluiten.'; "
+        f"echo '{header}'; "
+        f"echo '{hint}'; "
         "echo; "
         f"exec {run_cmd}"
     )
