@@ -2916,15 +2916,43 @@ class MainWindow(Adw.ApplicationWindow):
             self._schedule_photo_load()
 
     def _schedule_photo_load(self):
-        """Korte debounce (30ms) zodat snel doorklikken niet een rij grote
-        decodes start, maar de switch snappy voelt bij single-clicks."""
+        """Direct tonen bij cache-hit, anders thumbnail-placeholder + async load."""
         self._viewer_load_id += 1
+        load_id = self._viewer_load_id
         self.viewer_location.set_text("")
         self.filmstrip_area.queue_draw()
         self._scroll_filmstrip_to_current()
+
         if hasattr(self, '_nav_debounce_id') and self._nav_debounce_id:
             GLib.source_remove(self._nav_debounce_id)
-        self._nav_debounce_id = GLib.timeout_add(10, self._do_scheduled_load)
+            self._nav_debounce_id = None
+
+        if not self.photos:
+            return
+        path = self.photos[self.current_index]
+
+        # 1. Cache-hit (foto al gepreloaded) → direct tonen, geen debounce
+        if not is_video(path):
+            cached = self._viewer_pixbuf_cache.get(path)
+            if cached is not None:
+                self._viewer_pixbuf_cache.move_to_end(path)
+                self._show_full_photo(cached, path,
+                                      self._photo_location.get(path) or "")
+                GLib.idle_add(self._preload_adjacent_photos)
+                return
+
+        # 2. Cache-miss: toon thumbnail als placeholder (instant feedback)
+        try:
+            thumb_path = get_cache_path(path, THUMB_SIZE)
+            if os.path.exists(thumb_path):
+                thumb_pb = GdkPixbuf.Pixbuf.new_from_file(thumb_path)
+                if thumb_pb:
+                    self.photo_picture.set_pixbuf(thumb_pb)
+        except Exception:
+            pass
+
+        # 3. Full-res async; debounce 0ms (geen extra wachttijd)
+        self._nav_debounce_id = GLib.timeout_add(0, self._do_scheduled_load)
 
     def _preload_adjacent_photos(self):
         if not hasattr(self, "current_index") or not self.photos:
