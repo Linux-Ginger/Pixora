@@ -293,7 +293,84 @@ def get_mountpoint_for_uuid(uuid):
 def format_date_header(dt):
     return f"{dt.day} {MONTHS_NL_FULL[dt.month]} {dt.year}"
 
+
+# ── Metadata-cache (video-duur, foto-datum, GPS, geocode) ─────────────
+# Spaart zware EXIF- en ffprobe-calls bij iedere grid-reload/map-open.
+_METADATA_CACHE_PATH = os.path.expanduser("~/.cache/pixora/metadata.json")
+_metadata_cache = {
+    "video_duration": {},
+    "photo_date": {},
+    "gps_coords": {},
+    "geocode": {},
+}
+_metadata_dirty = False
+_metadata_save_lock = threading.Lock()
+
+
+def _load_metadata_cache():
+    try:
+        with open(_METADATA_CACHE_PATH, "r") as f:
+            data = json.load(f)
+        for k in _metadata_cache.keys():
+            v = data.get(k)
+            if isinstance(v, dict):
+                _metadata_cache[k] = v
+    except Exception:
+        pass
+
+
+def save_metadata_cache():
+    global _metadata_dirty
+    if not _metadata_dirty:
+        return
+    with _metadata_save_lock:
+        try:
+            os.makedirs(os.path.dirname(_METADATA_CACHE_PATH), exist_ok=True)
+            tmp = _METADATA_CACHE_PATH + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(_metadata_cache, f)
+            os.replace(tmp, _METADATA_CACHE_PATH)
+            _metadata_dirty = False
+        except Exception:
+            pass
+
+
+def _cache_fresh(bucket, path):
+    entry = _metadata_cache[bucket].get(path)
+    if not entry:
+        return None
+    try:
+        mtime = os.path.getmtime(path)
+    except Exception:
+        return None
+    if abs(entry.get("m", 0) - mtime) < 0.5:
+        return entry.get("v")
+    return None
+
+
+def _cache_put(bucket, path, value):
+    global _metadata_dirty
+    try:
+        mtime = os.path.getmtime(path)
+    except Exception:
+        return
+    _metadata_cache[bucket][path] = {"m": mtime, "v": value}
+    _metadata_dirty = True
+
+
+_load_metadata_cache()
+
+
 def get_gps_coords(photo_path):
+    cached = _cache_fresh("gps_coords", photo_path)
+    if cached is not None:
+        return tuple(cached) if cached else None
+    result = _get_gps_coords_raw(photo_path)
+    _cache_put("gps_coords", photo_path, list(result) if result else None)
+    return result
+
+
+def _get_gps_coords_raw(photo_path):
     try:
         from PIL import Image
         from PIL.ExifTags import TAGS, GPSTAGS
@@ -324,6 +401,18 @@ def get_gps_coords(photo_path):
         return None
 
 def reverse_geocode(lat, lon):
+    global _metadata_dirty
+    key = f"{lat:.4f},{lon:.4f}"
+    cached = _metadata_cache["geocode"].get(key)
+    if cached is not None:
+        return cached
+    result = _reverse_geocode_raw(lat, lon)
+    _metadata_cache["geocode"][key] = result or ""
+    _metadata_dirty = True
+    return result
+
+
+def _reverse_geocode_raw(lat, lon):
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
         req = urllib.request.Request(url, headers={"User-Agent": "Pixora/1.0"})
@@ -350,6 +439,15 @@ def lat_lon_to_tile_float(lat, lon, zoom):
 _EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, DateTimeDigitized, DateTime
 
 def get_photo_date(path: str) -> float:
+    cached = _cache_fresh("photo_date", path)
+    if cached is not None:
+        return float(cached)
+    value = _get_photo_date_raw(path)
+    _cache_put("photo_date", path, value)
+    return value
+
+
+def _get_photo_date_raw(path: str) -> float:
     """Geeft de fotodatum als timestamp. Probeert EXIF eerst, valt terug op mtime."""
     ext = os.path.splitext(path)[1].lower()
     if ext in (".jpg", ".jpeg", ".heic", ".png", ".dng"):
@@ -378,15 +476,20 @@ def get_cache_path(photo_path, thumb_size=None):
     return os.path.join(CACHE_DIR, key + ".png")
 
 def get_video_duration(path):
+    cached = _cache_fresh("video_duration", path)
+    if cached is not None:
+        return float(cached)
     try:
         result = subprocess.run(
             ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", path],
             capture_output=True, text=True, timeout=5
         )
         data = json.loads(result.stdout)
-        return float(data.get("format", {}).get("duration", 0))
+        dur = float(data.get("format", {}).get("duration", 0))
     except Exception:
-        return 0.0
+        dur = 0.0
+    _cache_put("video_duration", path, dur)
+    return dur
 
 
 def format_duration(seconds):
@@ -842,6 +945,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._fade_timer_id         = None
         self._fade_anim_id          = None
         self._favorites             = load_favorites()
+        self._favorites_save_id     = None
         self._favorites_only        = False
         self._current_flow          = None
         self._current_row_hbox      = None
@@ -1329,12 +1433,40 @@ class MainWindow(Adw.ApplicationWindow):
         self.load_photos()
         return False
 
+    def _schedule_save_favorites(self):
+        if self._favorites_save_id is not None:
+            try:
+                GLib.source_remove(self._favorites_save_id)
+            except Exception:
+                pass
+        self._favorites_save_id = GLib.timeout_add(250, self._flush_save_favorites)
+
+    def _flush_save_favorites(self):
+        self._favorites_save_id = None
+        try:
+            save_favorites(self._favorites)
+        except Exception as e:
+            log_error(f"Favorites save fout: {e}")
+        return False
+
     def on_close(self, window):
         log_info("Pixora wordt afgesloten — opruimen…")
         try:
             self._load_id += 1
             self._viewer_load_id += 1
             self._filmstrip_load_id += 1
+        except Exception:
+            pass
+        # Persist alle pending caches/writes
+        try:
+            if self._favorites_save_id is not None:
+                GLib.source_remove(self._favorites_save_id)
+                self._favorites_save_id = None
+                save_favorites(self._favorites)
+        except Exception:
+            pass
+        try:
+            save_metadata_cache()
         except Exception:
             pass
         self.stop_watcher()
@@ -1688,7 +1820,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _open_photo_from_map(self, paths):
         if isinstance(paths, str):
             paths = [paths]
-        valid = [p for p in paths if p in self.photos]
+        photos_set = set(self.photos)
+        valid = [p for p in paths if p in photos_set]
         if not valid:
             return
         self.close_map()
@@ -2614,10 +2747,11 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Sorteren ──────────────────────────────────────────────────────
     def apply_sort(self):
         index = self.sort_combo.get_selected()
-        if index == 0:
-            self.photos.sort(key=get_photo_date, reverse=True)
-        elif index == 1:
-            self.photos.sort(key=get_photo_date)
+        if index in (0, 1):
+            # Pre-compute alle datums eenmaal zodat sort() niet O(n log n)
+            # EXIF-reads triggert maar O(n) + O(n log n) compares.
+            date_map = {p: get_photo_date(p) for p in self.photos}
+            self.photos.sort(key=date_map.get, reverse=(index == 0))
         elif index == 2:
             self.photos.sort(key=lambda p: os.path.basename(p).lower())
         elif index == 3:
@@ -3438,7 +3572,7 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             self._favorites.add(path)
             log_info(f"Favoriet toegevoegd: {path}")
-        save_favorites(self._favorites)
+        self._schedule_save_favorites()
         self._update_favorite_btn()
         # refresh thumbnail badge if visible
         widget = self.thumb_widgets.get(self.current_index)
@@ -3781,7 +3915,7 @@ class MainWindow(Adw.ApplicationWindow):
             return
         if path in self._favorites:
             self._favorites.discard(path)
-            save_favorites(self._favorites)
+            self._schedule_save_favorites()
         self.photos.remove(path)
         if not self.photos:
             self.close_viewer()
@@ -3832,7 +3966,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self._favorites.discard(path)
                 fav_changed = True
         if fav_changed:
-            save_favorites(self._favorites)
+            self._schedule_save_favorites()
         self.toggle_select_mode()
         self.load_photos()
 
