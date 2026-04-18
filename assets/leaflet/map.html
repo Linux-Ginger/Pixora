@@ -218,6 +218,26 @@
     }
   }
 
+  // Verberg cluster-layer tijdens actieve beweging; toon weer na stilstaan.
+  // Grote perf-win omdat er tijdens pan/zoom geen marker-repositioning gebeurt.
+  let movingHideTimer = null;
+  function hideDuringMove() {
+    if (map.hasLayer(cluster)) {
+      map.removeLayer(cluster);
+    }
+    if (movingHideTimer) clearTimeout(movingHideTimer);
+    movingHideTimer = setTimeout(function() {
+      if (!map.hasLayer(cluster)) {
+        map.addLayer(cluster);
+      }
+    }, 120);
+  }
+  map.on('movestart zoomstart', hideDuringMove);
+  map.on('moveend zoomend', function() {
+    if (movingHideTimer) { clearTimeout(movingHideTimer); movingHideTimer = null; }
+    if (!map.hasLayer(cluster)) map.addLayer(cluster);
+  });
+
   window.pixoraSetMarkers = function(markers) {
     cluster.clearLayers();
     if (!markers || !markers.length) return;

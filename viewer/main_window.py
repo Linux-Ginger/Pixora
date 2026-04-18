@@ -153,7 +153,9 @@ _webkit_load_error = None
 # Zet sandbox-disable VOOR de WebKit-import zodat de env-var effect heeft.
 os.environ.setdefault("WEBKIT_DISABLE_SANDBOX", "1")
 os.environ.setdefault("WEBKIT_FORCE_SANDBOX", "0")
-os.environ.setdefault("WEBKIT_DISABLE_COMPOSITING_MODE", "1")
+# Forceer GPU-compositing voor Leaflet (anders valt WebKit terug op
+# software rendering in sommige VMs, wat pan/zoom traag maakt).
+os.environ.setdefault("WEBKIT_FORCE_COMPOSITING_MODE", "1")
 
 # Probeer eerst WebKit 6.0 (GTK4-native, nieuwste). Daarna WebKit2 4.1 / 4.0.
 try:
