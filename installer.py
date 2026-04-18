@@ -76,8 +76,6 @@ class InstallerWindow(Adw.ApplicationWindow):
     # ── Versie-kiezer pagina ───────────────────────────────────────────
 
     def _build_select_page(self):
-        install_dir = Path.home() / ".local" / "share" / "pixora"
-        already_installed = (install_dir / ".git").exists()
         version_file = Path.home() / ".config" / "pixora" / "installed_version"
         current_version = None
         if version_file.exists():
@@ -85,13 +83,7 @@ class InstallerWindow(Adw.ApplicationWindow):
                 current_version = version_file.read_text().strip() or None
             except Exception:
                 current_version = None
-        if already_installed and not current_version:
-            bundled = install_dir / "version.txt"
-            if bundled.exists():
-                try:
-                    current_version = bundled.read_text().strip() or None
-                except Exception:
-                    pass
+        already_installed = current_version is not None
         self._already_installed = already_installed
         self._local_version = current_version
 
