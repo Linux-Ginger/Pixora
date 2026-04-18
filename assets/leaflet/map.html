@@ -26,11 +26,14 @@
     background: rgba(30,30,30,0.94); color: #fff; border-radius: 10px;
   }
   .leaflet-popup-tip { background: rgba(30,30,30,0.94); }
-  .leaflet-popup-content { margin: 10px 12px; font-size: 12px; }
-  .leaflet-popup-content img { border-radius: 6px; max-width: 180px; display: block; margin-bottom: 6px; }
-  .leaflet-popup-content .fname { font-weight: bold; }
+  .leaflet-popup-content { margin: 10px 12px; font-size: 12px; min-width: 180px; }
+  .leaflet-popup-content img { border-radius: 6px; max-width: 200px; max-height: 140px;
+    display: block; margin: 0 auto 6px auto; background: #222; }
+  .leaflet-popup-content .fname { font-weight: bold; word-break: break-word; }
   .leaflet-popup-content .date { opacity: 0.7; font-size: 11px; }
   .leaflet-popup-content .hint { color: #e95420; font-size: 10px; margin-top: 4px; }
+  .leaflet-popup-content .count { color: #ffb300; font-size: 11px; margin-top: 4px; }
+  .leaflet-control-attribution a { color: #0077cc; }
 </style>
 </head>
 <body>
@@ -41,8 +44,21 @@
 <script src="markercluster.js"></script>
 <script>
 (function() {
-  const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([52.3, 5.3], 7);
-  L.control.attribution({ prefix: false }).addAttribution('© OpenStreetMap').addTo(map);
+  // Performance: animatie-opties uit op zwakke VM-rendering
+  const map = L.map('map', {
+    zoomControl: true,
+    attributionControl: false,
+    zoomAnimation: false,
+    fadeAnimation: false,
+    markerZoomAnimation: false,
+    preferCanvas: true
+  }).setView([52.3, 5.3], 7);
+
+  L.control.attribution({
+    prefix: '<a href="https://leafletjs.com/" target="_blank">Leaflet</a>'
+  }).addAttribution(
+    '© <a href="https://openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+  ).addTo(map);
 
   const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -71,8 +87,11 @@
 
   const cluster = L.markerClusterGroup({
     showCoverageOnHover: false,
-    spiderfyOnMaxZoom: true,
+    spiderfyOnMaxZoom: false,
+    zoomToBoundsOnClick: false,
     maxClusterRadius: 45,
+    animate: false,
+    animateAddingMarkers: false,
     iconCreateFunction: function(c) {
       const count = c.getChildCount();
       const size = count < 10 ? 'cluster' : 'cluster-lg';
@@ -82,6 +101,27 @@
       });
     }
   });
+
+  // Hover op cluster: toon eerste thumbnail + aantal
+  cluster.on('clustermouseover', function(e) {
+    const children = e.layer.getAllChildMarkers();
+    if (!children.length) return;
+    const first = children[0].options._pix;
+    const count = children.length;
+    const html = buildPopupHtml(first, count);
+    L.popup({ closeButton: false, autoPan: false, offset: [0, -12] })
+      .setLatLng(e.layer.getLatLng())
+      .setContent(html)
+      .openOn(map);
+  });
+  cluster.on('clustermouseout', function() { map.closePopup(); });
+
+  // Klik op cluster: geef ALLE paths door aan Pixora
+  cluster.on('clusterclick', function(e) {
+    const paths = e.layer.getAllChildMarkers().map(function(m) { return m.options._pix.path; });
+    sendToPixora({ type: 'open_photos', paths: paths });
+  });
+
   map.addLayer(cluster);
 
   function singleIcon() {
@@ -97,32 +137,46 @@
     });
   }
 
+  function buildPopupHtml(m, count) {
+    let html = '';
+    if (m.thumb) {
+      html += '<img src="file://' + m.thumb + '" alt="" onerror="this.style.display=\'none\'">';
+    }
+    html += '<div class="fname">' + escapeHtml(m.filename) + '</div>';
+    html += '<div class="date">' + escapeHtml(m.date || '') + '</div>';
+    if (count && count > 1) {
+      html += '<div class="count">+ ' + (count - 1) + ' andere foto\'s in deze cluster</div>';
+      html += '<div class="hint">Klik cluster om gefilterd te bekijken</div>';
+    } else {
+      html += '<div class="hint">Klik om te openen</div>';
+    }
+    return html;
+  }
+
+  function sendToPixora(payload) {
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pixora) {
+      window.webkit.messageHandlers.pixora.postMessage(JSON.stringify(payload));
+    }
+  }
+
   window.pixoraSetMarkers = function(markers) {
     cluster.clearLayers();
     if (!markers || !markers.length) return;
     const bounds = L.latLngBounds();
     markers.forEach(function(m) {
       const latlng = [m.lat, m.lon];
-      const marker = L.marker(latlng, { icon: singleIcon() });
-      const html =
-        '<div class="fname">' + escapeHtml(m.filename) + '</div>' +
-        '<div class="date">' + escapeHtml(m.date || '') + '</div>' +
-        '<div class="hint">Klik op marker om te openen</div>';
-      marker.bindPopup(html, { maxWidth: 220, closeButton: false });
+      const marker = L.marker(latlng, { icon: singleIcon(), _pix: m });
+      marker.bindPopup(buildPopupHtml(m, 1), { maxWidth: 240, closeButton: false, autoPan: false });
       marker.on('mouseover', function() { marker.openPopup(); });
       marker.on('mouseout', function() { marker.closePopup(); });
       marker.on('click', function() {
-        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pixora) {
-          window.webkit.messageHandlers.pixora.postMessage(JSON.stringify({
-            type: 'open_photo', path: m.path
-          }));
-        }
+        sendToPixora({ type: 'open_photos', paths: [m.path] });
       });
       cluster.addLayer(marker);
       bounds.extend(latlng);
     });
     if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
     }
   };
 

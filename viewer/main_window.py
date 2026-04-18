@@ -721,10 +721,20 @@ class MapWidget(Gtk.Box):
             GLib.timeout_add(80, self._push_markers)
 
     def _push_markers(self):
-        data = [
-            {"lat": m[0], "lon": m[1], "filename": m[2], "date": m[3], "path": m[4]}
-            for m in self._pending_markers
-        ]
+        data = []
+        for m in self._pending_markers:
+            path = m[4]
+            try:
+                thumb = get_cache_path(path, THUMB_SIZE)
+                if not os.path.exists(thumb):
+                    thumb = None
+            except Exception:
+                thumb = None
+            data.append({
+                "lat": m[0], "lon": m[1],
+                "filename": m[2], "date": m[3],
+                "path": path, "thumb": thumb,
+            })
         js = f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers({json.dumps(data)});}}"
         ran = False
         try:
@@ -748,7 +758,12 @@ class MapWidget(Gtk.Box):
             payload = json.loads(raw)
         except Exception:
             return
-        if payload.get("type") == "open_photo":
+        msg_type = payload.get("type")
+        if msg_type == "open_photos":
+            paths = payload.get("paths") or []
+            if paths:
+                GLib.idle_add(self.open_photo_cb, paths)
+        elif msg_type == "open_photo":
             path = payload.get("path")
             if path:
                 GLib.idle_add(self.open_photo_cb, [path])
