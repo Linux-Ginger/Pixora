@@ -6,6 +6,21 @@
 # ─────────────────────────────────────────────
 
 import os
+
+# ── i18n ─────────────────────────────────────────────────────────────
+import gettext as _gt
+import json as _json_i18n
+try:
+    _lang = _json_i18n.load(open(os.path.expanduser("~/.config/pixora/settings.json"))).get("language", "nl")
+except Exception:
+    _lang = "nl"
+_t = _gt.translation(
+    "pixora",
+    localedir=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "locale")),
+    languages=[_lang], fallback=True
+)
+_ = _t.gettext
+
 import json
 import subprocess
 import threading
@@ -68,7 +83,7 @@ class SetupWizard(Adw.Window):
         self.drives = []
         self.selected_backup_path = None
 
-        self.set_title("Pixora — Instellen")
+        self.set_title(_("Pixora — Instellen"))
         self.set_default_size(480, 400)
         self.set_resizable(False)
 
@@ -106,7 +121,7 @@ class SetupWizard(Adw.Window):
         btn_bar.set_margin_start(16)
         btn_bar.set_margin_end(16)
 
-        self.back_btn = Gtk.Button(label="Terug")
+        self.back_btn = Gtk.Button(label=_("Terug"))
         self.back_btn.connect("clicked", self.go_back)
         self.back_btn.set_visible(False)
         btn_bar.append(self.back_btn)
@@ -115,7 +130,7 @@ class SetupWizard(Adw.Window):
         spacer.set_hexpand(True)
         btn_bar.append(spacer)
 
-        self.next_btn = Gtk.Button(label="Volgende")
+        self.next_btn = Gtk.Button(label=_("Volgende"))
         self.next_btn.add_css_class("suggested-action")
         self.next_btn.connect("clicked", self.go_next)
         btn_bar.append(self.next_btn)
@@ -162,7 +177,7 @@ class SetupWizard(Adw.Window):
         self.welcome_logo.set_halign(Gtk.Align.CENTER)
         page.append(self.welcome_logo)
 
-        title = Gtk.Label(label="Welkom bij Pixora!")
+        title = Gtk.Label(label=_("Welkom bij Pixora!"))
         title.add_css_class("title-1")
         title.set_halign(Gtk.Align.CENTER)
         page.append(title)
@@ -189,7 +204,7 @@ class SetupWizard(Adw.Window):
         page.set_margin_end(40)
         page.set_valign(Gtk.Align.START)
 
-        title = Gtk.Label(label="Waar wil je je foto's opslaan?")
+        title = Gtk.Label(label=_("Waar wil je je foto's opslaan?"))
         title.add_css_class("title-2")
         title.set_halign(Gtk.Align.START)
         page.append(title)
@@ -205,10 +220,10 @@ class SetupWizard(Adw.Window):
         row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
         self.folder_entry = Gtk.Entry()
-        self.folder_entry.set_placeholder_text("Kies een map…")
+        self.folder_entry.set_placeholder_text(_("Kies een map…"))
         self.folder_entry.set_hexpand(True)
 
-        browse_btn = Gtk.Button(label="Bladeren…")
+        browse_btn = Gtk.Button(label=_("Bladeren…"))
         browse_btn.connect("clicked", self._on_browse_folder)
 
         row_box.append(self.folder_entry)
@@ -227,7 +242,7 @@ class SetupWizard(Adw.Window):
         page.set_margin_end(40)
         page.set_valign(Gtk.Align.START)
 
-        title = Gtk.Label(label="Automatische backup")
+        title = Gtk.Label(label=_("Automatische backup"))
         title.add_css_class("title-2")
         title.set_halign(Gtk.Align.START)
         page.append(title)
@@ -248,9 +263,8 @@ class SetupWizard(Adw.Window):
         self.backup_switch.connect("notify::active", self._on_backup_toggle)
 
         backup_row = Adw.ActionRow(
-            title="Automatische backup",
-            subtitle="Synchroniseert na elke import naar externe schijf"
-        )
+            title=_("Automatische backup"),
+            subtitle=_("Synchroniseert na elke import naar externe schijf"))
         backup_row.add_suffix(self.backup_switch)
         backup_row.set_activatable_widget(self.backup_switch)
         group.add(backup_row)
@@ -267,13 +281,12 @@ class SetupWizard(Adw.Window):
         self.refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
         self.refresh_btn.add_css_class("flat")
         self.refresh_btn.set_valign(Gtk.Align.CENTER)
-        self.refresh_btn.set_tooltip_text("Vernieuwen")
+        self.refresh_btn.set_tooltip_text(_("Vernieuwen"))
         self.refresh_btn.connect("clicked", self._on_refresh_drives)
 
         self.drive_row = Adw.ActionRow(
-            title="Backup schijf",
-            subtitle="Alleen externe schijven worden getoond"
-        )
+            title=_("Backup schijf"),
+            subtitle=_("Alleen externe schijven worden getoond"))
         self.drive_row.add_suffix(self.refresh_btn)
         self.drive_row.add_suffix(self.drive_combo)
         self.drive_row.set_sensitive(False)
@@ -281,10 +294,9 @@ class SetupWizard(Adw.Window):
 
         # Map op backup schijf
         self.backup_folder_row = Adw.ActionRow(
-            title="Map op backup schijf",
-            subtitle="Nog geen schijf geselecteerd"
-        )
-        self.backup_folder_btn = Gtk.Button(label="Kiezen…")
+            title=_("Map op backup schijf"),
+            subtitle=_("Nog geen schijf geselecteerd"))
+        self.backup_folder_btn = Gtk.Button(label=_("Kiezen…"))
         self.backup_folder_btn.add_css_class("flat")
         self.backup_folder_btn.set_valign(Gtk.Align.CENTER)
         self.backup_folder_btn.connect("clicked", self._on_browse_backup_folder)
@@ -311,7 +323,7 @@ class SetupWizard(Adw.Window):
         page.set_margin_end(40)
         page.set_valign(Gtk.Align.START)
 
-        title = Gtk.Label(label="Duplicaat detectie")
+        title = Gtk.Label(label=_("Duplicaat detectie"))
         title.add_css_class("title-2")
         title.set_halign(Gtk.Align.START)
         page.append(title)
@@ -327,7 +339,7 @@ class SetupWizard(Adw.Window):
         group = Adw.PreferencesGroup()
 
         self.radio_strict = Gtk.CheckButton()
-        strict_row = Adw.ActionRow(title="Streng", subtitle="Alleen exact dezelfde foto's")
+        strict_row = Adw.ActionRow(title=_("Streng"), subtitle=_("Alleen exact dezelfde foto's"))
         strict_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
         strict_row.add_prefix(self.radio_strict)
         strict_row.set_activatable_widget(self.radio_strict)
@@ -336,7 +348,7 @@ class SetupWizard(Adw.Window):
         self.radio_normal = Gtk.CheckButton()
         self.radio_normal.set_group(self.radio_strict)
         self.radio_normal.set_active(True)
-        normal_row = Adw.ActionRow(title="Normaal", subtitle="Bijna identieke foto's worden gedetecteerd")
+        normal_row = Adw.ActionRow(title=_("Normaal"), subtitle=_("Bijna identieke foto's worden gedetecteerd"))
         normal_row.add_prefix(Gtk.Image.new_from_icon_name("security-medium-symbolic"))
         normal_row.add_prefix(self.radio_normal)
         normal_row.set_activatable_widget(self.radio_normal)
@@ -344,7 +356,7 @@ class SetupWizard(Adw.Window):
 
         self.radio_loose = Gtk.CheckButton()
         self.radio_loose.set_group(self.radio_strict)
-        loose_row = Adw.ActionRow(title="Soepel", subtitle="Ook licht bewerkte foto's worden gedetecteerd")
+        loose_row = Adw.ActionRow(title=_("Soepel"), subtitle=_("Ook licht bewerkte foto's worden gedetecteerd"))
         loose_row.add_prefix(Gtk.Image.new_from_icon_name("security-low-symbolic"))
         loose_row.add_prefix(self.radio_loose)
         loose_row.set_activatable_widget(self.radio_loose)
@@ -396,7 +408,7 @@ class SetupWizard(Adw.Window):
             self.stack.set_visible_child_name(self.pages[self.current])
             self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
             self.back_btn.set_visible(self.current > 0)
-            self.next_btn.set_label("Volgende")
+            self.next_btn.set_label(_("Volgende"))
             if hasattr(self, "backup_error"):
                 self.backup_error.set_visible(False)
 
@@ -404,7 +416,7 @@ class SetupWizard(Adw.Window):
 
     def _on_browse_folder(self, btn):
         dialog = Gtk.FileDialog()
-        dialog.set_title("Kies foto map")
+        dialog.set_title(_("Kies foto map"))
         dialog.select_folder(self, None, self._on_folder_selected)
 
     def _on_folder_selected(self, dialog, result):
@@ -426,13 +438,13 @@ class SetupWizard(Adw.Window):
         selected = combo.get_selected()
         if self.drives and selected < len(self.drives):
             self.backup_folder_row.set_sensitive(True)
-            self.backup_folder_row.set_subtitle("Nog geen map gekozen")
+            self.backup_folder_row.set_subtitle(_("Nog geen map gekozen"))
             self.selected_backup_path = None
             self.backup_error.set_visible(False)
 
     def _on_browse_backup_folder(self, btn):
         dialog = Gtk.FileDialog()
-        dialog.set_title("Kies map op backup schijf")
+        dialog.set_title(_("Kies map op backup schijf"))
 
         selected = self.drive_combo.get_selected()
         if self.drives and selected < len(self.drives):
@@ -471,7 +483,7 @@ class SetupWizard(Adw.Window):
                         self.backup_error.set_label("⚠️  Kies een map op de backup schijf, niet op je computer")
                         self.backup_error.set_visible(True)
                         self.selected_backup_path = None
-                        self.backup_folder_row.set_subtitle("Nog geen map gekozen")
+                        self.backup_folder_row.set_subtitle(_("Nog geen map gekozen"))
                         return
 
                 self.selected_backup_path = chosen_path

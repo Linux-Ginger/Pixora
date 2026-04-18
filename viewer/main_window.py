@@ -1755,7 +1755,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Spinner blijft, label naar "Verbinden..." tot eerste tiles binnen zijn.
         try:
-            self.map_spinner_label.set_text("Verbinden met kaart-server…")
+            self.map_spinner_label.set_text(_("Verbinden met kaart-server…"))
         except Exception:
             pass
 
@@ -1769,7 +1769,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._map_ready_fallback_id = GLib.timeout_add_seconds(
             12, self._on_map_ready_timeout
         )
-        self.map_title_label.set_text("Kaartweergave")
+        self.map_title_label.set_text(_("Kaartweergave"))
         self.map_btn.set_label(_("🗺"))
         self.map_btn.set_sensitive(True)
         return False
@@ -2768,7 +2768,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._sort_timer = None
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
-        self.spinner_label.set_text("Sorteren...")
+        self.spinner_label.set_text(_("Sorteren..."))
         sort_index = self.sort_combo.get_selected()
         threading.Thread(target=self._do_sort_bg, args=(sort_index,), daemon=True).start()
         return False
@@ -4078,7 +4078,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         lang_model = Gtk.StringList()
         self._lang_codes = ["nl", "en"]
-        self._lang_labels = ["Nederlands", "English"]
+        self._lang_labels = ["🇳🇱  Nederlands", "🇬🇧  English"]
         for label in self._lang_labels:
             lang_model.append(label)
         lang_combo = Gtk.DropDown(model=lang_model)

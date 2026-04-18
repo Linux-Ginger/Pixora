@@ -12,6 +12,21 @@ gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib
 
 import os
+
+# ── i18n ─────────────────────────────────────────────────────────────
+import gettext as _gt
+import json as _json_i18n
+try:
+    _lang = _json_i18n.load(open(os.path.expanduser("~/.config/pixora/settings.json"))).get("language", "nl")
+except Exception:
+    _lang = "nl"
+_t = _gt.translation(
+    "pixora",
+    localedir=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "locale")),
+    languages=[_lang], fallback=True
+)
+_ = _t.gettext
+
 import sys
 import json
 import subprocess
@@ -47,7 +62,7 @@ ALL_STEPS = [(label, key) for _, steps in PHASES for label, key in steps]
 class InstallerWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
-        self.set_title("Pixora Installer")
+        self.set_title(_("Pixora Installer"))
         self.set_default_size(460, 360)
         self.set_resizable(False)
 
@@ -102,7 +117,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         top.append(self._make_logo(48))
 
-        title = Gtk.Label(label="Pixora")
+        title = Gtk.Label(label=_("Pixora"))
         title.add_css_class("title-1")
         top.append(title)
 
@@ -118,7 +133,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         ver_box.set_margin_end(24)
         ver_box.set_margin_top(24)
 
-        ver_lbl = Gtk.Label(label="Versie")
+        ver_lbl = Gtk.Label(label=_("Versie"))
         ver_lbl.add_css_class("heading")
         ver_lbl.set_halign(Gtk.Align.START)
         ver_box.append(ver_lbl)
@@ -145,9 +160,8 @@ class InstallerWindow(Adw.ApplicationWindow):
         self.version_combo.set_valign(Gtk.Align.CENTER)
 
         ver_row = Adw.ActionRow(
-            title="Versie kiezen",
-            subtitle="Selecteer welke versie je wilt installeren"
-        )
+            title=_("Versie kiezen"),
+            subtitle=_("Selecteer welke versie je wilt installeren"))
         ver_row.add_suffix(self.version_combo)
         listbox.append(ver_row)
 
@@ -186,7 +200,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         top.append(self._make_logo(40))
 
-        title = Gtk.Label(label="Pixora")
+        title = Gtk.Label(label=_("Pixora"))
         title.add_css_class("title-1")
         top.append(title)
 
@@ -297,16 +311,16 @@ class InstallerWindow(Adw.ApplicationWindow):
     def _update_install_status(self, remote_version):
         local = self._local_version or ""
         if local == remote_version:
-            self.installed_row.set_title("Pixora is al geïnstalleerd")
+            self.installed_row.set_title(_("Pixora is al geïnstalleerd"))
             self.installed_row.set_subtitle(f"Versie {local} — up to date")
-            self.install_btn.set_label("Opnieuw installeren")
+            self.install_btn.set_label(_("Opnieuw installeren"))
             self.installed_icon.set_from_icon_name("emblem-ok-symbolic")
             self.installed_icon.remove_css_class("warning")
             self.installed_icon.add_css_class("success")
         else:
-            self.installed_row.set_title("Update beschikbaar")
+            self.installed_row.set_title(_("Update beschikbaar"))
             self.installed_row.set_subtitle(f"Update beschikbaar: {local} → {remote_version}")
-            self.install_btn.set_label("Bijwerken")
+            self.install_btn.set_label(_("Bijwerken"))
             self.installed_icon.set_from_icon_name("software-update-urgent-symbolic")
             self.installed_icon.remove_css_class("success")
             self.installed_icon.add_css_class("warning")

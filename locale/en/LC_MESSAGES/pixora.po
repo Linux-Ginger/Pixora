@@ -22,11 +22,20 @@ msgstr "2024/   2025/"
 msgid "2024/2024-03/   2024/2024-04/"
 msgstr "2024/2024-03/   2024/2024-04/"
 
+msgid "Alle importeren"
+msgstr "Alle importeren"
+
+msgid "Alle overslaan"
+msgstr "Alle overslaan"
+
 msgid "Alleen exact dezelfde foto's"
 msgstr "Only exactly identical photos"
 
 msgid "Alleen externe schijven"
 msgstr "External drives only"
+
+msgid "Alleen externe schijven worden getoond"
+msgstr "Alleen externe schijven worden getoond"
 
 msgid "Alleen favorieten tonen"
 msgstr "Show only favorites"
@@ -36,6 +45,12 @@ msgstr "Everything in one folder"
 
 msgid "Annuleren"
 msgstr "Cancel"
+
+msgid "Apparaat"
+msgstr "Apparaat"
+
+msgid "Apparaat gevonden"
+msgstr "Apparaat gevonden"
 
 msgid "Automatische backup"
 msgstr "Automatic backup"
@@ -58,6 +73,9 @@ msgstr "Crop"
 msgid "Bijwerken"
 msgstr "Update"
 
+msgid "Bladeren…"
+msgstr "Bladeren…"
+
 msgid "Controleer"
 msgstr "Check"
 
@@ -67,14 +85,29 @@ msgstr "Check for updates"
 msgid "Controleren mislukt"
 msgstr "Check failed"
 
+msgid "Deselecteer alles"
+msgstr "Deselecteer alles"
+
+msgid "Doorgaan"
+msgstr "Continue"
+
+msgid "Doorgaan met importeren"
+msgstr "Doorgaan met importeren"
+
 msgid "Draaien links"
 msgstr "Rotate left"
 
 msgid "Draaien rechts"
 msgstr "Rotate right"
 
+msgid "Duplicaat detectie"
+msgstr "Duplicaat detectie"
+
 msgid "Duplicate detectie"
 msgstr "Duplicate detection"
+
+msgid "Er is een fout opgetreden"
+msgstr "Er is een fout opgetreden"
 
 msgid "Foto &amp; video manager door LinuxGinger"
 msgstr "Photo &amp; video manager by LinuxGinger"
@@ -112,14 +145,23 @@ msgstr "How your photos are organized"
 msgid "Huidige map"
 msgstr "Current folder"
 
+msgid "Import voltooid"
+msgstr "Import voltooid"
+
 msgid "Importeer van iPhone of iPad"
 msgstr "Import from iPhone or iPad"
 
 msgid "Importeren"
 msgstr "Import"
 
+msgid "Installeer vereiste pakketten"
+msgstr "Installeer vereiste pakketten"
+
 msgid "Instellingen"
 msgstr "Settings"
+
+msgid "Je apparaat is verbonden en klaar om te importeren."
+msgstr "Je apparaat is verbonden en klaar om te importeren."
 
 msgid "Je hebt de nieuwste versie"
 msgstr "You have the latest version"
@@ -127,11 +169,20 @@ msgstr "You have the latest version"
 msgid "Kaartweergave"
 msgstr "Map view"
 
+msgid "Kies een map…"
+msgstr "Kies een map…"
+
 msgid "Kies foto map"
 msgstr "Choose photo folder"
 
 msgid "Kies map op backup schijf"
 msgstr "Choose folder on backup drive"
+
+msgid "Kiezen…"
+msgstr "Kiezen…"
+
+msgid "Map op backup schijf"
+msgstr "Map op backup schijf"
 
 msgid "Mapstructuur"
 msgstr "Folder structure"
@@ -139,14 +190,32 @@ msgstr "Folder structure"
 msgid "Markeer als favoriet (F)"
 msgstr "Mark as favorite (F)"
 
+msgid "Mogelijke duplicaten"
+msgstr "Mogelijke duplicaten"
+
+msgid "Nog geen map gekozen"
+msgstr "Nog geen map gekozen"
+
+msgid "Nog geen schijf geselecteerd"
+msgstr "Nog geen schijf geselecteerd"
+
 msgid "Normaal"
 msgstr "Normal"
 
 msgid "Ook licht bewerkte foto's worden gedetecteerd"
 msgstr "Lightly edited photos are also detected"
 
+msgid "Opnieuw installeren"
+msgstr "Reinstall"
+
+msgid "Opnieuw proberen"
+msgstr "Opnieuw proberen"
+
 msgid "Opslaan"
 msgstr "Save"
+
+msgid "Opslaan in"
+msgstr "Opslaan in"
 
 msgid "Over"
 msgstr "About"
@@ -160,8 +229,26 @@ msgstr "By year/month"
 msgid "Pixora"
 msgstr "Pixora"
 
+msgid "Pixora Installer"
+msgstr "Pixora Installer"
+
+msgid "Pixora Updater"
+msgstr "Pixora Updater"
+
+msgid "Pixora bijwerken"
+msgstr "Update Pixora"
+
+msgid "Pixora is al geïnstalleerd"
+msgstr "Pixora is already installed"
+
+msgid "Pixora starten"
+msgstr "Start Pixora"
+
 msgid "Pixora wordt gestart…"
 msgstr "Pixora is starting…"
+
+msgid "Pixora — Instellen"
+msgstr "Pixora — Instellen"
 
 msgid "Plat"
 msgstr "Flat"
@@ -169,20 +256,38 @@ msgstr "Flat"
 msgid "Reisverhaal samenstellen…"
 msgstr "Building travel story…"
 
+msgid "Selecteer alles"
+msgstr "Selecteer alles"
+
+msgid "Selecteer welke versie je wilt installeren"
+msgstr "Select which version to install"
+
 msgid "Selecteren"
 msgstr "Select"
+
+msgid "Sluit dit venster om Pixora te sluiten."
+msgstr "Close this window to quit Pixora."
 
 msgid "Sluit je iPhone of iPad aan om foto's te importeren"
 msgstr "Connect your iPhone or iPad to import photos"
 
+msgid "Sluiten"
+msgstr "Close"
+
 msgid "Soepel"
 msgstr "Loose"
+
+msgid "Sorteren..."
+msgstr "Sorteren..."
 
 msgid "Streng"
 msgstr "Strict"
 
 msgid "Synchroniseert na elke import"
 msgstr "Synchronizes after each import"
+
+msgid "Synchroniseert na elke import naar externe schijf"
+msgstr "Synchroniseert na elke import naar externe schijf"
 
 msgid "Taal"
 msgstr "Language"
@@ -193,23 +298,62 @@ msgstr "Changing language…"
 msgid "Terug"
 msgstr "Back"
 
+msgid "Terug naar galerij"
+msgstr "Terug naar galerij"
+
 msgid "Terug naar standaard (200 px)"
 msgstr "Reset to default (200 px)"
+
+msgid "Update beschikbaar"
+msgstr "Update available"
+
+msgid "Verbind je iPhone of iPad"
+msgstr "Verbind je iPhone of iPad"
+
+msgid "Verbinden met kaart-server…"
+msgstr "Verbinden met kaart-server…"
+
+msgid "Vernieuwen"
+msgstr "Vernieuwen"
+
+msgid "Versie"
+msgstr "Versie"
+
+msgid "Versie kiezen"
+msgstr "Choose version"
 
 msgid "Verwijderen"
 msgstr "Delete"
 
+msgid "Volgende"
+msgstr "Next"
+
+msgid "Waar wil je je foto's opslaan?"
+msgstr "Waar wil je je foto's opslaan?"
+
 msgid "Waar worden je foto's opgeslagen"
 msgstr "Where your photos are stored"
+
+msgid "Wachten op sudo…"
+msgstr "Waiting for sudo…"
 
 msgid "Weergave"
 msgstr "Display"
 
+msgid "Welkom bij Pixora!"
+msgstr "Welkom bij Pixora!"
+
 msgid "Wijzigen"
 msgstr "Change"
 
+msgid "Zoeken naar apparaat…"
+msgstr "Zoeken naar apparaat…"
+
 msgid "signal"
 msgstr "signal"
+
+msgid "─── Pixora (dev mode) ───"
+msgstr "─── Pixora (dev mode) ───"
 
 msgid "✕ Toon alle foto's"
 msgstr "✕ Show all photos"
@@ -219,10 +363,4 @@ msgstr "🗺"
 
 msgid "🗺 laden..."
 msgstr "🗺 loading..."
-
-msgid "─── Pixora (dev mode) ───"
-msgstr "─── Pixora (dev mode) ───"
-
-msgid "Sluit dit venster om Pixora te sluiten."
-msgstr "Close this window to quit Pixora."
 

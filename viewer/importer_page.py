@@ -11,6 +11,21 @@ gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk, Pango
 
 import os
+
+# ── i18n ─────────────────────────────────────────────────────────────
+import gettext as _gt
+import json as _json_i18n
+try:
+    _lang = _json_i18n.load(open(os.path.expanduser("~/.config/pixora/settings.json"))).get("language", "nl")
+except Exception:
+    _lang = "nl"
+_t = _gt.translation(
+    "pixora",
+    localedir=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "locale")),
+    languages=[_lang], fallback=True
+)
+_ = _t.gettext
+
 import sys
 import json
 import shutil
@@ -579,11 +594,11 @@ class ImporterPage(Gtk.Box):
 
         back_btn = Gtk.Button(icon_name="go-previous-symbolic")
         back_btn.add_css_class("flat")
-        back_btn.set_tooltip_text("Terug")
+        back_btn.set_tooltip_text(_("Terug"))
         back_btn.connect("clicked", self._on_back_clicked)
         header.pack_start(back_btn)
 
-        title_lbl = Gtk.Label(label="Importeren")
+        title_lbl = Gtk.Label(label=_("Importeren"))
         header.set_title_widget(title_lbl)
 
         self.append(header)
@@ -649,7 +664,7 @@ class ImporterPage(Gtk.Box):
         icon.set_halign(Gtk.Align.CENTER)
         inner.append(icon)
 
-        title_lbl = Gtk.Label(label="Verbind je iPhone of iPad")
+        title_lbl = Gtk.Label(label=_("Verbind je iPhone of iPad"))
         title_lbl.add_css_class("title-3")
         title_lbl.set_halign(Gtk.Align.CENTER)
         title_lbl.set_margin_top(4)
@@ -691,7 +706,7 @@ class ImporterPage(Gtk.Box):
         spin = Gtk.Spinner()
         spin.start()
         spinner_box.append(spin)
-        lbl = Gtk.Label(label="Zoeken naar apparaat…")
+        lbl = Gtk.Label(label=_("Zoeken naar apparaat…"))
         lbl.add_css_class("dim-label")
         spinner_box.append(lbl)
         inner.append(spinner_box)
@@ -703,8 +718,8 @@ class ImporterPage(Gtk.Box):
     def _build_detected_page(self):
         status = Adw.StatusPage()
         status.set_icon_name("object-select-symbolic")
-        status.set_title("Apparaat gevonden")
-        status.set_description("Je apparaat is verbonden en klaar om te importeren.")
+        status.set_title(_("Apparaat gevonden"))
+        status.set_description(_("Je apparaat is verbonden en klaar om te importeren."))
 
         clamp = Adw.Clamp()
         clamp.set_maximum_size(420)
@@ -717,7 +732,7 @@ class ImporterPage(Gtk.Box):
         info_group = Adw.PreferencesGroup()
 
         self.device_row = Adw.ActionRow()
-        self.device_row.set_title("Apparaat")
+        self.device_row.set_title(_("Apparaat"))
         self.device_row.set_subtitle("iPhone")
         ic = Gtk.Image.new_from_icon_name("computer-symbolic")
         ic.set_pixel_size(16)
@@ -725,7 +740,7 @@ class ImporterPage(Gtk.Box):
         info_group.add(self.device_row)
 
         self.dest_row = Adw.ActionRow()
-        self.dest_row.set_title("Opslaan in")
+        self.dest_row.set_title(_("Opslaan in"))
         self.dest_row.set_subtitle(self.settings.get("photo_path") or "~")
         ic2 = Gtk.Image.new_from_icon_name("folder-symbolic")
         ic2.set_pixel_size(16)
@@ -739,7 +754,7 @@ class ImporterPage(Gtk.Box):
             "year_month": "Per jaar/maand",
         }
         self.struct_row = Adw.ActionRow()
-        self.struct_row.set_title("Mapstructuur")
+        self.struct_row.set_title(_("Mapstructuur"))
         self.struct_row.set_subtitle(struct_labels.get(struct, struct))
         ic3 = Gtk.Image.new_from_icon_name("folder-open-symbolic")
         ic3.set_pixel_size(16)
@@ -748,7 +763,7 @@ class ImporterPage(Gtk.Box):
 
         box.append(info_group)
 
-        import_btn = Gtk.Button(label="Importeren")
+        import_btn = Gtk.Button(label=_("Importeren"))
         import_btn.add_css_class("suggested-action")
         import_btn.add_css_class("pill")
         import_btn.set_halign(Gtk.Align.CENTER)
@@ -860,11 +875,11 @@ class ImporterPage(Gtk.Box):
         # Onderbalk
         action_bar = Gtk.ActionBar()
 
-        sel_all_btn = Gtk.Button(label="Selecteer alles")
+        sel_all_btn = Gtk.Button(label=_("Selecteer alles"))
         sel_all_btn.connect("clicked", self._on_select_all)
         action_bar.pack_start(sel_all_btn)
 
-        desel_all_btn = Gtk.Button(label="Deselecteer alles")
+        desel_all_btn = Gtk.Button(label=_("Deselecteer alles"))
         desel_all_btn.connect("clicked", self._on_deselect_all)
         action_bar.pack_start(desel_all_btn)
 
@@ -872,7 +887,7 @@ class ImporterPage(Gtk.Box):
         self.select_count_lbl.add_css_class("dim-label")
         action_bar.set_center_widget(self.select_count_lbl)
 
-        self.select_continue_btn = Gtk.Button(label="Doorgaan")
+        self.select_continue_btn = Gtk.Button(label=_("Doorgaan"))
         self.select_continue_btn.add_css_class("suggested-action")
         self.select_continue_btn.connect("clicked", self._on_selecting_continue)
         action_bar.pack_end(self.select_continue_btn)
@@ -889,7 +904,7 @@ class ImporterPage(Gtk.Box):
         header_box.set_margin_start(24)
         header_box.set_margin_end(24)
 
-        title_lbl = Gtk.Label(label="Mogelijke duplicaten")
+        title_lbl = Gtk.Label(label=_("Mogelijke duplicaten"))
         title_lbl.add_css_class("title-1")
         title_lbl.set_halign(Gtk.Align.START)
         header_box.append(title_lbl)
@@ -915,15 +930,15 @@ class ImporterPage(Gtk.Box):
 
         action_bar = Gtk.ActionBar()
 
-        skip_all_btn = Gtk.Button(label="Alle overslaan")
+        skip_all_btn = Gtk.Button(label=_("Alle overslaan"))
         skip_all_btn.connect("clicked", self._on_skip_all)
         action_bar.pack_start(skip_all_btn)
 
-        import_all_btn = Gtk.Button(label="Alle importeren")
+        import_all_btn = Gtk.Button(label=_("Alle importeren"))
         import_all_btn.connect("clicked", self._on_import_all)
         action_bar.pack_start(import_all_btn)
 
-        continue_btn = Gtk.Button(label="Doorgaan met importeren")
+        continue_btn = Gtk.Button(label=_("Doorgaan met importeren"))
         continue_btn.add_css_class("suggested-action")
         continue_btn.connect("clicked", self._on_review_continue)
         action_bar.pack_end(continue_btn)
@@ -934,7 +949,7 @@ class ImporterPage(Gtk.Box):
     def _build_done_page(self):
         self.done_status = Adw.StatusPage()
         self.done_status.set_icon_name("emblem-ok-symbolic")
-        self.done_status.set_title("Import voltooid")
+        self.done_status.set_title(_("Import voltooid"))
 
         clamp = Adw.Clamp()
         clamp.set_maximum_size(420)
@@ -947,7 +962,7 @@ class ImporterPage(Gtk.Box):
         self.done_stats_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.append(self.done_stats_box)
 
-        close_btn = Gtk.Button(label="Terug naar galerij")
+        close_btn = Gtk.Button(label=_("Terug naar galerij"))
         close_btn.add_css_class("pill")
         close_btn.set_halign(Gtk.Align.CENTER)
         close_btn.connect("clicked", self._on_back_clicked)
@@ -963,7 +978,7 @@ class ImporterPage(Gtk.Box):
     def _build_error_page(self):
         self.error_status = Adw.StatusPage()
         self.error_status.set_icon_name("dialog-error-symbolic")
-        self.error_status.set_title("Er is een fout opgetreden")
+        self.error_status.set_title(_("Er is een fout opgetreden"))
 
         clamp = Adw.Clamp()
         clamp.set_maximum_size(420)
@@ -974,7 +989,7 @@ class ImporterPage(Gtk.Box):
         box.set_margin_end(12)
 
         self.error_deps_group = Adw.PreferencesGroup()
-        self.error_deps_group.set_title("Installeer vereiste pakketten")
+        self.error_deps_group.set_title(_("Installeer vereiste pakketten"))
         self.error_deps_group.set_visible(False)
 
         for pkg, cmd in [
@@ -992,7 +1007,7 @@ class ImporterPage(Gtk.Box):
 
         box.append(self.error_deps_group)
 
-        retry_btn = Gtk.Button(label="Opnieuw proberen")
+        retry_btn = Gtk.Button(label=_("Opnieuw proberen"))
         retry_btn.add_css_class("pill")
         retry_btn.set_halign(Gtk.Align.CENTER)
         retry_btn.connect("clicked", self._on_retry)

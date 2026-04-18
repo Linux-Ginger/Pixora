@@ -7,6 +7,21 @@
 # ─────────────────────────────────────────────
 
 import os
+
+# ── i18n ─────────────────────────────────────────────────────────────
+import gettext as _gt
+import json as _json_i18n
+try:
+    _lang = _json_i18n.load(open(os.path.expanduser("~/.config/pixora/settings.json"))).get("language", "nl")
+except Exception:
+    _lang = "nl"
+_t = _gt.translation(
+    "pixora",
+    localedir=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "locale")),
+    languages=[_lang], fallback=True
+)
+_ = _t.gettext
+
 import re
 import sys
 import threading
@@ -43,7 +58,7 @@ STEP_RE = re.compile(r'^STEP:([^:]+):(.*)$')
 class UpdaterWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
-        self.set_title("Pixora Updater")
+        self.set_title(_("Pixora Updater"))
         self.set_default_size(460, 420)
         self.set_resizable(False)
 
@@ -62,7 +77,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
         top.set_margin_bottom(12)
         top.set_halign(Gtk.Align.CENTER)
         top.append(self._make_logo(40))
-        title = Gtk.Label(label="Pixora bijwerken")
+        title = Gtk.Label(label=_("Pixora bijwerken"))
         title.add_css_class("title-1")
         top.append(title)
         sub = Gtk.Label(label="door LinuxGinger")
@@ -108,7 +123,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
 
         page.append(phases_box)
 
-        self.status_lbl = Gtk.Label(label="Wachten op sudo…")
+        self.status_lbl = Gtk.Label(label=_("Wachten op sudo…"))
         self.status_lbl.add_css_class("dim-label")
         self.status_lbl.set_margin_top(16)
         self.status_lbl.set_margin_bottom(8)
@@ -124,12 +139,12 @@ class UpdaterWindow(Adw.ApplicationWindow):
         self._btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._btn_box.set_halign(Gtk.Align.CENTER)
         self._btn_box.set_margin_bottom(16)
-        self._close_btn = Gtk.Button(label="Sluiten")
+        self._close_btn = Gtk.Button(label=_("Sluiten"))
         self._close_btn.add_css_class("pill")
         self._close_btn.set_size_request(140, 40)
         self._close_btn.set_sensitive(False)
         self._close_btn.connect("clicked", lambda b: self.close())
-        self._relaunch_btn = Gtk.Button(label="Pixora starten")
+        self._relaunch_btn = Gtk.Button(label=_("Pixora starten"))
         self._relaunch_btn.add_css_class("suggested-action")
         self._relaunch_btn.add_css_class("pill")
         self._relaunch_btn.set_size_request(160, 40)

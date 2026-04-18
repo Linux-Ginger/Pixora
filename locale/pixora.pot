@@ -21,10 +21,19 @@ msgstr ""
 msgid "2024/2024-03/   2024/2024-04/"
 msgstr ""
 
+msgid "Alle importeren"
+msgstr ""
+
+msgid "Alle overslaan"
+msgstr ""
+
 msgid "Alleen exact dezelfde foto's"
 msgstr ""
 
 msgid "Alleen externe schijven"
+msgstr ""
+
+msgid "Alleen externe schijven worden getoond"
 msgstr ""
 
 msgid "Alleen favorieten tonen"
@@ -34,6 +43,12 @@ msgid "Alles in één map"
 msgstr ""
 
 msgid "Annuleren"
+msgstr ""
+
+msgid "Apparaat"
+msgstr ""
+
+msgid "Apparaat gevonden"
 msgstr ""
 
 msgid "Automatische backup"
@@ -57,6 +72,9 @@ msgstr ""
 msgid "Bijwerken"
 msgstr ""
 
+msgid "Bladeren…"
+msgstr ""
+
 msgid "Controleer"
 msgstr ""
 
@@ -66,13 +84,28 @@ msgstr ""
 msgid "Controleren mislukt"
 msgstr ""
 
+msgid "Deselecteer alles"
+msgstr ""
+
+msgid "Doorgaan"
+msgstr ""
+
+msgid "Doorgaan met importeren"
+msgstr ""
+
 msgid "Draaien links"
 msgstr ""
 
 msgid "Draaien rechts"
 msgstr ""
 
+msgid "Duplicaat detectie"
+msgstr ""
+
 msgid "Duplicate detectie"
+msgstr ""
+
+msgid "Er is een fout opgetreden"
 msgstr ""
 
 msgid "Foto &amp; video manager door LinuxGinger"
@@ -111,13 +144,22 @@ msgstr ""
 msgid "Huidige map"
 msgstr ""
 
+msgid "Import voltooid"
+msgstr ""
+
 msgid "Importeer van iPhone of iPad"
 msgstr ""
 
 msgid "Importeren"
 msgstr ""
 
+msgid "Installeer vereiste pakketten"
+msgstr ""
+
 msgid "Instellingen"
+msgstr ""
+
+msgid "Je apparaat is verbonden en klaar om te importeren."
 msgstr ""
 
 msgid "Je hebt de nieuwste versie"
@@ -126,10 +168,19 @@ msgstr ""
 msgid "Kaartweergave"
 msgstr ""
 
+msgid "Kies een map…"
+msgstr ""
+
 msgid "Kies foto map"
 msgstr ""
 
 msgid "Kies map op backup schijf"
+msgstr ""
+
+msgid "Kiezen…"
+msgstr ""
+
+msgid "Map op backup schijf"
 msgstr ""
 
 msgid "Mapstructuur"
@@ -138,13 +189,31 @@ msgstr ""
 msgid "Markeer als favoriet (F)"
 msgstr ""
 
+msgid "Mogelijke duplicaten"
+msgstr ""
+
+msgid "Nog geen map gekozen"
+msgstr ""
+
+msgid "Nog geen schijf geselecteerd"
+msgstr ""
+
 msgid "Normaal"
 msgstr ""
 
 msgid "Ook licht bewerkte foto's worden gedetecteerd"
 msgstr ""
 
+msgid "Opnieuw installeren"
+msgstr ""
+
+msgid "Opnieuw proberen"
+msgstr ""
+
 msgid "Opslaan"
+msgstr ""
+
+msgid "Opslaan in"
 msgstr ""
 
 msgid "Over"
@@ -159,7 +228,25 @@ msgstr ""
 msgid "Pixora"
 msgstr ""
 
+msgid "Pixora Installer"
+msgstr ""
+
+msgid "Pixora Updater"
+msgstr ""
+
+msgid "Pixora bijwerken"
+msgstr ""
+
+msgid "Pixora is al geïnstalleerd"
+msgstr ""
+
+msgid "Pixora starten"
+msgstr ""
+
 msgid "Pixora wordt gestart…"
+msgstr ""
+
+msgid "Pixora — Instellen"
 msgstr ""
 
 msgid "Plat"
@@ -168,19 +255,37 @@ msgstr ""
 msgid "Reisverhaal samenstellen…"
 msgstr ""
 
+msgid "Selecteer alles"
+msgstr ""
+
+msgid "Selecteer welke versie je wilt installeren"
+msgstr ""
+
 msgid "Selecteren"
+msgstr ""
+
+msgid "Sluit dit venster om Pixora te sluiten."
 msgstr ""
 
 msgid "Sluit je iPhone of iPad aan om foto's te importeren"
 msgstr ""
 
+msgid "Sluiten"
+msgstr ""
+
 msgid "Soepel"
+msgstr ""
+
+msgid "Sorteren..."
 msgstr ""
 
 msgid "Streng"
 msgstr ""
 
 msgid "Synchroniseert na elke import"
+msgstr ""
+
+msgid "Synchroniseert na elke import naar externe schijf"
 msgstr ""
 
 msgid "Taal"
@@ -192,22 +297,61 @@ msgstr ""
 msgid "Terug"
 msgstr ""
 
+msgid "Terug naar galerij"
+msgstr ""
+
 msgid "Terug naar standaard (200 px)"
+msgstr ""
+
+msgid "Update beschikbaar"
+msgstr ""
+
+msgid "Verbind je iPhone of iPad"
+msgstr ""
+
+msgid "Verbinden met kaart-server…"
+msgstr ""
+
+msgid "Vernieuwen"
+msgstr ""
+
+msgid "Versie"
+msgstr ""
+
+msgid "Versie kiezen"
 msgstr ""
 
 msgid "Verwijderen"
 msgstr ""
 
+msgid "Volgende"
+msgstr ""
+
+msgid "Waar wil je je foto's opslaan?"
+msgstr ""
+
 msgid "Waar worden je foto's opgeslagen"
+msgstr ""
+
+msgid "Wachten op sudo…"
 msgstr ""
 
 msgid "Weergave"
 msgstr ""
 
+msgid "Welkom bij Pixora!"
+msgstr ""
+
 msgid "Wijzigen"
 msgstr ""
 
+msgid "Zoeken naar apparaat…"
+msgstr ""
+
 msgid "signal"
+msgstr ""
+
+msgid "─── Pixora (dev mode) ───"
 msgstr ""
 
 msgid "✕ Toon alle foto's"
@@ -217,11 +361,5 @@ msgid "🗺"
 msgstr ""
 
 msgid "🗺 laden..."
-msgstr ""
-
-msgid "─── Pixora (dev mode) ───"
-msgstr ""
-
-msgid "Sluit dit venster om Pixora te sluiten."
 msgstr ""
 
