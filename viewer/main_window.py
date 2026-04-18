@@ -2467,13 +2467,44 @@ class MainWindow(Adw.ApplicationWindow):
             return
         if getattr(btn, "_pixora_has_pixbuf", False):
             return
+        if getattr(btn, "_pixora_hydrating", False):
+            return
+        btn._pixora_hydrating = True
+        load_id = self._load_id
+        if not hasattr(self, "_hydrate_pool"):
+            self._hydrate_pool = ThreadPoolExecutor(max_workers=2)
+
+        def _load_in_thread():
+            try:
+                if cache_path and os.path.exists(cache_path):
+                    pb = GdkPixbuf.Pixbuf.new_from_file(cache_path)
+                else:
+                    pb = None
+            except Exception:
+                pb = None
+            GLib.idle_add(self._apply_hydrated_pixbuf, index, load_id, pb)
+
+        self._hydrate_pool.submit(_load_in_thread)
+
+    def _apply_hydrated_pixbuf(self, index, load_id, pb):
+        if load_id != self._load_id:
+            return False
+        item = self.thumb_widgets.get(index)
+        if not item:
+            return False
+        btn, _check = item
+        btn._pixora_hydrating = False
+        if pb is None:
+            return False
+        picture = getattr(btn, "_pixora_picture", None)
+        if picture is None:
+            return False
         try:
-            if cache_path and os.path.exists(cache_path):
-                pb = GdkPixbuf.Pixbuf.new_from_file(cache_path)
-                picture.set_pixbuf(pb)
-                btn._pixora_has_pixbuf = True
+            picture.set_pixbuf(pb)
+            btn._pixora_has_pixbuf = True
         except Exception:
             pass
+        return False
 
     def _dehydrate_thumb(self, index):
         item = self.thumb_widgets.get(index)
