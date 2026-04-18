@@ -1014,12 +1014,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.iphone_banner = Adw.Banner(title="", use_markup=False)
         self.iphone_banner.set_revealed(False)
 
-        toolbar_view = Adw.ToolbarView()
-        toolbar_view.add_top_bar(self.update_banner)
-        toolbar_view.add_top_bar(self.iphone_banner)
-        toolbar_view.add_top_bar(self.build_header())
-        toolbar_view.set_content(self.main_stack)
-        toolbar_view.add_bottom_bar(self.build_bottombar())
+        self.toolbar_view = Adw.ToolbarView()
+        self.toolbar_view.add_top_bar(self.update_banner)
+        self.toolbar_view.add_top_bar(self.iphone_banner)
+        self.toolbar_view.add_top_bar(self.build_header())
+        self.toolbar_view.set_content(self.main_stack)
+        self.toolbar_view.add_bottom_bar(self.build_bottombar())
+        toolbar_view = self.toolbar_view
 
         # ── Startup splash overlay ────────────────────────────────────
         root_overlay = Gtk.Overlay()
@@ -1735,6 +1736,11 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(f"Kaart geopend ({len(self.photos)} foto's gaan naar GPS-scan)")
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
+        try:
+            self.toolbar_view.set_reveal_top_bars(False)
+            self.toolbar_view.set_reveal_bottom_bars(False)
+        except Exception:
+            pass
         self.map_btn.set_label("🗺 laden...")
         self.map_btn.set_sensitive(False)
         self.map_container.set_visible_child_name("loading")
@@ -1801,6 +1807,11 @@ class MainWindow(Adw.ApplicationWindow):
         log_info("Kaart gesloten")
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
+        try:
+            self.toolbar_view.set_reveal_top_bars(True)
+            self.toolbar_view.set_reveal_bottom_bars(True)
+        except Exception:
+            pass
         self.main_stack.set_visible_child_name("grid")
 
     # ── Viewer pagina ─────────────────────────────────────────────────
@@ -2723,6 +2734,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.current_index = index
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
+        try:
+            self.toolbar_view.set_reveal_top_bars(False)
+            self.toolbar_view.set_reveal_bottom_bars(False)
+        except Exception:
+            pass
         self._stop_video()
         self.photo_picture.set_pixbuf(None)
         self.viewer_location.set_text("")
@@ -2765,7 +2781,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._viewer_pixbuf_cache.move_to_end(path)
         else:
             try:
-                max_dim = 3840
+                max_dim = 2560
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, max_dim, max_dim, True)
             except Exception:
                 pixbuf = None
@@ -2845,7 +2861,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._scroll_filmstrip_to_current()
         if hasattr(self, '_nav_debounce_id') and self._nav_debounce_id:
             GLib.source_remove(self._nav_debounce_id)
-        self._nav_debounce_id = GLib.timeout_add(30, self._do_scheduled_load)
+        self._nav_debounce_id = GLib.timeout_add(10, self._do_scheduled_load)
 
     def _preload_adjacent_photos(self):
         if not hasattr(self, "current_index") or not self.photos:
@@ -2859,7 +2875,7 @@ class MainWindow(Adw.ApplicationWindow):
                 continue
             def _bg_load(path=p):
                 try:
-                    pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 3840, 3840, True)
+                    pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 2560, 2560, True)
                 except Exception:
                     return
                 if pb is None:
@@ -2886,6 +2902,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_load_id += 1
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
+        try:
+            self.toolbar_view.set_reveal_top_bars(True)
+            self.toolbar_view.set_reveal_bottom_bars(True)
+        except Exception:
+            pass
         if hasattr(self, '_photos_before_cluster') and self._photos_before_cluster is not None:
             self.photos = self._photos_before_cluster
             self._photos_before_cluster = None
