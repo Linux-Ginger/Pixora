@@ -644,11 +644,13 @@ class MapWidget(Gtk.DrawingArea):
     def _request_visible_tiles(self):
         w = self.get_width() or 900
         h = self.get_height() or 650
+        if not hasattr(self, "_tile_pool"):
+            self._tile_pool = ThreadPoolExecutor(max_workers=4)
         for z, tx, ty, _, _ in self._get_visible_tiles(w, h):
             key = (z, tx, ty)
             if key not in self.tile_cache or self.tile_cache[key] is None:
                 self.tile_cache[key] = None
-                threading.Thread(target=self._load_tile, args=(z, tx, ty), daemon=True).start()
+                self._tile_pool.submit(self._load_tile, z, tx, ty)
         return False
 
     def _load_tile(self, z, tx, ty):
@@ -1749,21 +1751,27 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._load_gps_and_show_map, daemon=True).start()
 
     def _load_gps_and_show_map(self):
-        markers = []
-        for path in self.photos:
+        def scan_one(path):
             if is_video(path):
                 coords = get_video_gps_coords(path)
             else:
                 coords = get_gps_coords(path)
-            if coords:
-                lat, lon = coords
-                filename = os.path.basename(path)
-                try:
-                    mtime = os.path.getmtime(path)
-                    datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y")
-                except Exception:
-                    datum = ""
-                markers.append((lat, lon, filename, datum, path))
+            if not coords:
+                return None
+            lat, lon = coords
+            filename = os.path.basename(path)
+            try:
+                mtime = os.path.getmtime(path)
+                datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y")
+            except Exception:
+                datum = ""
+            return (lat, lon, filename, datum, path)
+
+        markers = []
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for result in pool.map(scan_one, self.photos):
+                if result is not None:
+                    markers.append(result)
         GLib.idle_add(self._show_map, markers)
 
     def _show_map(self, markers):
@@ -1875,7 +1883,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.edit_btn.connect("clicked", self.on_edit_current)
         viewer_area.add_overlay(self.edit_btn)
 
-        self.favorite_btn = Gtk.Button(icon_name="emblem-favorite-symbolic")
+        self.favorite_btn = Gtk.Button(icon_name="non-starred-symbolic")
         self.favorite_btn.add_css_class("osd")
         self.favorite_btn.add_css_class("circular")
         self.favorite_btn.set_halign(Gtk.Align.END)
