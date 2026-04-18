@@ -1,0 +1,46 @@
+# English translation.
+msgid ""
+msgstr ""
+"Project-Id-Version: Pixora\n"
+"POT-Creation-Date: 2026-04-18 00:00+0000\n"
+"PO-Revision-Date: 2026-04-18 00:00+0000\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Instellingen"
+msgstr "Settings"
+
+msgid "Weergave"
+msgstr "Display"
+
+msgid "Importeren"
+msgstr "Import"
+
+msgid "Geavanceerd"
+msgstr "Advanced"
+
+msgid "Over"
+msgstr "About"
+
+msgid "Foto map"
+msgstr "Photo folder"
+
+msgid "Waar worden je foto's opgeslagen"
+msgstr "Where your photos are stored"
+
+msgid "Hoe foto's in het grid worden getoond"
+msgstr "How photos are displayed in the grid"
+
+msgid "Mapstructuur"
+msgstr "Folder structure"
+
+msgid "Duplicate detectie"
+msgstr "Duplicate detection"
+
+msgid "Automatische backup"
+msgstr "Automatic backup"
+
+msgid "Kaartweergave"
+msgstr "Map view"

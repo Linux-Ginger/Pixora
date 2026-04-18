@@ -1,0 +1,52 @@
+# Pixora - Translation template
+# Copyright (C) 2026 LinuxGinger
+# This file is distributed under the same license as the Pixora package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Pixora\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-18 00:00+0000\n"
+"PO-Revision-Date: 2026-04-18 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Instellingen"
+msgstr ""
+
+msgid "Weergave"
+msgstr ""
+
+msgid "Importeren"
+msgstr ""
+
+msgid "Geavanceerd"
+msgstr ""
+
+msgid "Over"
+msgstr ""
+
+msgid "Foto map"
+msgstr ""
+
+msgid "Waar worden je foto's opgeslagen"
+msgstr ""
+
+msgid "Hoe foto's in het grid worden getoond"
+msgstr ""
+
+msgid "Mapstructuur"
+msgstr ""
+
+msgid "Duplicate detectie"
+msgstr ""
+
+msgid "Automatische backup"
+msgstr ""
+
+msgid "Kaartweergave"
+msgstr ""

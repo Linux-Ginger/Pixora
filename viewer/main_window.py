@@ -19,6 +19,22 @@ import inspect
 from collections import defaultdict, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
+# ── i18n (gettext) ───────────────────────────────────────────────────
+import gettext as _gettext_mod
+_LOCALE_DIR = os.path.abspath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "locale"
+))
+try:
+    with open(os.path.expanduser("~/.config/pixora/settings.json"), "r") as _sf:
+        _lang = json.load(_sf).get("language", "nl")
+except Exception:
+    _lang = "nl"
+_translation = _gettext_mod.translation(
+    "pixora", localedir=_LOCALE_DIR, languages=[_lang], fallback=True
+)
+_ = _translation.gettext
+_translation.install()  # maakt _() ook als builtin beschikbaar
+
 # ── Dev-mode logging ─────────────────────────────────────────────────
 # Lees dev_mode direct uit settings.json — we importeren NIET uit main.py
 # omdat dat main's module-level code opnieuw zou uitvoeren (en een tweede
@@ -1660,7 +1676,7 @@ class MainWindow(Adw.ApplicationWindow):
         back_btn.connect("clicked", self.close_map)
         map_header.pack_start(back_btn)
 
-        self.map_title_label = Gtk.Label(label="Kaartweergave")
+        self.map_title_label = Gtk.Label(label=_("Kaartweergave"))
         self.map_title_label.add_css_class("dim-label")
         map_header.set_title_widget(self.map_title_label)
 
@@ -3983,27 +3999,27 @@ class MainWindow(Adw.ApplicationWindow):
     def on_settings_clicked(self, btn):
         log_info("Instellingen geopend")
         dialog = Adw.PreferencesDialog()
-        dialog.set_title("Instellingen")
+        dialog.set_title(_("Instellingen"))
 
         display_page = Adw.PreferencesPage()
-        display_page.set_title("Weergave")
+        display_page.set_title(_("Weergave"))
         display_page.set_icon_name("preferences-desktop-display-symbolic")
 
         import_page = Adw.PreferencesPage()
-        import_page.set_title("Importeren")
+        import_page.set_title(_("Importeren"))
         import_page.set_icon_name("document-send-symbolic")
 
         advanced_page = Adw.PreferencesPage()
-        advanced_page.set_title("Geavanceerd")
+        advanced_page.set_title(_("Geavanceerd"))
         advanced_page.set_icon_name("applications-engineering-symbolic")
 
         about_page = Adw.PreferencesPage()
-        about_page.set_title("Over")
+        about_page.set_title(_("Over"))
         about_page.set_icon_name("help-about-symbolic")
 
         folder_group = Adw.PreferencesGroup()
-        folder_group.set_title("Foto map")
-        folder_group.set_description("Waar worden je foto's opgeslagen")
+        folder_group.set_title(_("Foto map"))
+        folder_group.set_description(_("Waar worden je foto's opgeslagen"))
 
         self.folder_row = Adw.ActionRow()
         self.folder_row.set_title("Huidige map")
@@ -4018,8 +4034,8 @@ class MainWindow(Adw.ApplicationWindow):
         display_page.add(folder_group)
 
         display_group = Adw.PreferencesGroup()
-        display_group.set_title("Weergave")
-        display_group.set_description("Hoe foto's in het grid worden getoond")
+        display_group.set_title(_("Weergave"))
+        display_group.set_description(_("Hoe foto's in het grid worden getoond"))
 
         thumb_row = Adw.ActionRow(
             title="Thumbnail grootte",
@@ -4054,10 +4070,32 @@ class MainWindow(Adw.ApplicationWindow):
         thumb_row.add_suffix(thumb_reset_btn)
 
         display_group.add(thumb_row)
+
+        # Taal-keuze
+        lang_row = Adw.ActionRow(
+            title=_("Taal"),
+            subtitle=_("Herstart van Pixora is nodig om een nieuwe taal te laden")
+        )
+        lang_model = Gtk.StringList()
+        self._lang_codes = ["nl", "en"]
+        self._lang_labels = ["Nederlands", "English"]
+        for label in self._lang_labels:
+            lang_model.append(label)
+        lang_combo = Gtk.DropDown(model=lang_model)
+        lang_combo.set_valign(Gtk.Align.CENTER)
+        current_lang = self.settings.get("language", "nl")
+        try:
+            lang_combo.set_selected(self._lang_codes.index(current_lang))
+        except ValueError:
+            lang_combo.set_selected(0)
+        lang_combo.connect("notify::selected", self._on_language_changed)
+        lang_row.add_suffix(lang_combo)
+        display_group.add(lang_row)
+
         display_page.add(display_group)
 
         dev_group = Adw.PreferencesGroup()
-        dev_group.set_title("Geavanceerd")
+        dev_group.set_title(_("Geavanceerd"))
         dev_group.set_description(
             "Developer mode toont Pixora met terminal-output en gebruikt "
             "de terminal-updater. Alleen aanzetten als je weet wat je doet."
@@ -4079,7 +4117,7 @@ class MainWindow(Adw.ApplicationWindow):
         advanced_page.add(dev_group)
 
         structure_group = Adw.PreferencesGroup()
-        structure_group.set_title("Mapstructuur")
+        structure_group.set_title(_("Mapstructuur"))
         structure_group.set_description("Hoe worden je foto's georganiseerd")
         current_structure = self.settings.get("structure", "year_month")
 
@@ -4114,7 +4152,7 @@ class MainWindow(Adw.ApplicationWindow):
         import_page.add(structure_group)
 
         dup_group = Adw.PreferencesGroup()
-        dup_group.set_title("Duplicate detectie")
+        dup_group.set_title(_("Duplicate detectie"))
         dup_group.set_description("Hoe streng worden duplicaten gedetecteerd")
         current_threshold = self.settings.get("duplicate_threshold", 2)
 
@@ -4149,7 +4187,7 @@ class MainWindow(Adw.ApplicationWindow):
         import_page.add(dup_group)
 
         backup_group = Adw.PreferencesGroup()
-        backup_group.set_title("Automatische backup")
+        backup_group.set_title(_("Automatische backup"))
         backup_group.set_description("Backup naar externe USB schijf na elke import")
 
         self.settings_backup_switch = Gtk.Switch()
@@ -4209,7 +4247,7 @@ class MainWindow(Adw.ApplicationWindow):
         import_page.add(backup_group)
 
         about_group = Adw.PreferencesGroup()
-        about_group.set_title("Over")
+        about_group.set_title(_("Over"))
 
         # App info row
         app_row = Adw.ActionRow(
@@ -4377,6 +4415,17 @@ class MainWindow(Adw.ApplicationWindow):
         d.add_response("ok", "OK")
         d.present()
         return False
+
+    def _on_language_changed(self, combo, _pspec):
+        idx = combo.get_selected()
+        if 0 <= idx < len(self._lang_codes):
+            new_lang = self._lang_codes[idx]
+            self.settings["language"] = new_lang
+            try:
+                save_settings(self.settings)
+            except Exception:
+                pass
+            log_info(f"Taal gewijzigd naar: {new_lang}")
 
     def _on_toggle_dev_mode(self, btn, row):
         currently_active = bool(self.settings.get("dev_mode", False))

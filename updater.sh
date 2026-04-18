@@ -37,7 +37,8 @@ step apt "Systeem packages controleren"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     python3 python3-gi python3-gi-cairo \
     gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-gudev-1.0 \
-    git ifuse libimobiledevice-utils usbmuxd ffmpeg python3-pip >/dev/null 2>&1
+    git ifuse libimobiledevice-utils usbmuxd ffmpeg python3-pip \
+    gettext >/dev/null 2>&1
 step_done apt
 
 step webkit "WebKit typelib installeren"
@@ -66,6 +67,16 @@ step_done clone
 step finalize "Configuratie en services"
 mkdir -p "$(dirname "$VERSION_FILE")"
 cp -f "$INSTALL_DIR/version.txt" "$VERSION_FILE"
+
+# Compileer .po → .mo voor alle vertalingen
+if command -v msgfmt >/dev/null 2>&1; then
+    for po in "$INSTALL_DIR"/locale/*/LC_MESSAGES/pixora.po; do
+        [ -f "$po" ] || continue
+        mo="${po%.po}.mo"
+        msgfmt -o "$mo" "$po" 2>/dev/null || true
+    done
+fi
+
 chown -R "$RUN_UID:$TARGET_GID" "$INSTALL_DIR" "$(dirname "$VERSION_FILE")"
 
 if [ -d /etc/apparmor.d ]; then

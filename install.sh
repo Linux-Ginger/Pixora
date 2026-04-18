@@ -47,6 +47,7 @@ sudo apt-get install -y -qq \
     gir1.2-adw-1 \
     gir1.2-gudev-1.0 \
     git \
+    gettext \
     2>/dev/null
 
 # WebKitGTK typelib — probeer nieuwste (6.0) eerst, valt terug op 4.1
@@ -61,6 +62,14 @@ if [ -d "$INSTALL_DIR/.git" ]; then
 else
     rm -rf "$INSTALL_DIR"
     git clone -q "$REPO_URL" "$INSTALL_DIR"
+fi
+
+# Compileer .po → .mo voor alle vertalingen
+if command -v msgfmt >/dev/null 2>&1; then
+    for po in "$INSTALL_DIR"/locale/*/LC_MESSAGES/pixora.po; do
+        [ -f "$po" ] || continue
+        msgfmt -o "${po%.po}.mo" "$po" 2>/dev/null || true
+    done
 fi
 
 echo -e "  ${GREEN}✓ Klaar — installer openen…${NC}"
