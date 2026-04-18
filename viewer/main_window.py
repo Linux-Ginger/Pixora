@@ -148,6 +148,13 @@ WEBKIT_AVAILABLE = False
 WebKit2 = None
 _webkit_load_error = None
 
+# Ubuntu 24.04's AppArmor blokkeert unprivileged user-namespaces, waardoor
+# WebKit's bwrap-sandbox faalt met "Permission denied" en WebKit crasht.
+# Zet sandbox-disable VOOR de WebKit-import zodat de env-var effect heeft.
+os.environ.setdefault("WEBKIT_DISABLE_SANDBOX", "1")
+os.environ.setdefault("WEBKIT_FORCE_SANDBOX", "0")
+os.environ.setdefault("WEBKIT_DISABLE_COMPOSITING_MODE", "1")
+
 # Probeer eerst WebKit 6.0 (GTK4-native, nieuwste). Daarna WebKit2 4.1 / 4.0.
 try:
     gi.require_version("WebKit", "6.0")
@@ -628,6 +635,15 @@ class MapWidget(Gtk.Box):
         self.web = WebKit2.WebView()
         self.web.set_vexpand(True)
         self.web.set_hexpand(True)
+
+        # Programmatisch sandbox uit voor Ubuntu 24.04 AppArmor-issue
+        for obj_name in ("get_network_session", "get_website_data_manager"):
+            try:
+                obj = getattr(self.web, obj_name)()
+                if obj and hasattr(obj, "set_sandbox_enabled"):
+                    obj.set_sandbox_enabled(False)
+            except Exception:
+                pass
 
         try:
             wk_settings = self.web.get_settings()
