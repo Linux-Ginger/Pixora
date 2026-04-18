@@ -632,18 +632,48 @@ class MapWidget(Gtk.Box):
         self.append(lbl)
 
     def _init_webview(self):
-        self.web = WebKit2.WebView()
+        # Sandbox uit VOOR WebView-creation. Ubuntu 24.04 blokkeert
+        # unprivileged user-namespaces systeem-wijd; WebKit's bwrap-sandbox
+        # faalt dan met "Permission denied" en crasht het proces. Door
+        # WebKit's eigen sandbox uit te zetten wordt bwrap niet aangeroepen;
+        # de kernel-AppArmor-restrictie blijft intact voor andere apps.
+        network_session = None
+        try:
+            # WebKit 6.0: NetworkSession heeft set_sandbox_enabled
+            if hasattr(WebKit2, "NetworkSession"):
+                try:
+                    network_session = WebKit2.NetworkSession.get_default()
+                except Exception:
+                    try:
+                        network_session = WebKit2.NetworkSession.new_ephemeral()
+                    except Exception:
+                        network_session = None
+                if network_session and hasattr(network_session, "set_sandbox_enabled"):
+                    network_session.set_sandbox_enabled(False)
+        except Exception as e:
+            log_warn(f"NetworkSession sandbox-disable faalde: {e}")
+
+        try:
+            # WebKit2 4.x: WebContext heeft set_sandbox_enabled
+            if hasattr(WebKit2, "WebContext"):
+                wc = WebKit2.WebContext.get_default()
+                if wc and hasattr(wc, "set_sandbox_enabled"):
+                    wc.set_sandbox_enabled(False)
+        except Exception as e:
+            log_warn(f"WebContext sandbox-disable faalde: {e}")
+
+        # Probeer WebView te maken mét een custom NetworkSession (WebKit 6.0)
+        self.web = None
+        if network_session is not None and hasattr(WebKit2, "WebView"):
+            try:
+                self.web = WebKit2.WebView.new_with_network_session(network_session)
+            except Exception:
+                self.web = None
+        if self.web is None:
+            self.web = WebKit2.WebView()
+
         self.web.set_vexpand(True)
         self.web.set_hexpand(True)
-
-        # Programmatisch sandbox uit voor Ubuntu 24.04 AppArmor-issue
-        for obj_name in ("get_network_session", "get_website_data_manager"):
-            try:
-                obj = getattr(self.web, obj_name)()
-                if obj and hasattr(obj, "set_sandbox_enabled"):
-                    obj.set_sandbox_enabled(False)
-            except Exception:
-                pass
 
         try:
             wk_settings = self.web.get_settings()
