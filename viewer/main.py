@@ -49,17 +49,20 @@ def _launch_dev_terminal():
 
     pixora_bin = os.path.expanduser("~/.local/bin/pixora")
     if os.path.exists(pixora_bin):
-        # Quote voor bash
         run_cmd = f'"{pixora_bin}"'
     else:
         run_cmd = f'python3 "{os.path.abspath(__file__)}"'
+    # Zet PIXORA_IN_DEV_TERM ín het bash-commando i.p.v. via Popen env —
+    # gnome-terminal-server neemt env niet altijd mee naar z'n child-shell,
+    # waardoor de child zonder marker recursief weer een terminal zou
+    # spawnen en alles zou exitten.
     bash_cmd = (
+        "export PIXORA_IN_DEV_TERM=1; "
         "echo '─── Pixora (dev mode) ───'; "
         "echo 'Sluit dit venster om Pixora te sluiten.'; "
         "echo; "
         f"exec {run_cmd}"
     )
-    child_env = {**os.environ, "PIXORA_IN_DEV_TERM": "1"}
 
     for term, args in [
         ("gnome-terminal", ["--title=Pixora (dev)", "--",
@@ -75,7 +78,6 @@ def _launch_dev_terminal():
             try:
                 subprocess.Popen(
                     [term] + args,
-                    env=child_env,
                     start_new_session=True,
                 )
                 # Origineel proces sluit af; de terminal neemt het over.
