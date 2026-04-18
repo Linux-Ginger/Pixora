@@ -974,6 +974,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._video_scrubbing_lock  = False
         self._video_seek_pending_id = None
         self._preview_cache         = OrderedDict()  # LRU: timestamp_s -> pixbuf | None
+        self._viewer_pixbuf_cache   = OrderedDict()  # LRU: path -> pixbuf, max 3
         self._preview_debounce_id   = None
         self._preview_extracting    = False
         self._preview_pending_ts    = None
@@ -1498,6 +1499,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.date_widgets = {}
             self._filmstrip_thumbs = {}
             self._preview_cache.clear()
+            self._viewer_pixbuf_cache.clear()
             self._photo_location.clear()
             if hasattr(self, "_viewer_pixbuf"):
                 self._viewer_pixbuf = None
@@ -2589,8 +2591,8 @@ class MainWindow(Adw.ApplicationWindow):
             if 'fav_box' not in tc:
                 p = Gtk.CssProvider()
                 p.load_from_string(
-                    "box { background-color: rgba(0,0,0,0.55); border-radius: 50%; padding: 5px; }"
-                    "image { color: #e95420; }"
+                    "box { background-color: rgba(0,0,0,0.55); border-radius: 50%; padding: 3px 6px; }"
+                    "label { color: #ffb300; font-size: 14px; font-weight: bold; }"
                 )
                 tc['fav_box'] = p
             fav_badge = Gtk.Box()
@@ -2601,9 +2603,8 @@ class MainWindow(Adw.ApplicationWindow):
             fav_badge.get_style_context().add_provider(
                 tc['fav_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
-            fav_icon = Gtk.Image.new_from_icon_name("starred-symbolic")
-            fav_icon.set_pixel_size(14)
-            fav_badge.append(fav_icon)
+            fav_label = Gtk.Label(label="★")
+            fav_badge.append(fav_label)
             fav_badge.set_visible(path in self._favorites)
             overlay.add_overlay(fav_badge)
 
@@ -2751,15 +2752,22 @@ class MainWindow(Adw.ApplicationWindow):
             if location and load_id == self._viewer_load_id:
                 GLib.idle_add(self.viewer_location.set_text, f"📍 {location}")
             return
-        try:
-            # Laad geschaald naar 2x schermgrootte (genoeg voor zoom, veel minder RAM)
-            max_dim = 3840  # 4K max, ruim genoeg voor elk scherm
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, max_dim, max_dim, True)
-        except Exception:
-            pixbuf = None
-        # Toon foto direct zonder te wachten op geocoding
+        pixbuf = self._viewer_pixbuf_cache.get(path)
+        if pixbuf is not None:
+            self._viewer_pixbuf_cache.move_to_end(path)
+        else:
+            try:
+                max_dim = 3840
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, max_dim, max_dim, True)
+            except Exception:
+                pixbuf = None
+            if pixbuf is not None:
+                self._viewer_pixbuf_cache[path] = pixbuf
+                while len(self._viewer_pixbuf_cache) > 3:
+                    self._viewer_pixbuf_cache.popitem(last=False)
         if load_id == self._viewer_load_id:
             GLib.idle_add(self._show_full_photo, pixbuf, path, self._photo_location.get(path) or "")
+            GLib.idle_add(self._preload_adjacent_photos)
         # Geocode daarna, update label als de gebruiker nog steeds deze foto bekijkt
         location = self._photo_location.get(path)
         if location is None:
@@ -2821,15 +2829,38 @@ class MainWindow(Adw.ApplicationWindow):
             self._schedule_photo_load()
 
     def _schedule_photo_load(self):
-        """Debounce: wacht 150ms voordat de foto geladen wordt bij snel navigeren."""
+        """Korte debounce (30ms) zodat snel doorklikken niet een rij grote
+        decodes start, maar de switch snappy voelt bij single-clicks."""
         self._viewer_load_id += 1
         self.viewer_location.set_text("")
         self.filmstrip_area.queue_draw()
         self._scroll_filmstrip_to_current()
-        # Annuleer een eventuele eerder geplande load
         if hasattr(self, '_nav_debounce_id') and self._nav_debounce_id:
             GLib.source_remove(self._nav_debounce_id)
-        self._nav_debounce_id = GLib.timeout_add(150, self._do_scheduled_load)
+        self._nav_debounce_id = GLib.timeout_add(30, self._do_scheduled_load)
+
+    def _preload_adjacent_photos(self):
+        if not hasattr(self, "current_index") or not self.photos:
+            return False
+        for delta in (1, -1):
+            idx = self.current_index + delta
+            if idx < 0 or idx >= len(self.photos):
+                continue
+            p = self.photos[idx]
+            if is_video(p) or p in self._viewer_pixbuf_cache:
+                continue
+            def _bg_load(path=p):
+                try:
+                    pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 3840, 3840, True)
+                except Exception:
+                    return
+                if pb is None:
+                    return
+                self._viewer_pixbuf_cache[path] = pb
+                while len(self._viewer_pixbuf_cache) > 3:
+                    self._viewer_pixbuf_cache.popitem(last=False)
+            threading.Thread(target=_bg_load, daemon=True).start()
+        return False
 
     def _do_scheduled_load(self):
         self._nav_debounce_id = None
