@@ -761,10 +761,12 @@ class MapWidget(Gtk.Box):
         msg_type = payload.get("type")
         if msg_type == "open_photos":
             paths = payload.get("paths") or []
+            log_info(f"Kaart → open_photos: {len(paths)} foto's")
             if paths:
                 GLib.idle_add(self.open_photo_cb, paths)
         elif msg_type == "open_photo":
             path = payload.get("path")
+            log_info(f"Kaart → open_photo: {path}")
             if path:
                 GLib.idle_add(self.open_photo_cb, [path])
 

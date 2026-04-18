@@ -44,14 +44,17 @@
 <script src="markercluster.js"></script>
 <script>
 (function() {
-  // Performance: animatie-opties uit op zwakke VM-rendering
+  // Performance: alle animaties uit voor VM-rendering zonder GPU-accel
   const map = L.map('map', {
     zoomControl: true,
     attributionControl: false,
     zoomAnimation: false,
     fadeAnimation: false,
     markerZoomAnimation: false,
-    preferCanvas: true
+    inertia: false,
+    preferCanvas: true,
+    wheelDebounceTime: 80,
+    zoomSnap: 1
   }).setView([52.3, 5.3], 7);
 
   L.control.attribution({
@@ -62,7 +65,10 @@
 
   const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    crossOrigin: true
+    crossOrigin: true,
+    updateWhenIdle: true,
+    updateWhenZooming: false,
+    keepBuffer: 1
   });
   tileLayer.addTo(map);
 
@@ -119,7 +125,11 @@
   // Klik op cluster: geef ALLE paths door aan Pixora
   cluster.on('clusterclick', function(e) {
     const paths = e.layer.getAllChildMarkers().map(function(m) { return m.options._pix.path; });
+    console.log('[Pixora] cluster click, ' + paths.length + ' foto\'s');
     sendToPixora({ type: 'open_photos', paths: paths });
+    if (e.originalEvent) {
+      L.DomEvent.stop(e.originalEvent);
+    }
   });
 
   map.addLayer(cluster);
