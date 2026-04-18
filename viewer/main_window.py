@@ -1311,40 +1311,17 @@ class MainWindow(Adw.ApplicationWindow):
         self._open_installer()
 
     def _open_installer(self):
-        if self.settings.get("dev_mode"):
-            # Dev-terminal update: toon live output via update.sh
-            # (install.sh zou installer.py openen wat voor updates niet nodig is)
-            log_info("Dev-mode update via terminal gestart")
-            script = (
-                "set -e;"
-                "TMP=$(mktemp -d);"
-                "cd $TMP;"
-                "echo '→ update.sh downloaden…';"
-                "curl -fsSL https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/update.sh -o update.sh;"
-                "echo '→ update.sh uitvoeren (sudo vraagt wachtwoord)…';"
-                "sudo bash update.sh;"
-                "rm -rf $TMP;"
-                "echo '';"
-                "echo '✓ Update klaar. Druk op enter om Pixora opnieuw te starten.';"
-                "read;"
-                f"{sys.executable} ~/.local/share/pixora/viewer/main.py &"
-            )
-            self.get_application().quit()
-            subprocess.Popen([
-                "gnome-terminal", "--wait", "--title=Pixora update",
-                "--", "bash", "-c", script
-            ])
-            return
-        # GUI-updater
         log_info("GUI-updater gestart")
-        self.get_application().quit()
         updater_path = os.path.abspath(os.path.join(
             os.path.dirname(__file__), "updater.py"
         ))
         try:
-            subprocess.Popen([sys.executable, updater_path])
+            subprocess.Popen([sys.executable, updater_path],
+                             start_new_session=True)
         except Exception as e:
             log_error(f"GUI-updater kon niet starten: {e}")
+            return
+        self.get_application().quit()
 
     def _on_settings_check_update(self, btn):
         self._update_check_btn.set_visible(False)
