@@ -196,6 +196,18 @@
     });
   }
 
+  // Labels kunnen door Python vertaald worden via pixoraSetLabels(...)
+  const LBL = {
+    otherInCluster: "andere foto's in deze cluster",
+    clickCluster: "Klik cluster om gefilterd te bekijken",
+    clickOpen: "Klik om te openen",
+    offline: "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"
+  };
+  window.pixoraSetLabels = function(labels) {
+    Object.assign(LBL, labels);
+    document.getElementById('offline-banner').textContent = LBL.offline;
+  };
+
   function buildPopupHtml(m, count) {
     let html = '';
     if (m.thumb) {
@@ -204,10 +216,10 @@
     html += '<div class="fname">' + escapeHtml(m.filename) + '</div>';
     html += '<div class="date">' + escapeHtml(m.date || '') + '</div>';
     if (count && count > 1) {
-      html += '<div class="count">+ ' + (count - 1) + ' andere foto\'s in deze cluster</div>';
-      html += '<div class="hint">Klik cluster om gefilterd te bekijken</div>';
+      html += '<div class="count">+ ' + (count - 1) + ' ' + LBL.otherInCluster + '</div>';
+      html += '<div class="hint">' + LBL.clickCluster + '</div>';
     } else {
-      html += '<div class="hint">Klik om te openen</div>';
+      html += '<div class="hint">' + LBL.clickOpen + '</div>';
     }
     return html;
   }

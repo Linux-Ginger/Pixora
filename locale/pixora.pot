@@ -1,10 +1,7 @@
-# Pixora translation template.
+# Template.
 msgid ""
 msgstr ""
-"Project-Id-Version: Pixora\n"
-"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
-"Content-Transfer-Encoding: 8bit\n"
 
 msgid "0 foto's"
 msgstr ""
@@ -19,6 +16,12 @@ msgid "2024/   2025/"
 msgstr ""
 
 msgid "2024/2024-03/   2024/2024-04/"
+msgstr ""
+
+msgid "Actief"
+msgstr ""
+
+msgid "Activeren"
 msgstr ""
 
 msgid "Alle importeren"
@@ -78,7 +81,13 @@ msgstr ""
 msgid "Bladeren…"
 msgstr ""
 
+msgid "Cache: {p}"
+msgstr ""
+
 msgid "Cluster-filter uitgezet → alle foto's"
+msgstr ""
+
+msgid "Config: {p}"
 msgstr ""
 
 msgid "Configuratie + services"
@@ -94,6 +103,15 @@ msgid "Controleer op updates"
 msgstr ""
 
 msgid "Controleren mislukt"
+msgstr ""
+
+msgid "Datum (nieuwste eerst)"
+msgstr ""
+
+msgid "Datum (oudste eerst)"
+msgstr ""
+
+msgid "Deactiveren"
 msgstr ""
 
 msgid "Deselecteer alles"
@@ -183,6 +201,9 @@ msgstr ""
 msgid "Importeren"
 msgstr ""
 
+msgid "Inactief"
+msgstr ""
+
 msgid "Installeer vereiste pakketten"
 msgstr ""
 
@@ -231,6 +252,12 @@ msgstr ""
 msgid "Kiezen…"
 msgstr ""
 
+msgid "Klik cluster om gefilterd te bekijken"
+msgstr ""
+
+msgid "Klik om te openen"
+msgstr ""
+
 msgid "Later"
 msgstr ""
 
@@ -247,6 +274,12 @@ msgid "Markeer als favoriet (F)"
 msgstr ""
 
 msgid "Mogelijke duplicaten"
+msgstr ""
+
+msgid "Naam (A-Z)"
+msgstr ""
+
+msgid "Naam (Z-A)"
 msgstr ""
 
 msgid "Nee"
@@ -283,6 +316,9 @@ msgid "Opslaan in"
 msgstr ""
 
 msgid "Over"
+msgstr ""
+
+msgid "PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks"
 msgstr ""
 
 msgid "Pair-records wissen — bevestiging gevraagd"
@@ -414,6 +450,12 @@ msgstr ""
 msgid "Terug naar standaard (200 px)"
 msgstr ""
 
+msgid "Thumbnail load done: {n} photos — UI ready"
+msgstr ""
+
+msgid "Thumbs: {px}px — favorites: {n}"
+msgstr ""
+
 msgid "Update beschikbaar"
 msgstr ""
 
@@ -471,6 +513,21 @@ msgstr ""
 msgid "Zoeken naar apparaat…"
 msgstr ""
 
+msgid "andere foto's in deze cluster"
+msgstr ""
+
+msgid "april"
+msgstr ""
+
+msgid "augustus"
+msgstr ""
+
+msgid "december"
+msgstr ""
+
+msgid "februari"
+msgstr ""
+
 msgid "iPhone blijft onherkenbaar na reset"
 msgstr ""
 
@@ -483,10 +540,40 @@ msgstr ""
 msgid "iPhone niet herkend door usbmuxd — start auto-recovery"
 msgstr ""
 
+msgid "januari"
+msgstr ""
+
+msgid "juli"
+msgstr ""
+
+msgid "juni"
+msgstr ""
+
 msgid "load_photos: photo_path leeg of bestaat niet — empty state"
 msgstr ""
 
+msgid "load_photos: scanning in {p}"
+msgstr ""
+
+msgid "load_photos: {n} files found"
+msgstr ""
+
+msgid "maart"
+msgstr ""
+
+msgid "mei"
+msgstr ""
+
+msgid "november"
+msgstr ""
+
+msgid "oktober"
+msgstr ""
+
 msgid "register_script_message_handler mislukt met alle varianten"
+msgstr ""
+
+msgid "september"
 msgstr ""
 
 msgid "signal"
@@ -496,6 +583,9 @@ msgid "─── Pixora (dev mode) ───"
 msgstr ""
 
 msgid "═══ Pixora gestart in Developer Mode ═══"
+msgstr ""
+
+msgid "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"
 msgstr ""
 
 msgid "✕ Toon alle foto's"

@@ -306,8 +306,13 @@ def get_mountpoint_for_uuid(uuid):
         pass
     return None
 
+_MONTH_KEYS = [
+    "", "januari", "februari", "maart", "april", "mei", "juni",
+    "juli", "augustus", "september", "oktober", "november", "december"
+]
+
 def format_date_header(dt):
-    return f"{dt.day} {MONTHS_NL_FULL[dt.month]} {dt.year}"
+    return f"{dt.day} {_(_MONTH_KEYS[dt.month])} {dt.year}"
 
 
 # ── Metadata-cache (video-duur, foto-datum, GPS, geocode) ─────────────
@@ -860,7 +865,16 @@ class MapWidget(Gtk.Box):
                 "filename": m[2], "date": m[3],
                 "path": path, "thumb": thumb,
             })
-        js = f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers({json.dumps(data)});}}"
+        labels = {
+            "otherInCluster": _("andere foto's in deze cluster"),
+            "clickCluster": _("Klik cluster om gefilterd te bekijken"),
+            "clickOpen": _("Klik om te openen"),
+            "offline": _("⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"),
+        }
+        js = (
+            f"if(window.pixoraSetLabels){{window.pixoraSetLabels({json.dumps(labels)});}}"
+            f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers({json.dumps(data)});}}"
+        )
         ran = False
         try:
             self.web.evaluate_javascript(js, -1, None, None, None, None, None)
@@ -917,10 +931,10 @@ class MainWindow(Adw.ApplicationWindow):
             THUMB_SIZE = 200
         if settings.get("dev_mode"):
             log_info(_("═══ Pixora gestart in Developer Mode ═══"))
-            log_info(f"Config: {CONFIG_PATH}")
-            log_info(f"Cache:  {CACHE_DIR}")
-            log_info(f"Thumbs: {THUMB_SIZE}px — favorieten: {len(load_favorites())}")
-            log_info(f"PID: {os.getpid()} — bij hangs: 'kill -USR1 {os.getpid()}' dumpt thread-stacks")
+            log_info(_("Config: {p}").format(p=CONFIG_PATH))
+            log_info(_("Cache: {p}").format(p=CACHE_DIR))
+            log_info(_("Thumbs: {px}px — favorites: {n}").format(px=THUMB_SIZE, n=len(load_favorites())))
+            log_info(_("PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks").format(p=os.getpid()))
         log_info(_("Startup fase 1: MainWindow __init__ begonnen"))
         self.photos          = []
         self.thumb_widgets   = {}
@@ -1551,7 +1565,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.header.pack_start(self.logo_picture)
 
         self.sort_model = Gtk.StringList()
-        for item in ["Datum (nieuwste eerst)", "Datum (oudste eerst)", "Naam (A-Z)", "Naam (Z-A)"]:
+        for item in [_("Datum (nieuwste eerst)"), _("Datum (oudste eerst)"),
+                     _("Naam (A-Z)"), _("Naam (Z-A)")]:
             self.sort_model.append(item)
 
         self.sort_combo = Gtk.DropDown(model=self.sort_model)
@@ -2318,7 +2333,7 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Foto's laden ──────────────────────────────────────────────────
     def load_photos(self):
         photo_path = self.settings.get("photo_path", "")
-        log_info(f"load_photos: scannen in {photo_path}")
+        log_info(_("load_photos: scanning in {p}").format(p=photo_path))
         if not photo_path or not os.path.exists(photo_path):
             log_warn(_("load_photos: photo_path leeg of bestaat niet — empty state"))
             self.show_empty_state()
@@ -2328,7 +2343,7 @@ class MainWindow(Adw.ApplicationWindow):
             for file in files:
                 if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
                     photos.append(os.path.join(root, file))
-        log_info(f"load_photos: {len(photos)} bestanden gevonden")
+        log_info(_("load_photos: {n} files found").format(n=len(photos)))
         if self._favorites_only:
             photos = [p for p in photos if p in self._favorites]
         if not photos:
@@ -2709,7 +2724,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _load_done(self, load_id, total):
         if load_id != self._load_id:
             return False
-        log_info(f"Thumbnail-load klaar: {total} foto's — UI is klaar voor input")
+        log_info(_("Thumbnail load done: {n} photos — UI ready").format(n=total))
         self.spinner.stop()
         self.content_stack.set_visible_child_name("grid")
         cluster_lbl = getattr(self, '_cluster_location_label', None)
@@ -4103,10 +4118,10 @@ class MainWindow(Adw.ApplicationWindow):
         current_dev = bool(self.settings.get("dev_mode", False))
         dev_row = Adw.ActionRow(
             title="Developer mode",
-            subtitle="Actief" if current_dev else "Inactief"
+            subtitle=_("Actief") if current_dev else _("Inactief")
         )
         dev_btn = Gtk.Button(
-            label="Deactiveren" if current_dev else "Activeren"
+            label=_("Deactiveren") if current_dev else _("Activeren")
         )
         dev_btn.add_css_class("flat")
         dev_btn.set_valign(Gtk.Align.CENTER)
@@ -4517,8 +4532,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings["dev_mode"] = target
         save_settings(self.settings)
         log_info(f"Dev-mode {'geactiveerd' if target else 'gedeactiveerd'} → herstarten…")
-        row.set_subtitle("Actief" if target else "Inactief")
-        btn.set_label("Deactiveren" if target else "Activeren")
+        row.set_subtitle(_("Actief") if target else _("Inactief"))
+        btn.set_label(_("Deactiveren") if target else _("Activeren"))
         # Herstart de app
         GLib.timeout_add(300, self._restart_app)
 

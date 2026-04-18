@@ -1,11 +1,8 @@
-# Nederlands — de originele taal.
+# Nederlands.
 msgid ""
 msgstr ""
-"Project-Id-Version: Pixora\n"
 "Language: nl\n"
-"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
-"Content-Transfer-Encoding: 8bit\n"
 
 msgid "0 foto's"
 msgstr "0 foto's"
@@ -21,6 +18,12 @@ msgstr "2024/   2025/"
 
 msgid "2024/2024-03/   2024/2024-04/"
 msgstr "2024/2024-03/   2024/2024-04/"
+
+msgid "Actief"
+msgstr "Actief"
+
+msgid "Activeren"
+msgstr "Activeren"
 
 msgid "Alle importeren"
 msgstr "Alle importeren"
@@ -79,8 +82,14 @@ msgstr "Bijwerken"
 msgid "Bladeren…"
 msgstr "Bladeren…"
 
+msgid "Cache: {p}"
+msgstr "Cache: {p}"
+
 msgid "Cluster-filter uitgezet → alle foto's"
 msgstr "Cluster-filter uitgezet → alle foto's"
+
+msgid "Config: {p}"
+msgstr "Config: {p}"
 
 msgid "Configuratie + services"
 msgstr "Configuratie + services"
@@ -96,6 +105,15 @@ msgstr "Controleer op updates"
 
 msgid "Controleren mislukt"
 msgstr "Controleren mislukt"
+
+msgid "Datum (nieuwste eerst)"
+msgstr "Datum (nieuwste eerst)"
+
+msgid "Datum (oudste eerst)"
+msgstr "Datum (oudste eerst)"
+
+msgid "Deactiveren"
+msgstr "Deactiveren"
 
 msgid "Deselecteer alles"
 msgstr "Deselecteer alles"
@@ -184,6 +202,9 @@ msgstr "Importeer van iPhone of iPad"
 msgid "Importeren"
 msgstr "Importeren"
 
+msgid "Inactief"
+msgstr "Inactief"
+
 msgid "Installeer vereiste pakketten"
 msgstr "Installeer vereiste pakketten"
 
@@ -232,6 +253,12 @@ msgstr "Kies map op backup schijf"
 msgid "Kiezen…"
 msgstr "Kiezen…"
 
+msgid "Klik cluster om gefilterd te bekijken"
+msgstr "Klik cluster om gefilterd te bekijken"
+
+msgid "Klik om te openen"
+msgstr "Klik om te openen"
+
 msgid "Later"
 msgstr "Later"
 
@@ -249,6 +276,12 @@ msgstr "Markeer als favoriet (F)"
 
 msgid "Mogelijke duplicaten"
 msgstr "Mogelijke duplicaten"
+
+msgid "Naam (A-Z)"
+msgstr "Naam (A-Z)"
+
+msgid "Naam (Z-A)"
+msgstr "Naam (Z-A)"
 
 msgid "Nee"
 msgstr "Nee"
@@ -285,6 +318,9 @@ msgstr "Opslaan in"
 
 msgid "Over"
 msgstr "Over"
+
+msgid "PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks"
+msgstr "PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks"
 
 msgid "Pair-records wissen — bevestiging gevraagd"
 msgstr "Pair-records wissen — bevestiging gevraagd"
@@ -415,6 +451,12 @@ msgstr "Terug naar galerij"
 msgid "Terug naar standaard (200 px)"
 msgstr "Terug naar standaard (200 px)"
 
+msgid "Thumbnail load done: {n} photos — UI ready"
+msgstr "Thumbnail load done: {n} photos — UI ready"
+
+msgid "Thumbs: {px}px — favorites: {n}"
+msgstr "Thumbs: {px}px — favorites: {n}"
+
 msgid "Update beschikbaar"
 msgstr "Update beschikbaar"
 
@@ -472,6 +514,21 @@ msgstr "Wissen"
 msgid "Zoeken naar apparaat…"
 msgstr "Zoeken naar apparaat…"
 
+msgid "andere foto's in deze cluster"
+msgstr "andere foto's in deze cluster"
+
+msgid "april"
+msgstr "april"
+
+msgid "augustus"
+msgstr "augustus"
+
+msgid "december"
+msgstr "december"
+
+msgid "februari"
+msgstr "februari"
+
 msgid "iPhone blijft onherkenbaar na reset"
 msgstr "iPhone blijft onherkenbaar na reset"
 
@@ -484,11 +541,41 @@ msgstr "iPhone herkend na reset"
 msgid "iPhone niet herkend door usbmuxd — start auto-recovery"
 msgstr "iPhone niet herkend door usbmuxd — start auto-recovery"
 
+msgid "januari"
+msgstr "januari"
+
+msgid "juli"
+msgstr "juli"
+
+msgid "juni"
+msgstr "juni"
+
 msgid "load_photos: photo_path leeg of bestaat niet — empty state"
 msgstr "load_photos: photo_path leeg of bestaat niet — empty state"
 
+msgid "load_photos: scanning in {p}"
+msgstr "load_photos: scanning in {p}"
+
+msgid "load_photos: {n} files found"
+msgstr "load_photos: {n} files found"
+
+msgid "maart"
+msgstr "maart"
+
+msgid "mei"
+msgstr "mei"
+
+msgid "november"
+msgstr "november"
+
+msgid "oktober"
+msgstr "oktober"
+
 msgid "register_script_message_handler mislukt met alle varianten"
 msgstr "register_script_message_handler mislukt met alle varianten"
+
+msgid "september"
+msgstr "september"
 
 msgid "signal"
 msgstr "signal"
@@ -498,6 +585,9 @@ msgstr "─── Pixora (dev mode) ───"
 
 msgid "═══ Pixora gestart in Developer Mode ═══"
 msgstr "═══ Pixora gestart in Developer Mode ═══"
+
+msgid "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"
+msgstr "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"
 
 msgid "✕ Toon alle foto's"
 msgstr "✕ Toon alle foto's"
