@@ -784,8 +784,6 @@ class MapWidget(Gtk.DrawingArea):
             cr.move_to(bx + pad, by + box_h - 10)
             cr.show_text("Klik om te openen")
 
-        GLib.idle_add(self._request_visible_tiles)
-
     def _rounded_rect(self, cr, x, y, w, h, r):
         cr.move_to(x + r, y)
         cr.line_to(x + w - r, y)
@@ -922,6 +920,7 @@ class MapWidget(Gtk.DrawingArea):
 
     def on_drag_end(self, gesture, dx, dy):
         self._drag_start = None
+        GLib.idle_add(self._request_visible_tiles)
 
 
 # ── Hoofdvenster ─────────────────────────────────────────────────────
