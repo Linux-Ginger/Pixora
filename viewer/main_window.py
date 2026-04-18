@@ -144,6 +144,18 @@ try:
 except (ValueError, ImportError):
     GUDEV_AVAILABLE = False
 
+WEBKIT_AVAILABLE = False
+WebKit2 = None
+for _webkit_version in ("4.1", "4.0"):
+    try:
+        gi.require_version("WebKit2", _webkit_version)
+        from gi.repository import WebKit2 as _WebKit2
+        WebKit2 = _WebKit2
+        WEBKIT_AVAILABLE = True
+        break
+    except (ValueError, ImportError):
+        continue
+
 DOCS_DIR         = os.path.join(os.path.dirname(__file__), "..", "docs")
 VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
 INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
@@ -558,371 +570,105 @@ class TimelineBar(Gtk.DrawingArea):
             self._scroll_cb((y / height) * self._max_scroll)
 
 
-# ── Kaart widget (in-app, geen apart venster) ────────────────────────
-class MapWidget(Gtk.DrawingArea):
+# ── Kaart widget (Leaflet in WebView) ────────────────────────────────
+class MapWidget(Gtk.Box):
     def __init__(self, markers, open_photo_cb):
-        super().__init__()
-        self.markers        = markers
-        self.open_photo_cb  = open_photo_cb
-        self.zoom           = 10.0 if markers else 7.0
-        self.tile_cache     = OrderedDict()
-        self._tile_cache_max = 200
-        self._drag_start    = None
-        self._mouse_x       = 450.0
-        self._mouse_y       = 325.0
-        self._hover_idx       = -1
-        self._hover_pixbufs   = {}
-        self._last_clusters   = []
-        self._clusters_dirty  = True
-
-        if markers:
-            avg_lat = sum(m[0] for m in markers) / len(markers)
-            avg_lon = sum(m[1] for m in markers) / len(markers)
-        else:
-            avg_lat, avg_lon = 52.3, 5.3
-
-        tx, ty = lat_lon_to_tile_float(avg_lat, avg_lon, self.zoom)
-        self.offset_x = tx * TILE_SIZE - 450.0
-        self.offset_y = ty * TILE_SIZE - 325.0
-
+        super().__init__(orientation=Gtk.Orientation.VERTICAL)
+        self.markers = markers
+        self.open_photo_cb = open_photo_cb
         self.set_vexpand(True)
         self.set_hexpand(True)
-        self.set_draw_func(self.on_draw)
+        self._pending_markers = list(markers) if markers else []
 
-        # Muiswiel — discreet
-        scroll_discrete = Gtk.EventControllerScroll.new(
-            Gtk.EventControllerScrollFlags.VERTICAL |
-            Gtk.EventControllerScrollFlags.DISCRETE
-        )
-        scroll_discrete.connect("scroll", self.on_scroll_discrete)
-        self.add_controller(scroll_discrete)
-
-        # Trackpad — smooth
-        scroll_smooth = Gtk.EventControllerScroll.new(
-            Gtk.EventControllerScrollFlags.VERTICAL
-        )
-        scroll_smooth.connect("scroll", self.on_scroll_smooth)
-        self.add_controller(scroll_smooth)
-
-        drag = Gtk.GestureDrag.new()
-        drag.connect("drag-begin",  self.on_drag_begin)
-        drag.connect("drag-update", self.on_drag_update)
-        drag.connect("drag-end",    self.on_drag_end)
-        self.add_controller(drag)
-
-        motion = Gtk.EventControllerMotion.new()
-        motion.connect("motion", self.on_mouse_motion)
-        self.add_controller(motion)
-
-        click = Gtk.GestureClick.new()
-        click.connect("released", self.on_click)
-        self.add_controller(click)
-
-        GLib.idle_add(self._request_visible_tiles)
-
-    def _get_visible_tiles(self, width, height):
-        z   = int(self.zoom)
-        n   = 2 ** z
-        tx0 = int(self.offset_x / TILE_SIZE)
-        ty0 = int(self.offset_y / TILE_SIZE)
-        px0 = -(self.offset_x % TILE_SIZE)
-        py0 = -(self.offset_y % TILE_SIZE)
-
-        tiles = []
-        py, ty = py0, ty0
-        while py < height + TILE_SIZE:
-            px, tx = px0, tx0
-            while px < width + TILE_SIZE:
-                if 0 <= tx < n and 0 <= ty < n:
-                    tiles.append((z, tx, ty, px, py))
-                px += TILE_SIZE
-                tx += 1
-            py += TILE_SIZE
-            ty += 1
-        return tiles
-
-    def _request_visible_tiles(self):
-        w = self.get_width() or 900
-        h = self.get_height() or 650
-        if not hasattr(self, "_tile_pool"):
-            self._tile_pool = ThreadPoolExecutor(max_workers=4)
-        for z, tx, ty, _, _ in self._get_visible_tiles(w, h):
-            key = (z, tx, ty)
-            if key not in self.tile_cache or self.tile_cache[key] is None:
-                self.tile_cache[key] = None
-                self._tile_pool.submit(self._load_tile, z, tx, ty)
-        return False
-
-    def _load_tile(self, z, tx, ty):
-        import io
-        if not CAIRO_AVAILABLE:
+        if not WEBKIT_AVAILABLE:
+            lbl = Gtk.Label(label=(
+                "WebKitGTK ontbreekt.\n"
+                "Installeer via: sudo apt install gir1.2-webkit2-4.1"
+            ))
+            lbl.set_vexpand(True)
+            lbl.set_hexpand(True)
+            lbl.set_justify(Gtk.Justification.CENTER)
+            self.append(lbl)
             return
-        key        = (z, tx, ty)
-        cache_path = os.path.join(TILE_CACHE_DIR, f"{z}_{tx}_{ty}.png")
-        if os.path.exists(cache_path):
+
+        self.web = WebKit2.WebView()
+        self.web.set_vexpand(True)
+        self.web.set_hexpand(True)
+
+        try:
+            wk_settings = self.web.get_settings()
+            wk_settings.set_enable_javascript(True)
+            wk_settings.set_javascript_can_access_clipboard(False)
+            wk_settings.set_enable_developer_extras(False)
+        except Exception:
+            pass
+
+        try:
+            ucm = self.web.get_user_content_manager()
             try:
-                surface = cairo.ImageSurface.create_from_png(cache_path)
-                GLib.idle_add(self._tile_loaded, key, surface)
-                return
-            except Exception:
-                pass
-        try:
-            url = f"https://tile.openstreetmap.org/{z}/{tx}/{ty}.png"
-            req = urllib.request.Request(url, headers={"User-Agent": "Pixora/1.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = resp.read()
-            os.makedirs(TILE_CACHE_DIR, exist_ok=True)
-            with open(cache_path, "wb") as f:
-                f.write(data)
-            surface = cairo.ImageSurface.create_from_png(io.BytesIO(data))
-            GLib.idle_add(self._tile_loaded, key, surface)
-        except Exception:
-            GLib.idle_add(self._tile_loaded, key, None)
+                ucm.register_script_message_handler("pixora")
+            except TypeError:
+                ucm.register_script_message_handler("pixora", None)
+            ucm.connect("script-message-received::pixora", self._on_js_message)
+        except Exception as e:
+            log_error(f"WebView bridge setup fout: {e}")
 
-    def _tile_loaded(self, key, surface):
-        self.tile_cache[key] = surface
-        self.tile_cache.move_to_end(key)
-        while len(self.tile_cache) > self._tile_cache_max:
-            self.tile_cache.popitem(last=False)
-        self.queue_draw()
+        self.web.connect("load-changed", self._on_load_changed)
+
+        assets_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "assets", "leaflet"
+        )
+        map_html_path = os.path.abspath(os.path.join(assets_dir, "map.html"))
+        if not os.path.exists(map_html_path):
+            lbl = Gtk.Label(label=f"Leaflet-assets niet gevonden:\n{map_html_path}")
+            lbl.set_vexpand(True)
+            lbl.set_hexpand(True)
+            self.append(lbl)
+            return
+
+        self.web.load_uri("file://" + map_html_path)
+        self.append(self.web)
+
+    def _on_load_changed(self, web, event):
+        try:
+            finished = (event == WebKit2.LoadEvent.FINISHED)
+        except Exception:
+            finished = False
+        if finished:
+            GLib.timeout_add(80, self._push_markers)
+
+    def _push_markers(self):
+        data = [
+            {"lat": m[0], "lon": m[1], "filename": m[2], "date": m[3], "path": m[4]}
+            for m in self._pending_markers
+        ]
+        js = f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers({json.dumps(data)});}}"
+        ran = False
+        try:
+            self.web.evaluate_javascript(js, -1, None, None, None, None, None)
+            ran = True
+        except Exception:
+            pass
+        if not ran:
+            try:
+                self.web.run_javascript(js, None, None, None)
+            except Exception as e:
+                log_error(f"JS push fout: {e}")
         return False
 
-    def on_draw(self, area, cr, width, height):
-        cr.set_source_rgb(0.85, 0.87, 0.88)
-        cr.paint()
-
-        for z, tx, ty, px, py in self._get_visible_tiles(width, height):
-            surface = self.tile_cache.get((z, tx, ty))
-            if surface:
-                cr.set_source_surface(surface, px, py)
-                cr.paint()
-
-        # Clusters + markers (alleen herberekenen na zoom/pan)
-        if self._clusters_dirty:
-            self._last_clusters  = self._get_clusters()
-            self._clusters_dirty = False
-        for mx, my, group in self._last_clusters:
-            if -20 <= mx <= width + 20 and -20 <= my <= height + 20:
-                count  = len(group)
-                radius = 9 if count == 1 else 14
-
-                cr.set_source_rgba(0, 0, 0, 0.25)
-                cr.arc(mx + 1, my + 2, radius, 0, 2 * math.pi)
-                cr.fill()
-
-                cr.set_source_rgb(0.914, 0.329, 0.125)
-                cr.arc(mx, my, radius, 0, 2 * math.pi)
-                cr.fill()
-
-                cr.set_source_rgb(1, 1, 1)
-                cr.set_line_width(2)
-                cr.arc(mx, my, radius, 0, 2 * math.pi)
-                cr.stroke()
-
-                if count > 1:
-                    label = str(count)
-                    cr.set_source_rgb(1, 1, 1)
-                    cr.select_font_face("Sans", 0, 1)
-                    cr.set_font_size(10)
-                    extents = cr.text_extents(label)
-                    cr.move_to(mx - extents.width / 2, my + extents.height / 2)
-                    cr.show_text(label)
-
-        # Hover preview
-        if 0 <= self._hover_idx < len(self.markers):
-            marker   = self.markers[self._hover_idx]
-            lat, lon = marker[0], marker[1]
-            filename = marker[2]
-            datum    = marker[3]
-            path     = marker[4]
-
-            tx_f, ty_f = lat_lon_to_tile_float(lat, lon, self.zoom)
-            mx = tx_f * TILE_SIZE - self.offset_x
-            my = ty_f * TILE_SIZE - self.offset_y
-
-            pixbuf = self._hover_pixbufs.get(path)
-            pw     = pixbuf.get_width()  if pixbuf else 0
-            ph     = pixbuf.get_height() if pixbuf else 0
-
-            pad   = 10
-            box_w = max(180, pw + pad * 2)
-            box_h = (ph + pad if pixbuf else 0) + 52
-            bx    = mx + 14
-            by    = my - box_h - 6
-
-            if bx + box_w > width - 4:
-                bx = mx - box_w - 14
-            if by < 4:
-                by = my + 14
-            if bx < 4:
-                bx = 4
-
-            cr.set_source_rgba(0.12, 0.12, 0.12, 0.94)
-            self._rounded_rect(cr, bx, by, box_w, box_h, 10)
-            cr.fill()
-
-            if pixbuf:
-                cr.save()
-                self._rounded_rect(cr, bx + pad, by + pad, pw, ph, 6)
-                cr.clip()
-                Gdk.cairo_set_source_pixbuf(cr, pixbuf, bx + pad, by + pad)
-                cr.paint()
-                cr.restore()
-
-            cr.set_source_rgb(1, 1, 1)
-            cr.select_font_face("Sans", 0, 1)
-            cr.set_font_size(11)
-            cr.move_to(bx + pad, by + ph + pad + 18)
-            cr.show_text(filename[:26] + "…" if len(filename) > 26 else filename)
-
-            cr.set_source_rgba(1, 1, 1, 0.6)
-            cr.select_font_face("Sans", 0, 0)
-            cr.set_font_size(10)
-            cr.move_to(bx + pad, by + ph + pad + 34)
-            cr.show_text(datum)
-
-            cr.set_source_rgba(0.914, 0.329, 0.125, 0.85)
-            cr.set_font_size(9)
-            cr.move_to(bx + pad, by + box_h - 10)
-            cr.show_text("Klik om te openen")
-
-    def _rounded_rect(self, cr, x, y, w, h, r):
-        cr.move_to(x + r, y)
-        cr.line_to(x + w - r, y)
-        cr.arc(x + w - r, y + r, r, -1.5708, 0)
-        cr.line_to(x + w, y + h - r)
-        cr.arc(x + w - r, y + h - r, r, 0, 1.5708)
-        cr.line_to(x + r, y + h)
-        cr.arc(x + r, y + h - r, r, 1.5708, 3.14159)
-        cr.line_to(x, y + r)
-        cr.arc(x + r, y + r, r, 3.14159, 4.71239)
-        cr.close_path()
-
-    def _load_hover_thumb(self, path):
+    def _on_js_message(self, ucm, message):
         try:
-            if is_video(path):
-                pixbuf = load_thumbnail(path)
-                if pixbuf:
-                    # Schaal naar hover-formaat
-                    w, h = pixbuf.get_width(), pixbuf.get_height()
-                    scale = min(160 / w, 120 / h)
-                    pixbuf = pixbuf.scale_simple(
-                        int(w * scale), int(h * scale),
-                        GdkPixbuf.InterpType.BILINEAR)
+            if hasattr(message, "to_string"):
+                raw = message.to_string()
             else:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 160, 120, True)
+                raw = message.get_js_value().to_string()
+            payload = json.loads(raw)
         except Exception:
-            pixbuf = None
-        GLib.idle_add(self._hover_thumb_loaded, path, pixbuf)
-
-    def _hover_thumb_loaded(self, path, pixbuf):
-        self._hover_pixbufs[path] = pixbuf
-        self.queue_draw()
-        return False
-
-    def on_mouse_motion(self, ctrl, x, y):
-        self._mouse_x = x
-        self._mouse_y = y
-        hover = -1
-        for mx, my, group in self._last_clusters:
-            radius = 9 if len(group) == 1 else 14
-            if math.sqrt((x - mx) ** 2 + (y - my) ** 2) < radius + 4:
-                hover = group[0]
-                break
-        if hover != self._hover_idx:
-            self._hover_idx = hover
-            if hover >= 0:
-                path = self.markers[hover][4]
-                if path not in self._hover_pixbufs:
-                    threading.Thread(
-                        target=self._load_hover_thumb,
-                        args=(path,),
-                        daemon=True
-                    ).start()
-            self.queue_draw()
-
-    def on_click(self, gesture, n_press, x, y):
-        for mx, my, group in self._last_clusters:
-            radius = 9 if len(group) == 1 else 14
-            if math.sqrt((x - mx) ** 2 + (y - my) ** 2) < radius + 4:
-                paths = [self.markers[i][4] for i in group]
-                GLib.idle_add(self.open_photo_cb, paths)
-                return
-
-    def _get_clusters(self):
-        CLUSTER_RADIUS = 24
-        assigned = [False] * len(self.markers)
-        clusters = []
-        for i, marker in enumerate(self.markers):
-            if assigned[i]:
-                continue
-            tx_f, ty_f = lat_lon_to_tile_float(marker[0], marker[1], self.zoom)
-            mx = tx_f * TILE_SIZE - self.offset_x
-            my = ty_f * TILE_SIZE - self.offset_y
-            group = [i]
-            assigned[i] = True
-            for j, other in enumerate(self.markers):
-                if assigned[j]:
-                    continue
-                tx2, ty2 = lat_lon_to_tile_float(other[0], other[1], self.zoom)
-                ox = tx2 * TILE_SIZE - self.offset_x
-                oy = ty2 * TILE_SIZE - self.offset_y
-                if math.sqrt((mx - ox) ** 2 + (my - oy) ** 2) < CLUSTER_RADIUS:
-                    group.append(j)
-                    assigned[j] = True
-            clusters.append((mx, my, group))
-        return clusters
-
-    def zoom_by(self, delta, cx=None, cy=None):
-        if cx is None:
-            cx = self._mouse_x
-        if cy is None:
-            cy = self._mouse_y
-        new_zoom = max(3.0, min(19.0, self.zoom + delta))
-        if abs(new_zoom - self.zoom) > 0.001:
-            scale         = 2 ** (new_zoom - self.zoom)
-            self.offset_x = (self.offset_x + cx) * scale - cx
-            self.offset_y = (self.offset_y + cy) * scale - cy
-            self.zoom            = new_zoom
-            self._clusters_dirty = True
-            self._clamp_offset()
-            GLib.idle_add(self._request_visible_tiles)
-            self.queue_draw()
-
-    def _clamp_offset(self):
-        w     = self.get_width() or 900
-        h     = self.get_height() or 650
-        z     = int(self.zoom)
-        n     = 2 ** z
-        max_x = max(0, n * TILE_SIZE - w)
-        max_y = max(0, n * TILE_SIZE - h)
-        self.offset_x = max(0.0, min(float(max_x), self.offset_x))
-        self.offset_y = max(0.0, min(float(max_y), self.offset_y))
-
-    def on_scroll_discrete(self, ctrl, dx, dy):
-        self.zoom_by(-1 if dy > 0 else 1)
-        return True
-
-    def on_scroll_smooth(self, ctrl, dx, dy):
-        if abs(dy) < 1.0:
-            self.zoom_by(-dy * 0.25)
-            return True
-        return False
-
-    def on_drag_begin(self, gesture, x, y):
-        self._drag_start = (self.offset_x, self.offset_y)
-
-    def on_drag_update(self, gesture, dx, dy):
-        if self._drag_start:
-            self.offset_x        = self._drag_start[0] - dx
-            self.offset_y        = self._drag_start[1] - dy
-            self._clusters_dirty = True
-            self._clamp_offset()
-            self.queue_draw()
-
-    def on_drag_end(self, gesture, dx, dy):
-        self._drag_start = None
-        GLib.idle_add(self._request_visible_tiles)
+            return
+        if payload.get("type") == "open_photo":
+            path = payload.get("path")
+            if path:
+                GLib.idle_add(self.open_photo_cb, [path])
 
 
 # ── Hoofdvenster ─────────────────────────────────────────────────────
@@ -1508,11 +1254,6 @@ class MainWindow(Adw.ApplicationWindow):
             if hasattr(self, "_editor_display_pixbuf"):
                 self._editor_display_pixbuf = None
             if hasattr(self, "_map_widget") and self._map_widget:
-                try:
-                    self._map_widget.tile_cache.clear()
-                    self._map_widget._hover_pixbufs.clear()
-                except Exception:
-                    pass
                 self._map_widget = None
         except Exception as e:
             log_error(f"Cleanup-fout: {e}")

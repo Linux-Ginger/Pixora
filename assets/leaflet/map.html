@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="leaflet.css">
+<link rel="stylesheet" href="markercluster.css">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #d8dde0; font-family: sans-serif; }
+  #map { width: 100%; height: 100%; background: #d8dde0; }
+  #offline-banner {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(30,30,30,0.92); color: #fff; padding: 10px 16px;
+    border-radius: 8px; font-size: 13px; display: none; z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .pixora-marker {
+    background: #e95420; border: 2px solid #fff; border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: bold; font-size: 11px;
+  }
+  .pixora-marker.single { width: 18px; height: 18px; }
+  .pixora-marker.cluster { width: 32px; height: 32px; font-size: 12px; }
+  .pixora-marker.cluster-lg { width: 40px; height: 40px; font-size: 13px; }
+  .leaflet-popup-content-wrapper {
+    background: rgba(30,30,30,0.94); color: #fff; border-radius: 10px;
+  }
+  .leaflet-popup-tip { background: rgba(30,30,30,0.94); }
+  .leaflet-popup-content { margin: 10px 12px; font-size: 12px; }
+  .leaflet-popup-content img { border-radius: 6px; max-width: 180px; display: block; margin-bottom: 6px; }
+  .leaflet-popup-content .fname { font-weight: bold; }
+  .leaflet-popup-content .date { opacity: 0.7; font-size: 11px; }
+  .leaflet-popup-content .hint { color: #e95420; font-size: 10px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="offline-banner">⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden</div>
+
+<script src="leaflet.js"></script>
+<script src="markercluster.js"></script>
+<script>
+(function() {
+  const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([52.3, 5.3], 7);
+  L.control.attribution({ prefix: false }).addAttribution('© OpenStreetMap').addTo(map);
+
+  const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    crossOrigin: true
+  });
+  tileLayer.addTo(map);
+
+  let tileErrorCount = 0;
+  tileLayer.on('tileerror', function() {
+    tileErrorCount += 1;
+    if (tileErrorCount > 4 || !navigator.onLine) {
+      document.getElementById('offline-banner').style.display = 'block';
+    }
+  });
+  tileLayer.on('tileload', function() {
+    tileErrorCount = 0;
+    document.getElementById('offline-banner').style.display = 'none';
+  });
+
+  window.addEventListener('offline', function() {
+    document.getElementById('offline-banner').style.display = 'block';
+  });
+  window.addEventListener('online', function() {
+    document.getElementById('offline-banner').style.display = 'none';
+  });
+
+  const cluster = L.markerClusterGroup({
+    showCoverageOnHover: false,
+    spiderfyOnMaxZoom: true,
+    maxClusterRadius: 45,
+    iconCreateFunction: function(c) {
+      const count = c.getChildCount();
+      const size = count < 10 ? 'cluster' : 'cluster-lg';
+      return L.divIcon({
+        html: '<div class="pixora-marker ' + size + '">' + count + '</div>',
+        className: '', iconSize: null
+      });
+    }
+  });
+  map.addLayer(cluster);
+
+  function singleIcon() {
+    return L.divIcon({
+      html: '<div class="pixora-marker single"></div>',
+      className: '', iconSize: [18, 18], iconAnchor: [9, 9]
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function(c) {
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+
+  window.pixoraSetMarkers = function(markers) {
+    cluster.clearLayers();
+    if (!markers || !markers.length) return;
+    const bounds = L.latLngBounds();
+    markers.forEach(function(m) {
+      const latlng = [m.lat, m.lon];
+      const marker = L.marker(latlng, { icon: singleIcon() });
+      const html =
+        '<div class="fname">' + escapeHtml(m.filename) + '</div>' +
+        '<div class="date">' + escapeHtml(m.date || '') + '</div>' +
+        '<div class="hint">Klik op marker om te openen</div>';
+      marker.bindPopup(html, { maxWidth: 220, closeButton: false });
+      marker.on('mouseover', function() { marker.openPopup(); });
+      marker.on('mouseout', function() { marker.closePopup(); });
+      marker.on('click', function() {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pixora) {
+          window.webkit.messageHandlers.pixora.postMessage(JSON.stringify({
+            type: 'open_photo', path: m.path
+          }));
+        }
+      });
+      cluster.addLayer(marker);
+      bounds.extend(latlng);
+    });
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+    }
+  };
+
+  window.pixoraReady = true;
+})();
+</script>
+</body>
+</html>

@@ -46,6 +46,7 @@ sudo apt-get install -y -qq \
     gir1.2-gtk-4.0 \
     gir1.2-adw-1 \
     gir1.2-gudev-1.0 \
+    gir1.2-webkit2-4.1 \
     git \
     2>/dev/null
 

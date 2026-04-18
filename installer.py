@@ -416,6 +416,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         packages = [
             "python3-gi", "python3-gi-cairo",
             "gir1.2-gtk-4.0", "gir1.2-adw-1",
+            "gir1.2-webkit2-4.1",
             "ifuse", "libimobiledevice-utils", "usbmuxd",
             "ffmpeg", "python3-pip",
         ]
