@@ -155,6 +155,16 @@ TILE_CACHE_DIR   = os.path.expanduser("~/.cache/pixora/tiles")
 THUMB_SIZE       = 200
 FILM_THUMB       = 70
 BATCH_SIZE       = 15
+
+def _low_ram_system():
+    try:
+        pages = os.sysconf("SC_PHYS_PAGES")
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        return (pages * page_size) < (4 * 1024 * 1024 * 1024)
+    except Exception:
+        return False
+
+THUMB_WORKERS = 2 if _low_ram_system() else 4
 TILE_SIZE        = 256
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
 VIDEO_EXTENSIONS = {".mp4", ".mov"}
@@ -1458,6 +1468,12 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_close(self, window):
         log_info("Pixora wordt afgesloten — opruimen…")
+        try:
+            self._load_id += 1
+            self._viewer_load_id += 1
+            self._filmstrip_load_id += 1
+        except Exception:
+            pass
         self.stop_watcher()
         # Stop USB-monitor
         try:
@@ -2304,7 +2320,7 @@ class MainWindow(Adw.ApplicationWindow):
             dur = get_video_duration(path) if is_video(path) else 0.0
             return (idx, path, pb, dur)
 
-        with ThreadPoolExecutor(max_workers=4) as pool:
+        with ThreadPoolExecutor(max_workers=THUMB_WORKERS) as pool:
             for date_str, date_obj, indices in groups:
                 if load_id != self._load_id:
                     return
