@@ -453,7 +453,16 @@ class InstallerWindow(Adw.ApplicationWindow):
 
             launcher = BIN_DIR / "pixora"
             launcher.write_text(
-                f"#!/bin/bash\npython3 {INSTALL_DIR}/viewer/main.py\n"
+                "#!/bin/bash\n"
+                "# Run met AppArmor-profile 'pixora' als beschikbaar, zodat\n"
+                "# WebKit's bwrap-sandbox werkt op Ubuntu 24.04+. Anders\n"
+                "# gewoon direct — werkt op systemen zonder AppArmor-restrictie.\n"
+                "if command -v aa-exec >/dev/null 2>&1 && "
+                "[ -r /etc/apparmor.d/pixora ]; then\n"
+                f"  exec aa-exec -p pixora -- python3 {INSTALL_DIR}/viewer/main.py \"$@\"\n"
+                "else\n"
+                f"  exec python3 {INSTALL_DIR}/viewer/main.py \"$@\"\n"
+                "fi\n"
             )
             launcher.chmod(0o755)
 
@@ -482,7 +491,39 @@ class InstallerWindow(Adw.ApplicationWindow):
                            check=True, capture_output=True)
         except subprocess.CalledProcessError:
             pass
+        self._install_apparmor_profile()
         return True, ""
+
+    def _install_apparmor_profile(self):
+        # Ubuntu 24.04+ blokkeert unprivileged user-namespaces via AppArmor,
+        # waardoor WebKit's sandbox (kaart-weergave) faalt. Dit profile geeft
+        # alleen Pixora de userns-permission; de system-wide AppArmor-
+        # restrictie blijft intact voor andere apps.
+        if not os.path.isdir("/etc/apparmor.d"):
+            return
+        profile_path = "/etc/apparmor.d/pixora"
+        profile_content = (
+            "abi <abi/4.0>,\n"
+            "include <tunables/global>\n\n"
+            "profile pixora flags=(unconfined) {\n"
+            "  userns,\n"
+            "  include if exists <local/pixora>\n"
+            "}\n"
+        )
+        try:
+            tmp = Path("/tmp/pixora-apparmor-profile")
+            tmp.write_text(profile_content)
+            subprocess.run(
+                ["sudo", "install", "-m", "0644", str(tmp), profile_path],
+                check=True, capture_output=True
+            )
+            tmp.unlink(missing_ok=True)
+            subprocess.run(
+                ["sudo", "systemctl", "reload", "apparmor"],
+                check=False, capture_output=True
+            )
+        except Exception:
+            pass
 
     def _launch_app(self):
         try:
