@@ -16,7 +16,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, Gio
 
-UPDATE_URL = "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/update.sh"
+UPDATE_URL = "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/updater.sh"
 
 ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
 
@@ -112,8 +112,8 @@ class UpdaterWindow(Adw.ApplicationWindow):
             f"set -e; "
             f"TMP=$(mktemp -d); "
             f"cd $TMP && "
-            f"curl -fsSL '{UPDATE_URL}' -o update.sh && "
-            f"bash update.sh 2>&1; "
+            f"curl -fsSL '{UPDATE_URL}' -o updater.sh && "
+            f"bash updater.sh 2>&1; "
             f"RC=$?; rm -rf $TMP; exit $RC"
         ]
         GLib.idle_add(self._append_log,
