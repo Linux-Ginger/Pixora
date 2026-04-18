@@ -2586,6 +2586,27 @@ class MainWindow(Adw.ApplicationWindow):
                 dur_box.append(dur_label)
                 overlay.add_overlay(dur_box)
 
+            if 'fav_box' not in tc:
+                p = Gtk.CssProvider()
+                p.load_from_string(
+                    "box { background-color: rgba(0,0,0,0.55); border-radius: 50%; padding: 5px; }"
+                    "image { color: #e95420; }"
+                )
+                tc['fav_box'] = p
+            fav_badge = Gtk.Box()
+            fav_badge.set_halign(Gtk.Align.START)
+            fav_badge.set_valign(Gtk.Align.START)
+            fav_badge.set_margin_start(6)
+            fav_badge.set_margin_top(6)
+            fav_badge.get_style_context().add_provider(
+                tc['fav_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+            fav_icon = Gtk.Image.new_from_icon_name("starred-symbolic")
+            fav_icon.set_pixel_size(14)
+            fav_badge.append(fav_icon)
+            fav_badge.set_visible(path in self._favorites)
+            overlay.add_overlay(fav_badge)
+
             btn = Gtk.Button()
             btn.set_child(overlay)
             btn.set_overflow(Gtk.Overflow.HIDDEN)
@@ -2599,11 +2620,10 @@ class MainWindow(Adw.ApplicationWindow):
             btn._pixora_cache_path = cache_path
             btn._pixora_picture = picture
             btn._pixora_index = index
+            btn._fav_badge = fav_badge
             self._append_thumb_to_row(btn, width_at_thumb)
             # check_box wordt lazy aangemaakt bij selectie-modus
             self.thumb_widgets[index] = (btn, None)
-            if path in self._favorites:
-                self._refresh_thumb_favorite(index)
         self._schedule_viewport_hydrate()
         return False
 
@@ -3440,37 +3460,10 @@ class MainWindow(Adw.ApplicationWindow):
         path = self.photos[index] if index < len(self.photos) else None
         if not path:
             return
-        is_fav = path in self._favorites
-        overlay = btn.get_child()
-        if not isinstance(overlay, Gtk.Overlay):
+        badge = getattr(btn, "_fav_badge", None)
+        if badge is None:
             return
-        existing = getattr(btn, "_fav_badge", None)
-        if is_fav and not existing:
-            tc = getattr(self, '_thumb_css', {})
-            if 'fav_box' not in tc:
-                p = Gtk.CssProvider()
-                p.load_from_string(
-                    "box { background-color: rgba(0,0,0,0.55); border-radius: 50%; padding: 5px; }"
-                    "image { color: #e95420; }"
-                )
-                tc['fav_box'] = p
-                self._thumb_css = tc
-            badge = Gtk.Box()
-            badge.set_halign(Gtk.Align.START)
-            badge.set_valign(Gtk.Align.START)
-            badge.set_margin_start(6)
-            badge.set_margin_top(6)
-            badge.get_style_context().add_provider(
-                tc['fav_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            )
-            icon = Gtk.Image.new_from_icon_name("starred-symbolic")
-            icon.set_pixel_size(14)
-            badge.append(icon)
-            overlay.add_overlay(badge)
-            btn._fav_badge = badge
-        elif not is_fav and existing:
-            overlay.remove_overlay(existing)
-            btn._fav_badge = None
+        badge.set_visible(path in self._favorites)
 
     def toggle_favorites_filter(self, btn):
         self._favorites_only = btn.get_active()
