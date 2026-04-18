@@ -79,7 +79,19 @@ class InstallerWindow(Adw.ApplicationWindow):
         install_dir = Path.home() / ".local" / "share" / "pixora"
         already_installed = (install_dir / ".git").exists()
         version_file = Path.home() / ".config" / "pixora" / "installed_version"
-        current_version = version_file.read_text().strip() if version_file.exists() else None
+        current_version = None
+        if version_file.exists():
+            try:
+                current_version = version_file.read_text().strip() or None
+            except Exception:
+                current_version = None
+        if already_installed and not current_version:
+            bundled = install_dir / "version.txt"
+            if bundled.exists():
+                try:
+                    current_version = bundled.read_text().strip() or None
+                except Exception:
+                    pass
         self._already_installed = already_installed
         self._local_version = current_version
 
