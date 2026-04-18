@@ -146,15 +146,29 @@ except (ValueError, ImportError):
 
 WEBKIT_AVAILABLE = False
 WebKit2 = None
-for _webkit_version in ("4.1", "4.0"):
-    try:
-        gi.require_version("WebKit2", _webkit_version)
-        from gi.repository import WebKit2 as _WebKit2
-        WebKit2 = _WebKit2
-        WEBKIT_AVAILABLE = True
-        break
-    except (ValueError, ImportError):
-        continue
+_webkit_load_error = None
+
+# Probeer eerst WebKit 6.0 (GTK4-native, nieuwste). Daarna WebKit2 4.1 / 4.0.
+try:
+    gi.require_version("WebKit", "6.0")
+    from gi.repository import WebKit as _WK
+    WebKit2 = _WK
+    WEBKIT_AVAILABLE = True
+except Exception as _e:
+    _webkit_load_error = repr(_e)
+
+if not WEBKIT_AVAILABLE:
+    for _webkit_version in ("4.1", "4.0"):
+        try:
+            gi.require_version("WebKit2", _webkit_version)
+            from gi.repository import WebKit2 as _WK2
+            WebKit2 = _WK2
+            WEBKIT_AVAILABLE = True
+            _webkit_load_error = None
+            break
+        except Exception as _e:
+            _webkit_load_error = repr(_e)
+            continue
 
 DOCS_DIR         = os.path.join(os.path.dirname(__file__), "..", "docs")
 VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
@@ -581,14 +595,21 @@ class MapWidget(Gtk.Box):
         self._pending_markers = list(markers) if markers else []
 
         if not WEBKIT_AVAILABLE:
-            lbl = Gtk.Label(label=(
-                "WebKitGTK ontbreekt.\n"
-                "Installeer via: sudo apt install gir1.2-webkit2-4.1"
-            ))
+            msg = (
+                "WebKitGTK kon niet geladen worden.\n\n"
+                "Installeer een van:\n"
+                "  sudo apt install gir1.2-webkit-6.0\n"
+                "  sudo apt install gir1.2-webkit2-4.1\n"
+            )
+            if _webkit_load_error:
+                msg += f"\nTechnische fout: {_webkit_load_error}"
+            lbl = Gtk.Label(label=msg)
             lbl.set_vexpand(True)
             lbl.set_hexpand(True)
             lbl.set_justify(Gtk.Justification.CENTER)
+            lbl.set_wrap(True)
             self.append(lbl)
+            log_error(f"WebKit niet beschikbaar: {_webkit_load_error}")
             return
 
         self.web = WebKit2.WebView()

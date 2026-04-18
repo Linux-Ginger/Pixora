@@ -416,16 +416,23 @@ class InstallerWindow(Adw.ApplicationWindow):
         packages = [
             "python3-gi", "python3-gi-cairo",
             "gir1.2-gtk-4.0", "gir1.2-adw-1",
-            "gir1.2-webkit2-4.1",
             "ifuse", "libimobiledevice-utils", "usbmuxd",
             "ffmpeg", "python3-pip",
         ]
         try:
             subprocess.run(["sudo", "apt-get", "install", "-y", "-qq"] + packages,
                            check=True, capture_output=True)
-            return True, ""
         except subprocess.CalledProcessError:
             return False, "apt mislukt"
+        # WebKit typelib — probeer 6.0 eerst, valt terug op 4.1
+        for wk in ("gir1.2-webkit-6.0", "gir1.2-webkit2-4.1"):
+            try:
+                subprocess.run(["sudo", "apt-get", "install", "-y", "-qq", wk],
+                               check=True, capture_output=True)
+                break
+            except subprocess.CalledProcessError:
+                continue
+        return True, ""
 
     def _install_pip(self):
         packages = ["Pillow", "pillow-heif", "imagehash", "watchdog"]

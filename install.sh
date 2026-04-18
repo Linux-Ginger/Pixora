@@ -46,9 +46,12 @@ sudo apt-get install -y -qq \
     gir1.2-gtk-4.0 \
     gir1.2-adw-1 \
     gir1.2-gudev-1.0 \
-    gir1.2-webkit2-4.1 \
     git \
     2>/dev/null
+
+# WebKitGTK typelib — probeer nieuwste (6.0) eerst, valt terug op 4.1
+sudo apt-get install -y -qq gir1.2-webkit-6.0 2>/dev/null || \
+sudo apt-get install -y -qq gir1.2-webkit2-4.1 2>/dev/null || true
 
 # ── Repo ophalen (altijd vers, geen cache) ──
 echo -e "  ${ORANGE}Pixora ophalen…${NC}"
