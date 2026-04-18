@@ -4004,9 +4004,21 @@ class MainWindow(Adw.ApplicationWindow):
         dialog = Adw.PreferencesDialog()
         dialog.set_title("Instellingen")
 
-        page = Adw.PreferencesPage()
-        page.set_title("Algemeen")
-        page.set_icon_name("preferences-system-symbolic")
+        display_page = Adw.PreferencesPage()
+        display_page.set_title("Weergave")
+        display_page.set_icon_name("preferences-desktop-display-symbolic")
+
+        import_page = Adw.PreferencesPage()
+        import_page.set_title("Importeren")
+        import_page.set_icon_name("document-send-symbolic")
+
+        advanced_page = Adw.PreferencesPage()
+        advanced_page.set_title("Geavanceerd")
+        advanced_page.set_icon_name("applications-engineering-symbolic")
+
+        about_page = Adw.PreferencesPage()
+        about_page.set_title("Over")
+        about_page.set_icon_name("help-about-symbolic")
 
         folder_group = Adw.PreferencesGroup()
         folder_group.set_title("Foto map")
@@ -4022,7 +4034,7 @@ class MainWindow(Adw.ApplicationWindow):
         change_folder_btn.connect("clicked", lambda b: self.change_folder(dialog))
         self.folder_row.add_suffix(change_folder_btn)
         folder_group.add(self.folder_row)
-        page.add(folder_group)
+        display_page.add(folder_group)
 
         display_group = Adw.PreferencesGroup()
         display_group.set_title("Weergave")
@@ -4061,7 +4073,7 @@ class MainWindow(Adw.ApplicationWindow):
         thumb_row.add_suffix(thumb_reset_btn)
 
         display_group.add(thumb_row)
-        page.add(display_group)
+        display_page.add(display_group)
 
         dev_group = Adw.PreferencesGroup()
         dev_group.set_title("Geavanceerd")
@@ -4083,7 +4095,7 @@ class MainWindow(Adw.ApplicationWindow):
         dev_row.add_suffix(dev_btn)
         self._dev_btn = dev_btn
         dev_group.add(dev_row)
-        page.add(dev_group)
+        advanced_page.add(dev_group)
 
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title("Mapstructuur")
@@ -4118,7 +4130,7 @@ class MainWindow(Adw.ApplicationWindow):
         month_row.add_prefix(self.radio_month)
         month_row.set_activatable_widget(self.radio_month)
         structure_group.add(month_row)
-        page.add(structure_group)
+        import_page.add(structure_group)
 
         dup_group = Adw.PreferencesGroup()
         dup_group.set_title("Duplicate detectie")
@@ -4153,7 +4165,7 @@ class MainWindow(Adw.ApplicationWindow):
         loose_row.add_prefix(self.radio_loose)
         loose_row.set_activatable_widget(self.radio_loose)
         dup_group.add(loose_row)
-        page.add(dup_group)
+        import_page.add(dup_group)
 
         backup_group = Adw.PreferencesGroup()
         backup_group.set_title("Automatische backup")
@@ -4213,7 +4225,7 @@ class MainWindow(Adw.ApplicationWindow):
         change_backup_folder_btn.connect("clicked", self.on_settings_change_backup_folder)
         self.settings_backup_folder_row.add_suffix(change_backup_folder_btn)
         backup_group.add(self.settings_backup_folder_row)
-        page.add(backup_group)
+        import_page.add(backup_group)
 
         about_group = Adw.PreferencesGroup()
         about_group.set_title("Over")
@@ -4254,9 +4266,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._update_check_row.add_suffix(self._update_check_spinner)
 
         about_group.add(self._update_check_row)
-        page.add(about_group)
+        about_page.add(about_group)
 
-        dialog.add(page)
+        dialog.add(display_page)
+        dialog.add(import_page)
+        dialog.add(advanced_page)
+        dialog.add(about_page)
         dialog.present(self)
 
     def _on_thumb_size_changed(self, scale, row):
