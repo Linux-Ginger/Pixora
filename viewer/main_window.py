@@ -156,6 +156,9 @@ os.environ.setdefault("WEBKIT_FORCE_SANDBOX", "0")
 # Forceer GPU-compositing voor Leaflet (anders valt WebKit terug op
 # software rendering in sommige VMs, wat pan/zoom traag maakt).
 os.environ.setdefault("WEBKIT_FORCE_COMPOSITING_MODE", "1")
+# EGL/DMA-BUF renderer werkt vaak beter in VMs (VMware SVGA3D) dan GLX.
+os.environ.setdefault("WEBKIT_USE_EGL", "1")
+os.environ.setdefault("GDK_GL", "gles")
 
 # Probeer eerst WebKit 6.0 (GTK4-native, nieuwste). Daarna WebKit2 4.1 / 4.0.
 try:
