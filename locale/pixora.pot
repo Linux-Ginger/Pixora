@@ -117,6 +117,9 @@ msgstr ""
 msgid "Deselecteer alles"
 msgstr ""
 
+msgid "Developer mode toont Pixora met terminal-output en gebruikt de terminal-updater. Alleen aanzetten als je weet wat je doet."
+msgstr ""
+
 msgid "Doorgaan"
 msgstr ""
 
@@ -166,6 +169,9 @@ msgid "GUI-updater gestart"
 msgstr ""
 
 msgid "Geavanceerd"
+msgstr ""
+
+msgid "Geen externe schijven gevonden"
 msgstr ""
 
 msgid "Geen foto's gevonden"
@@ -285,6 +291,9 @@ msgstr ""
 msgid "Nee"
 msgstr ""
 
+msgid "Niet ingesteld"
+msgstr ""
+
 msgid "Nieuwste versie"
 msgstr ""
 
@@ -298,6 +307,9 @@ msgid "Normaal"
 msgstr ""
 
 msgid "OK"
+msgstr ""
+
+msgid "Onbekend"
 msgstr ""
 
 msgid "Ook licht bewerkte foto's worden gedetecteerd"
@@ -450,6 +462,9 @@ msgstr ""
 msgid "Terug naar standaard (200 px)"
 msgstr ""
 
+msgid "Thumbnail grootte"
+msgstr ""
+
 msgid "Thumbnail load done: {n} photos — UI ready"
 msgstr ""
 
@@ -457,6 +472,9 @@ msgid "Thumbs: {px}px — favorites: {n}"
 msgstr ""
 
 msgid "Update beschikbaar"
+msgstr ""
+
+msgid "Update beschikbaar: {v}"
 msgstr ""
 
 msgid "Verbind je iPhone of iPad"
@@ -472,6 +490,9 @@ msgid "Versie"
 msgstr ""
 
 msgid "Versie kiezen"
+msgstr ""
+
+msgid "Versie {v} beschikbaar"
 msgstr ""
 
 msgid "Verwijderen"
@@ -588,7 +609,22 @@ msgstr ""
 msgid "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"
 msgstr ""
 
+msgid "⚠️ iPhone niet herkend — probeer Instellingen > iPhone-verbinding"
+msgstr ""
+
+msgid "✅ iPhone klaar — tap Trust op je iPhone indien gevraagd"
+msgstr ""
+
+msgid "✅ iPhone verbonden"
+msgstr ""
+
 msgid "✕ Toon alle foto's"
+msgstr ""
+
+msgid "📱 iPhone gedetecteerd, even geduld…"
+msgstr ""
+
+msgid "🔧 Verbinding herstellen, even geduld…"
 msgstr ""
 
 msgid "🗺"

@@ -1126,7 +1126,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self._recovery_prompt_active:
             return False
         self._recovery_prompt_active = True
-        self._set_iphone_banner("📱 iPhone gedetecteerd, even geduld…")
+        self._set_iphone_banner(_("📱 iPhone gedetecteerd, even geduld…"))
         threading.Thread(target=self._iphone_recovery_flow, daemon=True).start()
         return False
 
@@ -1141,7 +1141,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Niet herkend — automatisch reset
         log_warn(_("iPhone niet herkend door usbmuxd — start auto-recovery"))
         GLib.idle_add(self._set_iphone_banner,
-                      "🔧 Verbinding herstellen, even geduld…")
+                      _("🔧 Verbinding herstellen, even geduld…"))
         reset_ok = False
         try:
             r = subprocess.run(
@@ -1181,8 +1181,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._recovery_prompt_active = False
         self._update_import_btn_state(True)
         self._set_iphone_banner(
-            "✅ iPhone klaar — tap Trust op je iPhone indien gevraagd"
-            if was_reset else "✅ iPhone verbonden"
+            _("✅ iPhone klaar — tap Trust op je iPhone indien gevraagd")
+            if was_reset else _("✅ iPhone verbonden")
         )
         GLib.timeout_add_seconds(4, self._clear_iphone_banner)
         return False
@@ -1190,7 +1190,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _iphone_flow_fail(self):
         self._recovery_prompt_active = False
         self._set_iphone_banner(
-            "⚠️ iPhone niet herkend — probeer Instellingen > iPhone-verbinding"
+            _("⚠️ iPhone niet herkend — probeer Instellingen > iPhone-verbinding")
         )
         GLib.timeout_add_seconds(8, self._clear_iphone_banner)
         return False
@@ -1320,7 +1320,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_update_message_dialog(self, new_version):
         dlg = Adw.AlertDialog(
-            heading="Update beschikbaar",
+            heading=_("Update beschikbaar"),
             body=f"Pixora {new_version} is beschikbaar. Wil je nu bijwerken?",
         )
         dlg.add_response("later", _("Later"))
@@ -1334,7 +1334,7 @@ class MainWindow(Adw.ApplicationWindow):
         if response == "bijwerken":
             self._open_installer()
         else:
-            self.update_banner.set_title(f"Update beschikbaar: {new_version}")
+            self.update_banner.set_title(_("Update beschikbaar: {v}").format(v=new_version))
             self.update_banner.set_revealed(True)
 
     def _on_update_banner_clicked(self, banner):
@@ -1402,7 +1402,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._update_check_row.add_suffix(ok_icon)
             self._update_check_row._extra_suffixes = [ok_icon]
         else:
-            self._update_check_row.set_subtitle(f"Versie {remote_version} beschikbaar")
+            self._update_check_row.set_subtitle(_("Versie {v} beschikbaar").format(v=remote_version))
             warn_icon = Gtk.Image.new_from_icon_name("emblem-important-symbolic")
             warn_icon.set_valign(Gtk.Align.CENTER)
             self._update_check_row.add_suffix(warn_icon)
@@ -4038,7 +4038,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.folder_row = Adw.ActionRow()
         self.folder_row.set_title(_("Huidige map"))
-        self.folder_row.set_subtitle(self.settings.get("photo_path", "Niet ingesteld"))
+        self.folder_row.set_subtitle(self.settings.get("photo_path") or _("Niet ingesteld"))
 
         change_folder_btn = Gtk.Button(label=_("Wijzigen"))
         change_folder_btn.add_css_class("flat")
@@ -4053,7 +4053,7 @@ class MainWindow(Adw.ApplicationWindow):
         display_group.set_description(_("Hoe foto's in het grid worden getoond"))
 
         thumb_row = Adw.ActionRow(
-            title="Thumbnail grootte",
+            title=_("Thumbnail grootte"),
             subtitle=f"{THUMB_SIZE} px"
         )
         thumb_adj = Gtk.Adjustment(
@@ -4112,8 +4112,7 @@ class MainWindow(Adw.ApplicationWindow):
         dev_group = Adw.PreferencesGroup()
         dev_group.set_title(_("Geavanceerd"))
         dev_group.set_description(
-            "Developer mode toont Pixora met terminal-output en gebruikt "
-            "de terminal-updater. Alleen aanzetten als je weet wat je doet."
+            _("Developer mode toont Pixora met terminal-output en gebruikt de terminal-updater. Alleen aanzetten als je weet wat je doet.")
         )
         current_dev = bool(self.settings.get("dev_mode", False))
         dev_row = Adw.ActionRow(
@@ -4221,7 +4220,7 @@ class MainWindow(Adw.ApplicationWindow):
             for uuid, label in self.settings_drives:
                 self.settings_drive_model.append(label)
         else:
-            self.settings_drive_model.append("Geen externe schijven gevonden")
+            self.settings_drive_model.append(_("Geen externe schijven gevonden"))
 
         self.settings_drive_combo = Gtk.DropDown(model=self.settings_drive_model)
         self.settings_drive_combo.set_size_request(220, -1)
@@ -4246,10 +4245,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_drive_row.set_sensitive(bool(self.settings.get("backup_uuid")))
         backup_group.add(self.settings_drive_row)
 
-        current_backup_path = self.settings.get("backup_path", "Niet ingesteld")
+        current_backup_path = self.settings.get("backup_path") or _("Niet ingesteld")
         self.settings_backup_folder_row = Adw.ActionRow(
-            title="Map op backup schijf",
-            subtitle=current_backup_path or "Niet ingesteld"
+            title=_("Map op backup schijf"),
+            subtitle=current_backup_path
         )
         self.settings_backup_folder_row.set_sensitive(bool(self.settings.get("backup_uuid")))
 
@@ -4280,8 +4279,8 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             installed_ver = open(installed_version_path).read().strip()
         except Exception:
-            installed_ver = "Onbekend"
-        version_row = Adw.ActionRow(title="Versie", subtitle=installed_ver)
+            installed_ver = _("Onbekend")
+        version_row = Adw.ActionRow(title=_("Versie"), subtitle=installed_ver)
         about_group.add(version_row)
 
         # Controleer op updates row
@@ -4597,7 +4596,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self.settings_drive_model.append(label)
             self.settings_drive_combo.set_sensitive(True)
         else:
-            self.settings_drive_model.append("Geen externe schijven gevonden")
+            self.settings_drive_model.append(_("Geen externe schijven gevonden"))
             self.settings_drive_combo.set_sensitive(False)
 
     def on_settings_change_backup_folder(self, btn):

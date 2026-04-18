@@ -118,6 +118,9 @@ msgstr "Deactivate"
 msgid "Deselecteer alles"
 msgstr "Deselecteer alles"
 
+msgid "Developer mode toont Pixora met terminal-output en gebruikt de terminal-updater. Alleen aanzetten als je weet wat je doet."
+msgstr "Developer mode shows Pixora with terminal output and uses the terminal updater. Only enable if you know what you're doing."
+
 msgid "Doorgaan"
 msgstr "Continue"
 
@@ -168,6 +171,9 @@ msgstr "GUI-updater gestart"
 
 msgid "Geavanceerd"
 msgstr "Advanced"
+
+msgid "Geen externe schijven gevonden"
+msgstr "No external drives found"
 
 msgid "Geen foto's gevonden"
 msgstr "No photos found"
@@ -286,6 +292,9 @@ msgstr "Name (Z-A)"
 msgid "Nee"
 msgstr "Nee"
 
+msgid "Niet ingesteld"
+msgstr "Not configured"
+
 msgid "Nieuwste versie"
 msgstr "Latest version"
 
@@ -300,6 +309,9 @@ msgstr "Normal"
 
 msgid "OK"
 msgstr "OK"
+
+msgid "Onbekend"
+msgstr "Unknown"
 
 msgid "Ook licht bewerkte foto's worden gedetecteerd"
 msgstr "Lightly edited photos are also detected"
@@ -451,6 +463,9 @@ msgstr "Terug naar galerij"
 msgid "Terug naar standaard (200 px)"
 msgstr "Reset to default (200 px)"
 
+msgid "Thumbnail grootte"
+msgstr "Thumbnail size"
+
 msgid "Thumbnail load done: {n} photos — UI ready"
 msgstr "Thumbnail load done: {n} photos — UI ready"
 
@@ -459,6 +474,9 @@ msgstr "Thumbs: {px}px — favorites: {n}"
 
 msgid "Update beschikbaar"
 msgstr "Update available"
+
+msgid "Update beschikbaar: {v}"
+msgstr "Update available: {v}"
 
 msgid "Verbind je iPhone of iPad"
 msgstr "Verbind je iPhone of iPad"
@@ -474,6 +492,9 @@ msgstr "Versie"
 
 msgid "Versie kiezen"
 msgstr "Choose version"
+
+msgid "Versie {v} beschikbaar"
+msgstr "Version {v} available"
 
 msgid "Verwijderen"
 msgstr "Delete"
@@ -589,8 +610,23 @@ msgstr "═══ Pixora gestart in Developer Mode ═══"
 msgid "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"
 msgstr "⚠ No internet connection — map tiles cannot be loaded"
 
+msgid "⚠️ iPhone niet herkend — probeer Instellingen > iPhone-verbinding"
+msgstr "⚠️ iPhone not recognised — try Settings > iPhone connection"
+
+msgid "✅ iPhone klaar — tap Trust op je iPhone indien gevraagd"
+msgstr "✅ iPhone ready — tap Trust on your iPhone if asked"
+
+msgid "✅ iPhone verbonden"
+msgstr "✅ iPhone connected"
+
 msgid "✕ Toon alle foto's"
 msgstr "✕ Show all photos"
+
+msgid "📱 iPhone gedetecteerd, even geduld…"
+msgstr "📱 iPhone detected, please wait…"
+
+msgid "🔧 Verbinding herstellen, even geduld…"
+msgstr "🔧 Restoring connection, please wait…"
 
 msgid "🗺"
 msgstr "🗺"
