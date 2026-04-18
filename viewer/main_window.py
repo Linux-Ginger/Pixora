@@ -1653,6 +1653,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.grid_box.set_margin_end(8)
 
         self.scroll.set_child(self.grid_box)
+        try:
+            vadj = self.scroll.get_vadjustment()
+            vadj.connect("value-changed", lambda *_: self._schedule_viewport_hydrate())
+            vadj.connect("changed", lambda *_: self._schedule_viewport_hydrate())
+        except Exception:
+            pass
         self.content_stack.add_named(self.scroll, "grid")
 
         status_page = Adw.StatusPage()
@@ -2286,6 +2292,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.grid_box.remove(child)
         self.thumb_widgets = {}
         self.date_widgets  = {}
+        self._hydrated_indices = set()
         self._selected.clear()
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
@@ -2317,8 +2324,14 @@ class MainWindow(Adw.ApplicationWindow):
         def fetch(idx):
             path = photos[idx]
             pb = load_thumbnail(path)
+            if pb is not None:
+                w, h = pb.get_width(), pb.get_height()
+            else:
+                w, h = THUMB_SIZE, THUMB_SIZE
+            pb = None
+            cache_path = get_cache_path(path, THUMB_SIZE)
             dur = get_video_duration(path) if is_video(path) else 0.0
-            return (idx, path, pb, dur)
+            return (idx, path, cache_path, w, h, dur)
 
         with ThreadPoolExecutor(max_workers=THUMB_WORKERS) as pool:
             for date_str, date_obj, indices in groups:
@@ -2389,6 +2402,93 @@ class MainWindow(Adw.ApplicationWindow):
         self._current_row_hbox.append(btn)
         self._current_row_width += needed
 
+    def _schedule_viewport_hydrate(self):
+        if getattr(self, "_viewport_hydrate_pending", False):
+            return
+        self._viewport_hydrate_pending = True
+        GLib.timeout_add(80, self._run_viewport_hydrate)
+
+    def _run_viewport_hydrate(self):
+        self._viewport_hydrate_pending = False
+        try:
+            self._hydrate_viewport()
+        except Exception as e:
+            log_error(f"viewport hydrate fout: {e}")
+        return False
+
+    def _hydrate_viewport(self):
+        if not hasattr(self, "scroll") or self.scroll is None:
+            return
+        try:
+            vadj = self.scroll.get_vadjustment()
+            v_page = vadj.get_page_size()
+        except Exception:
+            return
+        if v_page <= 0:
+            v_page = self.scroll.get_height() or 600
+        buffer_px = max(int(v_page), 400)
+        if not hasattr(self, "_hydrated_indices"):
+            self._hydrated_indices = set()
+        want = set()
+        for index, (btn, _check) in self.thumb_widgets.items():
+            if not hasattr(btn, "_pixora_cache_path"):
+                continue
+            try:
+                res = btn.translate_coordinates(self.scroll, 0, 0)
+            except Exception:
+                continue
+            if not res:
+                continue
+            ok = res[0]
+            if not ok:
+                continue
+            dst_y = res[2] if len(res) >= 3 else 0
+            h = btn.get_height() or THUMB_SIZE
+            btn_top = dst_y
+            btn_bottom = dst_y + h
+            if btn_bottom >= -buffer_px and btn_top <= v_page + buffer_px:
+                want.add(index)
+        to_hydrate = want - self._hydrated_indices
+        to_drop = self._hydrated_indices - want
+        for idx in to_hydrate:
+            self._hydrate_thumb(idx)
+        for idx in to_drop:
+            self._dehydrate_thumb(idx)
+        self._hydrated_indices = want
+
+    def _hydrate_thumb(self, index):
+        item = self.thumb_widgets.get(index)
+        if not item:
+            return
+        btn, _check = item
+        cache_path = getattr(btn, "_pixora_cache_path", None)
+        picture = getattr(btn, "_pixora_picture", None)
+        if not cache_path or picture is None:
+            return
+        if getattr(btn, "_pixora_has_pixbuf", False):
+            return
+        try:
+            if cache_path and os.path.exists(cache_path):
+                pb = GdkPixbuf.Pixbuf.new_from_file(cache_path)
+                picture.set_pixbuf(pb)
+                btn._pixora_has_pixbuf = True
+        except Exception:
+            pass
+
+    def _dehydrate_thumb(self, index):
+        item = self.thumb_widgets.get(index)
+        if not item:
+            return
+        btn, _check = item
+        picture = getattr(btn, "_pixora_picture", None)
+        if picture is None:
+            return
+        try:
+            picture.set_paintable(None)
+        except Exception:
+            pass
+        btn._pixora_has_pixbuf = False
+
     def _apply_batch(self, load_id, batch, loaded, total):
         if load_id != self._load_id:
             return False
@@ -2416,19 +2516,12 @@ class MainWindow(Adw.ApplicationWindow):
             tc['btn'] = p
             self._thumb_css = tc
         tc = self._thumb_css
-        for index, path, pixbuf, duration in batch:
-            if pixbuf:
-                picture = Gtk.Picture.new_for_pixbuf(pixbuf)
-                pb_w = pixbuf.get_width()
-                pb_h = pixbuf.get_height()
-                # Fix height, laat breedte meeschalen met aspect ratio
-                if pb_h > 0:
-                    width_at_thumb = max(1, int(pb_w * THUMB_SIZE / pb_h))
-                else:
-                    width_at_thumb = THUMB_SIZE
+        for index, path, cache_path, pb_w, pb_h, duration in batch:
+            if pb_h > 0:
+                width_at_thumb = max(1, int(pb_w * THUMB_SIZE / pb_h))
             else:
-                picture = Gtk.Picture()
                 width_at_thumb = THUMB_SIZE
+            picture = Gtk.Picture()
             picture.set_size_request(width_at_thumb, THUMB_SIZE)
             picture.set_content_fit(Gtk.ContentFit.CONTAIN)
             picture.set_hexpand(False)
@@ -2472,11 +2565,15 @@ class MainWindow(Adw.ApplicationWindow):
 
             idx = index
             btn.connect("clicked", lambda b, i=idx: self.on_thumb_clicked(i))
+            btn._pixora_cache_path = cache_path
+            btn._pixora_picture = picture
+            btn._pixora_index = index
             self._append_thumb_to_row(btn, width_at_thumb)
             # check_box wordt lazy aangemaakt bij selectie-modus
             self.thumb_widgets[index] = (btn, None)
             if path in self._favorites:
                 self._refresh_thumb_favorite(index)
+        self._schedule_viewport_hydrate()
         return False
 
     def _load_done(self, load_id, total):
@@ -2489,6 +2586,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label.set_text(cluster_lbl if cluster_lbl else f"{total} foto's")
         self._loading = False
         GLib.timeout_add(800, self._update_timeline_from_positions)
+        GLib.timeout_add(120, self._run_viewport_hydrate)
         return False
 
     def show_empty_state(self):
