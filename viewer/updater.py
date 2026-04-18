@@ -249,15 +249,29 @@ class UpdaterWindow(Adw.ApplicationWindow):
         return False
 
     def _on_relaunch(self, btn):
+        btn.set_sensitive(False)
+        self._close_btn.set_sensitive(False)
+        pixora_bin = os.path.expanduser("~/.local/bin/pixora")
+        if os.path.exists(pixora_bin):
+            cmd = [pixora_bin]
+        else:
+            cmd = [sys.executable, str(INSTALL_DIR / "viewer" / "main.py")]
         try:
             subprocess.Popen(
-                [sys.executable,
-                 str(INSTALL_DIR / "viewer" / "main.py")],
-                start_new_session=True
+                cmd,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
             )
         except Exception:
             pass
-        self.get_application().quit()
+        # Wacht 400ms voordat de updater sluit zodat de child process
+        # echt losgekoppeld is en niet door onze close-signalen wordt geraakt.
+        def _delayed_quit():
+            self.get_application().quit()
+            return False
+        GLib.timeout_add(400, _delayed_quit)
 
 
 class UpdaterApp(Adw.Application):
