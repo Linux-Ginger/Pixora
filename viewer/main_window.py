@@ -1542,16 +1542,6 @@ class MainWindow(Adw.ApplicationWindow):
         back_btn.connect("clicked", self.close_map)
         map_header.pack_start(back_btn)
 
-        zoom_in_btn = Gtk.Button(icon_name="zoom-in-symbolic")
-        zoom_in_btn.add_css_class("flat")
-        zoom_in_btn.connect("clicked", lambda _: self._map_widget and self._map_widget.zoom_by(1))
-        map_header.pack_end(zoom_in_btn)
-
-        zoom_out_btn = Gtk.Button(icon_name="zoom-out-symbolic")
-        zoom_out_btn.add_css_class("flat")
-        zoom_out_btn.connect("clicked", lambda _: self._map_widget and self._map_widget.zoom_by(-1))
-        map_header.pack_end(zoom_out_btn)
-
         self.map_title_label = Gtk.Label(label="Kaartweergave")
         self.map_title_label.add_css_class("dim-label")
         map_header.set_title_widget(self.map_title_label)
@@ -1711,7 +1701,25 @@ class MainWindow(Adw.ApplicationWindow):
             else:
                 self._cluster_location_label = f"Gefilterd ({len(valid)} foto's)"
             self.photo_count_label.set_text(self._cluster_location_label)
+            try:
+                self.clear_filter_btn.set_visible(True)
+            except Exception:
+                pass
             GLib.idle_add(self.start_load)
+
+    def on_clear_cluster_filter(self, btn=None):
+        if not hasattr(self, "_photos_before_cluster") or not self._photos_before_cluster:
+            return
+        log_info("Cluster-filter uitgezet → alle foto's")
+        self.photos = self._photos_before_cluster
+        self._photos_before_cluster = None
+        self._cluster_location_label = None
+        self.photo_count_label.set_text(f"{len(self.photos)} foto's")
+        try:
+            self.clear_filter_btn.set_visible(False)
+        except Exception:
+            pass
+        GLib.idle_add(self.start_load)
 
     def close_map(self, btn=None):
         log_info("Kaart gesloten")
@@ -2076,6 +2084,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label = Gtk.Label(label="0 foto's")
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
+
+        self.clear_filter_btn = Gtk.Button(label="✕ Toon alle foto's")
+        self.clear_filter_btn.add_css_class("flat")
+        self.clear_filter_btn.set_visible(False)
+        self.clear_filter_btn.connect("clicked", self.on_clear_cluster_filter)
+        normal_bar.pack_end(self.clear_filter_btn)
 
         self.bottom_stack.add_named(normal_bar, "normal")
 
@@ -2822,6 +2836,10 @@ class MainWindow(Adw.ApplicationWindow):
             self._photos_before_cluster = None
             self._cluster_location_label = None
             self.photo_count_label.set_text(f"{len(self.photos)} foto's")
+            try:
+                self.clear_filter_btn.set_visible(False)
+            except Exception:
+                pass
         self.main_stack.set_visible_child_name("grid")
         GLib.idle_add(self._close_viewer_cleanup)
 

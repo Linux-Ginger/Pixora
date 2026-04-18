@@ -89,6 +89,22 @@
     }
   });
 
+  // Directe offline-check: als browser al zegt offline → meld dat meteen.
+  // Anders: 6s geen enkele tile binnen → meld offline.
+  if (!navigator.onLine) {
+    setTimeout(function() {
+      document.getElementById('offline-banner').style.display = 'block';
+      sendToPixora({ type: 'map-offline' });
+    }, 200);
+  } else {
+    setTimeout(function() {
+      if (!firstTileLoaded) {
+        document.getElementById('offline-banner').style.display = 'block';
+        sendToPixora({ type: 'map-offline' });
+      }
+    }, 6000);
+  }
+
   let tileErrorCount = 0;
   let offlineNotified = false;
   tileLayer.on('tileerror', function() {
@@ -117,13 +133,20 @@
     offlineNotified = false;
   });
 
+  // Dedicated canvas renderer voor betere performance bij veel markers
+  const canvasRenderer = L.canvas({ padding: 0.5 });
+
   const cluster = L.markerClusterGroup({
     showCoverageOnHover: false,
     spiderfyOnMaxZoom: false,
     zoomToBoundsOnClick: false,
-    maxClusterRadius: 45,
+    maxClusterRadius: 60,
     animate: false,
     animateAddingMarkers: false,
+    chunkedLoading: true,
+    chunkInterval: 50,
+    chunkDelay: 20,
+    removeOutsideVisibleBounds: true,
     iconCreateFunction: function(c) {
       const count = c.getChildCount();
       const size = count < 10 ? 'cluster' : 'cluster-lg';
