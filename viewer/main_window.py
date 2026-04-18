@@ -2545,7 +2545,11 @@ class MainWindow(Adw.ApplicationWindow):
             p.load_from_string("box { background-color: #e95420; border-radius: 6px; min-width: 22px; min-height: 22px; }")
             tc['check_box'] = p
             p = Gtk.CssProvider()
-            p.load_from_string("button { border-radius: 8px; padding: 0; } button picture { border-radius: 8px; } button:hover { outline: 2px solid #e95420; outline-offset: -2px; border-radius: 8px; }")
+            p.load_from_string(
+                "button { border-radius: 8px; padding: 0; background: rgba(128,128,128,0.18); }"
+                "button picture { border-radius: 8px; }"
+                "button:hover { outline: 2px solid #e95420; outline-offset: -2px; border-radius: 8px; }"
+            )
             tc['btn'] = p
             self._thumb_css = tc
         tc = self._thumb_css
@@ -2592,7 +2596,6 @@ class MainWindow(Adw.ApplicationWindow):
                 p = Gtk.CssProvider()
                 p.load_from_string(
                     "box { background-color: rgba(0,0,0,0.55); border-radius: 50%; padding: 3px 6px; }"
-                    "label { color: #ffb300; font-size: 14px; font-weight: bold; }"
                 )
                 tc['fav_box'] = p
             fav_badge = Gtk.Box()
@@ -2600,10 +2603,16 @@ class MainWindow(Adw.ApplicationWindow):
             fav_badge.set_valign(Gtk.Align.START)
             fav_badge.set_margin_start(6)
             fav_badge.set_margin_top(6)
+            fav_badge.set_can_target(False)
+            fav_badge.set_can_focus(False)
             fav_badge.get_style_context().add_provider(
                 tc['fav_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
-            fav_label = Gtk.Label(label="★")
+            fav_label = Gtk.Label()
+            fav_label.set_use_markup(True)
+            fav_label.set_markup(
+                '<span foreground="#ffb300" size="large" weight="bold">★</span>'
+            )
             fav_badge.append(fav_label)
             fav_badge.set_visible(path in self._favorites)
             overlay.add_overlay(fav_badge)
