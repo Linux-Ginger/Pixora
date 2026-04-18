@@ -2,9 +2,8 @@
 
 # ─────────────────────────────────────────────
 #  Pixora — updater.sh
-#  Draait als root via pkexec (GUI-updater). Doet alles wat install.sh
-#  doet: apt-deps, git-pull, python pip packages, ownership-fix.
-#  Geen ASCII-art of terminal-interactie — output gaat naar de GUI log.
+#  Draait als root via pkexec. Emit "STEP:<key>:<label>" markers
+#  zodat de GUI-updater per stap een spinner/check kan tonen.
 # ─────────────────────────────────────────────
 
 set -e
@@ -31,47 +30,44 @@ if ! command -v apt-get &> /dev/null; then
     exit 1
 fi
 
-echo "[1/5] Systeem-dependencies controleren…"
+step() { echo "STEP:$1:$2"; }
+step_done() { echo "STEP:$1:DONE"; }
+
+step apt "Systeem packages controleren"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-    python3 \
-    python3-gi \
-    python3-gi-cairo \
-    gir1.2-gtk-4.0 \
-    gir1.2-adw-1 \
-    gir1.2-gudev-1.0 \
-    git \
-    ifuse \
-    libimobiledevice-utils \
-    usbmuxd \
-    ffmpeg \
-    python3-pip
+    python3 python3-gi python3-gi-cairo \
+    gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-gudev-1.0 \
+    git ifuse libimobiledevice-utils usbmuxd ffmpeg python3-pip >/dev/null 2>&1
+step_done apt
 
-echo "[2/5] WebKit typelib (voor kaart-weergave)…"
-apt-get install -y -qq gir1.2-webkit-6.0 2>/dev/null || \
-apt-get install -y -qq gir1.2-webkit2-4.1 2>/dev/null || true
+step webkit "WebKit typelib installeren"
+apt-get install -y -qq gir1.2-webkit-6.0 >/dev/null 2>&1 || \
+apt-get install -y -qq gir1.2-webkit2-4.1 >/dev/null 2>&1 || true
+step_done webkit
 
-echo "[3/5] Python packages (Pillow, imagehash, watchdog)…"
+step pip "Python packages installeren"
 runuser -u "$TARGET_USER" -- python3 -m pip install -q \
     --break-system-packages \
-    Pillow pillow-heif imagehash watchdog || true
+    Pillow pillow-heif imagehash watchdog >/dev/null 2>&1 || true
+step_done pip
 
-echo "[4/5] Pixora ophalen van GitHub…"
+step clone "Pixora ophalen van GitHub"
 if [ -d "$INSTALL_DIR/.git" ]; then
-    runuser -u "$TARGET_USER" -- git -C "$INSTALL_DIR" fetch -q origin
-    runuser -u "$TARGET_USER" -- git -C "$INSTALL_DIR" reset --hard origin/main -q
+    runuser -u "$TARGET_USER" -- git -C "$INSTALL_DIR" fetch -q origin >/dev/null 2>&1
+    runuser -u "$TARGET_USER" -- git -C "$INSTALL_DIR" reset --hard origin/main -q >/dev/null 2>&1
 else
     rm -rf "$INSTALL_DIR"
     mkdir -p "$(dirname "$INSTALL_DIR")"
     chown "$RUN_UID:$TARGET_GID" "$(dirname "$INSTALL_DIR")"
-    runuser -u "$TARGET_USER" -- git clone -q "$REPO_URL" "$INSTALL_DIR"
+    runuser -u "$TARGET_USER" -- git clone -q "$REPO_URL" "$INSTALL_DIR" >/dev/null 2>&1
 fi
+step_done clone
 
-echo "[5/5] Versie-marker + AppArmor profile + usbmuxd-service…"
+step finalize "Configuratie en services"
 mkdir -p "$(dirname "$VERSION_FILE")"
 cp -f "$INSTALL_DIR/version.txt" "$VERSION_FILE"
 chown -R "$RUN_UID:$TARGET_GID" "$INSTALL_DIR" "$(dirname "$VERSION_FILE")"
 
-# AppArmor profile (voor WebKit sandbox op Ubuntu 24.04+)
 if [ -d /etc/apparmor.d ]; then
     cat > /etc/apparmor.d/pixora << 'PROFILE_EOF'
 abi <abi/4.0>,
@@ -82,12 +78,8 @@ profile pixora flags=(unconfined) {
   include if exists <local/pixora>
 }
 PROFILE_EOF
-    systemctl reload apparmor 2>/dev/null || true
+    systemctl reload apparmor >/dev/null 2>&1 || true
 fi
 
-# usbmuxd-service actief voor iPhone-import
-systemctl enable --now usbmuxd 2>/dev/null || true
-
-NEW_VERSION="$(cat "$INSTALL_DIR/version.txt")"
-echo ""
-echo "Klaar — Pixora is bijgewerkt naar versie $NEW_VERSION."
+systemctl enable --now usbmuxd >/dev/null 2>&1 || true
+step_done finalize
