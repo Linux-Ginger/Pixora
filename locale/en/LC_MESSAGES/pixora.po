@@ -1289,3 +1289,6 @@ msgstr "Pixora is backing up to your USB drive. Closing now will interrupt the b
 
 msgid "Toch sluiten"
 msgstr "Close anyway"
+
+msgid "Drive-scan: {n} externe schijven gevonden"
+msgstr "Drive scan: {n} external drives found"

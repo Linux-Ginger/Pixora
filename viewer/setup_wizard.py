@@ -510,13 +510,15 @@ class SetupWizard(Adw.Window):
             self.drive_model.remove(0)
 
         self.drives = drives
+        # Combo blijft bruikbaar zolang backup aan staat, ook als er (nog)
+        # geen schijven zijn. Dan kan user de refresh-knop opnieuw gebruiken.
+        backup_on = self.backup_switch.get_active() if hasattr(self, "backup_switch") else True
         if drives:
             for uuid, label in drives:
                 self.drive_model.append(label)
-            self.drive_combo.set_sensitive(True)
         else:
             self.drive_model.append(_("Geen externe schijven gevonden"))
-            self.drive_combo.set_sensitive(False)
+        self.drive_combo.set_sensitive(backup_on)
 
         return False
 

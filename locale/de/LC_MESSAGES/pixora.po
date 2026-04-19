@@ -1280,3 +1280,6 @@ msgstr "Pixora sichert gerade auf dein USB-Laufwerk. Wenn du jetzt schließt wir
 
 msgid "Toch sluiten"
 msgstr "Trotzdem schließen"
+
+msgid "Drive-scan: {n} externe schijven gevonden"
+msgstr "Laufwerk-Scan: {n} externe Laufwerke gefunden"

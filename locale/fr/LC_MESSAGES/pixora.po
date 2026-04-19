@@ -1280,3 +1280,6 @@ msgstr "Pixora sauvegarde vers votre disque USB. Fermer maintenant interrompra l
 
 msgid "Toch sluiten"
 msgstr "Fermer quand même"
+
+msgid "Drive-scan: {n} externe schijven gevonden"
+msgstr "Scan des lecteurs : {n} lecteurs externes trouvés"

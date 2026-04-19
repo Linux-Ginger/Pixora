@@ -311,34 +311,61 @@ def save_favorites(favorites):
         pass
 
 def get_available_drives():
+    """Zoek aangesloten drives die geschikt zijn als backup-target.
+    Een drive komt in aanmerking als:
+      - fstype in BACKUP_FSTYPES (ext4, ntfs, exfat, …)
+      - hotplug=True OF gemount onder /media/*, /run/media/*, /mnt/* (veel
+        USB-sticks/HDDs worden zo gemount ook al is HOTPLUG=0)
+      - NIET gemount op /, /boot, /home, /boot/efi (systeem-drives nooit
+        als backup-target)."""
     drives = []
+    SYS_MOUNTS = {"/", "/boot", "/boot/efi", "/home", "/var", "/usr", "/etc"}
+    EXTERNAL_PREFIXES = ("/media/", "/run/media/", "/mnt/")
+    seen_uuids = set()
     try:
         result = subprocess.run(
-            ["lsblk", "-o", "NAME,UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT,HOTPLUG", "-J"],
-            capture_output=True, text=True
+            ["lsblk", "-o", "NAME,UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT,HOTPLUG,RM,TRAN", "-J"],
+            capture_output=True, text=True, timeout=5
         )
         data = json.loads(result.stdout)
-        def process_device(device):
-            hotplug = device.get("hotplug", False)
-            if not hotplug:
-                return
+
+        def _is_external(mountpoint, hotplug, rm, tran):
+            """Extern = hotplug, of removable-flag, of USB-transport, of
+            gemount onder /media/, /run/media/, /mnt/."""
+            if hotplug or rm:
+                return True
+            if tran in ("usb", "ieee1394"):
+                return True
+            if mountpoint and any(mountpoint.startswith(p) for p in EXTERNAL_PREFIXES):
+                return True
+            return False
+
+        def process_device(device, parent_hotplug=False, parent_rm=False, parent_tran=""):
+            hotplug = bool(device.get("hotplug", False)) or parent_hotplug
+            rm = bool(device.get("rm", False)) or parent_rm
+            tran = (device.get("tran") or parent_tran or "").lower()
             uuid       = device.get("uuid")
             fstype     = (device.get("fstype") or "").lower()
             label      = (device.get("label") or "").strip()
             size       = device.get("size") or ""
             mountpoint = (device.get("mountpoint") or "").strip()
-            if uuid and fstype in BACKUP_FSTYPES:
-                display = (f"💾  {label}  ({size})" if label else
-                           f"💾  {mountpoint}  ({size})" if mountpoint else
-                           f"💾  {_('Externe schijf')}  ({size})")
-                drives.append((uuid, display))
+            if mountpoint in SYS_MOUNTS:
+                pass  # skip system partition (maar wel children bekijken)
+            elif uuid and fstype in BACKUP_FSTYPES:
+                if _is_external(mountpoint, hotplug, rm, tran) and uuid not in seen_uuids:
+                    seen_uuids.add(uuid)
+                    display = (f"💾  {label}  ({size})" if label else
+                               f"💾  {mountpoint}  ({size})" if mountpoint else
+                               f"💾  {_('Externe schijf')}  ({size})")
+                    drives.append((uuid, display))
             for child in device.get("children", []):
-                child["hotplug"] = hotplug
-                process_device(child)
+                process_device(child, hotplug, rm, tran)
+
         for device in data.get("blockdevices", []):
             process_device(device)
     except Exception as e:
         log_error(_("Drive detectie fout: {err}").format(err=e))
+    log_info(_("Drive-scan: {n} externe schijven gevonden").format(n=len(drives)))
     return drives
 
 def _cmd_available_bk(cmd):
@@ -5172,13 +5199,18 @@ class MainWindow(Adw.ApplicationWindow):
         while self.settings_drive_model.get_n_items() > 0:
             self.settings_drive_model.remove(0)
         self.settings_drives = get_available_drives()
+        # Combo blijft sensitive zolang de backup-switch aan staat, ook als
+        # de lijst (nog) leeg is — anders kan de gebruiker na een refresh-
+        # mislukking nergens meer op klikken.
+        backup_enabled = bool(self.settings.get("backup_uuid")) or \
+            (hasattr(self, "settings_backup_switch") and
+             self.settings_backup_switch.get_active())
         if self.settings_drives:
             for uuid, label in self.settings_drives:
                 self.settings_drive_model.append(label)
-            self.settings_drive_combo.set_sensitive(True)
         else:
             self.settings_drive_model.append(_("Geen externe schijven gevonden"))
-            self.settings_drive_combo.set_sensitive(False)
+        self.settings_drive_combo.set_sensitive(backup_enabled)
 
     def on_settings_change_backup_folder(self, btn):
         dialog = Gtk.FileDialog()
