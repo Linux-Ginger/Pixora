@@ -55,7 +55,9 @@ except ImportError:
 CONFIG_PATH  = Path.home() / ".config" / "pixora" / "settings.json"
 CACHE_DIR    = Path.home() / ".cache"  / "pixora"
 HASH_CACHE   = CACHE_DIR / "hashes.json"
-MOUNT_POINT  = Path(tempfile.gettempdir()) / "pixora_iphone"
+# Mount-point uniek per user (voorkomt conflict tussen twee gelijktijdige
+# Pixora-instances op dezelfde machine, of stale mounts van andere users).
+MOUNT_POINT  = Path(tempfile.gettempdir()) / f"pixora_iphone_{os.getuid()}"
 
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
 SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".dng", ".mp4", ".mov", ".m4v", ".webp", ".gif", ".tiff", ".tif", ".3gp", ".bmp"}

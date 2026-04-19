@@ -3582,17 +3582,23 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         if ts_s in self._preview_cache:
             return False
+        if not self.photos or not (0 <= self.current_index < len(self.photos)):
+            return False
         self._preview_cache[ts_s] = None  # mark loading
         self._preview_extracting = True
         path = self.photos[self.current_index]
+        # Koppel extractie aan de huidige viewer-load-id: als user verspringt
+        # naar een andere video voordat ffmpeg klaar is, vallen de late
+        # callbacks weg en zetten we geen frame van een oude video op de UI.
+        load_id = self._viewer_load_id
         threading.Thread(
             target=self._extract_preview_frame,
-            args=(path, ts_s),
+            args=(path, ts_s, load_id),
             daemon=True
         ).start()
         return False
 
-    def _extract_preview_frame(self, path, ts_s):
+    def _extract_preview_frame(self, path, ts_s, load_id):
         import tempfile
         try:
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
@@ -3602,19 +3608,26 @@ class MainWindow(Adw.ApplicationWindow):
                  "-vframes", "1", "-vf", "scale=160:-1", tmp, "-y"],
                 capture_output=True, timeout=8
             )
+            if load_id != self._viewer_load_id:
+                # User is al doorgeklikt — verwerp resultaat.
+                os.unlink(tmp)
+                return
             pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(tmp, 160, 90, True)
             os.unlink(tmp)
             self._preview_cache[ts_s] = pb
             self._preview_cache.move_to_end(ts_s)
             while len(self._preview_cache) > 25:
                 self._preview_cache.popitem(last=False)
-            GLib.idle_add(self._apply_preview_frame, ts_s)
+            GLib.idle_add(self._apply_preview_frame, ts_s, load_id)
         except Exception:
             pass
         finally:
             self._preview_extracting = False
 
-    def _apply_preview_frame(self, ts_s):
+    def _apply_preview_frame(self, ts_s, load_id=None):
+        # Skip als we inmiddels op een andere foto/video zitten.
+        if load_id is not None and load_id != self._viewer_load_id:
+            return False
         pb = self._preview_cache.get(ts_s)
         if pb:
             self._preview_cache.move_to_end(ts_s)
