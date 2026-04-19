@@ -3,6 +3,7 @@ msgid ""
 msgstr ""
 "Language: nl\n"
 "Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 msgid "0 foto's"
 msgstr "0 foto's"
@@ -634,3 +635,226 @@ msgstr "🗺"
 msgid "🗺 laden..."
 msgstr "🗺 laden..."
 
+
+# ── v1.12.7: nieuwe strings ──────────────────────────────────────────
+
+msgid "Externe schijf"
+msgstr "Externe schijf"
+
+msgid "Drive detectie fout: {err}"
+msgstr "Drive detectie fout: {err}"
+
+msgid "WebKitGTK kon niet geladen worden."
+msgstr "WebKitGTK kon niet geladen worden."
+
+msgid "Installeer een van:"
+msgstr "Installeer een van:"
+
+msgid "Technische fout"
+msgstr "Technische fout"
+
+msgid "WebKit niet beschikbaar: {err}"
+msgstr "WebKit niet beschikbaar: {err}"
+
+msgid "WebView init crashte:\n{tb}"
+msgstr "WebView init crashte:\n{tb}"
+
+msgid "Kaart-weergave kon niet starten."
+msgstr "Kaart-weergave kon niet starten."
+
+msgid "Fout: {err}"
+msgstr "Fout: {err}"
+
+msgid "Check /home/beau/.cache/pixora/pixora.log voor meer."
+msgstr "Check /home/beau/.cache/pixora/pixora.log voor meer."
+
+msgid "Verwijder uit favorieten (F)"
+msgstr "Verwijder uit favorieten (F)"
+
+msgid "Foto verwijderen?"
+msgstr "Foto verwijderen?"
+
+msgid "Weet je zeker dat je '{name}' wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+msgstr "Weet je zeker dat je '{name}' wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+
+msgid "Opslaan mislukt"
+msgstr "Opslaan mislukt"
+
+msgid "Gefilterd op locatie: {loc}"
+msgstr "Gefilterd op locatie: {loc}"
+
+msgid "Gefilterd ({count})"
+msgstr "Gefilterd ({count})"
+
+msgid "{count} (favorieten)"
+msgstr "{count} (favorieten)"
+
+msgid "usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust."
+msgstr "usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust."
+
+msgid "Wachtwoord geannuleerd of pkexec niet beschikbaar."
+msgstr "Wachtwoord geannuleerd of pkexec niet beschikbaar."
+
+msgid "Herstart mislukt (code {code}).\n{err}"
+msgstr "Herstart mislukt (code {code}).\n{err}"
+
+msgid "pkexec niet gevonden. Voer handmatig uit:\n  sudo killall usbmuxd; sudo usbmuxd"
+msgstr "pkexec niet gevonden. Voer handmatig uit:\n  sudo killall usbmuxd; sudo usbmuxd"
+
+msgid "Herstart duurde te lang (timeout)."
+msgstr "Herstart duurde te lang (timeout)."
+
+msgid "Onverwachte fout: {err}"
+msgstr "Onverwachte fout: {err}"
+
+msgid "Relaunch na taal-wissel fout: {err}"
+msgstr "Relaunch na taal-wissel fout: {err}"
+
+msgid "Developer mode activeren?"
+msgstr "Developer mode activeren?"
+
+msgid "Bij dev mode start Pixora in een terminal en gaan updates via de terminal zodat je output kunt zien. Pixora herstart direct."
+msgstr "Bij dev mode start Pixora in een terminal en gaan updates via de terminal zodat je output kunt zien. Pixora herstart direct."
+
+msgid "Developer mode deactiveren?"
+msgstr "Developer mode deactiveren?"
+
+msgid "Pixora start daarna zonder terminal en gebruikt de GUI-updater."
+msgstr "Pixora start daarna zonder terminal en gebruikt de GUI-updater."
+
+msgid "Sluit je iPhone of iPad aan via een USB-kabel en ontgrendel het scherm.\nAls je apparaat vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'."
+msgstr "Sluit je iPhone of iPad aan via een USB-kabel en ontgrendel het scherm.\nAls je apparaat vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'."
+
+msgid "USB-kabel"
+msgstr "USB-kabel"
+
+msgid "Gebruik bij voorkeur de originele Apple-kabel"
+msgstr "Gebruik bij voorkeur de originele Apple-kabel"
+
+msgid "Vertrouw deze computer"
+msgstr "Vertrouw deze computer"
+
+msgid "Tik op 'Vertrouw' als je apparaat dat vraagt"
+msgstr "Tik op 'Vertrouw' als je apparaat dat vraagt"
+
+msgid "Ontgrendeld scherm"
+msgstr "Ontgrendeld scherm"
+
+msgid "Zorg dat je apparaat ontgrendeld is tijdens de import"
+msgstr "Zorg dat je apparaat ontgrendeld is tijdens de import"
+
+msgid "Gebruik een blauwe USB-poort"
+msgstr "Gebruik een blauwe USB-poort"
+
+msgid "USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten"
+msgstr "USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten"
+
+msgid "iCloud foto's"
+msgstr "iCloud foto's"
+
+msgid "iCloud Foto's uitgeschakeld? Dan staan alle foto's lokaal op je toestel en worden ze allemaal gevonden."
+msgstr "iCloud Foto's uitgeschakeld? Dan staan alle foto's lokaal op je toestel en worden ze allemaal gevonden."
+
+msgid "Bestandsformaat"
+msgstr "Bestandsformaat"
+
+msgid "Zet op je apparaat: Instellingen → Foto's → 'Zet over naar Mac of pc' → 'Behoud originelen'"
+msgstr "Zet op je apparaat: Instellingen → Foto's → 'Zet over naar Mac of pc' → 'Behoud originelen'"
+
+msgid "Apparaat losgekoppeld"
+msgstr "Apparaat losgekoppeld"
+
+msgid "Je apparaat is losgekoppeld tijdens het selecteren van foto's.\nSluit het apparaat opnieuw aan en probeer het opnieuw."
+msgstr "Je apparaat is losgekoppeld tijdens het selecteren van foto's.\nSluit het apparaat opnieuw aan en probeer het opnieuw."
+
+msgid "Apparaat koppelen…"
+msgstr "Apparaat koppelen…"
+
+msgid "Even geduld, dit duurt maar even."
+msgstr "Even geduld, dit duurt maar even."
+
+msgid "ifuse of libimobiledevice is niet geïnstalleerd. Installeer de vereiste pakketten hieronder."
+msgstr "ifuse of libimobiledevice is niet geïnstalleerd. Installeer de vereiste pakketten hieronder."
+
+msgid "Kon het apparaat niet koppelen. Zorg dat het scherm ontgrendeld is en tik op 'Vertrouw' als dat wordt gevraagd."
+msgstr "Kon het apparaat niet koppelen. Zorg dat het scherm ontgrendeld is en tik op 'Vertrouw' als dat wordt gevraagd."
+
+msgid "Foto's scannen…"
+msgstr "Foto's scannen…"
+
+msgid "Zoeken naar foto's en video's op je apparaat."
+msgstr "Zoeken naar foto's en video's op je apparaat."
+
+msgid "Kies welke foto's en video's je wilt importeren.\n💡 Tip: leeg eerst de prullenbak op je iPhone om verwijderde foto's uit te sluiten."
+msgstr "Kies welke foto's en video's je wilt importeren.\n💡 Tip: leeg eerst de prullenbak op je iPhone om verwijderde foto's uit te sluiten."
+
+msgid "Pixora importeert foto's en video's van je iPhone,\ndetecteert duplicaten en maakt automatisch backups.\n\nDeze wizard helpt je Pixora instellen in een paar stappen."
+msgstr "Pixora importeert foto's en video's van je iPhone,\ndetecteert duplicaten en maakt automatisch backups.\n\nDeze wizard helpt je Pixora instellen in een paar stappen."
+
+msgid "Kies een map op je computer waar Pixora\nje foto's en video's naartoe kopieert."
+msgstr "Kies een map op je computer waar Pixora\nje foto's en video's naartoe kopieert."
+
+msgid "Pixora kan na elke import automatisch een backup\nmaken naar een externe USB schijf of HDD."
+msgstr "Pixora kan na elke import automatisch een backup\nmaken naar een externe USB schijf of HDD."
+
+msgid "⚠️  Kies een backup schijf om door te gaan"
+msgstr "⚠️  Kies een backup schijf om door te gaan"
+
+msgid "Pixora vergelijkt foto's visueel op inhoud.\nStel in hoe streng de detectie moet zijn."
+msgstr "Pixora vergelijkt foto's visueel op inhoud.\nStel in hoe streng de detectie moet zijn."
+
+msgid "Geen map gekozen"
+msgstr "Geen map gekozen"
+
+msgid "Kies een map waar je foto's opgeslagen worden."
+msgstr "Kies een map waar je foto's opgeslagen worden."
+
+msgid "⚠️  Kies ook een map op de backup schijf"
+msgstr "⚠️  Kies ook een map op de backup schijf"
+
+msgid "Voltooien"
+msgstr "Voltooien"
+
+msgid "⚠️  Kies een map op de backup schijf, niet op je computer"
+msgstr "⚠️  Kies een map op de backup schijf, niet op je computer"
+
+msgid "pkexec niet gevonden. Installeer policykit-1."
+msgstr "pkexec niet gevonden. Installeer policykit-1."
+
+msgid "Pixora is bijgewerkt."
+msgstr "Pixora is bijgewerkt."
+
+msgid "Update mislukt."
+msgstr "Update mislukt."
+
+# ── Plural forms ─────────────────────────────────────────────────────
+
+msgid "%d foto"
+msgid_plural "%d foto's"
+msgstr[0] "%d foto"
+msgstr[1] "%d foto's"
+
+msgid "%d foto verwijderen?"
+msgid_plural "%d foto's verwijderen?"
+msgstr[0] "%d foto verwijderen?"
+msgstr[1] "%d foto's verwijderen?"
+
+msgid "Weet je zeker dat je %d foto wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+msgid_plural "Weet je zeker dat je %d foto's wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+msgstr[0] "Weet je zeker dat je %d foto wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+msgstr[1] "Weet je zeker dat je %d foto's wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+
+msgid "%d verwijderen"
+msgid_plural "%d verwijderen"
+msgstr[0] "%d verwijderen"
+msgstr[1] "%d verwijderen"
+
+msgid "%d bestand gevonden"
+msgid_plural "%d bestanden gevonden"
+msgstr[0] "%d bestand gevonden"
+msgstr[1] "%d bestanden gevonden"
+
+msgid "%d foto lijkt al in je archief te staan. Kies wat je wilt doen, of gebruik de knoppen onderaan."
+msgid_plural "%d foto's lijken al in je archief te staan. Kies per foto wat je wilt doen, of gebruik de knoppen onderaan voor alles tegelijk."
+msgstr[0] "%d foto lijkt al in je archief te staan. Kies wat je wilt doen, of gebruik de knoppen onderaan."
+msgstr[1] "%d foto's lijken al in je archief te staan. Kies per foto wat je wilt doen, of gebruik de knoppen onderaan voor alles tegelijk."

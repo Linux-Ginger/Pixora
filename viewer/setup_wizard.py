@@ -60,7 +60,7 @@ def get_available_drives():
                 elif mountpoint:
                     display = f"💾  {mountpoint}  ({size})"
                 else:
-                    display = f"💾  Externe schijf  ({size})"
+                    display = f"💾  {_('Externe schijf')}  ({size})"
                 drives.append((uuid, display))
 
             for child in device.get("children", []):
@@ -183,9 +183,9 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label="Pixora importeert foto's en video's van je iPhone,\n"
-                  "detecteert duplicaten en maakt automatisch backups.\n\n"
-                  "Deze wizard helpt je Pixora instellen in een paar stappen."
+            label=_("Pixora importeert foto's en video's van je iPhone,\n"
+                    "detecteert duplicaten en maakt automatisch backups.\n\n"
+                    "Deze wizard helpt je Pixora instellen in een paar stappen.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.CENTER)
@@ -210,8 +210,8 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label="Kies een map op je computer waar Pixora\n"
-                  "je foto's en video's naartoe kopieert."
+            label=_("Kies een map op je computer waar Pixora\n"
+                    "je foto's en video's naartoe kopieert.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -248,8 +248,8 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label="Pixora kan na elke import automatisch een backup\n"
-                  "maken naar een externe USB schijf of HDD."
+            label=_("Pixora kan na elke import automatisch een backup\n"
+                    "maken naar een externe USB schijf of HDD.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -304,7 +304,7 @@ class SetupWizard(Adw.Window):
         self.backup_folder_row.set_sensitive(False)
         group.add(self.backup_folder_row)
 
-        self.backup_error = Gtk.Label(label="⚠️  Kies een backup schijf om door te gaan")
+        self.backup_error = Gtk.Label(label=_("⚠️  Kies een backup schijf om door te gaan"))
         self.backup_error.add_css_class("error")
         self.backup_error.set_halign(Gtk.Align.START)
         self.backup_error.set_visible(False)
@@ -329,8 +329,8 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label="Pixora vergelijkt foto's visueel op inhoud.\n"
-                  "Stel in hoe streng de detectie moet zijn."
+            label=_("Pixora vergelijkt foto's visueel op inhoud.\n"
+                    "Stel in hoe streng de detectie moet zijn.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -374,8 +374,8 @@ class SetupWizard(Adw.Window):
             if not self.folder_entry.get_text().strip():
                 dialog = Adw.MessageDialog(
                     transient_for=self,
-                    heading="Geen map gekozen",
-                    body="Kies een map waar je foto's opgeslagen worden."
+                    heading=_("Geen map gekozen"),
+                    body=_("Kies een map waar je foto's opgeslagen worden.")
                 )
                 dialog.add_response("ok", _("OK"))
                 dialog.present()
@@ -384,11 +384,11 @@ class SetupWizard(Adw.Window):
         if page == "backup":
             if self.backup_switch.get_active():
                 if not self.drives or self.drive_combo.get_selected() >= len(self.drives):
-                    self.backup_error.set_label("⚠️  Kies een backup schijf om door te gaan")
+                    self.backup_error.set_label(_("⚠️  Kies een backup schijf om door te gaan"))
                     self.backup_error.set_visible(True)
                     return
                 if not self.selected_backup_path:
-                    self.backup_error.set_label("⚠️  Kies ook een map op de backup schijf")
+                    self.backup_error.set_label(_("⚠️  Kies ook een map op de backup schijf"))
                     self.backup_error.set_visible(True)
                     return
             self.backup_error.set_visible(False)
@@ -397,7 +397,7 @@ class SetupWizard(Adw.Window):
             self.current += 1
             self.stack.set_visible_child_name(self.pages[self.current])
             self.back_btn.set_visible(True)
-            self.next_btn.set_label("Voltooien" if self.current == len(self.pages) - 1 else "Volgende")
+            self.next_btn.set_label(_("Voltooien") if self.current == len(self.pages) - 1 else _("Volgende"))
         else:
             self._save_and_finish()
 
@@ -480,7 +480,7 @@ class SetupWizard(Adw.Window):
                     uuid = self.drives[selected][0]
                     mountpoint = self._get_mountpoint_for_uuid(uuid)
                     if mountpoint and not chosen_path.startswith(mountpoint):
-                        self.backup_error.set_label("⚠️  Kies een map op de backup schijf, niet op je computer")
+                        self.backup_error.set_label(_("⚠️  Kies een map op de backup schijf, niet op je computer"))
                         self.backup_error.set_visible(True)
                         self.selected_backup_path = None
                         self.backup_folder_row.set_subtitle(_("Nog geen map gekozen"))

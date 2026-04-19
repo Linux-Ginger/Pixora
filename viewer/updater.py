@@ -227,7 +227,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
             )
         except FileNotFoundError:
             GLib.idle_add(self._finish, False,
-                          "pkexec niet gevonden. Installeer policykit-1.")
+                          _("pkexec niet gevonden. Installeer policykit-1."))
             return
 
         for line in proc.stdout:
@@ -242,7 +242,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
         proc.wait()
         ok = (proc.returncode == 0)
         GLib.idle_add(self._finish, ok,
-                      "Pixora is bijgewerkt." if ok else "Update mislukt.")
+                      _("Pixora is bijgewerkt.") if ok else _("Update mislukt."))
 
     def _finish(self, ok, message):
         if self._pulse_timer:

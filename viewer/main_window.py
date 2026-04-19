@@ -33,6 +33,7 @@ _translation = _gettext_mod.translation(
     "pixora", localedir=_LOCALE_DIR, languages=[_lang], fallback=True
 )
 _ = _translation.gettext
+ngettext = _translation.ngettext
 _translation.install()  # maakt _() ook als builtin beschikbaar
 
 # ── Dev-mode logging ─────────────────────────────────────────────────
@@ -283,7 +284,7 @@ def get_available_drives():
             if uuid and fstype in BACKUP_FSTYPES:
                 display = (f"💾  {label}  ({size})" if label else
                            f"💾  {mountpoint}  ({size})" if mountpoint else
-                           f"💾  Externe schijf  ({size})")
+                           f"💾  {_('Externe schijf')}  ({size})")
                 drives.append((uuid, display))
             for child in device.get("children", []):
                 child["hotplug"] = hotplug
@@ -291,7 +292,7 @@ def get_available_drives():
         for device in data.get("blockdevices", []):
             process_device(device)
     except Exception as e:
-        log_error(f"Drive detectie fout: {e}")
+        log_error(_("Drive detectie fout: {err}").format(err=e))
     return drives
 
 def get_mountpoint_for_uuid(uuid):
@@ -733,13 +734,13 @@ class MapWidget(Gtk.Box):
 
         if not WEBKIT_AVAILABLE:
             self._show_fallback(
-                "WebKitGTK kon niet geladen worden.\n\n"
-                "Installeer een van:\n"
+                _("WebKitGTK kon niet geladen worden.") + "\n\n"
+                + _("Installeer een van:") + "\n"
                 "  sudo apt install gir1.2-webkit-6.0\n"
                 "  sudo apt install gir1.2-webkit2-4.1\n"
-                + (f"\nTechnische fout: {_webkit_load_error}" if _webkit_load_error else "")
+                + (f"\n{_('Technische fout')}: {_webkit_load_error}" if _webkit_load_error else "")
             )
-            log_error(f"WebKit niet beschikbaar: {_webkit_load_error}")
+            log_error(_("WebKit niet beschikbaar: {err}").format(err=_webkit_load_error))
             return
 
         try:
@@ -747,10 +748,11 @@ class MapWidget(Gtk.Box):
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
-            log_error(f"WebView init crashte:\n{tb}")
+            log_error(_("WebView init crashte:\n{tb}").format(tb=tb))
             self._show_fallback(
-                "Kaart-weergave kon niet starten.\n\n"
-                f"Fout: {e}\n\nCheck /home/beau/.cache/pixora/pixora.log voor meer."
+                _("Kaart-weergave kon niet starten.") + "\n\n"
+                + _("Fout: {err}").format(err=e) + "\n\n"
+                + _("Check /home/beau/.cache/pixora/pixora.log voor meer.")
             )
 
     def _show_fallback(self, msg):
@@ -1847,9 +1849,11 @@ class MainWindow(Adw.ApplicationWindow):
             # Toon locatienaam in header als beschikbaar
             loc = self._photo_location.get(valid[0], "")
             if loc:
-                self._cluster_location_label = f"Gefilterd op locatie: {loc}"
+                self._cluster_location_label = _("Gefilterd op locatie: {loc}").format(loc=loc)
             else:
-                self._cluster_location_label = f"Gefilterd ({len(valid)} foto's)"
+                self._cluster_location_label = _("Gefilterd ({count})").format(
+                    count=ngettext("%d foto", "%d foto's", len(valid)) % len(valid)
+                )
             self.photo_count_label.set_text(self._cluster_location_label)
             try:
                 self.clear_filter_btn.set_visible(True)
@@ -1864,7 +1868,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.photos = self._photos_before_cluster
         self._photos_before_cluster = None
         self._cluster_location_label = None
-        self.photo_count_label.set_text(f"{len(self.photos)} foto's")
+        n = len(self.photos)
+        self.photo_count_label.set_text(ngettext("%d foto", "%d foto's", n) % n)
         try:
             self.clear_filter_btn.set_visible(False)
         except Exception:
@@ -2231,7 +2236,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.bottom_stack.set_transition_duration(150)
 
         normal_bar = Gtk.ActionBar()
-        self.photo_count_label = Gtk.Label(label=_("0 foto's"))
+        self.photo_count_label = Gtk.Label(label=ngettext("%d foto", "%d foto's", 0) % 0)
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
 
@@ -2355,8 +2360,11 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         self.photos = photos
         self.apply_sort()
-        suffix = " (favorieten)" if self._favorites_only else ""
-        self.photo_count_label.set_text(f"{len(self.photos)} foto's{suffix}")
+        n = len(self.photos)
+        count_text = ngettext("%d foto", "%d foto's", n) % n
+        if self._favorites_only:
+            count_text = _("{count} (favorieten)").format(count=count_text)
+        self.photo_count_label.set_text(count_text)
         self.start_load()
         self.start_watcher(photo_path)
         return False
@@ -2728,7 +2736,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.spinner.stop()
         self.content_stack.set_visible_child_name("grid")
         cluster_lbl = getattr(self, '_cluster_location_label', None)
-        self.photo_count_label.set_text(cluster_lbl if cluster_lbl else f"{total} foto's")
+        self.photo_count_label.set_text(
+            cluster_lbl if cluster_lbl
+            else ngettext("%d foto", "%d foto's", total) % total
+        )
         self._loading = False
         GLib.timeout_add(800, self._update_timeline_from_positions)
         GLib.timeout_add(120, self._run_viewport_hydrate)
@@ -2737,7 +2748,7 @@ class MainWindow(Adw.ApplicationWindow):
     def show_empty_state(self):
         self.spinner.stop()
         self.content_stack.set_visible_child_name("empty")
-        self.photo_count_label.set_text("0 foto's")
+        self.photo_count_label.set_text(ngettext("%d foto", "%d foto's", 0) % 0)
         self._loading = False
 
     # ── Thumbnail klik ────────────────────────────────────────────────
@@ -3014,7 +3025,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.photos = self._photos_before_cluster
             self._photos_before_cluster = None
             self._cluster_location_label = None
-            self.photo_count_label.set_text(f"{len(self.photos)} foto's")
+            n = len(self.photos)
+            self.photo_count_label.set_text(ngettext("%d foto", "%d foto's", n) % n)
             try:
                 self.clear_filter_btn.set_visible(False)
             except Exception:
@@ -3599,7 +3611,7 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             ctx.remove_class("pixora-fav")
         self.favorite_btn.set_tooltip_text(
-            "Verwijder uit favorieten (F)" if is_fav else "Markeer als favoriet (F)"
+            _("Verwijder uit favorieten (F)") if is_fav else _("Markeer als favoriet (F)")
         )
 
     def on_toggle_favorite(self, btn):
@@ -3915,7 +3927,7 @@ class MainWindow(Adw.ApplicationWindow):
         def _save_error(msg):
             dialog = Adw.MessageDialog(
                 transient_for=self,
-                heading="Opslaan mislukt",
+                heading=_("Opslaan mislukt"),
                 body=msg
             )
             dialog.add_response("ok", _("OK"))
@@ -3929,8 +3941,8 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(f"Verwijder bevestiging gevraagd: {path}")
         dialog = Adw.MessageDialog(
             transient_for=self,
-            heading="Foto verwijderen?",
-            body=f"Weet je zeker dat je '{os.path.basename(path)}' wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+            heading=_("Foto verwijderen?"),
+            body=_("Weet je zeker dat je '{name}' wilt verwijderen? Dit kan niet ongedaan worden gemaakt.").format(name=os.path.basename(path))
         )
         dialog.add_response("cancel", _("Annuleren"))
         dialog.add_response("delete", _("Verwijderen"))
@@ -3978,11 +3990,15 @@ class MainWindow(Adw.ApplicationWindow):
         count = len(self._selected)
         dialog = Adw.MessageDialog(
             transient_for=self,
-            heading=f"{count} foto's verwijderen?",
-            body=f"Weet je zeker dat je {count} foto's wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+            heading=ngettext("%d foto verwijderen?", "%d foto's verwijderen?", count) % count,
+            body=ngettext(
+                "Weet je zeker dat je %d foto wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+                "Weet je zeker dat je %d foto's wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+                count,
+            ) % count,
         )
         dialog.add_response("cancel", _("Annuleren"))
-        dialog.add_response("delete", f"{count} verwijderen")
+        dialog.add_response("delete", ngettext("%d verwijderen", "%d verwijderen", count) % count)
         dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
@@ -4348,18 +4364,20 @@ class MainWindow(Adw.ApplicationWindow):
                 )
                 if r.returncode == 0:
                     ok = True
-                    result_msg = "usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust."
+                    result_msg = _("usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust.")
                 elif r.returncode == 126 or r.returncode == 127:
-                    result_msg = "Wachtwoord geannuleerd of pkexec niet beschikbaar."
+                    result_msg = _("Wachtwoord geannuleerd of pkexec niet beschikbaar.")
                 else:
-                    result_msg = f"Herstart mislukt (code {r.returncode}).\n{r.stderr.strip()[:200]}"
+                    result_msg = _("Herstart mislukt (code {code}).\n{err}").format(
+                        code=r.returncode, err=r.stderr.strip()[:200]
+                    )
             except FileNotFoundError:
-                result_msg = ("pkexec niet gevonden. Voer handmatig uit:\n"
-                              "  sudo killall usbmuxd; sudo usbmuxd")
+                result_msg = _("pkexec niet gevonden. Voer handmatig uit:\n"
+                               "  sudo killall usbmuxd; sudo usbmuxd")
             except subprocess.TimeoutExpired:
-                result_msg = "Herstart duurde te lang (timeout)."
+                result_msg = _("Herstart duurde te lang (timeout).")
             except Exception as e:
-                result_msg = f"Onverwachte fout: {e}"
+                result_msg = _("Onverwachte fout: {err}").format(err=e)
             GLib.idle_add(self._after_usbmuxd_reset, btn, ok, result_msg)
 
         threading.Thread(target=do, daemon=True).start()
@@ -4498,7 +4516,7 @@ class MainWindow(Adw.ApplicationWindow):
                     env=child_env,
                 )
             except Exception as e:
-                log_error(f"Relaunch na taal-wissel fout: {e}")
+                log_error(_("Relaunch na taal-wissel fout: {err}").format(err=e))
             self.close()
             return False
         GLib.timeout_add(1000, _relaunch)
@@ -4507,13 +4525,13 @@ class MainWindow(Adw.ApplicationWindow):
         currently_active = bool(self.settings.get("dev_mode", False))
         target = not currently_active
         if target:
-            heading = "Developer mode activeren?"
-            body = ("Bij dev mode start Pixora in een terminal en gaan "
-                    "updates via de terminal zodat je output kunt zien. "
-                    "Pixora herstart direct.")
+            heading = _("Developer mode activeren?")
+            body = _("Bij dev mode start Pixora in een terminal en gaan "
+                     "updates via de terminal zodat je output kunt zien. "
+                     "Pixora herstart direct.")
         else:
-            heading = "Developer mode deactiveren?"
-            body = "Pixora start daarna zonder terminal en gebruikt de GUI-updater."
+            heading = _("Developer mode deactiveren?")
+            body = _("Pixora start daarna zonder terminal en gebruikt de GUI-updater.")
         dialog = Adw.MessageDialog(
             transient_for=self, heading=heading, body=body
         )

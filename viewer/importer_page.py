@@ -25,6 +25,7 @@ _t = _gt.translation(
     languages=[_lang], fallback=True
 )
 _ = _t.gettext
+ngettext = _t.ngettext
 
 import sys
 import json
@@ -670,7 +671,7 @@ class ImporterPage(Gtk.Box):
         title_lbl.set_margin_top(4)
         inner.append(title_lbl)
 
-        desc_lbl = Gtk.Label(label="Sluit je iPhone of iPad aan via een USB-kabel en ontgrendel het scherm.\nAls je apparaat vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'.")
+        desc_lbl = Gtk.Label(label=_("Sluit je iPhone of iPad aan via een USB-kabel en ontgrendel het scherm.\nAls je apparaat vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'."))
         desc_lbl.add_css_class("dim-label")
         desc_lbl.set_halign(Gtk.Align.CENTER)
         desc_lbl.set_justify(Gtk.Justification.CENTER)
@@ -683,12 +684,12 @@ class ImporterPage(Gtk.Box):
         listbox.add_css_class("boxed-list")
 
         for ico_name, title, subtitle in [
-            ("drive-removable-media-symbolic", "USB-kabel",              "Gebruik bij voorkeur de originele Apple-kabel"),
-            ("security-medium-symbolic",       "Vertrouw deze computer", "Tik op 'Vertrouw' als je apparaat dat vraagt"),
-            ("system-lock-screen-symbolic",    "Ontgrendeld scherm",     "Zorg dat je apparaat ontgrendeld is tijdens de import"),
-            ("media-flash-symbolic",           "Gebruik een blauwe USB-poort", "USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten"),
-            ("weather-overcast-symbolic",      "iCloud foto's",          "iCloud Foto's uitgeschakeld? Dan staan alle foto's lokaal op je toestel en worden ze allemaal gevonden."),
-            ("document-save-symbolic",         "Bestandsformaat",        "Zet op je apparaat: Instellingen → Foto's → 'Zet over naar Mac of pc' → 'Behoud originelen'"),
+            ("drive-removable-media-symbolic", _("USB-kabel"),              _("Gebruik bij voorkeur de originele Apple-kabel")),
+            ("security-medium-symbolic",       _("Vertrouw deze computer"), _("Tik op 'Vertrouw' als je apparaat dat vraagt")),
+            ("system-lock-screen-symbolic",    _("Ontgrendeld scherm"),     _("Zorg dat je apparaat ontgrendeld is tijdens de import")),
+            ("media-flash-symbolic",           _("Gebruik een blauwe USB-poort"), _("USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten")),
+            ("weather-overcast-symbolic",      _("iCloud foto's"),          _("iCloud Foto's uitgeschakeld? Dan staan alle foto's lokaal op je toestel en worden ze allemaal gevonden.")),
+            ("document-save-symbolic",         _("Bestandsformaat"),        _("Zet op je apparaat: Instellingen → Foto's → 'Zet over naar Mac of pc' → 'Behoud originelen'")),
         ]:
             row = Adw.ActionRow()
             row.set_title(title)
@@ -1099,9 +1100,9 @@ class ImporterPage(Gtk.Box):
 
         dialog = Adw.MessageDialog.new(
             window,
-            "Apparaat losgekoppeld",
-            "Je apparaat is losgekoppeld tijdens het selecteren van foto's.\n"
-            "Sluit het apparaat opnieuw aan en probeer het opnieuw."
+            _("Apparaat losgekoppeld"),
+            _("Je apparaat is losgekoppeld tijdens het selecteren van foto's.\n"
+              "Sluit het apparaat opnieuw aan en probeer het opnieuw.")
         )
         dialog.add_response("cancel", _("Annuleren"))
         dialog.add_response("retry", _("Opnieuw proberen"))
@@ -1118,25 +1119,25 @@ class ImporterPage(Gtk.Box):
     # ─── Import flow ─────────────────────────────────────────────────────────
 
     def _on_import_clicked(self, _btn):
-        self._set_progress("Apparaat koppelen…", "Even geduld, dit duurt maar even.")
+        self._set_progress(_("Apparaat koppelen…"), _("Even geduld, dit duurt maar even."))
         self._show_state(STATE_MOUNTING)
         threading.Thread(target=self._do_mount, daemon=True).start()
 
     def _do_mount(self):
         if not _cmd_available("ifuse") or not _cmd_available("idevice_id"):
             GLib.idle_add(self._show_error,
-                "ifuse of libimobiledevice is niet geïnstalleerd. "
-                "Installeer de vereiste pakketten hieronder.", True)
+                _("ifuse of libimobiledevice is niet geïnstalleerd. "
+                  "Installeer de vereiste pakketten hieronder."), True)
             return
         if not mount_iphone(self.udid, MOUNT_POINT):
             GLib.idle_add(self._show_error,
-                "Kon het apparaat niet koppelen. Zorg dat het scherm ontgrendeld is "
-                "en tik op 'Vertrouw' als dat wordt gevraagd.", False)
+                _("Kon het apparaat niet koppelen. Zorg dat het scherm ontgrendeld is "
+                  "en tik op 'Vertrouw' als dat wordt gevraagd."), False)
             return
         GLib.idle_add(self._start_scan)
 
     def _start_scan(self):
-        self._set_progress("Foto's scannen…", "Zoeken naar foto's en video's op je apparaat.")
+        self._set_progress(_("Foto's scannen…"), _("Zoeken naar foto's en video's op je apparaat."))
         self._show_state(STATE_SCANNING)
         self._start_detection_poll()
         self._start_progress_pulse()
@@ -1256,10 +1257,10 @@ class ImporterPage(Gtk.Box):
 
     def _show_selecting(self, files: list[Path]):
         n = len(files)
-        self.select_title.set_text(f"{n} bestand{'en' if n != 1 else ''} gevonden")
+        self.select_title.set_text(ngettext("%d bestand gevonden", "%d bestanden gevonden", n) % n)
         self.select_subtitle.set_text(
-            "Kies welke foto's en video's je wilt importeren.\n"
-            "💡 Tip: leeg eerst de prullenbak op je iPhone om verwijderde foto's uit te sluiten."
+            _("Kies welke foto's en video's je wilt importeren.\n"
+              "💡 Tip: leeg eerst de prullenbak op je iPhone om verwijderde foto's uit te sluiten.")
         )
 
         # Alles standaard geselecteerd
@@ -1402,8 +1403,13 @@ class ImporterPage(Gtk.Box):
     def _show_review(self, duplicates: list[tuple[Path, Path]]):
         n = len(duplicates)
         self.review_subtitle.set_text(
-            f"{n} foto{'\'s' if n != 1 else ''} lijken al in je archief te staan. "
-            "Kies per foto wat je wilt doen, of gebruik de knoppen onderaan voor alles tegelijk."
+            ngettext(
+                "%d foto lijkt al in je archief te staan. "
+                "Kies wat je wilt doen, of gebruik de knoppen onderaan.",
+                "%d foto's lijken al in je archief te staan. "
+                "Kies per foto wat je wilt doen, of gebruik de knoppen onderaan voor alles tegelijk.",
+                n,
+            ) % n
         )
 
         while child := self.review_box.get_first_child():

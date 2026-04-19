@@ -42,17 +42,17 @@ REPO_URL     = "https://github.com/Linux-Ginger/Pixora.git"
 RELEASES_API = "https://api.github.com/repos/Linux-Ginger/Pixora/releases"
 
 PHASES = [
-    ("Downloaden", [
-        ("Pixora bestanden downloaden", "clone"),
+    (_("Downloaden"), [
+        (_("Pixora bestanden downloaden"), "clone"),
     ]),
-    ("Installeren", [
-        ("Systeem packages installeren", "apt"),
-        ("Python packages installeren",  "pip"),
-        ("Launcher aanmaken",            "desktop"),
+    (_("Installeren"), [
+        (_("Systeem packages installeren"), "apt"),
+        (_("Python packages installeren"),  "pip"),
+        (_("Launcher aanmaken"),            "desktop"),
     ]),
-    ("Starten", [
-        ("Services activeren",           "services"),
-        ("Pixora starten",               "launch"),
+    (_("Starten"), [
+        (_("Services activeren"),           "services"),
+        (_("Pixora starten"),               "launch"),
     ]),
 ]
 
@@ -153,7 +153,7 @@ class InstallerWindow(Adw.ApplicationWindow):
             listbox.append(self.installed_row)
 
         self.version_model = Gtk.StringList()
-        self.version_model.append("Nieuwste versie")
+        self.version_model.append(_("Nieuwste versie"))
 
         self.version_combo = Gtk.DropDown(model=self.version_model)
         self.version_combo.set_size_request(220, -1)
@@ -330,7 +330,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         while self.version_model.get_n_items() > 0:
             self.version_model.remove(0)
 
-        self.version_model.append("Nieuwste versie")
+        self.version_model.append(_("Nieuwste versie"))
         for tag in tags:
             self.version_model.append(tag)
 
