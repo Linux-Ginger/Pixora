@@ -1211,3 +1211,6 @@ msgstr "Pair-records gewist en usbmuxd opnieuw gestart. Sluit je iPhone aan en t
 
 msgid "Taal-relaunch gepland (1.2s delay)"
 msgstr "Taal-relaunch gepland (1.2s delay)"
+
+msgid "Kaart: {m} markers uit {p} foto's (GPS), uit {t} totaal"
+msgstr "Kaart: {m} markers uit {p} foto's (GPS), uit {t} totaal"

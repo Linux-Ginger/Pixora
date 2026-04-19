@@ -1202,3 +1202,6 @@ msgstr[1] "%d sélectionnés"
 
 msgid "Taal-relaunch gepland (1.2s delay)"
 msgstr "Relance de langue planifiée (délai 1,2 s)"
+
+msgid "Kaart: {m} markers uit {p} foto's (GPS), uit {t} totaal"
+msgstr "Carte : {m} marqueurs sur {p} photos (GPS), sur {t} au total"

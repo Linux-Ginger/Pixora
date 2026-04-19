@@ -1852,10 +1852,37 @@ class MainWindow(Adw.ApplicationWindow):
             return (lat, lon, filename, datum, path)
 
         markers = []
+        seen_paths = set()
+        # Live Photos zijn paren (IMG_xxxx.HEIC + IMG_xxxx.MOV) met identieke
+        # GPS — zonder dedup telt de cluster ze beide → user ziet 14 terwijl
+        # het gevoel is van 12 unieke "foto-momenten".
+        # Groepeer paden op basis van (lat, lon, filename-zonder-extensie):
+        # als HEIC en MOV dezelfde stem + GPS hebben, is het hetzelfde moment.
+        grouped = {}  # key → (lat, lon, filename, datum, [paths])
         with ThreadPoolExecutor(max_workers=8) as pool:
             for result in pool.map(scan_one, self.photos):
-                if result is not None:
-                    markers.append(result)
+                if result is None:
+                    continue
+                lat, lon, filename, datum, path = result
+                if path in seen_paths:
+                    continue
+                seen_paths.add(path)
+                stem = os.path.splitext(filename)[0].lower()
+                # Afronden op 6 decimalen (~10cm precisie) — absolute matching
+                # op Live Photo pairs die EXIF/ffprobe identiek invullen.
+                key = (round(lat, 6), round(lon, 6), stem)
+                if key in grouped:
+                    grouped[key][4].append(path)
+                else:
+                    grouped[key] = (lat, lon, filename, datum, [path])
+
+        for (lat, lon, filename, datum, paths) in grouped.values():
+            markers.append((lat, lon, filename, datum, paths[0]))
+        log_info(
+            _("Kaart: {m} markers uit {p} foto's (GPS), uit {t} totaal").format(
+                m=len(markers), p=len(seen_paths), t=len(self.photos)
+            )
+        )
         GLib.idle_add(self._show_map, markers)
 
     def _show_map(self, markers):
