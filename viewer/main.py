@@ -23,9 +23,19 @@ _PIXORA_APP = None
 
 
 def load_settings():
-    if os.path.exists(CONFIG_PATH):
+    if not os.path.exists(CONFIG_PATH):
+        return None
+    try:
         with open(CONFIG_PATH, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        # Corrupt settings: backup en terug naar setup-wizard flow
+        try:
+            os.rename(CONFIG_PATH, CONFIG_PATH + ".corrupt")
+        except Exception:
+            pass
     return None
 
 

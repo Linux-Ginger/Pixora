@@ -266,24 +266,43 @@ def get_logo_path(dark_mode):
     return os.path.join(DOCS_DIR, f"pixora-logo-{'dark' if dark_mode else 'light'}.png")
 
 def save_settings(settings):
+    # Atomic write: eerst naar .tmp, dan rename. Voorkomt corrupt JSON
+    # als Pixora midden in een write crasht (bv. power-off).
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-    with open(CONFIG_PATH, "w") as f:
+    tmp = CONFIG_PATH + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(settings, f, indent=2)
+    os.replace(tmp, CONFIG_PATH)
 
 
 def load_favorites():
     try:
         with open(FAVORITES_PATH, "r") as f:
-            return set(json.load(f))
+            data = json.load(f)
+        if isinstance(data, list):
+            return set(data)
+        return set()
+    except FileNotFoundError:
+        return set()
     except Exception:
+        # Corrupt bestand: backup en start schoon i.p.v. elke start weer
+        # dezelfde parse-error raken.
+        try:
+            os.rename(FAVORITES_PATH, FAVORITES_PATH + ".corrupt")
+        except Exception:
+            pass
         return set()
 
 
 def save_favorites(favorites):
+    # Atomic write via .tmp + rename zodat een crash midden in een write
+    # geen corrupt favorites.json achterlaat.
     try:
         os.makedirs(os.path.dirname(FAVORITES_PATH), exist_ok=True)
-        with open(FAVORITES_PATH, "w") as f:
+        tmp = FAVORITES_PATH + ".tmp"
+        with open(tmp, "w") as f:
             json.dump(sorted(favorites), f, indent=2)
+        os.replace(tmp, FAVORITES_PATH)
     except Exception:
         pass
 
@@ -320,7 +339,7 @@ def get_available_drives():
 
 def get_mountpoint_for_uuid(uuid):
     try:
-        result = subprocess.run(["lsblk", "-o", "UUID,MOUNTPOINT", "-J"], capture_output=True, text=True)
+        result = subprocess.run(["lsblk", "-o", "UUID,MOUNTPOINT", "-J"], capture_output=True, text=True, timeout=5)
         data = json.loads(result.stdout)
         for device in data.get("blockdevices", []):
             for child in device.get("children", [device]):
@@ -407,7 +426,10 @@ def _cache_fresh(bucket, path):
         mtime = os.path.getmtime(path)
     except Exception:
         return None
-    if abs(entry.get("m", 0) - mtime) < 0.5:
+    # Exact mtime-match: zodra de foto is bewerkt/aangepast krijgt het bestand
+    # een nieuwe mtime en wordt de cache ongeldig. Een tolerantie van 0.5s
+    # kon stale data geven direct na een edit — bij exact-match is dat weg.
+    if entry.get("m") == mtime:
         return entry.get("v")
     return None
 
@@ -1422,7 +1444,10 @@ class MainWindow(Adw.ApplicationWindow):
             local_version_file = os.path.join(
                 os.path.expanduser("~"), ".config", "pixora", "installed_version"
             )
-            local_version = open(local_version_file).read().strip() if os.path.exists(local_version_file) else ""
+            local_version = ""
+            if os.path.exists(local_version_file):
+                with open(local_version_file) as _lvf:
+                    local_version = _lvf.read().strip()
             req = urllib.request.Request(
                 "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt",
                 headers={"User-Agent": "Pixora/1.0"}
@@ -1522,12 +1547,23 @@ class MainWindow(Adw.ApplicationWindow):
             self._filmstrip_load_id += 1
         except Exception:
             pass
+        # Cancel ALLE GLib timers EERST, voordat we state vernietigen.
+        # Anders kan een timer firing na cleanup crashen op None/missende state.
+        for attr in ("_favorites_save_id", "_sort_timer", "_fade_timer_id",
+                     "_fade_anim_id", "_preview_debounce_id",
+                     "_video_seek_pending_id", "_video_poll_id",
+                     "_thumb_size_timer", "_map_ready_fallback_id",
+                     "_nav_debounce_id"):
+            tid = getattr(self, attr, None)
+            if tid is not None:
+                try:
+                    GLib.source_remove(tid)
+                except Exception:
+                    pass
+                setattr(self, attr, None)
         # Persist alle pending caches/writes
         try:
-            if self._favorites_save_id is not None:
-                GLib.source_remove(self._favorites_save_id)
-                self._favorites_save_id = None
-                save_favorites(self._favorites)
+            save_favorites(self._favorites)
         except Exception:
             pass
         try:
@@ -2880,7 +2916,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Foto viewer ───────────────────────────────────────────────────
     def open_photo(self, index):
-        path = self.photos[index] if 0 <= index < len(self.photos) else "?"
+        # Guard: lege lijst of out-of-range index → niet openen
+        if not self.photos or not (0 <= index < len(self.photos)):
+            return
+        path = self.photos[index]
         kind = _("video") if is_video(path) else _("foto")
         log_info(_("open_photo: {kind} idx={i} path={p}").format(kind=kind, i=index, p=path))
         self.current_index = index
@@ -2900,9 +2939,10 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add(80, self._scroll_filmstrip_to_current)
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
+        # Pad is hierboven al veilig uit self.photos gehaald (niet self.photos[index])
         threading.Thread(
             target=self._load_full_photo,
-            args=(self.photos[index], load_id),
+            args=(path, load_id),
             daemon=True
         ).start()
 
@@ -4013,6 +4053,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Verwijderen ───────────────────────────────────────────────────
     def on_delete_current(self, btn):
+        # Guard: lege lijst of ongeldige index
+        if not self.photos or not (0 <= self.current_index < len(self.photos)):
+            return
         path = self.photos[self.current_index]
         log_info(_("Verwijder bevestiging gevraagd: {p}").format(p=path))
         dialog = Adw.MessageDialog(
@@ -4044,18 +4087,24 @@ class MainWindow(Adw.ApplicationWindow):
         if path in self._favorites:
             self._favorites.discard(path)
             self._schedule_save_favorites()
-        self.photos.remove(path)
+        # Path kan al uit self.photos zijn (watcher reload) — discard-stijl
+        try:
+            self.photos.remove(path)
+        except ValueError:
+            pass
         if not self.photos:
             self.close_viewer()
             self.show_empty_state()
             return
         if self.current_index >= len(self.photos):
             self.current_index = len(self.photos) - 1
+        # Copy path vóór thread-start (zie open_photo)
+        next_path = self.photos[self.current_index]
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
         threading.Thread(
             target=self._load_full_photo,
-            args=(self.photos[self.current_index], load_id),
+            args=(next_path, load_id),
             daemon=True
         ).start()
         GLib.timeout_add(500, self.start_load)
@@ -4369,7 +4418,8 @@ class MainWindow(Adw.ApplicationWindow):
         # Versie row
         installed_version_path = os.path.join(os.path.expanduser("~"), ".config", "pixora", "installed_version")
         try:
-            installed_ver = open(installed_version_path).read().strip()
+            with open(installed_version_path) as _ivf:
+                installed_ver = _ivf.read().strip()
         except Exception:
             installed_ver = _("Onbekend")
         version_row = Adw.ActionRow(title=_("Versie"), subtitle=installed_ver)

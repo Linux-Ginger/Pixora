@@ -162,19 +162,31 @@ def get_device_name(udid: str) -> str:
 
 
 def mount_iphone(udid: str, mountpoint: Path) -> bool:
-    # Unmount eerst (ook als de vorige mount kapot is)
+    # Unmount eerst (ook als de vorige mount kapot is). We checken het resultaat
+    # om niet stil verder te gaan als unmount faalde — dan zou ifuse hierna
+    # alsnog falen met "mountpoint is not empty".
     try:
-        subprocess.run(["fusermount", "-uz", str(mountpoint)], capture_output=True, timeout=5)
+        subprocess.run(["fusermount", "-uz", str(mountpoint)],
+                       capture_output=True, timeout=5)
     except Exception:
         pass
-    # Verwijder de map als die in een kapotte staat is
+    # Alleen dir verwijderen als hij NIET gemount is — anders rmtree-op-mount
+    # kan hangen of fouten geven op FUSE.
     try:
-        if mountpoint.exists() or mountpoint.is_mount():
+        still_mounted = False
+        try:
+            still_mounted = mountpoint.is_mount()
+        except Exception:
+            pass
+        if mountpoint.exists() and not still_mounted:
             import shutil as _shutil
             _shutil.rmtree(str(mountpoint), ignore_errors=True)
-    except OSError:
-        subprocess.run(["rm", "-rf", str(mountpoint)], capture_output=True)
-    mountpoint.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    try:
+        mountpoint.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        return False
     try:
         result = subprocess.run(
             ["ifuse", "--udid", udid, str(mountpoint)],
@@ -468,7 +480,7 @@ def get_backup_mountpoint(uuid: str) -> Path | None:
     try:
         result = subprocess.run(
             ["lsblk", "-o", "UUID,MOUNTPOINT", "-J"],
-            capture_output=True, text=True
+            capture_output=True, text=True, timeout=5
         )
         data = json.loads(result.stdout)
 
@@ -583,6 +595,7 @@ class ImporterPage(Gtk.Box):
 
         self._poll_timer_id: int | None = None
         self._disconnect_dialog_open = False
+        self._thumb_load_gen = 0  # bump bij state-wissel om stale callbacks te detecten
 
         self._build_ui()
 
@@ -633,8 +646,14 @@ class ImporterPage(Gtk.Box):
     def deactivate(self):
         """Wordt aangeroepen als de pagina verborgen wordt."""
         if self._poll_timer_id is not None:
-            GLib.source_remove(self._poll_timer_id)
+            try:
+                GLib.source_remove(self._poll_timer_id)
+            except Exception:
+                pass
             self._poll_timer_id = None
+        # Bump generation zodat lopende background-loaders hun idle-callbacks
+        # niet meer proberen toe te passen op verwijderde widgets.
+        self._thumb_load_gen += 1
         unmount_iphone(MOUNT_POINT)
 
     def _on_back_clicked(self, _btn):
@@ -1278,6 +1297,10 @@ class ImporterPage(Gtk.Box):
         self.selected_files = {str(f) for f in files}
         self._update_select_count()
 
+        # Bump generation zodat eerdere thumb-loaders (van een vorige import-run)
+        # hun idle_add callbacks niet op de nieuwe widgets droppen.
+        self._thumb_load_gen += 1
+
         # Verwijder oude kaarten
         while child := self.select_flow.get_first_child():
             self.select_flow.remove(child)
@@ -1342,32 +1365,48 @@ class ImporterPage(Gtk.Box):
 
     def _load_select_thumbs(self, files: list[Path]):
         """Laad thumbnails één voor één — sneller op USB/FUSE dan parallel."""
+        # Capture de generation van dit load voor stale-check (user kan terug
+        # klikken terwijl we nog laden → we willen geen callbacks doen op
+        # widgets die al verdwenen zijn).
+        my_gen = self._thumb_load_gen
         for fp in files:
+            if my_gen != self._thumb_load_gen:
+                return  # user is naar een andere state gegaan
             pixbuf = load_select_thumb(fp)
             if pixbuf is not None:
-                GLib.idle_add(self._set_select_thumb, str(fp), pixbuf)
+                GLib.idle_add(self._set_select_thumb, str(fp), pixbuf, my_gen)
             # Videoduur ophalen
             if fp.suffix.lower() in _VIDEO_EXT:
                 dur = _get_video_duration(fp)
                 if dur:
-                    GLib.idle_add(self._set_video_duration, str(fp), dur)
+                    GLib.idle_add(self._set_video_duration, str(fp), dur, my_gen)
 
-    def _set_select_thumb(self, path_str: str, pixbuf):
+    def _set_select_thumb(self, path_str: str, pixbuf, gen: int = 0):
         """Vervang placeholder door echte thumbnail in de selectiekaart."""
+        if gen and gen != self._thumb_load_gen:
+            return  # stale callback
         overlay = self._select_overlays.get(path_str)
         if overlay is None:
             return
-        pic = Gtk.Picture.new_for_pixbuf(pixbuf)
-        pic.set_can_shrink(False)
-        pic.set_content_fit(Gtk.ContentFit.COVER)
-        pic.set_size_request(SELECT_THUMB, SELECT_THUMB)
-        overlay.set_child(pic)
+        try:
+            pic = Gtk.Picture.new_for_pixbuf(pixbuf)
+            pic.set_can_shrink(False)
+            pic.set_content_fit(Gtk.ContentFit.COVER)
+            pic.set_size_request(SELECT_THUMB, SELECT_THUMB)
+            overlay.set_child(pic)
+        except Exception:
+            pass
 
-    def _set_video_duration(self, path_str: str, duration: str):
+    def _set_video_duration(self, path_str: str, duration: str, gen: int = 0):
         """Update de video-indicator met de duur (bijv. '▶ 1:23')."""
+        if gen and gen != self._thumb_load_gen:
+            return
         lbl = self._video_duration_labels.get(path_str)
         if lbl:
-            lbl.set_text(f"▶ {duration}")
+            try:
+                lbl.set_text(f"▶ {duration}")
+            except Exception:
+                pass
 
     def _on_card_click(self, path_str: str):
         """Klik ergens op de kaart togglet het vinkje (enige toggle-handler)."""
@@ -1648,6 +1687,7 @@ class ImporterPage(Gtk.Box):
 
         success = False
         if _cmd_available("rsync"):
+            proc = None
             try:
                 proc = subprocess.Popen(
                     ["rsync", "-a", "--info=progress2",
@@ -1661,6 +1701,14 @@ class ImporterPage(Gtk.Box):
                 success = proc.returncode == 0
             except Exception:
                 success = False
+            finally:
+                # Ongeacht uitkomst: zorg dat proc niet als zombie blijft hangen.
+                if proc is not None and proc.poll() is None:
+                    try:
+                        proc.kill()
+                        proc.wait(timeout=5)
+                    except Exception:
+                        pass
         else:
             success = self._manual_backup(photo_path, backup_dest)
 
