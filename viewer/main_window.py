@@ -363,6 +363,7 @@ _metadata_save_lock = threading.Lock()
 
 
 def _load_metadata_cache():
+    global _metadata_dirty
     try:
         with open(_METADATA_CACHE_PATH, "r") as f:
             data = json.load(f)
@@ -370,6 +371,14 @@ def _load_metadata_cache():
             v = data.get(k)
             if isinstance(v, dict):
                 _metadata_cache[k] = v
+        # Eenmalige cleanup: oude geocode-cache met lege waarden of oude
+        # key-format (zonder "{lang}:" prefix) verwijderen — die blokkeerden
+        # retries en gaven altijd Engelse labels terug.
+        geo = _metadata_cache.get("geocode", {})
+        pruned = {k: v for k, v in geo.items() if v and ":" in k}
+        if len(pruned) != len(geo):
+            _metadata_cache["geocode"] = pruned
+            _metadata_dirty = True
     except Exception:
         pass
 
@@ -456,21 +465,30 @@ def _get_gps_coords_raw(photo_path):
         return None
 
 def reverse_geocode(lat, lon):
+    # Cache-sleutel inclusief taal: zelfde coördinaten krijgen andere labels
+    # per taal (bv. "Paris, France" vs "Parijs, Frankrijk" vs "Paris, Frankreich").
     global _metadata_dirty
-    key = f"{lat:.4f},{lon:.4f}"
+    key = f"{_lang}:{lat:.4f},{lon:.4f}"
     cached = _metadata_cache["geocode"].get(key)
-    if cached is not None:
+    if cached:  # alleen gebruiken als niet-leeg (lege cache = vorige faal, opnieuw proberen)
         return cached
     result = _reverse_geocode_raw(lat, lon)
-    _metadata_cache["geocode"][key] = result or ""
-    _metadata_dirty = True
+    if result:
+        _metadata_cache["geocode"][key] = result
+        _metadata_dirty = True
     return result
 
 
 def _reverse_geocode_raw(lat, lon):
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-        req = urllib.request.Request(url, headers={"User-Agent": "Pixora/1.0"})
+        # Accept-Language stuurt Nominatim de gekozen Pixora-taal zodat
+        # city/country labels in die taal terugkomen (bv. "Parijs, Frankrijk"
+        # in NL-modus i.p.v. de standaard Engelse "Paris, France").
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Pixora/1.0",
+            "Accept-Language": _lang,
+        })
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read())
         addr = data.get("address", {})
