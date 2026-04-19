@@ -71,13 +71,24 @@ step finalize "Configuratie en services"
 mkdir -p "$(dirname "$VERSION_FILE")"
 cp -f "$INSTALL_DIR/version.txt" "$VERSION_FILE"
 
-# Compileer .po → .mo voor alle vertalingen
+# Compileer .po → .mo voor alle vertalingen.
+# Belangrijk: OUDE .mo eerst verwijderen zodat we niet stil terugvallen op
+# een stale compilatie als msgfmt faalt. Errors naar stdout zodat ze in de
+# updater-UI-log zichtbaar zijn (niet meer verborgen met 2>/dev/null).
 if command -v msgfmt >/dev/null 2>&1; then
     for po in "$INSTALL_DIR"/locale/*/LC_MESSAGES/pixora.po; do
         [ -f "$po" ] || continue
         mo="${po%.po}.mo"
-        msgfmt -o "$mo" "$po" 2>/dev/null || true
+        rm -f "$mo"
+        if ! msgfmt -o "$mo" "$po"; then
+            echo "STEP:finalize:msgfmt FAILED for $po"
+        fi
+        if [ ! -f "$mo" ]; then
+            echo "STEP:finalize:missing .mo after compile: $mo"
+        fi
     done
+else
+    echo "STEP:finalize:msgfmt not installed — translations will fall back to source strings"
 fi
 
 chown -R "$RUN_UID:$TARGET_GID" "$INSTALL_DIR" "$(dirname "$VERSION_FILE")"

@@ -36,6 +36,14 @@ _ = _translation.gettext
 ngettext = _translation.ngettext
 _translation.install()  # maakt _() ook als builtin beschikbaar
 
+# Debug: welke .mo is geladen? (zichtbaar in dev-terminal zodat je weet
+# of vertalingen überhaupt werken)
+_MO_PATH = os.path.join(_LOCALE_DIR, _lang, "LC_MESSAGES", "pixora.mo")
+_I18N_STATUS = (
+    f"lang={_lang} mo={'found' if os.path.exists(_MO_PATH) else 'MISSING'} "
+    f"path={_MO_PATH}"
+)
+
 # LC_TIME sync — zodat strftime("%B") ook de gekozen taal volgt i.p.v. systeem-locale
 import locale as _locale_mod
 _LC_TIME_CANDIDATES = {
@@ -956,6 +964,7 @@ class MainWindow(Adw.ApplicationWindow):
             THUMB_SIZE = 200
         if settings.get("dev_mode"):
             log_info(_("═══ Pixora gestart in Developer Mode ═══"))
+            log_info(f"i18n: {_I18N_STATUS}")
             log_info(_("Config: {p}").format(p=CONFIG_PATH))
             log_info(_("Cache: {p}").format(p=CACHE_DIR))
             log_info(_("Thumbs: {px}px — favorites: {n}").format(px=THUMB_SIZE, n=len(load_favorites())))
@@ -2277,7 +2286,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.bottom_stack.add_named(normal_bar, "normal")
 
         select_bar = Gtk.ActionBar()
-        self.select_count_label = Gtk.Label(label=_("0 geselecteerd"))
+        self.select_count_label = Gtk.Label(label=ngettext("%d geselecteerd", "%d geselecteerd", 0) % 0)
         self.select_count_label.add_css_class("dim-label")
         select_bar.pack_start(self.select_count_label)
 

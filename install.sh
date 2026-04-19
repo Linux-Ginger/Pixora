@@ -83,12 +83,19 @@ else
     git clone -q "$REPO_URL" "$INSTALL_DIR"
 fi
 
-# Compileer .po → .mo voor alle vertalingen
+# Compileer .po → .mo voor alle vertalingen.
+# Oude .mo eerst verwijderen + errors zichtbaar houden (geen 2>/dev/null)
 if command -v msgfmt >/dev/null 2>&1; then
     for po in "$INSTALL_DIR"/locale/*/LC_MESSAGES/pixora.po; do
         [ -f "$po" ] || continue
-        msgfmt -o "${po%.po}.mo" "$po" 2>/dev/null || true
+        mo="${po%.po}.mo"
+        rm -f "$mo"
+        if ! msgfmt -o "$mo" "$po"; then
+            echo "  ⚠ msgfmt failed for $po"
+        fi
     done
+else
+    echo "  ⚠ msgfmt not installed — translations will fall back to source strings"
 fi
 
 echo -e "  ${GREEN}${LBL_DONE}${NC}"
