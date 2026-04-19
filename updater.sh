@@ -22,6 +22,17 @@ TARGET_USER="$(getent passwd "$RUN_UID" | cut -d: -f1)"
 TARGET_HOME="$(getent passwd "$RUN_UID" | cut -d: -f6)"
 TARGET_GID="$(getent passwd "$RUN_UID" | cut -d: -f4)"
 
+# Sanity-check: weiger te werken als we geen echte home krijgen. Anders zou
+# een latere `rm -rf "$INSTALL_DIR"` op een root-dir kunnen draaien.
+if [ -z "$TARGET_HOME" ] || [ "$TARGET_HOME" = "/" ] || [ ! -d "$TARGET_HOME" ]; then
+    echo "Fout: kan home-directory niet bepalen voor UID=$RUN_UID" >&2
+    exit 1
+fi
+case "$TARGET_HOME" in
+    /home/*|/root|/Users/*) ;;
+    *) echo "Fout: onverwachte home-directory $TARGET_HOME — weigert uit voorzorg" >&2; exit 1 ;;
+esac
+
 INSTALL_DIR="$TARGET_HOME/.local/share/pixora"
 VERSION_FILE="$TARGET_HOME/.config/pixora/installed_version"
 

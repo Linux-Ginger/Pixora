@@ -268,9 +268,12 @@ def get_logo_path(dark_mode):
 def save_settings(settings):
     # Atomic write: eerst naar .tmp, dan rename. Voorkomt corrupt JSON
     # als Pixora midden in een write crasht (bv. power-off).
+    # Mode 0600: alleen eigenaar kan lezen — bevat foto-pad en kan op
+    # multi-user-machines privacy-gevoelig zijn.
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     tmp = CONFIG_PATH + ".tmp"
-    with open(tmp, "w") as f:
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         json.dump(settings, f, indent=2)
     os.replace(tmp, CONFIG_PATH)
 
@@ -295,12 +298,13 @@ def load_favorites():
 
 
 def save_favorites(favorites):
-    # Atomic write via .tmp + rename zodat een crash midden in een write
-    # geen corrupt favorites.json achterlaat.
+    # Atomic write via .tmp + rename + mode 0600. Favorieten-lijst bevat
+    # paden → privé voor de eigenaar op multi-user machines.
     try:
         os.makedirs(os.path.dirname(FAVORITES_PATH), exist_ok=True)
         tmp = FAVORITES_PATH + ".tmp"
-        with open(tmp, "w") as f:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
             json.dump(sorted(favorites), f, indent=2)
         os.replace(tmp, FAVORITES_PATH)
     except Exception:
