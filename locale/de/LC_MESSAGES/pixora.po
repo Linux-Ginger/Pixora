@@ -1211,3 +1211,6 @@ msgstr "Filter zurücksetzen"
 
 msgid "Gefilterde locatie"
 msgstr "Gefilterter Ort"
+
+msgid "Onbekende datum"
+msgstr "Unbekanntes Datum"

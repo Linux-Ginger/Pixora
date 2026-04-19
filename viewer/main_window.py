@@ -364,6 +364,9 @@ def format_date_header(dt):
 def format_viewer_date(dt):
     # Taalonafhankelijke datum-formatting via gettext (niet via strftime-locale,
     # omdat en_US.UTF-8 niet overal geïnstalleerd is).
+    # Epoch/bogus dates (< jan 2000) → "Onbekende datum" i.p.v. "1 januari 1970"
+    if dt is None or dt.year < 2000:
+        return _("Onbekende datum")
     return _("{day} {month} {year}  {time}").format(
         day=dt.day,
         month=_(_MONTH_KEYS[dt.month]),
@@ -1890,8 +1893,11 @@ class MainWindow(Adw.ApplicationWindow):
             filename = os.path.basename(path)
             try:
                 mtime = os.path.getmtime(path)
-                dt = datetime.datetime.fromtimestamp(mtime)
-                datum = f"{dt.day} {_(_MONTH_KEYS[dt.month])} {dt.year}"
+                if mtime > 0 and mtime >= 946684800:
+                    dt = datetime.datetime.fromtimestamp(mtime)
+                    datum = f"{dt.day} {_(_MONTH_KEYS[dt.month])} {dt.year}"
+                else:
+                    datum = ""
             except Exception:
                 datum = ""
             return (lat, lon, filename, datum, path)
@@ -2017,7 +2023,11 @@ class MainWindow(Adw.ApplicationWindow):
                 dates = []
                 for p in valid:
                     try:
-                        dates.append(os.path.getmtime(p))
+                        mt = os.path.getmtime(p)
+                        # Filter epoch-0 / bogus mtime (voor Jan 1 2000)
+                        # zodat de banner geen "1 januari 1970" toont.
+                        if mt > 0 and mt >= 946684800:
+                            dates.append(mt)
                     except Exception:
                         pass
                 if dates:
@@ -2629,15 +2639,27 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _group_by_date(self, photos):
         groups = defaultdict(list)
+        # Sentinel voor onleesbare / epoch-0 mtime: sorteer ze apart als
+        # "Onbekende datum" i.p.v. te tonen als 1 januari 1970.
+        UNKNOWN = datetime.date.min
         for i, path in enumerate(photos):
             try:
                 mtime = os.path.getmtime(path)
-                dt    = datetime.datetime.fromtimestamp(mtime).date()
+                if mtime <= 0 or mtime < 946684800:  # < Jan 1 2000 = bogus
+                    dt = UNKNOWN
+                else:
+                    dt = datetime.datetime.fromtimestamp(mtime).date()
             except Exception:
-                dt = datetime.date(1970, 1, 1)
+                dt = UNKNOWN
             groups[dt].append(i)
         sorted_dates = sorted(groups.keys(), reverse=True)
-        return [(format_date_header(dt), dt, groups[dt]) for dt in sorted_dates]
+
+        def _header(dt):
+            if dt == UNKNOWN:
+                return _("Onbekende datum")
+            return format_date_header(dt)
+
+        return [(_header(dt), dt, groups[dt]) for dt in sorted_dates]
 
     def _load_thread(self, load_id, photos):
         total  = len(photos)

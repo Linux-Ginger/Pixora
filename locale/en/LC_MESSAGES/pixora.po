@@ -1220,3 +1220,6 @@ msgstr "Clear filter"
 
 msgid "Gefilterde locatie"
 msgstr "Filtered location"
+
+msgid "Onbekende datum"
+msgstr "Unknown date"
