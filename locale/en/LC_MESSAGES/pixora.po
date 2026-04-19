@@ -57,7 +57,7 @@ msgid "Apparaat gevonden"
 msgstr "Device found"
 
 msgid "Apple USB-device aangesloten (vendor=05ac) — check na 2.5s"
-msgstr "Apple USB-device aangesloten (vendor=05ac) — check na 2.5s"
+msgstr "Apple USB device connected (vendor=05ac) — check after 2.5s"
 
 msgid "Automatische backup"
 msgstr "Automatic backup"
@@ -168,7 +168,7 @@ msgid "Foto's laden..."
 msgstr "Loading photos..."
 
 msgid "GUI-updater gestart"
-msgstr "GUI-updater gestart"
+msgstr "GUI updater started"
 
 msgid "Geavanceerd"
 msgstr "Advanced"
@@ -237,10 +237,10 @@ msgid "Kaart gesloten"
 msgstr "Map closed"
 
 msgid "Kaart → eerste tiles geladen"
-msgstr "Kaart → eerste tiles geladen"
+msgstr "Map → first tiles loaded"
 
 msgid "Kaart → offline / tile-errors"
-msgstr "Kaart → offline / tile-errors"
+msgstr "Map → offline / tile errors"
 
 msgid "Kaart-ready timeout — toon kaart alsnog"
 msgstr "Map-ready timeout — showing map anyway"
@@ -258,7 +258,7 @@ msgid "Kies map op backup schijf"
 msgstr "Choose folder on backup drive"
 
 msgid "Kiezen…"
-msgstr "Kiezen…"
+msgstr "Choose…"
 
 msgid "Klik cluster om gefilterd te bekijken"
 msgstr "Click cluster to view filtered"
@@ -336,7 +336,7 @@ msgid "PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks"
 msgstr "PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks"
 
 msgid "Pair-records wissen — bevestiging gevraagd"
-msgstr "Pair-records wissen — bevestiging gevraagd"
+msgstr "Clear pair records — confirmation requested"
 
 msgid "Per jaar"
 msgstr "By year"
@@ -369,13 +369,13 @@ msgid "Pixora starten"
 msgstr "Start Pixora"
 
 msgid "Pixora wordt afgesloten — opruimen…"
-msgstr "Pixora wordt afgesloten — opruimen…"
+msgstr "Pixora shutting down — cleaning up…"
 
 msgid "Pixora wordt gestart…"
 msgstr "Pixora is starting…"
 
 msgid "Pixora — Instellen"
-msgstr "Pixora — Instellen"
+msgstr "Pixora — Setup"
 
 msgid "Plat"
 msgstr "Flat"
@@ -384,13 +384,13 @@ msgid "Python packages installeren"
 msgstr "Installing Python packages"
 
 msgid "Reisverhaal samenstellen…"
-msgstr "Building travel story…"
+msgstr "Compiling travel story…"
 
 msgid "Reset usbmuxd aangeroepen (settings)"
-msgstr "Reset usbmuxd aangeroepen (settings)"
+msgstr "Reset usbmuxd invoked (settings)"
 
 msgid "Restart gepland (1.2s delay voor GApplication unregister)"
-msgstr "Restart gepland (1.2s delay voor GApplication unregister)"
+msgstr "Restart scheduled (1.2s delay for GApplication unregister)"
 
 msgid "Selecteer alles"
 msgstr "Select all"
@@ -417,22 +417,22 @@ msgid "Soepel"
 msgstr "Loose"
 
 msgid "Sorteren..."
-msgstr "Sorteren..."
+msgstr "Sorting..."
 
 msgid "Starten"
 msgstr "Starting"
 
 msgid "Startup fase 1: MainWindow __init__ begonnen"
-msgstr "Startup fase 1: MainWindow __init__ begonnen"
+msgstr "Startup phase 1: MainWindow __init__ started"
 
 msgid "Startup fase 2: pages opbouwen…"
-msgstr "Startup fase 2: pages opbouwen…"
+msgstr "Startup phase 2: building pages…"
 
 msgid "Startup fase 3: pages klaar"
 msgstr "Startup phase 3: pages ready"
 
 msgid "Startup fase 4: foto's laden gepland via idle_add"
-msgstr "Startup fase 4: foto's laden gepland via idle_add"
+msgstr "Startup phase 4: loading photos scheduled via idle_add"
 
 msgid "Streng"
 msgstr "Strict"
@@ -459,10 +459,10 @@ msgid "Terug"
 msgstr "Back"
 
 msgid "Terug naar galerij"
-msgstr "Terug naar galerij"
+msgstr "Back to gallery"
 
 msgid "Terug naar standaard (200 px)"
-msgstr "Reset to default (200 px)"
+msgstr "Back to default (200 px)"
 
 msgid "Thumbnail grootte"
 msgstr "Thumbnail size"
@@ -480,13 +480,13 @@ msgid "Update beschikbaar: {v}"
 msgstr "Update available: {v}"
 
 msgid "Verbind je iPhone of iPad"
-msgstr "Verbind je iPhone of iPad"
+msgstr "Connect your iPhone or iPad"
 
 msgid "Verbinden met kaart-server…"
-msgstr "Verbinden met kaart-server…"
+msgstr "Connecting to map server…"
 
 msgid "Vernieuwen"
-msgstr "Vernieuwen"
+msgstr "Refresh"
 
 msgid "Versie"
 msgstr "Version"
@@ -501,7 +501,7 @@ msgid "Verwijderen"
 msgstr "Delete"
 
 msgid "Viewer gesloten → terug naar grid"
-msgstr "Viewer gesloten → terug naar grid"
+msgstr "Viewer closed → back to grid"
 
 msgid "Volgende"
 msgstr "Next"
@@ -525,13 +525,13 @@ msgid "Weergave"
 msgstr "Display"
 
 msgid "Welkom bij Pixora!"
-msgstr "Welkom bij Pixora!"
+msgstr "Welcome to Pixora!"
 
 msgid "Wijzigen"
 msgstr "Change"
 
 msgid "Wissen"
-msgstr "Wissen"
+msgstr "Clear"
 
 msgid "Zoeken naar apparaat…"
 msgstr "Searching for device…"
@@ -552,16 +552,16 @@ msgid "februari"
 msgstr "February"
 
 msgid "iPhone blijft onherkenbaar na reset"
-msgstr "iPhone blijft onherkenbaar na reset"
+msgstr "iPhone still unrecognised after reset"
 
 msgid "iPhone direct herkend door usbmuxd"
-msgstr "iPhone direct herkend door usbmuxd"
+msgstr "iPhone directly recognised by usbmuxd"
 
 msgid "iPhone herkend na reset"
-msgstr "iPhone herkend na reset"
+msgstr "iPhone recognised after reset"
 
 msgid "iPhone niet herkend door usbmuxd — start auto-recovery"
-msgstr "iPhone niet herkend door usbmuxd — start auto-recovery"
+msgstr "iPhone not recognised by usbmuxd — starting auto-recovery"
 
 msgid "januari"
 msgstr "January"
@@ -573,7 +573,7 @@ msgid "juni"
 msgstr "June"
 
 msgid "load_photos: photo_path leeg of bestaat niet — empty state"
-msgstr "load_photos: photo_path leeg of bestaat niet — empty state"
+msgstr "load_photos: photo_path empty or missing — empty state"
 
 msgid "load_photos: scanning in {p}"
 msgstr "load_photos: scanning in {p}"
@@ -606,7 +606,7 @@ msgid "─── Pixora (dev mode) ───"
 msgstr "─── Pixora (dev mode) ───"
 
 msgid "═══ Pixora gestart in Developer Mode ═══"
-msgstr "═══ Pixora gestart in Developer Mode ═══"
+msgstr "═══ Pixora started in Developer Mode ═══"
 
 msgid "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"
 msgstr "⚠ No internet connection — map tiles cannot be loaded"
@@ -1051,8 +1051,8 @@ msgstr "Map → open_photos: {n} photos"
 msgid "Klaar"
 msgstr "Done"
 
-msgid "Leaflet-assets niet gevonden:\\n{p}"
-msgstr "Leaflet assets not found:\\n{p}"
+msgid "Leaflet-assets niet gevonden:\n{p}"
+msgstr "Leaflet assets not found:\n{p}"
 
 msgid "Markeer als favoriet"
 msgstr "Mark as favorite"

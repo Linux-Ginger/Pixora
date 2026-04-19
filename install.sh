@@ -18,6 +18,25 @@ ORANGE='\033[0;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Taal-detectie — volg $LANG / $LC_ALL / $LC_MESSAGES zodat de shell-output
+# matcht met de GUI-taal op EN-systemen.
+case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
+    nl*|NL*)
+        LBL_BY="door LinuxGinger"
+        LBL_NEED="Fout: Pixora vereist Ubuntu of Debian."
+        LBL_PREP="Voorbereiding…"
+        LBL_FETCH="Pixora ophalen…"
+        LBL_DONE="✓ Klaar — installer openen…"
+        ;;
+    *)
+        LBL_BY="by LinuxGinger"
+        LBL_NEED="Error: Pixora requires Ubuntu or Debian."
+        LBL_PREP="Preparing…"
+        LBL_FETCH="Fetching Pixora…"
+        LBL_DONE="✓ Done — opening installer…"
+        ;;
+esac
+
 clear
 echo ""
 echo -e "${ORANGE}${BOLD}"
@@ -28,17 +47,17 @@ echo "  ██╔═══╝ ██║ ██╔██╗ ██║   ██║
 echo "  ██║     ██║██╔╝ ██╗╚██████╔╝██║  ██║██║  ██║"
 echo "  ╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝"
 echo -e "${NC}"
-echo -e "  ${BOLD}door LinuxGinger${NC}"
+echo -e "  ${BOLD}${LBL_BY}${NC}"
 echo ""
 
 # ── Check Ubuntu/Debian ──
 if ! command -v apt &> /dev/null; then
-    echo "Fout: Pixora vereist Ubuntu of Debian."
+    echo "${LBL_NEED}"
     exit 1
 fi
 
 # ── Minimale deps ──
-echo -e "  ${ORANGE}Voorbereiding…${NC}"
+echo -e "  ${ORANGE}${LBL_PREP}${NC}"
 sudo apt-get install -y -qq \
     python3 \
     python3-gi \
@@ -55,7 +74,7 @@ sudo apt-get install -y -qq gir1.2-webkit-6.0 2>/dev/null || \
 sudo apt-get install -y -qq gir1.2-webkit2-4.1 2>/dev/null || true
 
 # ── Repo ophalen (altijd vers, geen cache) ──
-echo -e "  ${ORANGE}Pixora ophalen…${NC}"
+echo -e "  ${ORANGE}${LBL_FETCH}${NC}"
 if [ -d "$INSTALL_DIR/.git" ]; then
     git -C "$INSTALL_DIR" fetch -q origin
     git -C "$INSTALL_DIR" reset --hard origin/main -q
@@ -72,7 +91,7 @@ if command -v msgfmt >/dev/null 2>&1; then
     done
 fi
 
-echo -e "  ${GREEN}✓ Klaar — installer openen…${NC}"
+echo -e "  ${GREEN}${LBL_DONE}${NC}"
 echo ""
 
 # ── Installer starten vanuit de repo (geen CDN caching) ──

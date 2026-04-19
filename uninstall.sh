@@ -10,6 +10,24 @@ ORANGE='\033[0;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Taal-detectie
+case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
+    nl*|NL*)
+        LBL_BY="door LinuxGinger"
+        LBL_CONFIRM="Weet je zeker dat je Pixora wilt verwijderen? (j/N) "
+        LBL_CANCEL="Verwijdering geannuleerd."
+        LBL_DONE="✓ Pixora is verwijderd."
+        YES_CHAR="j"
+        ;;
+    *)
+        LBL_BY="by LinuxGinger"
+        LBL_CONFIRM="Are you sure you want to uninstall Pixora? (y/N) "
+        LBL_CANCEL="Uninstall cancelled."
+        LBL_DONE="✓ Pixora has been uninstalled."
+        YES_CHAR="y"
+        ;;
+esac
+
 clear
 echo ""
 echo -e "${ORANGE}${BOLD}"
@@ -20,13 +38,13 @@ echo "  ██╔═══╝ ██║ ██╔██╗ ██║   ██║
 echo "  ██║     ██║██╔╝ ██╗╚██████╔╝██║  ██║██║  ██║"
 echo "  ╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝"
 echo -e "${NC}"
-echo -e "  ${BOLD}door LinuxGinger${NC}"
+echo -e "  ${BOLD}${LBL_BY}${NC}"
 echo ""
 
-read -p "Weet je zeker dat je Pixora wilt verwijderen? (j/N) " antwoord
+read -p "${LBL_CONFIRM}" antwoord
 
-if [[ "$antwoord" != "j" && "$antwoord" != "J" ]]; then
-    echo "Verwijdering geannuleerd."
+if [[ "${antwoord,,}" != "${YES_CHAR}" ]]; then
+    echo "${LBL_CANCEL}"
     exit 0
 fi
 
@@ -40,5 +58,5 @@ if command -v update-desktop-database &> /dev/null; then
     update-desktop-database "$HOME/.local/share/applications"
 fi
 
-echo -e "${GREEN}${BOLD}✓ Pixora is verwijderd.${NC}"
+echo -e "${GREEN}${BOLD}${LBL_DONE}${NC}"
 echo ""

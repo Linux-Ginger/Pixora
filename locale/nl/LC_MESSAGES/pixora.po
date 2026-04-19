@@ -1051,8 +1051,8 @@ msgstr "Kaart → open_photos: {n} foto's"
 msgid "Klaar"
 msgstr "Klaar"
 
-msgid "Leaflet-assets niet gevonden:\\n{p}"
-msgstr "Leaflet-assets niet gevonden:\\n{p}"
+msgid "Leaflet-assets niet gevonden:\n{p}"
+msgstr "Leaflet-assets niet gevonden:\n{p}"
 
 msgid "Markeer als favoriet"
 msgstr "Markeer als favoriet"

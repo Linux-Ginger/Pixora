@@ -26,7 +26,10 @@ INSTALL_DIR="$TARGET_HOME/.local/share/pixora"
 VERSION_FILE="$TARGET_HOME/.config/pixora/installed_version"
 
 if ! command -v apt-get &> /dev/null; then
-    echo "Fout: Pixora vereist Ubuntu of Debian."
+    case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
+        nl*|NL*) echo "Fout: Pixora vereist Ubuntu of Debian." ;;
+        *)       echo "Error: Pixora requires Ubuntu or Debian." ;;
+    esac
     exit 1
 fi
 

@@ -484,11 +484,15 @@ class InstallerWindow(Adw.ApplicationWindow):
 
             icon = INSTALL_DIR / "docs" / "pixora-icon.svg"
             desktop = DESKTOP_DIR / "pixora.desktop"
+            # .desktop-file i18n: GenericName[xx]= / Comment[xx]= worden door de
+            # desktop-environment gekozen op basis van $LANG van de gebruiker.
             desktop.write_text(
                 "[Desktop Entry]\n"
                 "Name=Pixora\n"
-                "GenericName=Foto & Video Manager\n"
-                "Comment=Foto & video manager door LinuxGinger\n"
+                "GenericName=Photo & Video Manager\n"
+                "GenericName[nl]=Foto & Video Manager\n"
+                "Comment=Photo & video manager by LinuxGinger\n"
+                "Comment[nl]=Foto & video manager door LinuxGinger\n"
                 f"Exec={launcher}\n"
                 f"Icon={icon}\n"
                 "Terminal=false\n"
