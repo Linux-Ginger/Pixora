@@ -1226,3 +1226,57 @@ msgstr "photos-Liste: {before} → {after}"
 
 msgid "Bestand al weg van disk: {p}"
 msgstr "Datei schon von der Festplatte verdwenen: {p}"
+
+msgid "Backup wacht op USB-schijf aansluiting"
+msgstr "Backup wartet auf USB-Laufwerk-Verbindung"
+
+msgid "📀 Sluit je USB-backup-schijf aan voor de automatische backup"
+msgstr "📀 Schließe dein USB-Backup-Laufwerk für die automatische Sicherung an"
+
+msgid "✓ Backup voltooid"
+msgstr "✓ Backup abgeschlossen"
+
+msgid "⚠ Backup mislukt: {note}"
+msgstr "⚠ Backup fehlgeschlagen: {note}"
+
+msgid "Backup-schijf gedetecteerd"
+msgstr "Backup-Laufwerk erkannt"
+
+msgid "Je USB-schijf is aangesloten. Nieuwe foto's zijn klaar om geback-upt te worden. Nu starten?"
+msgstr "Dein USB-Laufwerk ist verbunden. Neue Fotos sind bereit zum Sichern. Jetzt starten?"
+
+msgid "Nu backuppen"
+msgstr "Jetzt sichern"
+
+msgid "Backup gestart"
+msgstr "Backup gestartet"
+
+msgid "Backup voltooid"
+msgstr "Backup abgeschlossen"
+
+msgid "Backup mislukt: {note}"
+msgstr "Backup fehlgeschlagen: {note}"
+
+msgid "Backup bezig"
+msgstr "Backup läuft"
+
+msgid "Backup: {pct}%"
+msgstr "Backup: {pct}%"
+
+msgid "Back-upschijf niet gevonden."
+msgstr "Backup-Laufwerk nicht gefunden."
+
+msgid "Backup fout: {err}"
+msgstr "Backup-Fehler: {err}"
+
+msgid "Backup gedeeltelijk mislukt."
+msgstr "Backup teilweise fehlgeschlagen."
+
+msgid "Pixora afsluiten?"
+msgstr "Pixora beenden?"
+
+msgid "Pixora is bezig met een backup naar je USB-schijf. Als je nu sluit wordt de backup onderbroken."
+msgstr "Pixora sichert gerade auf dein USB-Laufwerk. Wenn du jetzt schließt wird die Sicherung unterbrochen."
+
+msgid "Toch sluiten"
+msgstr "Trotzdem schließen"

@@ -341,6 +341,11 @@ def get_available_drives():
         log_error(_("Drive detectie fout: {err}").format(err=e))
     return drives
 
+def _cmd_available_bk(cmd):
+    """Wrapper rond shutil.which voor de backup-flow."""
+    import shutil as _sh
+    return _sh.which(cmd) is not None
+
 def get_mountpoint_for_uuid(uuid):
     try:
         result = subprocess.run(["lsblk", "-o", "UUID,MOUNTPOINT", "-J"], capture_output=True, text=True, timeout=5)
@@ -1063,6 +1068,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._current_flow          = None
         self._current_row_hbox      = None
         self._current_row_width     = 0
+        # ── Backup-manager state ───────────────────────────────────────
+        self._backup_running   = False
+        self._backup_fraction  = 0.0   # 0.0–1.0
+        self._backup_detail    = ""
+        self._backup_proc      = None  # actieve rsync Popen (of None)
+        self._backup_total     = 0     # totaal te backuppen (voor manual-fallback)
+        self._backup_done      = 0
 
         self.set_title("Pixora (Dev Mode)" if self.settings.get("dev_mode") else "Pixora")
         self.set_default_size(9999, 9999)
@@ -1093,9 +1105,25 @@ class MainWindow(Adw.ApplicationWindow):
         self.iphone_banner = Adw.Banner(title="", use_markup=False)
         self.iphone_banner.set_revealed(False)
 
+        # "Sluit je USB-backup-schijf aan"-banner
+        self.backup_pending_banner = Adw.Banner(title="", use_markup=False)
+        self.backup_pending_banner.set_revealed(False)
+
+        # "Backup voltooid"-banner (button = ✕ om weg te klikken)
+        self.backup_done_banner = Adw.Banner(
+            title="", button_label=_("OK"), use_markup=False
+        )
+        self.backup_done_banner.set_revealed(False)
+        self.backup_done_banner.connect(
+            "button-clicked",
+            lambda _b: self.backup_done_banner.set_revealed(False)
+        )
+
         self.toolbar_view = Adw.ToolbarView()
         self.toolbar_view.add_top_bar(self.update_banner)
         self.toolbar_view.add_top_bar(self.iphone_banner)
+        self.toolbar_view.add_top_bar(self.backup_pending_banner)
+        self.toolbar_view.add_top_bar(self.backup_done_banner)
         self.toolbar_view.add_top_bar(self.build_header())
         self.toolbar_view.set_content(self.main_stack)
         self.toolbar_view.add_bottom_bar(self.build_bottombar())
@@ -1163,6 +1191,12 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._poll_import_device)
         GLib.timeout_add_seconds(10, self._poll_import_device)
         self._setup_usb_monitor()
+        # Poll de backup-drive elke 4s zodat we een drive-insert snel zien
+        # (betrouwbaarder dan GUdev voor block-device mount-events).
+        self._backup_drive_last_seen = False
+        GLib.timeout_add_seconds(4, self._poll_backup_drive)
+        # Bij startup: als pending + drive aangesloten → meteen popup
+        GLib.idle_add(self._check_pending_backup)
 
     def _start_services(self):
         try:
@@ -1547,7 +1581,31 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def on_close(self, window):
+        # Close-guard: als backup actief is, vraag eerst bevestiging
+        if (self._backup_running and
+                not getattr(self, "_close_confirmed", False)):
+            dlg = Adw.AlertDialog(
+                heading=_("Pixora afsluiten?"),
+                body=_("Pixora is bezig met een backup naar je USB-schijf. "
+                       "Als je nu sluit wordt de backup onderbroken."),
+            )
+            dlg.add_response("cancel", _("Annuleren"))
+            dlg.add_response("close", _("Toch sluiten"))
+            dlg.set_response_appearance(
+                "close", Adw.ResponseAppearance.DESTRUCTIVE
+            )
+            dlg.set_default_response("cancel")
+            dlg.connect("response", self._on_close_guard_response)
+            dlg.present(self)
+            return True  # annuleer close event — we beslissen via de dialog
         log_info(_("Pixora wordt afgesloten — opruimen…"))
+        # Indien backup actief en gebruiker bevestigde → probeer rsync-proc
+        # netjes te killen zodat de backup stopt in plaats van te hangen.
+        if self._backup_running and self._backup_proc is not None:
+            try:
+                self._backup_proc.kill()
+            except Exception:
+                pass
         try:
             self._load_id += 1
             self._viewer_load_id += 1
@@ -1713,6 +1771,22 @@ class MainWindow(Adw.ApplicationWindow):
         settings_btn.set_tooltip_text(_("Instellingen"))
         settings_btn.connect("clicked", self.on_settings_clicked)
         self.header.pack_end(settings_btn)
+
+        # Backup-progress donut (verborgen tot backup actief is).
+        # Gtk.Button met custom DrawingArea-child zodat de cirkel meedraait
+        # met de button-hover en klik → popover met details.
+        self._backup_donut = Gtk.DrawingArea()
+        self._backup_donut.set_size_request(24, 24)
+        self._backup_donut.set_valign(Gtk.Align.CENTER)
+        self._backup_donut.set_draw_func(self._draw_backup_donut)
+        self._backup_donut_btn = Gtk.Button()
+        self._backup_donut_btn.add_css_class("flat")
+        self._backup_donut_btn.add_css_class("circular")
+        self._backup_donut_btn.set_child(self._backup_donut)
+        self._backup_donut_btn.set_tooltip_text(_("Backup bezig"))
+        self._backup_donut_btn.set_visible(False)
+        self._backup_donut_btn.connect("clicked", self._on_backup_donut_clicked)
+        self.header.pack_end(self._backup_donut_btn)
 
         return self.header
 
@@ -5171,5 +5245,307 @@ class MainWindow(Adw.ApplicationWindow):
         self.close_importer()
         if count and count > 0:
             self.reload_photos()
+            # Pending-backup markeren door last_import_time bij te werken
+            self.settings["last_import_time"] = time.time()
+            try:
+                save_settings(self.settings)
+            except Exception:
+                pass
+            # Meteen backup-check: als drive er is → start; anders banner
+            GLib.idle_add(self._check_pending_backup)
+
+    # ── Backup-manager ───────────────────────────────────────────────
+    def _is_backup_pending(self):
+        """True als er nieuwe import is geweest sinds de laatste backup."""
+        if not self.settings.get("backup_uuid"):
+            return False
+        last_import = self.settings.get("last_import_time", 0) or 0
+        last_backup = self.settings.get("last_backup_time", 0) or 0
+        return last_import > last_backup
+
+    def _backup_drive_mountpoint(self):
+        """Geeft Path van de backup-drive als die aangesloten is, anders None."""
+        uuid = self.settings.get("backup_uuid")
+        if not uuid:
+            return None
+        mp = get_mountpoint_for_uuid(uuid)
+        if not mp:
+            return None
+        try:
+            from pathlib import Path as _P
+            return _P(mp)
+        except Exception:
+            return None
+
+    def _check_pending_backup(self):
+        """Bij import-done en bij drive-insert aangeroepen: start backup als
+        pending + drive aangesloten, anders toon banner 'sluit USB aan'."""
+        if not self._is_backup_pending() or self._backup_running:
+            return False
+        drive = self._backup_drive_mountpoint()
+        if drive:
+            # Drive er is → start meteen
+            self.start_backup()
+        else:
+            # Geen drive → banner laten zien (implementatie komt in Task 6)
+            self._show_backup_pending_banner()
+        return False
+
+    def _show_backup_pending_banner(self):
+        try:
+            self.backup_pending_banner.set_title(
+                _("📀 Sluit je USB-backup-schijf aan voor de automatische backup")
+            )
+            self.backup_pending_banner.set_revealed(True)
+        except Exception:
+            pass
+
+    def _hide_backup_pending_banner(self):
+        try:
+            self.backup_pending_banner.set_revealed(False)
+        except Exception:
+            pass
+
+    def _poll_backup_drive(self):
+        """Detecteer drive-insert: bij overgang no-drive → drive én pending →
+        toon popup 'Wil je nu backuppen?'."""
+        drive_now = self._backup_drive_mountpoint() is not None
+        just_attached = drive_now and not self._backup_drive_last_seen
+        self._backup_drive_last_seen = drive_now
+        if just_attached and self._is_backup_pending() and not self._backup_running:
+            GLib.idle_add(self._prompt_backup_on_insert)
+        # Als drive weer weg is en we niet actief backuppen maar wel pending →
+        # zorg dat de banner aan staat.
+        if (not drive_now and self._is_backup_pending()
+                and not self._backup_running):
+            self._show_backup_pending_banner()
+        return True  # repeat
+
+    def _prompt_backup_on_insert(self):
+        if self._backup_running:
+            return False
+        dlg = Adw.AlertDialog(
+            heading=_("Backup-schijf gedetecteerd"),
+            body=_("Je USB-schijf is aangesloten. Nieuwe foto's zijn klaar om "
+                   "geback-upt te worden. Nu starten?"),
+        )
+        dlg.add_response("later", _("Later"))
+        dlg.add_response("start", _("Nu backuppen"))
+        dlg.set_response_appearance("start", Adw.ResponseAppearance.SUGGESTED)
+        dlg.connect("response", self._on_backup_prompt_response)
+        dlg.present(self)
+        return False
+
+    def _on_backup_prompt_response(self, dlg, response):
+        if response == "start":
+            self.start_backup()
+
+    def _on_close_guard_response(self, dlg, response):
+        if response == "close":
+            self._close_confirmed = True
+            self.close()
+
+    def start_backup(self):
+        if self._backup_running:
+            return
+        self._backup_running = True
+        self._backup_fraction = 0.0
+        self._backup_detail = ""
+        self._hide_backup_pending_banner()
+        log_info(_("Backup gestart"))
+        threading.Thread(target=self._backup_thread, daemon=True).start()
+
+    def _backup_thread(self):
+        from pathlib import Path as _P
+        photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
+        backup_uuid = self.settings.get("backup_uuid")
+        backup_path_str = self.settings.get("backup_path")
+        drive_root = self._backup_drive_mountpoint()
+        if not drive_root:
+            GLib.idle_add(self._backup_finished, False, _("Back-upschijf niet gevonden."))
+            return
+        backup_dest = _P(backup_path_str) if backup_path_str else drive_root / "Pixora"
+        try:
+            backup_dest.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            GLib.idle_add(self._backup_finished, False, _("Fout: {err}").format(err=e))
+            return
+
+        def _on_rsync_line(line):
+            for part in line.split():
+                if part.endswith("%"):
+                    try:
+                        frac = int(part[:-1]) / 100.0
+                        GLib.idle_add(self._update_backup_progress, frac, part)
+                    except ValueError:
+                        pass
+
+        success = False
+        if _cmd_available_bk("rsync"):
+            proc = None
+            try:
+                proc = subprocess.Popen(
+                    ["rsync", "-a", "--info=progress2",
+                     str(photo_path) + "/", str(backup_dest) + "/"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    text=True
+                )
+                self._backup_proc = proc
+                for line in proc.stdout:
+                    _on_rsync_line(line)
+                proc.wait(timeout=3600)
+                success = proc.returncode == 0
+            except Exception as e:
+                log_error(_("Backup fout: {err}").format(err=e))
+                success = False
+            finally:
+                if proc is not None and proc.poll() is None:
+                    try:
+                        proc.kill()
+                        proc.wait(timeout=5)
+                    except Exception:
+                        pass
+                self._backup_proc = None
+        else:
+            success = self._manual_backup(photo_path, backup_dest)
+
+        GLib.idle_add(self._backup_finished, success,
+                      None if success else _("Backup gedeeltelijk mislukt."))
+
+    def _manual_backup(self, src, dst):
+        """Fallback zonder rsync: handmatig kopiëren met progress."""
+        try:
+            all_src = []
+            for root, _, files in os.walk(src):
+                for fn in files:
+                    all_src.append(os.path.join(root, fn))
+            total = len(all_src)
+            self._backup_total = total
+            for i, sf in enumerate(all_src):
+                rel = os.path.relpath(sf, str(src))
+                df = os.path.join(str(dst), rel)
+                os.makedirs(os.path.dirname(df), exist_ok=True)
+                if not os.path.exists(df):
+                    import shutil as _sh
+                    _sh.copy2(sf, df)
+                frac = (i + 1) / total if total > 0 else 1.0
+                self._backup_done = i + 1
+                GLib.idle_add(self._update_backup_progress, frac,
+                              f"{i + 1} / {total}")
+            return True
+        except Exception as e:
+            log_error(_("Backup fout: {err}").format(err=e))
+            return False
+
+    def _update_backup_progress(self, fraction, detail):
+        self._backup_fraction = max(0.0, min(1.0, fraction))
+        self._backup_detail = detail or ""
+        if hasattr(self, "_backup_donut"):
+            try:
+                self._backup_donut.queue_draw()
+            except Exception:
+                pass
+        if hasattr(self, "_backup_donut_btn"):
+            try:
+                # Donut zichtbaar zolang backup loopt
+                self._backup_donut_btn.set_visible(self._backup_running)
+                self._backup_donut_btn.set_tooltip_text(
+                    _("Backup: {pct}%").format(
+                        pct=int(self._backup_fraction * 100)
+                    )
+                )
+            except Exception:
+                pass
+        return False
+
+    def _draw_backup_donut(self, area, cr, w, h):
+        """Donut/pie-chart die vult van 0° tot progress × 360°."""
+        try:
+            cx = w / 2
+            cy = h / 2
+            r_outer = min(w, h) / 2 - 1
+            r_inner = r_outer * 0.55
+            frac = max(0.0, min(1.0, self._backup_fraction))
+
+            # Background ring (grijs)
+            cr.set_source_rgba(0.5, 0.5, 0.5, 0.3)
+            cr.arc(cx, cy, r_outer, 0, 2 * math.pi)
+            cr.arc_negative(cx, cy, r_inner, 2 * math.pi, 0)
+            cr.fill()
+
+            # Progress-arc (Pixora-oranje)
+            if frac > 0.001:
+                start = -math.pi / 2  # top
+                end = start + frac * 2 * math.pi
+                cr.set_source_rgb(0.914, 0.329, 0.125)
+                cr.move_to(cx, cy)
+                cr.arc(cx, cy, r_outer, start, end)
+                cr.close_path()
+                cr.fill()
+                # Inner gat terug weg-cutten
+                cr.set_operator(cairo.OPERATOR_CLEAR)
+                cr.arc(cx, cy, r_inner, 0, 2 * math.pi)
+                cr.fill()
+                cr.set_operator(cairo.OPERATOR_OVER)
+        except Exception:
+            pass
+
+    def _on_backup_donut_clicked(self, btn):
+        """Klik op donut → popover met backup-detail."""
+        pop = Gtk.Popover()
+        pop.set_parent(btn)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_margin_top(8); box.set_margin_bottom(8)
+        box.set_margin_start(12); box.set_margin_end(12)
+        title = Gtk.Label(label=_("Backup bezig"))
+        title.add_css_class("heading")
+        title.set_halign(Gtk.Align.START)
+        box.append(title)
+        pct = Gtk.Label(label=f"{int(self._backup_fraction * 100)}%")
+        pct.set_halign(Gtk.Align.START)
+        box.append(pct)
+        if self._backup_detail:
+            det = Gtk.Label(label=self._backup_detail)
+            det.add_css_class("caption")
+            det.add_css_class("dim-label")
+            det.set_halign(Gtk.Align.START)
+            box.append(det)
+        pop.set_child(box)
+        pop.popup()
+
+    def _backup_finished(self, success, note):
+        self._backup_running = False
+        if success:
+            self.settings["last_backup_time"] = time.time()
+            try:
+                save_settings(self.settings)
+            except Exception:
+                pass
+            log_info(_("Backup voltooid"))
+        else:
+            log_warn(_("Backup mislukt: {note}").format(note=note or ""))
+        if hasattr(self, "_backup_donut_btn"):
+            try:
+                self._backup_donut_btn.set_visible(False)
+            except Exception:
+                pass
+        self._show_backup_done_banner(success, note)
+        return False
+
+    def _show_backup_done_banner(self, success, note):
+        try:
+            if success:
+                self.backup_done_banner.set_title(_("✓ Backup voltooid"))
+            else:
+                self.backup_done_banner.set_title(
+                    _("⚠ Backup mislukt: {note}").format(note=note or "")
+                )
+            self.backup_done_banner.set_revealed(True)
+            # Auto-verdwijnt na 10s
+            GLib.timeout_add_seconds(10, lambda: (
+                self.backup_done_banner.set_revealed(False) or False
+            ))
+        except Exception:
+            pass
 
 

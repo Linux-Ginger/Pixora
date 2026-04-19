@@ -1651,11 +1651,10 @@ class ImporterPage(Gtk.Box):
 
     def _on_import_done(self):
         unmount_iphone(MOUNT_POINT)
-        backup_uuid = self.settings.get("backup_uuid")
-        if backup_uuid:
-            self._start_backup()
-        else:
-            self._finish()
+        # Backup-flow zit nu in main_window (BackupManager) — via on_done_cb
+        # (in main_window.on_import_done) wordt last_import_time geset en
+        # de eventuele backup gestart. De importer toont alleen de done-page.
+        self._finish()
 
     # ─── Back-up ─────────────────────────────────────────────────────────────
 
