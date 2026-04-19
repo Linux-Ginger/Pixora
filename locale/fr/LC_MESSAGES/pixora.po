@@ -1223,3 +1223,6 @@ msgstr "Erreur de pré-rendu d'animation shred : {err}"
 
 msgid "photos-list: {before} → {after}"
 msgstr "liste photos : {before} → {after}"
+
+msgid "Bestand al weg van disk: {p}"
+msgstr "Fichier déjà absent du disque : {p}"

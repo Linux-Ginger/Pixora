@@ -1232,3 +1232,6 @@ msgstr "Shred-animatie pre-render fout: {err}"
 
 msgid "photos-list: {before} → {after}"
 msgstr "photos-list: {before} → {after}"
+
+msgid "Bestand al weg van disk: {p}"
+msgstr "Bestand al weg van disk: {p}"

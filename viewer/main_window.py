@@ -4238,8 +4238,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Verwijderen ───────────────────────────────────────────────────
     def on_delete_current(self, btn):
-        # Guard: lege lijst of ongeldige index
+        # Guard: lege lijst, ongeldige index, of al bezig met een shred
         if not self.photos or not (0 <= self.current_index < len(self.photos)):
+            return
+        if getattr(self, "_shredding", False):
             return
         path = self.photos[self.current_index]
         log_info(_("Verwijder bevestiging gevraagd: {p}").format(p=path))
@@ -4396,14 +4398,22 @@ class MainWindow(Adw.ApplicationWindow):
         n_before = len(self.photos)
         try:
             os.remove(path)
-            cache_path = get_cache_path(path)
-            if os.path.exists(cache_path):
-                os.remove(cache_path)
             log_info(_("Foto verwijderd: {p}").format(p=path))
+        except FileNotFoundError:
+            # File was al weg (vorige delete, externe tool, watcher-race).
+            # Niet fataal — gewoon doorgaan met photos-list update + navigatie.
+            log_warn(_("Bestand al weg van disk: {p}").format(p=path))
         except Exception as e:
             log_error(_("Verwijderen mislukt: {err}").format(err=e))
             self._shredding = False
             return
+        # Cache-thumbnail ook weghalen (best-effort, faalt niet de flow)
+        try:
+            cache_path = get_cache_path(path)
+            if os.path.exists(cache_path):
+                os.remove(cache_path)
+        except Exception:
+            pass
         if path in self._favorites:
             self._favorites.discard(path)
             self._schedule_save_favorites()
