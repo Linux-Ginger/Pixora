@@ -1728,10 +1728,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.filter_info_bar.set_margin_bottom(4)
         self.filter_info_bar.set_visible(False)
 
-        # Icoon links
-        _filter_icon = Gtk.Image.new_from_icon_name("mark-location-symbolic")
-        _filter_icon.set_pixel_size(24)
+        # Emoji-pin links
+        _filter_icon = Gtk.Label(label="📍")
         _filter_icon.set_valign(Gtk.Align.CENTER)
+        _filter_icon_css = Gtk.CssProvider()
+        _filter_icon_css.load_from_string("label { font-size: 20px; }")
+        _filter_icon.get_style_context().add_provider(
+            _filter_icon_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.filter_info_bar.append(_filter_icon)
 
         # Tekst-stack: titel + subtitel
