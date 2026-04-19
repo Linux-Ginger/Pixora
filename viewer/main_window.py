@@ -3102,28 +3102,33 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _load_full_photo(self, path, load_id):
         if is_video(path):
-            # Toon video direct, geocode daarna
+            # Bepaal een direct-zichtbare locatie: city-naam uit cache, of
+            # ruwe coords uit EXIF (snel, geen netwerk nodig), of niks.
+            cached = self._photo_location.get(path)
+            coords = get_video_gps_coords(path) if cached is None or cached == "" else None
+            if cached:
+                initial = cached
+            elif coords:
+                initial = f"{coords[0]:.4f}, {coords[1]:.4f}"
+            else:
+                initial = ""
             if load_id == self._viewer_load_id:
-                GLib.idle_add(self._show_video, path, self._photo_location.get(path) or "")
-            location = self._photo_location.get(path)
-            if location is None:
-                coords = get_video_gps_coords(path)
-                if coords:
-                    location = reverse_geocode(coords[0], coords[1])
-                    if location:
-                        self._photo_location[path] = location
-                    else:
-                        # Fallback naar ruwe coords bij geocode-fail
-                        location = f"{coords[0]:.4f}, {coords[1]:.4f}"
-                else:
-                    location = ""
-                    try:
-                        if time.time() - os.path.getmtime(path) > 30:
-                            self._photo_location[path] = location
-                    except Exception:
-                        pass
-            if location and load_id == self._viewer_load_id:
-                GLib.idle_add(self.viewer_location.set_text, f"📍 {location}")
+                GLib.idle_add(self._show_video, path, initial)
+            # Async: als we nog geen city-name hebben, probeer reverse-geocode
+            # en upgrade het label wanneer we 't terugkrijgen.
+            if coords and not cached:
+                city = reverse_geocode(coords[0], coords[1])
+                if city:
+                    self._photo_location[path] = city
+                    if load_id == self._viewer_load_id:
+                        GLib.idle_add(self._update_viewer_location, f"📍 {city}", load_id)
+            elif cached is None and not coords:
+                # Geen GPS: cache "" zodat we niet elke open-EXIF-parsen
+                try:
+                    if time.time() - os.path.getmtime(path) > 30:
+                        self._photo_location[path] = ""
+                except Exception:
+                    pass
             return
         pixbuf = self._viewer_pixbuf_cache.get(path)
         if pixbuf is not None:
@@ -3138,30 +3143,43 @@ class MainWindow(Adw.ApplicationWindow):
                 self._viewer_pixbuf_cache[path] = pixbuf
                 while len(self._viewer_pixbuf_cache) > 3:
                     self._viewer_pixbuf_cache.popitem(last=False)
+        # Bepaal een initial location vóór we _show_full_photo aanroepen, zodat
+        # user direct iets ziet i.p.v. wachten op async geocode.
+        cached = self._photo_location.get(path)
+        coords = get_gps_coords(path) if cached is None or cached == "" else None
+        if cached:
+            initial = cached
+        elif coords:
+            initial = f"{coords[0]:.4f}, {coords[1]:.4f}"
+        else:
+            initial = ""
         if load_id == self._viewer_load_id:
-            GLib.idle_add(self._show_full_photo, pixbuf, path, self._photo_location.get(path) or "")
+            GLib.idle_add(self._show_full_photo, pixbuf, path, initial)
             GLib.idle_add(self._preload_adjacent_photos)
-        # Geocode daarna, update label als de gebruiker nog steeds deze foto bekijkt
-        location = self._photo_location.get(path)
-        if location is None:
-            coords = get_gps_coords(path)
-            if coords:
-                location = reverse_geocode(coords[0], coords[1])
-                if location:
-                    self._photo_location[path] = location
-                else:
-                    # Geocode faalde (rate-limit / offline) — toon ruwe coords
-                    # als fallback zodat user ziet dat de GPS wél bekend is.
-                    location = f"{coords[0]:.4f}, {coords[1]:.4f}"
-            else:
-                location = ""
-                try:
-                    if time.time() - os.path.getmtime(path) > 30:
-                        self._photo_location[path] = location
-                except Exception:
-                    pass
-        if location and load_id == self._viewer_load_id:
-            GLib.idle_add(self.viewer_location.set_text, f"📍 {location}")
+        # Async: reverse-geocode als we coords hebben maar nog geen city-naam
+        if coords and not cached:
+            city = reverse_geocode(coords[0], coords[1])
+            if city:
+                self._photo_location[path] = city
+                if load_id == self._viewer_load_id:
+                    GLib.idle_add(self._update_viewer_location, f"📍 {city}", load_id)
+        elif cached is None and not coords:
+            try:
+                if time.time() - os.path.getmtime(path) > 30:
+                    self._photo_location[path] = ""
+            except Exception:
+                pass
+
+    def _update_viewer_location(self, text, load_id):
+        # Guard tegen stale callbacks (user kan inmiddels naar andere foto
+        # genavigeerd zijn).
+        if load_id != self._viewer_load_id:
+            return False
+        try:
+            self.viewer_location.set_text(text)
+        except Exception:
+            pass
+        return False
 
     def _show_full_photo(self, pixbuf, path, location=""):
         self._stop_video()
@@ -4257,7 +4275,34 @@ class MainWindow(Adw.ApplicationWindow):
         animatie en voer de callback direct uit."""
         pixbuf = getattr(self, "_viewer_pixbuf", None)
         if pixbuf is None:
-            # Geen pixbuf (bv. video) → sla de animatie over.
+            on_done(path)
+            return
+
+        # Render de pixbuf EENMAAL naar een cairo ImageSurface. Anders zou
+        # Gdk.cairo_set_source_pixbuf per strip per frame de hele pixbuf naar
+        # GPU moeten uploaden (~14 × 60 = 840 keer per seconde) = lage fps.
+        # Met een ImageSurface doen we de upload één keer.
+        try:
+            anim_pb = pixbuf
+            orig_w = anim_pb.get_width()
+            orig_h = anim_pb.get_height()
+            # Schaal naar max 1280px voor snellere rendering
+            MAX_DIM = 1280
+            if max(orig_w, orig_h) > MAX_DIM:
+                scale = MAX_DIM / max(orig_w, orig_h)
+                anim_pb = anim_pb.scale_simple(
+                    max(1, int(orig_w * scale)),
+                    max(1, int(orig_h * scale)),
+                    GdkPixbuf.InterpType.BILINEAR,
+                )
+            pb_w = anim_pb.get_width()
+            pb_h = anim_pb.get_height()
+            surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, pb_w, pb_h)
+            _tmp_ctx = cairo.Context(surface)
+            Gdk.cairo_set_source_pixbuf(_tmp_ctx, anim_pb, 0, 0)
+            _tmp_ctx.paint()
+        except Exception as e:
+            log_error(_("Shred-animatie pre-render fout: {err}").format(err=e))
             on_done(path)
             return
 
@@ -4268,18 +4313,14 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_area.add_overlay(draw_area)
         self.photo_picture.set_visible(False)
 
-        N_STRIPS = 14
-        DURATION = 1.0  # seconden — iets langer zodat het duidelijk zichtbaar is
-
-        # Progress in gedeelde state zodat draw_fn en tick_cb elkaar kunnen zien
+        N_STRIPS = 12
+        DURATION = 1.1
         state = {"progress": 0.0, "start": None, "done": False}
 
         def _draw_fn(area, cr, w, h):
             try:
                 progress = state["progress"]
-                pb_w = pixbuf.get_width()
-                pb_h = pixbuf.get_height()
-                if pb_w <= 0 or pb_h <= 0 or w <= 0 or h <= 0:
+                if w <= 0 or h <= 0 or pb_w <= 0 or pb_h <= 0:
                     return
                 scale = min(w / pb_w, h / pb_h)
                 disp_w = pb_w * scale
@@ -4291,19 +4332,28 @@ class MainWindow(Adw.ApplicationWindow):
                     delay = (i / N_STRIPS) * 0.35
                     denom = max(0.001, 1.0 - delay)
                     sp = max(0.0, min(1.0, (progress - delay) / denom))
-                    y_off = sp * sp * h * 1.3
-                    opacity = max(0.0, 1.0 - sp)
-                    rot = (sp * 0.35) * (1 if i % 2 else -1)
+                    # Ease-in cubic voor meer “zwaartekracht”-gevoel
+                    ease = sp * sp * sp
+                    y_off = ease * h * 1.4
+                    opacity = max(0.0, 1.0 - sp * 1.05)
+                    rot = (sp * 0.4) * (1 if i % 2 else -1)
                     strip_x = x0 + i * strip_w
+
                     cr.save()
+                    # Clip naar de kolom van deze strip
                     cr.rectangle(strip_x, 0, strip_w + 1, h)
                     cr.clip()
+                    # Rotatie rondom het middelpunt van de (verplaatste) strip
                     cx = strip_x + strip_w / 2
                     cy = y0 + disp_h / 2 + y_off
                     cr.translate(cx, cy)
                     cr.rotate(rot)
                     cr.translate(-cx, -cy)
-                    Gdk.cairo_set_source_pixbuf(cr, pixbuf, x0, y0 + y_off)
+                    # Teken de cached cairo-surface (originele pixel-grootte)
+                    # geschaald naar display-grootte.
+                    cr.translate(x0, y0 + y_off)
+                    cr.scale(scale, scale)
+                    cr.set_source_surface(surface, 0, 0)
                     cr.paint_with_alpha(opacity)
                     cr.restore()
             except Exception as _e:
@@ -4311,13 +4361,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         draw_area.set_draw_func(_draw_fn)
 
-        # add_tick_callback geeft een vsync-gesynchroniseerde callback per
-        # frame — betrouwbaarder voor animaties dan GLib.timeout_add dat
-        # soms in burst firet of achterblijft.
         def _tick(widget, frame_clock):
             if state["done"]:
                 return False
-            now = frame_clock.get_frame_time() / 1_000_000.0  # µs → s
+            now = frame_clock.get_frame_time() / 1_000_000.0
             if state["start"] is None:
                 state["start"] = now
             elapsed = now - state["start"]

@@ -1217,3 +1217,6 @@ msgstr "Unbekanntes Datum"
 
 msgid "Shred-animatie draw fout: {err}"
 msgstr "Shred-Animation Zeichenfehler: {err}"
+
+msgid "Shred-animatie pre-render fout: {err}"
+msgstr "Shred-Animation Pre-Render-Fehler: {err}"
