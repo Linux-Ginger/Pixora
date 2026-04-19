@@ -4235,6 +4235,99 @@ class MainWindow(Adw.ApplicationWindow):
         if response != "delete":
             log_info(_("Verwijderen geannuleerd: {p}").format(p=path))
             return
+        # Guard: niet twee keer tegelijk shredden
+        if getattr(self, "_shredding", False):
+            return
+        self._shredding = True
+        # Start shred-animatie; na animatie-klaar wordt de file daadwerkelijk
+        # verwijderd en navigeren we naar vorige/volgende foto.
+        self._play_shred_animation(path, on_done=self._finish_delete_after_shred)
+
+    def _play_shred_animation(self, path, on_done):
+        """Papier-versnipperaar-effect: verdeel de huidige foto in verticale
+        strips, laat ze met vertraging naar beneden vallen + fade out, en
+        roep on_done(path) aan na afloop. Bij video/geen pixbuf: skip visuele
+        animatie en voer de callback direct uit."""
+        pixbuf = getattr(self, "_viewer_pixbuf", None)
+        if pixbuf is None:
+            # Geen pixbuf (bv. video) → sla de animatie over.
+            on_done(path)
+            return
+
+        draw_area = Gtk.DrawingArea()
+        draw_area.set_vexpand(True)
+        draw_area.set_hexpand(True)
+        draw_area.set_can_target(False)
+        self.viewer_area.add_overlay(draw_area)
+        # Verberg de echte picture tijdens animatie.
+        self.photo_picture.set_visible(False)
+
+        N_STRIPS = 14
+        start_t = time.time()
+        duration = 0.75  # seconden
+
+        def _draw_fn(area, cr, w, h):
+            import cairo as _cairo
+            elapsed = time.time() - start_t
+            progress = min(1.0, elapsed / duration)
+
+            pb_w = pixbuf.get_width()
+            pb_h = pixbuf.get_height()
+            if pb_w <= 0 or pb_h <= 0:
+                return
+            scale = min(w / pb_w, h / pb_h)
+            disp_w = pb_w * scale
+            disp_h = pb_h * scale
+            x0 = (w - disp_w) / 2
+            y0 = (h - disp_h) / 2
+
+            strip_w = disp_w / N_STRIPS
+            for i in range(N_STRIPS):
+                # Staggered start: links valt eerst, rechts laatst.
+                delay = (i / N_STRIPS) * 0.35
+                denom = max(0.001, 1.0 - delay)
+                sp = max(0.0, min(1.0, (progress - delay) / denom))
+                # Kwadratische val (gravity-gevoel)
+                y_off = sp * sp * h * 1.3
+                opacity = max(0.0, 1.0 - sp)
+                # Afwisselende lichte rotatie
+                rot = (sp * 0.35) * (1 if i % 2 else -1)
+                strip_x = x0 + i * strip_w
+
+                cr.save()
+                # Clip strip-kolom over de volledige hoogte zodat vallende
+                # strook zichtbaar blijft onder zijn originele kolom.
+                cr.rectangle(strip_x, 0, strip_w + 1, h)
+                cr.clip()
+                # Draai rond middenpunt van de verplaatste strip.
+                cx = strip_x + strip_w / 2
+                cy = y0 + disp_h / 2 + y_off
+                cr.translate(cx, cy)
+                cr.rotate(rot)
+                cr.translate(-cx, -cy)
+                # Teken de hele pixbuf, maar verschoven naar beneden.
+                Gdk.cairo_set_source_pixbuf(cr, pixbuf, x0, y0 + y_off)
+                cr.paint_with_alpha(opacity)
+                cr.restore()
+
+        draw_area.set_draw_func(_draw_fn)
+
+        def _tick():
+            draw_area.queue_draw()
+            if time.time() - start_t >= duration:
+                try:
+                    self.viewer_area.remove_overlay(draw_area)
+                except Exception:
+                    pass
+                self.photo_picture.set_visible(True)
+                on_done(path)
+                return False
+            return True
+
+        GLib.timeout_add(16, _tick)  # ~60fps
+
+    def _finish_delete_after_shred(self, path):
+        """Na-animatie: daadwerkelijk verwijderen + navigeren."""
         try:
             os.remove(path)
             cache_path = get_cache_path(path)
@@ -4243,22 +4336,22 @@ class MainWindow(Adw.ApplicationWindow):
             log_info(_("Foto verwijderd: {p}").format(p=path))
         except Exception as e:
             log_error(_("Verwijderen mislukt: {err}").format(err=e))
+            self._shredding = False
             return
         if path in self._favorites:
             self._favorites.discard(path)
             self._schedule_save_favorites()
-        # Path kan al uit self.photos zijn (watcher reload) — discard-stijl
         try:
             self.photos.remove(path)
         except ValueError:
             pass
         if not self.photos:
+            self._shredding = False
             self.close_viewer()
             self.show_empty_state()
             return
         if self.current_index >= len(self.photos):
             self.current_index = len(self.photos) - 1
-        # Copy path vóór thread-start (zie open_photo)
         next_path = self.photos[self.current_index]
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
@@ -4268,6 +4361,7 @@ class MainWindow(Adw.ApplicationWindow):
             daemon=True
         ).start()
         GLib.timeout_add(500, self.start_load)
+        self._shredding = False
 
     def on_delete_selected(self, btn):
         if not self._selected:
