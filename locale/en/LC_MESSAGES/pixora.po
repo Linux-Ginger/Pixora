@@ -1223,3 +1223,6 @@ msgstr "Filtered location"
 
 msgid "Onbekende datum"
 msgstr "Unknown date"
+
+msgid "Shred-animatie draw fout: {err}"
+msgstr "Shred animation draw error: {err}"

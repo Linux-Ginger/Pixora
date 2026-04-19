@@ -3112,6 +3112,9 @@ class MainWindow(Adw.ApplicationWindow):
                     location = reverse_geocode(coords[0], coords[1])
                     if location:
                         self._photo_location[path] = location
+                    else:
+                        # Fallback naar ruwe coords bij geocode-fail
+                        location = f"{coords[0]:.4f}, {coords[1]:.4f}"
                 else:
                     location = ""
                     try:
@@ -3146,6 +3149,10 @@ class MainWindow(Adw.ApplicationWindow):
                 location = reverse_geocode(coords[0], coords[1])
                 if location:
                     self._photo_location[path] = location
+                else:
+                    # Geocode faalde (rate-limit / offline) — toon ruwe coords
+                    # als fallback zodat user ziet dat de GPS wél bekend is.
+                    location = f"{coords[0]:.4f}, {coords[1]:.4f}"
             else:
                 location = ""
                 try:
@@ -4259,62 +4266,65 @@ class MainWindow(Adw.ApplicationWindow):
         draw_area.set_hexpand(True)
         draw_area.set_can_target(False)
         self.viewer_area.add_overlay(draw_area)
-        # Verberg de echte picture tijdens animatie.
         self.photo_picture.set_visible(False)
 
         N_STRIPS = 14
-        start_t = time.time()
-        duration = 0.75  # seconden
+        DURATION = 1.0  # seconden — iets langer zodat het duidelijk zichtbaar is
+
+        # Progress in gedeelde state zodat draw_fn en tick_cb elkaar kunnen zien
+        state = {"progress": 0.0, "start": None, "done": False}
 
         def _draw_fn(area, cr, w, h):
-            import cairo as _cairo
-            elapsed = time.time() - start_t
-            progress = min(1.0, elapsed / duration)
-
-            pb_w = pixbuf.get_width()
-            pb_h = pixbuf.get_height()
-            if pb_w <= 0 or pb_h <= 0:
-                return
-            scale = min(w / pb_w, h / pb_h)
-            disp_w = pb_w * scale
-            disp_h = pb_h * scale
-            x0 = (w - disp_w) / 2
-            y0 = (h - disp_h) / 2
-
-            strip_w = disp_w / N_STRIPS
-            for i in range(N_STRIPS):
-                # Staggered start: links valt eerst, rechts laatst.
-                delay = (i / N_STRIPS) * 0.35
-                denom = max(0.001, 1.0 - delay)
-                sp = max(0.0, min(1.0, (progress - delay) / denom))
-                # Kwadratische val (gravity-gevoel)
-                y_off = sp * sp * h * 1.3
-                opacity = max(0.0, 1.0 - sp)
-                # Afwisselende lichte rotatie
-                rot = (sp * 0.35) * (1 if i % 2 else -1)
-                strip_x = x0 + i * strip_w
-
-                cr.save()
-                # Clip strip-kolom over de volledige hoogte zodat vallende
-                # strook zichtbaar blijft onder zijn originele kolom.
-                cr.rectangle(strip_x, 0, strip_w + 1, h)
-                cr.clip()
-                # Draai rond middenpunt van de verplaatste strip.
-                cx = strip_x + strip_w / 2
-                cy = y0 + disp_h / 2 + y_off
-                cr.translate(cx, cy)
-                cr.rotate(rot)
-                cr.translate(-cx, -cy)
-                # Teken de hele pixbuf, maar verschoven naar beneden.
-                Gdk.cairo_set_source_pixbuf(cr, pixbuf, x0, y0 + y_off)
-                cr.paint_with_alpha(opacity)
-                cr.restore()
+            try:
+                progress = state["progress"]
+                pb_w = pixbuf.get_width()
+                pb_h = pixbuf.get_height()
+                if pb_w <= 0 or pb_h <= 0 or w <= 0 or h <= 0:
+                    return
+                scale = min(w / pb_w, h / pb_h)
+                disp_w = pb_w * scale
+                disp_h = pb_h * scale
+                x0 = (w - disp_w) / 2
+                y0 = (h - disp_h) / 2
+                strip_w = disp_w / N_STRIPS
+                for i in range(N_STRIPS):
+                    delay = (i / N_STRIPS) * 0.35
+                    denom = max(0.001, 1.0 - delay)
+                    sp = max(0.0, min(1.0, (progress - delay) / denom))
+                    y_off = sp * sp * h * 1.3
+                    opacity = max(0.0, 1.0 - sp)
+                    rot = (sp * 0.35) * (1 if i % 2 else -1)
+                    strip_x = x0 + i * strip_w
+                    cr.save()
+                    cr.rectangle(strip_x, 0, strip_w + 1, h)
+                    cr.clip()
+                    cx = strip_x + strip_w / 2
+                    cy = y0 + disp_h / 2 + y_off
+                    cr.translate(cx, cy)
+                    cr.rotate(rot)
+                    cr.translate(-cx, -cy)
+                    Gdk.cairo_set_source_pixbuf(cr, pixbuf, x0, y0 + y_off)
+                    cr.paint_with_alpha(opacity)
+                    cr.restore()
+            except Exception as _e:
+                log_error(_("Shred-animatie draw fout: {err}").format(err=_e))
 
         draw_area.set_draw_func(_draw_fn)
 
-        def _tick():
-            draw_area.queue_draw()
-            if time.time() - start_t >= duration:
+        # add_tick_callback geeft een vsync-gesynchroniseerde callback per
+        # frame — betrouwbaarder voor animaties dan GLib.timeout_add dat
+        # soms in burst firet of achterblijft.
+        def _tick(widget, frame_clock):
+            if state["done"]:
+                return False
+            now = frame_clock.get_frame_time() / 1_000_000.0  # µs → s
+            if state["start"] is None:
+                state["start"] = now
+            elapsed = now - state["start"]
+            state["progress"] = min(1.0, elapsed / DURATION)
+            widget.queue_draw()
+            if elapsed >= DURATION:
+                state["done"] = True
                 try:
                     self.viewer_area.remove_overlay(draw_area)
                 except Exception:
@@ -4324,7 +4334,7 @@ class MainWindow(Adw.ApplicationWindow):
                 return False
             return True
 
-        GLib.timeout_add(16, _tick)  # ~60fps
+        draw_area.add_tick_callback(_tick)
 
     def _finish_delete_after_shred(self, path):
         """Na-animatie: daadwerkelijk verwijderen + navigeren."""
