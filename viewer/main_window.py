@@ -4559,23 +4559,35 @@ class MainWindow(Adw.ApplicationWindow):
 
         def _relaunch():
             pixora_bin = os.path.expanduser("~/.local/bin/pixora")
-            cmd = [pixora_bin] if os.path.exists(pixora_bin) else \
-                  [sys.executable, os.path.join(INSTALL_DIR, "viewer", "main.py")]
+            if os.path.exists(pixora_bin):
+                relaunch_cmd = f'"{pixora_bin}"'
+            else:
+                script = os.path.join(INSTALL_DIR, "viewer", "main.py")
+                relaunch_cmd = f'{sys.executable!s} {script!r}'
             # Strip PIXORA_IN_DEV_TERM zodat de relaunch opnieuw een
-            # dev-terminal kan spawnen als dev-mode actief is.
+            # dev-terminal kan spawnen als dev-mode actief is. Strip ook
+            # PIXORA_DEV_LOG_OPENED voor consistentie met _restart_app.
             child_env = {k: v for k, v in os.environ.items()
-                         if k != "PIXORA_IN_DEV_TERM"}
+                         if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")}
             try:
+                # 1.2s sleep zodat GApplication op D-Bus is uitgeschreven
+                # voordat de nieuwe instance zich probeert te registreren
+                # (anders ziet GTK bestaande unique app en geeft alleen
+                # een activate i.p.v. nieuwe window).
                 subprocess.Popen(
-                    cmd, start_new_session=True,
+                    ["bash", "-c", f"sleep 1.2 && exec {relaunch_cmd}"],
+                    env=child_env,
+                    start_new_session=True,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,
-                    env=child_env,
                 )
+                log_info(_("Taal-relaunch gepland (1.2s delay)"))
             except Exception as e:
                 log_error(_("Relaunch na taal-wissel fout: {err}").format(err=e))
-            self.close()
+            # Gebruik app.quit() i.p.v. self.close() zodat het oude proces
+            # écht volledig afsluit en D-Bus z'n registratie vrijgeeft.
+            self.get_application().quit()
             return False
         GLib.timeout_add(1000, _relaunch)
 

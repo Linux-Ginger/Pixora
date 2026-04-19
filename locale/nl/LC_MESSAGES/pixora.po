@@ -1208,3 +1208,6 @@ msgstr "Dit verwijdert alle bestaande iPhone-koppelingen in /var/lib/lockdown/. 
 
 msgid "Pair-records gewist en usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust."
 msgstr "Pair-records gewist en usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust."
+
+msgid "Taal-relaunch gepland (1.2s delay)"
+msgstr "Taal-relaunch gepland (1.2s delay)"

@@ -1199,3 +1199,6 @@ msgid "%d geselecteerd"
 msgid_plural "%d geselecteerd"
 msgstr[0] "%d sélectionné"
 msgstr[1] "%d sélectionnés"
+
+msgid "Taal-relaunch gepland (1.2s delay)"
+msgstr "Relance de langue planifiée (délai 1,2 s)"
