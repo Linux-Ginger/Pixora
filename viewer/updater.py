@@ -80,7 +80,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
         title = Gtk.Label(label=_("Pixora bijwerken"))
         title.add_css_class("title-1")
         top.append(title)
-        sub = Gtk.Label(label="door LinuxGinger")
+        sub = Gtk.Label(label=_("door LinuxGinger"))
         sub.add_css_class("dim-label")
         top.append(sub)
         page.append(top)

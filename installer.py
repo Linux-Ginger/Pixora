@@ -121,7 +121,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         title.add_css_class("title-1")
         top.append(title)
 
-        sub = Gtk.Label(label="door LinuxGinger")
+        sub = Gtk.Label(label=_("door LinuxGinger"))
         sub.add_css_class("dim-label")
         top.append(sub)
 
@@ -144,7 +144,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         if already_installed:
             self.installed_row = Adw.ActionRow(
-                title="Pixora is al geïnstalleerd",
+                title=_("Pixora is al geïnstalleerd"),
                 subtitle=current_version if current_version else ""
             )
             self.installed_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
@@ -175,7 +175,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         btn_box.set_margin_top(8)
         btn_box.set_margin_bottom(20)
 
-        btn_label = "Bijwerken" if already_installed else "Installeren"  # bijgewerkt door _fetch_releases
+        btn_label = _("Bijwerken") if already_installed else _("Installeren")  # bijgewerkt door _fetch_releases
         self.install_btn = Gtk.Button(label=btn_label)
         self.install_btn.add_css_class("suggested-action")
         self.install_btn.add_css_class("pill")
@@ -204,7 +204,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         title.add_css_class("title-1")
         top.append(title)
 
-        sub = Gtk.Label(label="door LinuxGinger")
+        sub = Gtk.Label(label=_("door LinuxGinger"))
         sub.add_css_class("dim-label")
         top.append(sub)
 
@@ -312,14 +312,16 @@ class InstallerWindow(Adw.ApplicationWindow):
         local = self._local_version or ""
         if local == remote_version:
             self.installed_row.set_title(_("Pixora is al geïnstalleerd"))
-            self.installed_row.set_subtitle(f"Versie {local} — up to date")
+            self.installed_row.set_subtitle(_("Versie {v} — up to date").format(v=local))
             self.install_btn.set_label(_("Opnieuw installeren"))
             self.installed_icon.set_from_icon_name("emblem-ok-symbolic")
             self.installed_icon.remove_css_class("warning")
             self.installed_icon.add_css_class("success")
         else:
             self.installed_row.set_title(_("Update beschikbaar"))
-            self.installed_row.set_subtitle(f"Update beschikbaar: {local} → {remote_version}")
+            self.installed_row.set_subtitle(_("Update beschikbaar: {local} → {remote}").format(
+                local=local, remote=remote_version
+            ))
             self.install_btn.set_label(_("Bijwerken"))
             self.installed_icon.set_from_icon_name("software-update-urgent-symbolic")
             self.installed_icon.remove_css_class("success")
@@ -368,7 +370,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         stack.set_visible_child_name("check")
 
     def _set_error(self, msg):
-        self.status_lbl.set_text(f"Fout: {msg}")
+        self.status_lbl.set_text(_("Fout: {err}").format(err=msg))
         self.progress.add_css_class("error")
 
     def _run_install(self):
@@ -424,7 +426,7 @@ class InstallerWindow(Adw.ApplicationWindow):
                                    check=True, capture_output=True)
             return True, ""
         except subprocess.CalledProcessError:
-            return False, "downloaden mislukt"
+            return False, _("downloaden mislukt")
 
     def _install_apt(self):
         packages = [
@@ -437,7 +439,7 @@ class InstallerWindow(Adw.ApplicationWindow):
             subprocess.run(["sudo", "apt-get", "install", "-y", "-qq"] + packages,
                            check=True, capture_output=True)
         except subprocess.CalledProcessError:
-            return False, "apt mislukt"
+            return False, _("apt mislukt")
         # WebKit typelib — probeer 6.0 eerst, valt terug op 4.1
         for wk in ("gir1.2-webkit-6.0", "gir1.2-webkit2-4.1"):
             try:
@@ -458,7 +460,7 @@ class InstallerWindow(Adw.ApplicationWindow):
             )
             return True, ""
         except subprocess.CalledProcessError:
-            return False, "pip mislukt"
+            return False, _("pip mislukt")
 
     def _create_launcher(self):
         try:

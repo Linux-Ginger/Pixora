@@ -97,10 +97,16 @@ def _launch_dev_terminal():
                 # Origineel proces sluit af; de terminal neemt het over.
                 sys.exit(0)
             except Exception as e:
-                print(f"Kon {term} niet starten: {e}")
+                try:
+                    print(_t.gettext("Kon {term} niet starten: {err}").format(term=term, err=e))
+                except Exception:
+                    print(f"Could not start {term}: {e}")
                 continue
     # Geen terminal gevonden: val terug op directe start met waarschuwing
-    print("Geen terminal gevonden voor dev-mode; Pixora start zonder.")
+    try:
+        print(_t.gettext("Geen terminal gevonden voor dev-mode; Pixora start zonder."))
+    except Exception:
+        print("No terminal found for dev-mode; Pixora starts without.")
 
 
 def _quit_pixora_app():

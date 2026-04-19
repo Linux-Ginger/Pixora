@@ -328,6 +328,16 @@ _MONTH_KEYS = [
 def format_date_header(dt):
     return f"{dt.day} {_(_MONTH_KEYS[dt.month])} {dt.year}"
 
+def format_viewer_date(dt):
+    # Taalonafhankelijke datum-formatting via gettext (niet via strftime-locale,
+    # omdat en_US.UTF-8 niet overal geïnstalleerd is).
+    return _("{day} {month} {year}  {time}").format(
+        day=dt.day,
+        month=_(_MONTH_KEYS[dt.month]),
+        year=dt.year,
+        time=dt.strftime("%H:%M"),
+    )
+
 
 # ── Metadata-cache (video-duur, foto-datum, GPS, geocode) ─────────────
 # Spaart zware EXIF- en ffprobe-calls bij iedere grid-reload/map-open.
@@ -796,7 +806,7 @@ class MapWidget(Gtk.Box):
                 if network_session and hasattr(network_session, "set_sandbox_enabled"):
                     network_session.set_sandbox_enabled(False)
         except Exception as e:
-            log_warn(f"NetworkSession sandbox-disable faalde: {e}")
+            log_warn(_("NetworkSession sandbox-disable faalde: {err}").format(err=e))
 
         try:
             # WebKit2 4.x: WebContext heeft set_sandbox_enabled
@@ -805,7 +815,7 @@ class MapWidget(Gtk.Box):
                 if wc and hasattr(wc, "set_sandbox_enabled"):
                     wc.set_sandbox_enabled(False)
         except Exception as e:
-            log_warn(f"WebContext sandbox-disable faalde: {e}")
+            log_warn(_("WebContext sandbox-disable faalde: {err}").format(err=e))
 
         # Probeer WebView te maken mét een custom NetworkSession (WebKit 6.0)
         self.web = None
@@ -826,7 +836,7 @@ class MapWidget(Gtk.Box):
             wk_settings.set_javascript_can_access_clipboard(False)
             wk_settings.set_enable_developer_extras(False)
         except Exception as e:
-            log_warn(f"WebView settings niet volledig gezet: {e}")
+            log_warn(_("WebView settings niet volledig gezet: {err}").format(err=e))
 
         try:
             ucm = self.web.get_user_content_manager()
@@ -842,7 +852,7 @@ class MapWidget(Gtk.Box):
                 log_error(_("register_script_message_handler mislukt met alle varianten"))
             ucm.connect("script-message-received::pixora", self._on_js_message)
         except Exception as e:
-            log_error(f"WebView bridge setup fout: {e}")
+            log_error(_("WebView bridge setup fout: {err}").format(err=e))
 
         self.web.connect("load-changed", self._on_load_changed)
 
@@ -851,7 +861,7 @@ class MapWidget(Gtk.Box):
         )
         map_html_path = os.path.abspath(os.path.join(assets_dir, "map.html"))
         if not os.path.exists(map_html_path):
-            self._show_fallback(f"Leaflet-assets niet gevonden:\n{map_html_path}")
+            self._show_fallback(_("Leaflet-assets niet gevonden:\n{p}").format(p=map_html_path))
             return
 
         self.web.load_uri("file://" + map_html_path)
@@ -900,7 +910,7 @@ class MapWidget(Gtk.Box):
             try:
                 self.web.run_javascript(js, None, None, None)
             except Exception as e:
-                log_error(f"JS push fout: {e}")
+                log_error(_("JS push fout: {err}").format(err=e))
         return False
 
     def _on_js_message(self, ucm, message):
@@ -915,12 +925,12 @@ class MapWidget(Gtk.Box):
         msg_type = payload.get("type")
         if msg_type == "open_photos":
             paths = payload.get("paths") or []
-            log_info(f"Kaart → open_photos: {len(paths)} foto's")
+            log_info(_("Kaart → open_photos: {n} foto's").format(n=len(paths)))
             if paths:
                 GLib.idle_add(self.open_photo_cb, paths)
         elif msg_type == "open_photo":
             path = payload.get("path")
-            log_info(f"Kaart → open_photo: {path}")
+            log_info(_("Kaart → open_photo: {p}").format(p=path))
             if path:
                 GLib.idle_add(self.open_photo_cb, [path])
         elif msg_type == "map-ready":
@@ -1115,7 +1125,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._udev_client = GUdev.Client(subsystems=["usb"])
             self._udev_client.connect("uevent", self._on_usb_event)
         except Exception as e:
-            log_error(f"GUdev monitor kon niet starten: {e}")
+            log_error(_("GUdev monitor kon niet starten: {err}").format(err=e))
             self._udev_client = None
 
     def _on_usb_event(self, client, action, device):
@@ -1165,9 +1175,9 @@ class MainWindow(Adw.ApplicationWindow):
                 capture_output=True, text=True, timeout=40
             )
             reset_ok = (r.returncode == 0)
-            log_info(f"usbmuxd reset rc={r.returncode}")
+            log_info(_("usbmuxd reset rc={rc}").format(rc=r.returncode))
         except Exception as e:
-            log_error(f"usbmuxd reset fout: {e}")
+            log_error(_("usbmuxd reset fout: {err}").format(err=e))
             reset_ok = False
         if not reset_ok:
             GLib.idle_add(self._iphone_flow_fail)
@@ -1364,7 +1374,7 @@ class MainWindow(Adw.ApplicationWindow):
             subprocess.Popen([sys.executable, updater_path],
                              start_new_session=True)
         except Exception as e:
-            log_error(f"GUI-updater kon niet starten: {e}")
+            log_error(_("GUI-updater kon niet starten: {err}").format(err=e))
             return
         # Trigger on_close (met z'n 2s force-exit fallback) i.p.v.
         # app.quit() dat de GTK-loop wel stopt maar non-daemon threads +
@@ -1472,7 +1482,7 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             save_favorites(self._favorites)
         except Exception as e:
-            log_error(f"Favorites save fout: {e}")
+            log_error(_("Favorites save fout: {err}").format(err=e))
         return False
 
     def on_close(self, window):
@@ -1528,7 +1538,7 @@ class MainWindow(Adw.ApplicationWindow):
             if hasattr(self, "_map_widget") and self._map_widget:
                 self._map_widget = None
         except Exception as e:
-            log_error(f"Cleanup-fout: {e}")
+            log_error(_("Cleanup-fout: {err}").format(err=e))
         # Trigger garbage collect
         try:
             import gc
@@ -1559,7 +1569,7 @@ class MainWindow(Adw.ApplicationWindow):
         # proces in geheugen houden.
         def _force_exit():
             try:
-                print("Pixora proces forceert exit (lingering threads)", flush=True)
+                print(_("Pixora proces forceert exit (lingering threads)"), flush=True)
             except Exception:
                 pass
             os._exit(0)
@@ -1739,7 +1749,7 @@ class MainWindow(Adw.ApplicationWindow):
         return box
 
     def open_map(self, btn=None):
-        log_info(f"Kaart geopend ({len(self.photos)} foto's gaan naar GPS-scan)")
+        log_info(_("Kaart geopend ({n} foto's gaan naar GPS-scan)").format(n=len(self.photos)))
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
         try:
@@ -1766,7 +1776,8 @@ class MainWindow(Adw.ApplicationWindow):
             filename = os.path.basename(path)
             try:
                 mtime = os.path.getmtime(path)
-                datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y")
+                dt = datetime.datetime.fromtimestamp(mtime)
+                datum = f"{dt.day} {_(_MONTH_KEYS[dt.month])} {dt.year}"
             except Exception:
                 datum = ""
             return (lat, lon, filename, datum, path)
@@ -1935,7 +1946,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_close_btn.set_margin_top(16)
         self.viewer_close_btn.set_margin_end(16)
         self.viewer_close_btn.set_size_request(40, 40)
-        self.viewer_close_btn.set_tooltip_text(_("Sluiten (Esc)"))
+        self.viewer_close_btn.set_tooltip_text(_("Sluiten"))
         self.viewer_close_btn.connect("clicked", self.close_viewer)
         viewer_area.add_overlay(self.viewer_close_btn)
 
@@ -1947,7 +1958,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_delete_btn.set_margin_top(16)
         self.viewer_delete_btn.set_margin_end(68)
         self.viewer_delete_btn.set_size_request(40, 40)
-        self.viewer_delete_btn.set_tooltip_text(_("Verwijderen (Delete)"))
+        self.viewer_delete_btn.set_tooltip_text(_("Verwijderen"))
         self.viewer_delete_btn.connect("clicked", self.on_delete_current)
         viewer_area.add_overlay(self.viewer_delete_btn)
 
@@ -1971,7 +1982,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.favorite_btn.set_margin_top(16)
         self.favorite_btn.set_margin_end(172)
         self.favorite_btn.set_size_request(40, 40)
-        self.favorite_btn.set_tooltip_text(_("Markeer als favoriet (F)"))
+        self.favorite_btn.set_tooltip_text(_("Markeer als favoriet"))
         self.favorite_btn.connect("clicked", self.on_toggle_favorite)
         self._favorite_css = Gtk.CssProvider()
         self._favorite_css.load_from_string(
@@ -2072,7 +2083,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.prev_btn.set_margin_start(16)
         self.prev_btn.set_margin_bottom(105)
         self.prev_btn.set_size_request(48, 48)
-        self.prev_btn.set_tooltip_text(_("Vorige (←)"))
+        self.prev_btn.set_tooltip_text(_("Vorige"))
         self.prev_btn.connect("clicked", self.prev_photo)
         viewer_area.add_overlay(self.prev_btn)
 
@@ -2084,7 +2095,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.set_margin_end(16)
         self.next_btn.set_margin_bottom(105)
         self.next_btn.set_size_request(48, 48)
-        self.next_btn.set_tooltip_text(_("Volgende (→)"))
+        self.next_btn.set_tooltip_text(_("Volgende"))
         self.next_btn.connect("clicked", self.next_photo)
         viewer_area.add_overlay(self.next_btn)
 
@@ -2298,13 +2309,15 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Selectie modus ────────────────────────────────────────────────
     def toggle_select_mode(self, btn=None):
         self._select_mode = not self._select_mode
-        log_info(f"Selectie-modus: {'aan' if self._select_mode else 'uit'}")
+        log_info(_("Selectie-modus: {state}").format(
+            state=_("aan") if self._select_mode else _("uit")
+        ))
         self._selected.clear()
         if self._select_mode:
             self.select_btn.set_label(_("Annuleren"))
             self.select_btn.add_css_class("suggested-action")
             self.bottom_stack.set_visible_child_name("select")
-            self.select_count_label.set_text("0 geselecteerd")
+            self.select_count_label.set_text(ngettext("%d geselecteerd", "%d geselecteerd", 0) % 0)
         else:
             self.select_btn.set_label(_("Selecteren"))
             self.select_btn.remove_css_class("suggested-action")
@@ -2407,7 +2420,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._selected.clear()
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
-        self.spinner_label.set_text(f"Foto's laden... 0 / {len(self.photos)}")
+        self.spinner_label.set_text(
+            _("Foto's laden… {loaded} / {total}").format(loaded=0, total=len(self.photos))
+        )
         thread = threading.Thread(
             target=self._load_thread,
             args=(load_id, list(self.photos)),
@@ -2524,7 +2539,7 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             self._hydrate_viewport()
         except Exception as e:
-            log_error(f"viewport hydrate fout: {e}")
+            log_error(_("viewport hydrate fout: {err}").format(err=e))
         return False
 
     def _hydrate_viewport(self):
@@ -2634,7 +2649,9 @@ class MainWindow(Adw.ApplicationWindow):
     def _apply_batch(self, load_id, batch, loaded, total):
         if load_id != self._load_id:
             return False
-        self.spinner_label.set_text(f"Foto's laden... {loaded} / {total}")
+        self.spinner_label.set_text(
+            _("Foto's laden… {loaded} / {total}").format(loaded=loaded, total=total)
+        )
         # Shared CSS providers — created once, reused for every thumbnail
         if not hasattr(self, '_thumb_css'):
             tc = {}
@@ -2772,16 +2789,17 @@ class MainWindow(Adw.ApplicationWindow):
     def on_thumb_clicked(self, index):
         path = self.photos[index] if 0 <= index < len(self.photos) else "?"
         if self._select_mode:
-            action = "deselecteer" if index in self._selected else "selecteer"
-            log_info(f"Thumbnail {action}: idx={index} path={path}")
+            action = _("deselecteer") if index in self._selected else _("selecteer")
+            log_info(_("Thumbnail {action}: idx={i} path={p}").format(action=action, i=index, p=path))
             if index in self._selected:
                 self._selected.discard(index)
             else:
                 self._selected.add(index)
             self._update_thumb_visual(index, self.thumb_widgets[index])
-            self.select_count_label.set_text(f"{len(self._selected)} geselecteerd")
+            n = len(self._selected)
+            self.select_count_label.set_text(ngettext("%d geselecteerd", "%d geselecteerd", n) % n)
         else:
-            log_info(f"Thumbnail geklikt → open foto: idx={index} path={path}")
+            log_info(_("Thumbnail geklikt → open foto: idx={i} path={p}").format(i=index, p=path))
             self.open_photo(index)
 
     # ── Sorteren ──────────────────────────────────────────────────────
@@ -2800,9 +2818,11 @@ class MainWindow(Adw.ApplicationWindow):
     def on_sort_changed(self, combo, _):
         if not self.photos:
             return
-        options = ["Datum nieuwste", "Datum oudste", "Naam A-Z", "Naam Z-A"]
+        options = [_("Datum nieuwste"), _("Datum oudste"), _("Naam A-Z"), _("Naam Z-A")]
         idx = combo.get_selected()
-        log_info(f"Sortering gewijzigd: {options[idx] if idx < len(options) else idx}")
+        log_info(_("Sortering gewijzigd: {opt}").format(
+            opt=options[idx] if idx < len(options) else idx
+        ))
         if self._sort_timer:
             GLib.source_remove(self._sort_timer)
         self._sort_timer = GLib.timeout_add(400, self._do_sort)
@@ -2832,8 +2852,8 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Foto viewer ───────────────────────────────────────────────────
     def open_photo(self, index):
         path = self.photos[index] if 0 <= index < len(self.photos) else "?"
-        kind = "video" if is_video(path) else "foto"
-        log_info(f"open_photo: {kind} idx={index} path={path}")
+        kind = _("video") if is_video(path) else _("foto")
+        log_info(_("open_photo: {kind} idx={i} path={p}").format(kind=kind, i=index, p=path))
         self.current_index = index
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
@@ -2929,7 +2949,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.photo_picture.set_pixbuf(pixbuf)
             self._apply_viewer_transform()
         mtime = os.path.getmtime(path)
-        datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y  %H:%M")
+        datum = format_viewer_date(datetime.datetime.fromtimestamp(mtime))
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
         self.viewer_location.set_text(f"📍 {location}" if location else "")
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
@@ -2944,7 +2964,9 @@ class MainWindow(Adw.ApplicationWindow):
             self._stop_video()
             self.current_index -= 1
             new_path = self.photos[self.current_index] if self.photos else "?"
-            log_info(f"Vorige foto: idx={self.current_index} → {os.path.basename(new_path)}")
+            log_info(_("Vorige foto: idx={i} → {name}").format(
+                i=self.current_index, name=os.path.basename(new_path)
+            ))
             self._schedule_photo_load()
 
     def next_photo(self, btn=None):
@@ -2952,7 +2974,9 @@ class MainWindow(Adw.ApplicationWindow):
             self._stop_video()
             self.current_index += 1
             new_path = self.photos[self.current_index] if self.photos else "?"
-            log_info(f"Volgende foto: idx={self.current_index} → {os.path.basename(new_path)}")
+            log_info(_("Volgende foto: idx={i} → {name}").format(
+                i=self.current_index, name=os.path.basename(new_path)
+            ))
             self._schedule_photo_load()
 
     def _schedule_photo_load(self):
@@ -3236,7 +3260,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_scrubber.set_value(0.0)
         self.video_time_label.set_text("0:00 / 0:00")
         mtime = os.path.getmtime(path)
-        datum = datetime.datetime.fromtimestamp(mtime).strftime("%-d %B %Y  %H:%M")
+        datum = format_viewer_date(datetime.datetime.fromtimestamp(mtime))
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
         self.viewer_location.set_text(f"📍 {location}" if location else "")
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
@@ -3628,7 +3652,7 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             ctx.remove_class("pixora-fav")
         self.favorite_btn.set_tooltip_text(
-            _("Verwijder uit favorieten (F)") if is_fav else _("Markeer als favoriet (F)")
+            _("Verwijder uit favorieten") if is_fav else _("Markeer als favoriet")
         )
 
     def on_toggle_favorite(self, btn):
@@ -3637,10 +3661,10 @@ class MainWindow(Adw.ApplicationWindow):
             return
         if path in self._favorites:
             self._favorites.discard(path)
-            log_info(f"Favoriet verwijderd: {path}")
+            log_info(_("Favoriet verwijderd: {p}").format(p=path))
         else:
             self._favorites.add(path)
-            log_info(f"Favoriet toegevoegd: {path}")
+            log_info(_("Favoriet toegevoegd: {p}").format(p=path))
         self._schedule_save_favorites()
         self._update_favorite_btn()
         # refresh thumbnail badge if visible
@@ -3663,14 +3687,16 @@ class MainWindow(Adw.ApplicationWindow):
 
     def toggle_favorites_filter(self, btn):
         self._favorites_only = btn.get_active()
-        log_info(f"Favorieten-filter: {'aan' if self._favorites_only else 'uit'}")
+        log_info(_("Favorieten-filter: {state}").format(
+            state=_("aan") if self._favorites_only else _("uit")
+        ))
         self.load_photos()
 
 
     # ── Foto editor ───────────────────────────────────────────────────
     def on_edit_current(self, btn):
         path = self._current_photo_path() or "?"
-        log_info(f"Editor geopend voor: {os.path.basename(path)}")
+        log_info(_("Editor geopend voor: {name}").format(name=os.path.basename(path)))
         self._editor_active         = True
         self._editor_rotation       = 0
         self._editor_crop_mode      = False
@@ -3741,7 +3767,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_editor_toggle_crop(self, btn):
         self._editor_crop_mode = btn.get_active()
-        log_info(f"Editor crop-modus: {'aan' if self._editor_crop_mode else 'uit'}")
+        log_info(_("Editor crop-modus: {state}").format(
+            state=_("aan") if self._editor_crop_mode else _("uit")
+        ))
         self._crop_rect        = None
         self._crop_handle      = None
         self._crop_rect_origin = None
@@ -3877,7 +3905,9 @@ class MainWindow(Adw.ApplicationWindow):
     def on_editor_save(self, btn):
         path     = self.photos[self.current_index]
         rotation = self._editor_rotation
-        log_info(f"Editor opslaan: rotation={rotation}° crop={bool(self._crop_rect)} path={path}")
+        log_info(_("Editor opslaan: rotation={rot}° crop={crop} path={p}").format(
+            rot=rotation, crop=bool(self._crop_rect), p=path
+        ))
 
         crop_box = None
         if self._editor_crop_mode and self._crop_rect:
@@ -3928,7 +3958,7 @@ class MainWindow(Adw.ApplicationWindow):
                 os.utime(path, (original_mtime, original_mtime))
                 GLib.idle_add(_after_save)
             except Exception as e:
-                log_error(f"Editor opslaan mislukt: {e}")
+                log_error(_("Editor opslaan mislukt: {err}").format(err=e))
                 GLib.idle_add(_save_error, str(e))
 
         def _after_save():
@@ -3955,7 +3985,7 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Verwijderen ───────────────────────────────────────────────────
     def on_delete_current(self, btn):
         path = self.photos[self.current_index]
-        log_info(f"Verwijder bevestiging gevraagd: {path}")
+        log_info(_("Verwijder bevestiging gevraagd: {p}").format(p=path))
         dialog = Adw.MessageDialog(
             transient_for=self,
             heading=_("Foto verwijderen?"),
@@ -3971,16 +4001,16 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_delete_current_response(self, dialog, response, path):
         if response != "delete":
-            log_info(f"Verwijderen geannuleerd: {path}")
+            log_info(_("Verwijderen geannuleerd: {p}").format(p=path))
             return
         try:
             os.remove(path)
             cache_path = get_cache_path(path)
             if os.path.exists(cache_path):
                 os.remove(cache_path)
-            log_info(f"Foto verwijderd: {path}")
+            log_info(_("Foto verwijderd: {p}").format(p=path))
         except Exception as e:
-            log_error(f"Verwijderen mislukt: {e}")
+            log_error(_("Verwijderen mislukt: {err}").format(err=e))
             return
         if path in self._favorites:
             self._favorites.discard(path)
@@ -4034,7 +4064,7 @@ class MainWindow(Adw.ApplicationWindow):
                 if os.path.exists(cache_path):
                     os.remove(cache_path)
             except Exception as e:
-                log_error(f"Verwijderen mislukt: {e}")
+                log_error(_("Verwijderen mislukt: {err}").format(err=e))
             if path in self._favorites:
                 self._favorites.discard(path)
                 fav_changed = True
@@ -4149,7 +4179,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         current_dev = bool(self.settings.get("dev_mode", False))
         dev_row = Adw.ActionRow(
-            title="Developer mode",
+            title=_("Developer mode"),
             subtitle=_("Actief") if current_dev else _("Inactief")
         )
         dev_btn = Gtk.Button(
@@ -4358,7 +4388,7 @@ class MainWindow(Adw.ApplicationWindow):
         global THUMB_SIZE
         if new_size == THUMB_SIZE:
             return False
-        log_info(f"Thumbnail-grootte gewijzigd: {THUMB_SIZE}px → {new_size}px")
+        log_info(_("Thumbnail-grootte gewijzigd: {old}px → {new}px").format(old=THUMB_SIZE, new=new_size))
         THUMB_SIZE = new_size
         self.settings["thumbnail_size"] = new_size
         save_settings(self.settings)
@@ -4404,7 +4434,7 @@ class MainWindow(Adw.ApplicationWindow):
         btn.set_sensitive(True)
         dialog = Adw.MessageDialog(
             transient_for=self,
-            heading="USB-verbinding herstart" if ok else "Herstart mislukt",
+            heading=_("USB-verbinding herstart") if ok else _("Herstart mislukt"),
             body=msg
         )
         dialog.add_response("ok", _("OK"))
@@ -4417,10 +4447,10 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(_("Pair-records wissen — bevestiging gevraagd"))
         confirm = Adw.MessageDialog(
             transient_for=self,
-            heading="Pair-records wissen?",
-            body=("Dit verwijdert alle bestaande iPhone-koppelingen in "
-                  "/var/lib/lockdown/. Je iPhone vraagt de volgende keer "
-                  "opnieuw om Trust.")
+            heading=_("Pair-records wissen?"),
+            body=_("Dit verwijdert alle bestaande iPhone-koppelingen in "
+                   "/var/lib/lockdown/. Je iPhone vraagt de volgende keer "
+                   "opnieuw om Trust.")
         )
         confirm.add_response("cancel", _("Annuleren"))
         confirm.add_response("clear", _("Wissen"))
@@ -4445,16 +4475,16 @@ class MainWindow(Adw.ApplicationWindow):
                 )
                 if r.returncode == 0:
                     ok = True
-                    result_msg = ("Pair-records gewist en usbmuxd opnieuw gestart. "
-                                  "Sluit je iPhone aan en tap Trust.")
+                    result_msg = _("Pair-records gewist en usbmuxd opnieuw gestart. "
+                                   "Sluit je iPhone aan en tap Trust.")
                 else:
-                    result_msg = f"Wissen mislukt (code {r.returncode})."
+                    result_msg = _("Wissen mislukt (code {code}).").format(code=r.returncode)
             except FileNotFoundError:
-                result_msg = "pkexec niet gevonden."
+                result_msg = _("pkexec niet gevonden.")
             except Exception as e:
-                result_msg = f"Fout: {e}"
+                result_msg = _("Fout: {err}").format(err=e)
             GLib.idle_add(self._show_info_dialog,
-                          "Klaar" if ok else "Mislukt", result_msg)
+                          _("Klaar") if ok else _("Mislukt"), result_msg)
 
         threading.Thread(target=do, daemon=True).start()
 
@@ -4477,7 +4507,7 @@ class MainWindow(Adw.ApplicationWindow):
             save_settings(self.settings)
         except Exception:
             pass
-        log_info(f"Taal gewijzigd naar: {new_lang} — Pixora wordt herstart")
+        log_info(_("Taal gewijzigd naar: {lang} — Pixora wordt herstart").format(lang=new_lang))
 
         # Laad translation in NIEUWE taal voor de overlay-tekst
         try:
@@ -4561,11 +4591,15 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _apply_dev_mode(self, dialog, response, target, row, btn):
         if response != "apply":
-            log_info(f"Dev-mode toggle geannuleerd (was: {self.settings.get('dev_mode', False)})")
+            log_info(_("Dev-mode toggle geannuleerd (was: {was})").format(
+                was=self.settings.get('dev_mode', False)
+            ))
             return
         self.settings["dev_mode"] = target
         save_settings(self.settings)
-        log_info(f"Dev-mode {'geactiveerd' if target else 'gedeactiveerd'} → herstarten…")
+        log_info(_("Dev-mode {state} → herstarten…").format(
+            state=_("geactiveerd") if target else _("gedeactiveerd")
+        ))
         row.set_subtitle(_("Actief") if target else _("Inactief"))
         btn.set_label(_("Deactiveren") if target else _("Activeren"))
         # Herstart de app
@@ -4592,7 +4626,7 @@ class MainWindow(Adw.ApplicationWindow):
             )
             log_info(_("Restart gepland (1.2s delay voor GApplication unregister)"))
         except Exception as e:
-            log_error(f"Restart fout: {e}")
+            log_error(_("Restart fout: {err}").format(err=e))
         self.get_application().quit()
         return False
 
@@ -4680,14 +4714,16 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def open_importer(self, btn=None):
-        log_info(f"Importer geopend (iOS device {'aanwezig' if self._ios_device_present else 'niet gedetecteerd'})")
+        log_info(_("Importer geopend (iOS device {state})").format(
+            state=_("aanwezig") if self._ios_device_present else _("niet gedetecteerd")
+        ))
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
         self.main_stack.set_visible_child_name("importer")
         self.importer_page.activate()
 
     def close_importer(self):
-        log_info("Importer gesloten")
+        log_info(_("Importer gesloten"))
         self.importer_page.deactivate()
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)

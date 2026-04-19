@@ -964,3 +964,241 @@ msgid "%d overgeslagen"
 msgid_plural "%d overgeslagen"
 msgstr[0] "%d overgeslagen"
 msgstr[1] "%d overgeslagen"
+
+# ── v1.12.9: rauwe code-scan, logs, tooltips, about, progress ─────
+
+msgid "Cleanup-fout: {err}"
+msgstr "Cleanup-fout: {err}"
+
+msgid "Datum nieuwste"
+msgstr "Datum nieuwste"
+
+msgid "Datum oudste"
+msgstr "Datum oudste"
+
+msgid "Dev-mode toggle geannuleerd (was: {was})"
+msgstr "Dev-mode toggle geannuleerd (was: {was})"
+
+msgid "Dev-mode {state} → herstarten…"
+msgstr "Dev-mode {state} → herstarten…"
+
+msgid "Developer mode"
+msgstr "Developer mode"
+
+msgid "Editor crop-modus: {state}"
+msgstr "Editor crop-modus: {state}"
+
+msgid "Editor geopend voor: {name}"
+msgstr "Editor geopend voor: {name}"
+
+msgid "Editor opslaan mislukt: {err}"
+msgstr "Editor opslaan mislukt: {err}"
+
+msgid "Editor opslaan: rotation={rot}° crop={crop} path={p}"
+msgstr "Editor opslaan: rotation={rot}° crop={crop} path={p}"
+
+msgid "Favoriet toegevoegd: {p}"
+msgstr "Favoriet toegevoegd: {p}"
+
+msgid "Favoriet verwijderd: {p}"
+msgstr "Favoriet verwijderd: {p}"
+
+msgid "Favorieten-filter: {state}"
+msgstr "Favorieten-filter: {state}"
+
+msgid "Favorites save fout: {err}"
+msgstr "Favorites save fout: {err}"
+
+msgid "Foto verwijderd: {p}"
+msgstr "Foto verwijderd: {p}"
+
+msgid "Foto's laden… {loaded} / {total}"
+msgstr "Foto's laden… {loaded} / {total}"
+
+msgid "Foto's worden gesynchroniseerd naar je externe schijf."
+msgstr "Foto's worden gesynchroniseerd naar je externe schijf."
+
+msgid "GUI-updater kon niet starten: {err}"
+msgstr "GUI-updater kon niet starten: {err}"
+
+msgid "GUdev monitor kon niet starten: {err}"
+msgstr "GUdev monitor kon niet starten: {err}"
+
+msgid "Herstart mislukt"
+msgstr "Herstart mislukt"
+
+msgid "Importer geopend (iOS device {state})"
+msgstr "Importer geopend (iOS device {state})"
+
+msgid "Importer gesloten"
+msgstr "Importer gesloten"
+
+msgid "Importeren…"
+msgstr "Importeren…"
+
+msgid "JS push fout: {err}"
+msgstr "JS push fout: {err}"
+
+msgid "Kaart geopend ({n} foto's gaan naar GPS-scan)"
+msgstr "Kaart geopend ({n} foto's gaan naar GPS-scan)"
+
+msgid "Kaart → open_photo: {p}"
+msgstr "Kaart → open_photo: {p}"
+
+msgid "Kaart → open_photos: {n} foto's"
+msgstr "Kaart → open_photos: {n} foto's"
+
+msgid "Klaar"
+msgstr "Klaar"
+
+msgid "Leaflet-assets niet gevonden:\\n{p}"
+msgstr "Leaflet-assets niet gevonden:\\n{p}"
+
+msgid "Markeer als favoriet"
+msgstr "Markeer als favoriet"
+
+msgid "Mislukt"
+msgstr "Mislukt"
+
+msgid "Naam A-Z"
+msgstr "Naam A-Z"
+
+msgid "Naam Z-A"
+msgstr "Naam Z-A"
+
+msgid "NetworkSession sandbox-disable faalde: {err}"
+msgstr "NetworkSession sandbox-disable faalde: {err}"
+
+msgid "Pair-records wissen?"
+msgstr "Pair-records wissen?"
+
+msgid "Pixora proces forceert exit (lingering threads)"
+msgstr "Pixora proces forceert exit (lingering threads)"
+
+msgid "Restart fout: {err}"
+msgstr "Restart fout: {err}"
+
+msgid "Selectie-modus: {state}"
+msgstr "Selectie-modus: {state}"
+
+msgid "Sortering gewijzigd: {opt}"
+msgstr "Sortering gewijzigd: {opt}"
+
+msgid "Taal gewijzigd naar: {lang} — Pixora wordt herstart"
+msgstr "Taal gewijzigd naar: {lang} — Pixora wordt herstart"
+
+msgid "Thumbnail geklikt → open foto: idx={i} path={p}"
+msgstr "Thumbnail geklikt → open foto: idx={i} path={p}"
+
+msgid "Thumbnail {action}: idx={i} path={p}"
+msgstr "Thumbnail {action}: idx={i} path={p}"
+
+msgid "Thumbnail-grootte gewijzigd: {old}px → {new}px"
+msgstr "Thumbnail-grootte gewijzigd: {old}px → {new}px"
+
+msgid "USB-verbinding herstart"
+msgstr "USB-verbinding herstart"
+
+msgid "Update beschikbaar: {local} → {remote}"
+msgstr "Update beschikbaar: {local} → {remote}"
+
+msgid "Versie {v} — up to date"
+msgstr "Versie {v} — up to date"
+
+msgid "Verwijder bevestiging gevraagd: {p}"
+msgstr "Verwijder bevestiging gevraagd: {p}"
+
+msgid "Verwijder uit favorieten"
+msgstr "Verwijder uit favorieten"
+
+msgid "Verwijderen geannuleerd: {p}"
+msgstr "Verwijderen geannuleerd: {p}"
+
+msgid "Verwijderen mislukt: {err}"
+msgstr "Verwijderen mislukt: {err}"
+
+msgid "Volgende foto: idx={i} → {name}"
+msgstr "Volgende foto: idx={i} → {name}"
+
+msgid "Vorige"
+msgstr "Vorige"
+
+msgid "Vorige foto: idx={i} → {name}"
+msgstr "Vorige foto: idx={i} → {name}"
+
+msgid "WebContext sandbox-disable faalde: {err}"
+msgstr "WebContext sandbox-disable faalde: {err}"
+
+msgid "WebView bridge setup fout: {err}"
+msgstr "WebView bridge setup fout: {err}"
+
+msgid "WebView settings niet volledig gezet: {err}"
+msgstr "WebView settings niet volledig gezet: {err}"
+
+msgid "Wissen mislukt (code {code})."
+msgstr "Wissen mislukt (code {code})."
+
+msgid "aan"
+msgstr "aan"
+
+msgid "aanwezig"
+msgstr "aanwezig"
+
+msgid "apt mislukt"
+msgstr "apt mislukt"
+
+msgid "deselecteer"
+msgstr "deselecteer"
+
+msgid "door LinuxGinger"
+msgstr "door LinuxGinger"
+
+msgid "downloaden mislukt"
+msgstr "downloaden mislukt"
+
+msgid "foto"
+msgstr "foto"
+
+msgid "geactiveerd"
+msgstr "geactiveerd"
+
+msgid "gedeactiveerd"
+msgstr "gedeactiveerd"
+
+msgid "niet gedetecteerd"
+msgstr "niet gedetecteerd"
+
+msgid "open_photo: {kind} idx={i} path={p}"
+msgstr "open_photo: {kind} idx={i} path={p}"
+
+msgid "pip mislukt"
+msgstr "pip mislukt"
+
+msgid "pkexec niet gevonden."
+msgstr "pkexec niet gevonden."
+
+msgid "selecteer"
+msgstr "selecteer"
+
+msgid "uit"
+msgstr "uit"
+
+msgid "usbmuxd reset fout: {err}"
+msgstr "usbmuxd reset fout: {err}"
+
+msgid "usbmuxd reset rc={rc}"
+msgstr "usbmuxd reset rc={rc}"
+
+msgid "video"
+msgstr "video"
+
+msgid "viewport hydrate fout: {err}"
+msgstr "viewport hydrate fout: {err}"
+
+msgid "{day} {month} {year}  {time}"
+msgstr "{day} {month} {year}  {time}"
+
+msgid "%d geselecteerd"
+msgid_plural "%d geselecteerd"
+msgstr[0] "%d geselecteerd"
+msgstr[1] "%d geselecteerd"

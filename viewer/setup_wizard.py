@@ -71,7 +71,7 @@ def get_available_drives():
             process_device(device)
 
     except Exception as e:
-        print(f"Drive detectie fout: {e}")
+        print(_("Drive detectie fout: {err}").format(err=e))
 
     return drives
 
@@ -271,7 +271,7 @@ class SetupWizard(Adw.Window):
 
         # Schijf dropdown
         self.drive_model = Gtk.StringList()
-        self.drive_model.append("Geen externe schijven gevonden")
+        self.drive_model.append(_("Geen externe schijven gevonden"))
 
         self.drive_combo = Gtk.DropDown(model=self.drive_model)
         self.drive_combo.set_sensitive(False)
@@ -515,7 +515,7 @@ class SetupWizard(Adw.Window):
                 self.drive_model.append(label)
             self.drive_combo.set_sensitive(True)
         else:
-            self.drive_model.append("Geen externe schijven gevonden")
+            self.drive_model.append(_("Geen externe schijven gevonden"))
             self.drive_combo.set_sensitive(False)
 
         return False
