@@ -3100,35 +3100,50 @@ class MainWindow(Adw.ApplicationWindow):
             daemon=True
         ).start()
 
+# ── Locatie-helpers ─────────────────────────────────────────────
+    def _determine_initial_location(self, path):
+        """Geeft (initial_label, coords_for_geocode) terug, synchroon en snel.
+        - Als city-naam gecached → return (city, None)  [geen async nodig]
+        - Als coords in EXIF → return (raw coords, coords) [async upgrade naar city]
+        - Anders → return ('', None)
+        Cache ook "" voor foto's zonder GPS ouder dan 30s zodat we niet elke
+        open opnieuw EXIF parsen."""
+        cached = self._photo_location.get(path)
+        if cached:
+            return cached, None
+        if is_video(path):
+            coords = get_video_gps_coords(path)
+        else:
+            coords = get_gps_coords(path)
+        if coords:
+            return f"{coords[0]:.4f}, {coords[1]:.4f}", coords
+        # Geen GPS
+        try:
+            if cached is None and time.time() - os.path.getmtime(path) > 30:
+                self._photo_location[path] = ""
+        except Exception:
+            pass
+        return "", None
+
+    def _start_geocode_upgrade(self, path, coords, load_id):
+        """Async reverse-geocode; upgradet viewer_location van 'lat, lon' naar
+        'Stad, Land' wanneer Nominatim antwoordt. load_id-guard voorkomt dat
+        stale callbacks een andere foto's label overschrijven."""
+        def _bg():
+            city = reverse_geocode(coords[0], coords[1])
+            if city:
+                self._photo_location[path] = city
+                if load_id == self._viewer_load_id:
+                    GLib.idle_add(self._update_viewer_location, f"📍 {city}", load_id)
+        threading.Thread(target=_bg, daemon=True).start()
+
     def _load_full_photo(self, path, load_id):
         if is_video(path):
-            # Bepaal een direct-zichtbare locatie: city-naam uit cache, of
-            # ruwe coords uit EXIF (snel, geen netwerk nodig), of niks.
-            cached = self._photo_location.get(path)
-            coords = get_video_gps_coords(path) if cached is None or cached == "" else None
-            if cached:
-                initial = cached
-            elif coords:
-                initial = f"{coords[0]:.4f}, {coords[1]:.4f}"
-            else:
-                initial = ""
+            initial, coords = self._determine_initial_location(path)
             if load_id == self._viewer_load_id:
                 GLib.idle_add(self._show_video, path, initial)
-            # Async: als we nog geen city-name hebben, probeer reverse-geocode
-            # en upgrade het label wanneer we 't terugkrijgen.
-            if coords and not cached:
-                city = reverse_geocode(coords[0], coords[1])
-                if city:
-                    self._photo_location[path] = city
-                    if load_id == self._viewer_load_id:
-                        GLib.idle_add(self._update_viewer_location, f"📍 {city}", load_id)
-            elif cached is None and not coords:
-                # Geen GPS: cache "" zodat we niet elke open-EXIF-parsen
-                try:
-                    if time.time() - os.path.getmtime(path) > 30:
-                        self._photo_location[path] = ""
-                except Exception:
-                    pass
+            if coords:
+                self._start_geocode_upgrade(path, coords, load_id)
             return
         pixbuf = self._viewer_pixbuf_cache.get(path)
         if pixbuf is not None:
@@ -3143,32 +3158,12 @@ class MainWindow(Adw.ApplicationWindow):
                 self._viewer_pixbuf_cache[path] = pixbuf
                 while len(self._viewer_pixbuf_cache) > 3:
                     self._viewer_pixbuf_cache.popitem(last=False)
-        # Bepaal een initial location vóór we _show_full_photo aanroepen, zodat
-        # user direct iets ziet i.p.v. wachten op async geocode.
-        cached = self._photo_location.get(path)
-        coords = get_gps_coords(path) if cached is None or cached == "" else None
-        if cached:
-            initial = cached
-        elif coords:
-            initial = f"{coords[0]:.4f}, {coords[1]:.4f}"
-        else:
-            initial = ""
+        initial, coords = self._determine_initial_location(path)
         if load_id == self._viewer_load_id:
             GLib.idle_add(self._show_full_photo, pixbuf, path, initial)
             GLib.idle_add(self._preload_adjacent_photos)
-        # Async: reverse-geocode als we coords hebben maar nog geen city-naam
-        if coords and not cached:
-            city = reverse_geocode(coords[0], coords[1])
-            if city:
-                self._photo_location[path] = city
-                if load_id == self._viewer_load_id:
-                    GLib.idle_add(self._update_viewer_location, f"📍 {city}", load_id)
-        elif cached is None and not coords:
-            try:
-                if time.time() - os.path.getmtime(path) > 30:
-                    self._photo_location[path] = ""
-            except Exception:
-                pass
+        if coords:
+            self._start_geocode_upgrade(path, coords, load_id)
 
     def _update_viewer_location(self, text, load_id):
         # Guard tegen stale callbacks (user kan inmiddels naar andere foto
@@ -3248,8 +3243,13 @@ class MainWindow(Adw.ApplicationWindow):
             cached = self._viewer_pixbuf_cache.get(path)
             if cached is not None:
                 self._viewer_pixbuf_cache.move_to_end(path)
-                self._show_full_photo(cached, path,
-                                      self._photo_location.get(path) or "")
+                # Direct zichtbare locatie bepalen + async geocode-upgrade.
+                # Zonder deze call verdween het locatie-label bij prev/next-
+                # navigatie tussen gepreloade foto's (de bug).
+                initial, coords = self._determine_initial_location(path)
+                self._show_full_photo(cached, path, initial)
+                if coords:
+                    self._start_geocode_upgrade(path, coords, load_id)
                 GLib.idle_add(self._preload_adjacent_photos)
                 return
 
@@ -4410,6 +4410,25 @@ class MainWindow(Adw.ApplicationWindow):
         if self.current_index >= len(self.photos):
             self.current_index = len(self.photos) - 1
         next_path = self.photos[self.current_index]
+        # Oude pixbuf direct wissen zodat de verwijderde foto niet 'terugflasht'
+        # tussen het einde van de animatie en het laden van de volgende foto.
+        try:
+            self.photo_picture.set_pixbuf(None)
+            self.viewer_title.set_text("")
+            self.viewer_location.set_text("")
+        except Exception:
+            pass
+        # Filmstrip-thumbs opnieuw laten bouwen en scrollen naar de nieuwe
+        # current_index — anders blijft de oude tape met de verwijderde foto
+        # staan totdat de grid-reload achter de schermen klaar is.
+        self._filmstrip_thumbs = {}
+        GLib.idle_add(self._update_filmstrip)
+        GLib.timeout_add(80, self._scroll_filmstrip_to_current)
+        # Viewer-counter alvast bijwerken (_show_full_photo zou dat later doen)
+        try:
+            self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
+        except Exception:
+            pass
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
         threading.Thread(
