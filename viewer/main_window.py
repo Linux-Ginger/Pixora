@@ -36,6 +36,19 @@ _ = _translation.gettext
 ngettext = _translation.ngettext
 _translation.install()  # maakt _() ook als builtin beschikbaar
 
+# LC_TIME sync — zodat strftime("%B") ook de gekozen taal volgt i.p.v. systeem-locale
+import locale as _locale_mod
+_LC_TIME_CANDIDATES = {
+    "nl": ["nl_NL.UTF-8", "nl_NL.utf8", "nl_NL", "nl"],
+    "en": ["en_US.UTF-8", "en_US.utf8", "en_US", "C.UTF-8", "C"],
+}
+for _cand in _LC_TIME_CANDIDATES.get(_lang, []):
+    try:
+        _locale_mod.setlocale(_locale_mod.LC_TIME, _cand)
+        break
+    except _locale_mod.Error:
+        continue
+
 # ── Dev-mode logging ─────────────────────────────────────────────────
 # Lees dev_mode direct uit settings.json — we importeren NIET uit main.py
 # omdat dat main's module-level code opnieuw zou uitvoeren (en een tweede
@@ -1005,7 +1018,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.add_named(self.importer_page,       "importer")
         log_info(_("Startup fase 3: pages klaar"))
 
-        self.update_banner = Adw.Banner(title="", button_label="Bijwerken", use_markup=False)
+        self.update_banner = Adw.Banner(title="", button_label=_("Bijwerken"), use_markup=False)
         self.update_banner.set_revealed(False)
         self.update_banner.connect("button-clicked", self._on_update_banner_clicked)
 
@@ -1246,7 +1259,7 @@ class MainWindow(Adw.ApplicationWindow):
         if has_device:
             ctx.add_class("pixora-import-active")
             self.import_btn.set_tooltip_text(
-                "iPhone of iPad gedetecteerd — klik om te importeren"
+                _("iPhone of iPad gedetecteerd — klik om te importeren")
             )
         else:
             ctx.remove_class("pixora-import-active")
@@ -1323,7 +1336,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_update_message_dialog(self, new_version):
         dlg = Adw.AlertDialog(
             heading=_("Update beschikbaar"),
-            body=f"Pixora {new_version} is beschikbaar. Wil je nu bijwerken?",
+            body=_("Pixora {v} is beschikbaar. Wil je nu bijwerken?").format(v=new_version),
         )
         dlg.add_response("later", _("Later"))
         dlg.add_response("bijwerken", _("Bijwerken"))
@@ -1922,6 +1935,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_close_btn.set_margin_top(16)
         self.viewer_close_btn.set_margin_end(16)
         self.viewer_close_btn.set_size_request(40, 40)
+        self.viewer_close_btn.set_tooltip_text(_("Sluiten (Esc)"))
         self.viewer_close_btn.connect("clicked", self.close_viewer)
         viewer_area.add_overlay(self.viewer_close_btn)
 
@@ -1933,6 +1947,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_delete_btn.set_margin_top(16)
         self.viewer_delete_btn.set_margin_end(68)
         self.viewer_delete_btn.set_size_request(40, 40)
+        self.viewer_delete_btn.set_tooltip_text(_("Verwijderen (Delete)"))
         self.viewer_delete_btn.connect("clicked", self.on_delete_current)
         viewer_area.add_overlay(self.viewer_delete_btn)
 
@@ -2057,6 +2072,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.prev_btn.set_margin_start(16)
         self.prev_btn.set_margin_bottom(105)
         self.prev_btn.set_size_request(48, 48)
+        self.prev_btn.set_tooltip_text(_("Vorige (←)"))
         self.prev_btn.connect("clicked", self.prev_photo)
         viewer_area.add_overlay(self.prev_btn)
 
@@ -2068,6 +2084,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.set_margin_end(16)
         self.next_btn.set_margin_bottom(105)
         self.next_btn.set_size_request(48, 48)
+        self.next_btn.set_tooltip_text(_("Volgende (→)"))
         self.next_btn.connect("clicked", self.next_photo)
         viewer_area.add_overlay(self.next_btn)
 
@@ -2372,7 +2389,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_empty_favorites(self):
         self.spinner.stop()
         self.content_stack.set_visible_child_name("empty")
-        self.photo_count_label.set_text("0 favorieten")
+        self.photo_count_label.set_text(ngettext("%d favoriet", "%d favorieten", 0) % 0)
         self._loading = False
 
     def start_load(self):

@@ -750,9 +750,9 @@ class ImporterPage(Gtk.Box):
 
         struct = self.settings.get("structure", "year_month")
         struct_labels = {
-            "flat":       "Alles in één map",
-            "year":       "Per jaar",
-            "year_month": "Per jaar/maand",
+            "flat":       _("Alles in één map"),
+            "year":       _("Per jaar"),
+            "year_month": _("Per jaar/maand"),
         }
         self.struct_row = Adw.ActionRow()
         self.struct_row.set_title(_("Mapstructuur"))
@@ -1168,16 +1168,25 @@ class ImporterPage(Gtk.Box):
 
     def _do_scan(self):
         def on_progress(count):
-            GLib.idle_add(self.progress_subtitle.set_text, f"{count} bestanden gevonden…")
+            GLib.idle_add(
+                self.progress_subtitle.set_text,
+                ngettext("%d bestand gevonden…", "%d bestanden gevonden…", count) % count,
+            )
         files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
         total = len(files)
-        GLib.idle_add(self.progress_subtitle.set_text,
-                      f"{total} bestanden gevonden, sorteren op datum…")
+        GLib.idle_add(
+            self.progress_subtitle.set_text,
+            ngettext(
+                "%d bestand gevonden, sorteren op datum…",
+                "%d bestanden gevonden, sorteren op datum…",
+                total,
+            ) % total,
+        )
         # Sorteren met tussentijdse voortgang (laat 'm chunk-gewijs lopen zodat UI reageert)
         GLib.idle_add(self._begin_sort_progress, total)
         if total <= 500:
             files.sort(key=get_photo_date, reverse=True)
-            GLib.idle_add(self._update_progress, 1.0, f"Sorteren klaar ({total})", "")
+            GLib.idle_add(self._update_progress, 1.0, _("Sorteren klaar ({n})").format(n=total), "")
         else:
             # Bereken datums met voortgang per foto, dan eenmalig sorteren op voorgecachte waardes
             date_cache = {}
@@ -1186,7 +1195,7 @@ class ImporterPage(Gtk.Box):
                 frac = (i + 1) / total
                 GLib.idle_add(
                     self._update_progress, frac,
-                    f"Sorteren: {i + 1} / {total}", f.name
+                    _("Sorteren: {i} / {total}").format(i=i + 1, total=total), f.name
                 )
             files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
         GLib.idle_add(self._on_scan_done, files)
@@ -1202,14 +1211,14 @@ class ImporterPage(Gtk.Box):
         if not files:
             unmount_iphone(MOUNT_POINT)
             self._show_error(
-                "Geen foto's of video's gevonden op het apparaat.\n"
-                "Mogelijk zijn alle media al eerder geïmporteerd.", False)
+                _("Geen foto's of video's gevonden op het apparaat.\n"
+                  "Mogelijk zijn alle media al eerder geïmporteerd."), False)
             return
         self._show_selecting(files)
 
     def _start_hashing(self, files: list[Path]):
-        self._set_progress("Duplicaten controleren…",
-                           "Foto's worden vergeleken met je bestaande archief.")
+        self._set_progress(_("Duplicaten controleren…"),
+                           _("Foto's worden vergeleken met je bestaande archief."))
         self._show_state(STATE_HASHING)
         threading.Thread(target=self._do_hashing, args=(files,), daemon=True).start()
 
@@ -1220,7 +1229,8 @@ class ImporterPage(Gtk.Box):
 
         def lib_progress(i, total, name):
             frac = (i / total) * 0.5 if total > 0 else 0
-            GLib.idle_add(self._update_progress, frac, f"Archief scannen: {i}/{total}", name)
+            GLib.idle_add(self._update_progress, frac,
+                          _("Archief scannen: {i}/{total}").format(i=i, total=total), name)
 
         library_hashes = build_library_hashes(photo_path, lib_progress)
         self.library_hashes = library_hashes
@@ -1231,7 +1241,8 @@ class ImporterPage(Gtk.Box):
 
         for i, fp in enumerate(iphone_files):
             frac = 0.5 + (i / total) * 0.5 if total > 0 else 0.5
-            GLib.idle_add(self._update_progress, frac, f"Apparaat scannen: {i + 1}/{total}", fp.name)
+            GLib.idle_add(self._update_progress, frac,
+                          _("Apparaat scannen: {i}/{total}").format(i=i + 1, total=total), fp.name)
             ph = perceptual_hash(fp)
             if ph:
                 dup = find_duplicate(ph, library_hashes, max_dist)
@@ -1386,7 +1397,9 @@ class ImporterPage(Gtk.Box):
     def _update_select_count(self):
         n = len(self.selected_files)
         total = len(self.iphone_files)
-        self.select_count_lbl.set_text(f"{n} van {total} geselecteerd")
+        self.select_count_lbl.set_text(
+            _("{n} van {total} geselecteerd").format(n=n, total=total)
+        )
         self.select_continue_btn.set_sensitive(n > 0)
 
     def _on_selecting_continue(self, _btn):
@@ -1442,8 +1455,8 @@ class ImporterPage(Gtk.Box):
         img_row.set_margin_end(12)
         img_row.set_margin_bottom(10)
 
-        for path, caption in [(iphone_path, "📱 iPhone — nieuw"),
-                               (lib_path,    "🗂️ Archief — bestaand")]:
+        for path, caption in [(iphone_path, _("📱 iPhone — nieuw")),
+                               (lib_path,    _("🗂️ Archief — bestaand"))]:
             col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
             col.set_hexpand(True)
 
@@ -1470,9 +1483,9 @@ class ImporterPage(Gtk.Box):
         btn_row.set_margin_bottom(12)
         btn_row.set_homogeneous(True)
 
-        keep_btn   = Gtk.ToggleButton(label="Bestaande behouden")
-        import_btn = Gtk.ToggleButton(label="Nieuwe importeren")
-        both_btn   = Gtk.ToggleButton(label="Beide bewaren")
+        keep_btn   = Gtk.ToggleButton(label=_("Bestaande behouden"))
+        import_btn = Gtk.ToggleButton(label=_("Nieuwe importeren"))
+        both_btn   = Gtk.ToggleButton(label=_("Beide bewaren"))
         keep_btn.set_active(True)
 
         def on_keep(b, ip=iphone_path):
@@ -1546,8 +1559,12 @@ class ImporterPage(Gtk.Box):
     def _start_import(self):
         total = len(self.to_import)
         self._set_progress(
-            "Importeren…",
-            f"{total} bestand{'en' if total != 1 else ''} worden gekopieerd."
+            _("Importeren…"),
+            ngettext(
+                "%d bestand wordt gekopieerd.",
+                "%d bestanden worden gekopieerd.",
+                total,
+            ) % total
         )
         self._show_state(STATE_IMPORTING)
         threading.Thread(target=self._do_import, daemon=True).start()
@@ -1602,8 +1619,8 @@ class ImporterPage(Gtk.Box):
     # ─── Back-up ─────────────────────────────────────────────────────────────
 
     def _start_backup(self):
-        self._set_progress("Back-up maken…",
-                           "Foto's worden gesynchroniseerd naar je externe schijf.")
+        self._set_progress(_("Back-up maken…"),
+                           _("Foto's worden gesynchroniseerd naar je externe schijf."))
         self._show_state(STATE_BACKUP)
         threading.Thread(target=self._do_backup, daemon=True).start()
 
@@ -1614,7 +1631,7 @@ class ImporterPage(Gtk.Box):
 
         drive_root = get_backup_mountpoint(backup_uuid)
         if not drive_root:
-            GLib.idle_add(self._finish, "Back-upschijf niet gevonden. Sluit de schijf aan en probeer opnieuw via de instellingen.")
+            GLib.idle_add(self._finish, _("Back-upschijf niet gevonden. Sluit de schijf aan en probeer opnieuw via de instellingen."))
             return
 
         backup_dest = Path(backup_path_str) if backup_path_str else drive_root / "Pixora"
@@ -1625,7 +1642,7 @@ class ImporterPage(Gtk.Box):
                 if part.endswith("%"):
                     try:
                         frac = int(part[:-1]) / 100
-                        GLib.idle_add(self._update_progress, frac, f"Back-up: {part}", "")
+                        GLib.idle_add(self._update_progress, frac, _("Back-up: {pct}").format(pct=part), "")
                     except ValueError:
                         pass
 
@@ -1648,7 +1665,7 @@ class ImporterPage(Gtk.Box):
             success = self._manual_backup(photo_path, backup_dest)
 
         GLib.idle_add(self._finish, None if success else
-                      "Back-up gedeeltelijk mislukt. De import zelf is wel geslaagd.")
+                      _("Back-up gedeeltelijk mislukt. De import zelf is wel geslaagd."))
 
     def _manual_backup(self, src: Path, dst: Path) -> bool:
         try:
@@ -1676,11 +1693,17 @@ class ImporterPage(Gtk.Box):
         dup_n = len(self.duplicates)
         skipped = sum(1 for d in self.duplicate_decisions.values() if d == "skip")
 
-        desc_parts = [f"{n} bestand{'en' if n != 1 else ''} geïmporteerd"]
+        desc_parts = [
+            ngettext("%d bestand geïmporteerd", "%d bestanden geïmporteerd", n) % n
+        ]
         if dup_n:
-            desc_parts.append(f"{dup_n} duplicaat{'s' if dup_n != 1 else ''} gevonden")
+            desc_parts.append(
+                ngettext("%d duplicaat gevonden", "%d duplicaten gevonden", dup_n) % dup_n
+            )
         if skipped:
-            desc_parts.append(f"{skipped} overgeslagen")
+            desc_parts.append(
+                ngettext("%d overgeslagen", "%d overgeslagen", skipped) % skipped
+            )
         if note:
             desc_parts.append(note)
 

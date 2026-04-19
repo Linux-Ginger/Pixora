@@ -858,3 +858,109 @@ msgid "%d foto lijkt al in je archief te staan. Kies wat je wilt doen, of gebrui
 msgid_plural "%d foto's lijken al in je archief te staan. Kies per foto wat je wilt doen, of gebruik de knoppen onderaan voor alles tegelijk."
 msgstr[0] "%d foto lijkt al in je archief te staan. Kies wat je wilt doen, of gebruik de knoppen onderaan."
 msgstr[1] "%d foto's lijken al in je archief te staan. Kies per foto wat je wilt doen, of gebruik de knoppen onderaan voor alles tegelijk."
+
+# ── v1.12.8: tooltips, importer-fix, update-popup ────────────────────
+
+msgid "Sluiten (Esc)"
+msgstr "Sluiten (Esc)"
+
+msgid "Verwijderen (Delete)"
+msgstr "Verwijderen (Delete)"
+
+msgid "Vorige (←)"
+msgstr "Vorige (←)"
+
+msgid "Volgende (→)"
+msgstr "Volgende (→)"
+
+msgid "iPhone of iPad gedetecteerd — klik om te importeren"
+msgstr "iPhone of iPad gedetecteerd — klik om te importeren"
+
+msgid "Geen foto's of video's gevonden op het apparaat.\nMogelijk zijn alle media al eerder geïmporteerd."
+msgstr "Geen foto's of video's gevonden op het apparaat.\nMogelijk zijn alle media al eerder geïmporteerd."
+
+msgid "Duplicaten controleren…"
+msgstr "Duplicaten controleren…"
+
+msgid "Foto's worden vergeleken met je bestaande archief."
+msgstr "Foto's worden vergeleken met je bestaande archief."
+
+msgid "{n} van {total} geselecteerd"
+msgstr "{n} van {total} geselecteerd"
+
+msgid "Bestaande behouden"
+msgstr "Bestaande behouden"
+
+msgid "Nieuwe importeren"
+msgstr "Nieuwe importeren"
+
+msgid "Beide bewaren"
+msgstr "Beide bewaren"
+
+msgid "Sorteren klaar ({n})"
+msgstr "Sorteren klaar ({n})"
+
+msgid "Sorteren: {i} / {total}"
+msgstr "Sorteren: {i} / {total}"
+
+msgid "📱 iPhone — nieuw"
+msgstr "📱 iPhone — nieuw"
+
+msgid "🗂️ Archief — bestaand"
+msgstr "🗂️ Archief — bestaand"
+
+msgid "Back-up maken…"
+msgstr "Back-up maken…"
+
+msgid "Back-upschijf niet gevonden. Sluit de schijf aan en probeer opnieuw via de instellingen."
+msgstr "Back-upschijf niet gevonden. Sluit de schijf aan en probeer opnieuw via de instellingen."
+
+msgid "Back-up: {pct}"
+msgstr "Back-up: {pct}"
+
+msgid "Back-up gedeeltelijk mislukt. De import zelf is wel geslaagd."
+msgstr "Back-up gedeeltelijk mislukt. De import zelf is wel geslaagd."
+
+msgid "Archief scannen: {i}/{total}"
+msgstr "Archief scannen: {i}/{total}"
+
+msgid "Apparaat scannen: {i}/{total}"
+msgstr "Apparaat scannen: {i}/{total}"
+
+msgid "Pixora {v} is beschikbaar. Wil je nu bijwerken?"
+msgstr "Pixora {v} is beschikbaar. Wil je nu bijwerken?"
+
+msgid "%d favoriet"
+msgid_plural "%d favorieten"
+msgstr[0] "%d favoriet"
+msgstr[1] "%d favorieten"
+
+msgid "%d bestand gevonden…"
+msgid_plural "%d bestanden gevonden…"
+msgstr[0] "%d bestand gevonden…"
+msgstr[1] "%d bestanden gevonden…"
+
+msgid "%d bestand gevonden, sorteren op datum…"
+msgid_plural "%d bestanden gevonden, sorteren op datum…"
+msgstr[0] "%d bestand gevonden, sorteren op datum…"
+msgstr[1] "%d bestanden gevonden, sorteren op datum…"
+
+msgid "%d bestand wordt gekopieerd."
+msgid_plural "%d bestanden worden gekopieerd."
+msgstr[0] "%d bestand wordt gekopieerd."
+msgstr[1] "%d bestanden worden gekopieerd."
+
+msgid "%d bestand geïmporteerd"
+msgid_plural "%d bestanden geïmporteerd"
+msgstr[0] "%d bestand geïmporteerd"
+msgstr[1] "%d bestanden geïmporteerd"
+
+msgid "%d duplicaat gevonden"
+msgid_plural "%d duplicaten gevonden"
+msgstr[0] "%d duplicaat gevonden"
+msgstr[1] "%d duplicaten gevonden"
+
+msgid "%d overgeslagen"
+msgid_plural "%d overgeslagen"
+msgstr[0] "%d overgeslagen"
+msgstr[1] "%d overgeslagen"

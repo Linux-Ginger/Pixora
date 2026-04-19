@@ -27,10 +27,10 @@ msgid "Activeren"
 msgstr "Activate"
 
 msgid "Alle importeren"
-msgstr "Alle importeren"
+msgstr "Import all"
 
 msgid "Alle overslaan"
-msgstr "Alle overslaan"
+msgstr "Skip all"
 
 msgid "Alleen exact dezelfde foto's"
 msgstr "Only exactly identical photos"
@@ -39,7 +39,7 @@ msgid "Alleen externe schijven"
 msgstr "External drives only"
 
 msgid "Alleen externe schijven worden getoond"
-msgstr "Alleen externe schijven worden getoond"
+msgstr "Only external drives are shown"
 
 msgid "Alleen favorieten tonen"
 msgstr "Show only favorites"
@@ -51,10 +51,10 @@ msgid "Annuleren"
 msgstr "Cancel"
 
 msgid "Apparaat"
-msgstr "Apparaat"
+msgstr "Device"
 
 msgid "Apparaat gevonden"
-msgstr "Apparaat gevonden"
+msgstr "Device found"
 
 msgid "Apple USB-device aangesloten (vendor=05ac) — check na 2.5s"
 msgstr "Apple USB-device aangesloten (vendor=05ac) — check na 2.5s"
@@ -81,7 +81,7 @@ msgid "Bijwerken"
 msgstr "Update"
 
 msgid "Bladeren…"
-msgstr "Bladeren…"
+msgstr "Browse…"
 
 msgid "Cache: {p}"
 msgstr "Cache: {p}"
@@ -117,7 +117,7 @@ msgid "Deactiveren"
 msgstr "Deactivate"
 
 msgid "Deselecteer alles"
-msgstr "Deselecteer alles"
+msgstr "Deselect all"
 
 msgid "Developer mode toont Pixora met terminal-output en gebruikt de terminal-updater. Alleen aanzetten als je weet wat je doet."
 msgstr "Developer mode shows Pixora with terminal output and uses the terminal updater. Only enable if you know what you're doing."
@@ -126,7 +126,7 @@ msgid "Doorgaan"
 msgstr "Continue"
 
 msgid "Doorgaan met importeren"
-msgstr "Doorgaan met importeren"
+msgstr "Continue importing"
 
 msgid "Downloaden"
 msgstr "Downloading"
@@ -138,22 +138,22 @@ msgid "Draaien rechts"
 msgstr "Rotate right"
 
 msgid "Duplicaat detectie"
-msgstr "Duplicaat detectie"
+msgstr "Duplicate detection"
 
 msgid "Duplicate detectie"
 msgstr "Duplicate detection"
 
 msgid "Editor geannuleerd"
-msgstr "Editor geannuleerd"
+msgstr "Editor cancelled"
 
 msgid "Editor: draaien links (-90°)"
-msgstr "Editor: draaien links (-90°)"
+msgstr "Editor: rotate left (-90°)"
 
 msgid "Editor: draaien rechts (+90°)"
-msgstr "Editor: draaien rechts (+90°)"
+msgstr "Editor: rotate right (+90°)"
 
 msgid "Er is een fout opgetreden"
-msgstr "Er is een fout opgetreden"
+msgstr "An error occurred"
 
 msgid "Foto &amp; video manager door LinuxGinger"
 msgstr "Photo &amp; video manager by LinuxGinger"
@@ -201,7 +201,7 @@ msgid "Huidige map"
 msgstr "Current folder"
 
 msgid "Import voltooid"
-msgstr "Import voltooid"
+msgstr "Import complete"
 
 msgid "Importeer van iPhone of iPad"
 msgstr "Import from iPhone or iPad"
@@ -213,7 +213,7 @@ msgid "Inactief"
 msgstr "Inactive"
 
 msgid "Installeer vereiste pakketten"
-msgstr "Installeer vereiste pakketten"
+msgstr "Install required packages"
 
 msgid "Installeren"
 msgstr "Installing"
@@ -222,13 +222,13 @@ msgid "Instellingen"
 msgstr "Settings"
 
 msgid "Instellingen geopend"
-msgstr "Instellingen geopend"
+msgstr "Settings opened"
 
 msgid "Ja"
-msgstr "Ja"
+msgstr "Yes"
 
 msgid "Je apparaat is verbonden en klaar om te importeren."
-msgstr "Je apparaat is verbonden en klaar om te importeren."
+msgstr "Your device is connected and ready to import."
 
 msgid "Je hebt de nieuwste versie"
 msgstr "You have the latest version"
@@ -249,7 +249,7 @@ msgid "Kaartweergave"
 msgstr "Map view"
 
 msgid "Kies een map…"
-msgstr "Kies een map…"
+msgstr "Choose a folder…"
 
 msgid "Kies foto map"
 msgstr "Choose photo folder"
@@ -273,7 +273,7 @@ msgid "Launcher aanmaken"
 msgstr "Creating launcher"
 
 msgid "Map op backup schijf"
-msgstr "Map op backup schijf"
+msgstr "Folder on backup drive"
 
 msgid "Mapstructuur"
 msgstr "Folder structure"
@@ -282,7 +282,7 @@ msgid "Markeer als favoriet (F)"
 msgstr "Mark as favorite (F)"
 
 msgid "Mogelijke duplicaten"
-msgstr "Mogelijke duplicaten"
+msgstr "Possible duplicates"
 
 msgid "Naam (A-Z)"
 msgstr "Name (A-Z)"
@@ -291,7 +291,7 @@ msgid "Naam (Z-A)"
 msgstr "Name (Z-A)"
 
 msgid "Nee"
-msgstr "Nee"
+msgstr "No"
 
 msgid "Niet ingesteld"
 msgstr "Not configured"
@@ -300,10 +300,10 @@ msgid "Nieuwste versie"
 msgstr "Latest version"
 
 msgid "Nog geen map gekozen"
-msgstr "Nog geen map gekozen"
+msgstr "No folder chosen yet"
 
 msgid "Nog geen schijf geselecteerd"
-msgstr "Nog geen schijf geselecteerd"
+msgstr "No drive selected yet"
 
 msgid "Normaal"
 msgstr "Normal"
@@ -321,13 +321,13 @@ msgid "Opnieuw installeren"
 msgstr "Reinstall"
 
 msgid "Opnieuw proberen"
-msgstr "Opnieuw proberen"
+msgstr "Try again"
 
 msgid "Opslaan"
 msgstr "Save"
 
 msgid "Opslaan in"
-msgstr "Opslaan in"
+msgstr "Save to"
 
 msgid "Over"
 msgstr "About"
@@ -393,7 +393,7 @@ msgid "Restart gepland (1.2s delay voor GApplication unregister)"
 msgstr "Restart gepland (1.2s delay voor GApplication unregister)"
 
 msgid "Selecteer alles"
-msgstr "Selecteer alles"
+msgstr "Select all"
 
 msgid "Selecteer welke versie je wilt installeren"
 msgstr "Select which version to install"
@@ -429,7 +429,7 @@ msgid "Startup fase 2: pages opbouwen…"
 msgstr "Startup fase 2: pages opbouwen…"
 
 msgid "Startup fase 3: pages klaar"
-msgstr "Startup fase 3: pages klaar"
+msgstr "Startup phase 3: pages ready"
 
 msgid "Startup fase 4: foto's laden gepland via idle_add"
 msgstr "Startup fase 4: foto's laden gepland via idle_add"
@@ -441,7 +441,7 @@ msgid "Synchroniseert na elke import"
 msgstr "Synchronizes after each import"
 
 msgid "Synchroniseert na elke import naar externe schijf"
-msgstr "Synchroniseert na elke import naar externe schijf"
+msgstr "Syncs to external drive after each import"
 
 msgid "Systeem packages controleren"
 msgstr "Checking system packages"
@@ -489,7 +489,7 @@ msgid "Vernieuwen"
 msgstr "Vernieuwen"
 
 msgid "Versie"
-msgstr "Versie"
+msgstr "Version"
 
 msgid "Versie kiezen"
 msgstr "Choose version"
@@ -510,7 +510,7 @@ msgid "Voorbereiden"
 msgstr "Preparing"
 
 msgid "Waar wil je je foto's opslaan?"
-msgstr "Waar wil je je foto's opslaan?"
+msgstr "Where do you want to save your photos?"
 
 msgid "Waar worden je foto's opgeslagen"
 msgstr "Where your photos are stored"
@@ -534,7 +534,7 @@ msgid "Wissen"
 msgstr "Wissen"
 
 msgid "Zoeken naar apparaat…"
-msgstr "Zoeken naar apparaat…"
+msgstr "Searching for device…"
 
 msgid "andere foto's in deze cluster"
 msgstr "other photos in this cluster"
@@ -594,7 +594,7 @@ msgid "oktober"
 msgstr "October"
 
 msgid "register_script_message_handler mislukt met alle varianten"
-msgstr "register_script_message_handler mislukt met alle varianten"
+msgstr "register_script_message_handler failed with all variants"
 
 msgid "september"
 msgstr "September"
@@ -858,3 +858,109 @@ msgid "%d foto lijkt al in je archief te staan. Kies wat je wilt doen, of gebrui
 msgid_plural "%d foto's lijken al in je archief te staan. Kies per foto wat je wilt doen, of gebruik de knoppen onderaan voor alles tegelijk."
 msgstr[0] "%d photo may already be in your archive. Choose what to do, or use the buttons below."
 msgstr[1] "%d photos may already be in your archive. Choose per photo what to do, or use the buttons below for all at once."
+
+# ── v1.12.8: tooltips, importer-fix, update-popup ────────────────────
+
+msgid "Sluiten (Esc)"
+msgstr "Close (Esc)"
+
+msgid "Verwijderen (Delete)"
+msgstr "Delete (Delete)"
+
+msgid "Vorige (←)"
+msgstr "Previous (←)"
+
+msgid "Volgende (→)"
+msgstr "Next (→)"
+
+msgid "iPhone of iPad gedetecteerd — klik om te importeren"
+msgstr "iPhone or iPad detected — click to import"
+
+msgid "Geen foto's of video's gevonden op het apparaat.\nMogelijk zijn alle media al eerder geïmporteerd."
+msgstr "No photos or videos found on the device.\nAll media may already have been imported."
+
+msgid "Duplicaten controleren…"
+msgstr "Checking duplicates…"
+
+msgid "Foto's worden vergeleken met je bestaande archief."
+msgstr "Photos are being compared with your existing archive."
+
+msgid "{n} van {total} geselecteerd"
+msgstr "{n} of {total} selected"
+
+msgid "Bestaande behouden"
+msgstr "Keep existing"
+
+msgid "Nieuwe importeren"
+msgstr "Import new"
+
+msgid "Beide bewaren"
+msgstr "Keep both"
+
+msgid "Sorteren klaar ({n})"
+msgstr "Sorting done ({n})"
+
+msgid "Sorteren: {i} / {total}"
+msgstr "Sorting: {i} / {total}"
+
+msgid "📱 iPhone — nieuw"
+msgstr "📱 iPhone — new"
+
+msgid "🗂️ Archief — bestaand"
+msgstr "🗂️ Archive — existing"
+
+msgid "Back-up maken…"
+msgstr "Backing up…"
+
+msgid "Back-upschijf niet gevonden. Sluit de schijf aan en probeer opnieuw via de instellingen."
+msgstr "Backup drive not found. Connect the drive and try again from settings."
+
+msgid "Back-up: {pct}"
+msgstr "Backup: {pct}"
+
+msgid "Back-up gedeeltelijk mislukt. De import zelf is wel geslaagd."
+msgstr "Backup partially failed. The import itself did succeed."
+
+msgid "Archief scannen: {i}/{total}"
+msgstr "Scanning archive: {i}/{total}"
+
+msgid "Apparaat scannen: {i}/{total}"
+msgstr "Scanning device: {i}/{total}"
+
+msgid "Pixora {v} is beschikbaar. Wil je nu bijwerken?"
+msgstr "Pixora {v} is available. Update now?"
+
+msgid "%d favoriet"
+msgid_plural "%d favorieten"
+msgstr[0] "%d favorite"
+msgstr[1] "%d favorites"
+
+msgid "%d bestand gevonden…"
+msgid_plural "%d bestanden gevonden…"
+msgstr[0] "%d file found…"
+msgstr[1] "%d files found…"
+
+msgid "%d bestand gevonden, sorteren op datum…"
+msgid_plural "%d bestanden gevonden, sorteren op datum…"
+msgstr[0] "%d file found, sorting by date…"
+msgstr[1] "%d files found, sorting by date…"
+
+msgid "%d bestand wordt gekopieerd."
+msgid_plural "%d bestanden worden gekopieerd."
+msgstr[0] "%d file is being copied."
+msgstr[1] "%d files are being copied."
+
+msgid "%d bestand geïmporteerd"
+msgid_plural "%d bestanden geïmporteerd"
+msgstr[0] "%d file imported"
+msgstr[1] "%d files imported"
+
+msgid "%d duplicaat gevonden"
+msgid_plural "%d duplicaten gevonden"
+msgstr[0] "%d duplicate found"
+msgstr[1] "%d duplicates found"
+
+msgid "%d overgeslagen"
+msgid_plural "%d overgeslagen"
+msgstr[0] "%d skipped"
+msgstr[1] "%d skipped"
