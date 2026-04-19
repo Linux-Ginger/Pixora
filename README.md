@@ -43,7 +43,7 @@ Requires **Ubuntu 24.04 LTS** or newer.
 - Python 3.12+
 - GTK 4 + libadwaita (`python3-gi`, `gir1.2-gtk-4.0`, `gir1.2-adw-1`)
 - ifuse + libimobiledevice
-- ffmpeg (voor video thumbnails en previews)
+- ffmpeg (for video thumbnails and previews)
 
 All dependencies are installed automatically by the install script.
 
@@ -63,7 +63,7 @@ This project is licensed under the **GNU General Public License v3.0** — see t
 
 ## 🤖 Vibecoded
 
-Pixora is vibecoded door **LinuxGinger** samen met **Claude** (Anthropic) — een mens met een idee, een AI als pair-programmer, en heel veel koffie. ☕
+Pixora is vibecoded by **LinuxGinger** together with **Claude** (Anthropic) — a human with an idea, an AI as pair-programmer, and a whole lot of coffee. ☕
 
 ---
 

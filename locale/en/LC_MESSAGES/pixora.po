@@ -1202,3 +1202,9 @@ msgid "%d geselecteerd"
 msgid_plural "%d geselecteerd"
 msgstr[0] "%d selected"
 msgstr[1] "%d selected"
+
+msgid "Dit verwijdert alle bestaande iPhone-koppelingen in /var/lib/lockdown/. Je iPhone vraagt de volgende keer opnieuw om Trust."
+msgstr "This removes all existing iPhone pairings in /var/lib/lockdown/. Your iPhone will ask for Trust again next time."
+
+msgid "Pair-records gewist en usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust."
+msgstr "Pair records cleared and usbmuxd restarted. Connect your iPhone and tap Trust."
