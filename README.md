@@ -49,6 +49,12 @@ All dependencies are installed automatically by the install script.
 
 ---
 
+## 🤖 Pixora is vibecoded
+
+Pixora is vibecoded by **Linux Ginger** together with **Claude** (Anthropic).
+
+---
+
 ## 📄 License
 
 This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
@@ -59,12 +65,3 @@ This project is licensed under the **GNU General Public License v3.0** — see t
 
 [linuxginger.com/pixora](https://linuxginger.com/pixora)
 
----
-
-## 🤖 Vibecoded
-
-Pixora is vibecoded by **LinuxGinger** together with **Claude** (Anthropic) — a human with an idea, an AI as pair-programmer, and a whole lot of coffee. ☕
-
----
-
-<sub>Made with ❤️ by <a href="https://linuxginger.com">LinuxGinger</a></sub>
