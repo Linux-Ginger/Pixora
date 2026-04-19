@@ -18,8 +18,7 @@ ORANGE='\033[0;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-# Taal-detectie — volg $LANG / $LC_ALL / $LC_MESSAGES zodat de shell-output
-# matcht met de GUI-taal op EN-systemen.
+# Taal-detectie — volg $LANG / $LC_ALL / $LC_MESSAGES
 case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
     nl*|NL*)
         LBL_BY="door LinuxGinger"
@@ -27,6 +26,20 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_PREP="Voorbereiding…"
         LBL_FETCH="Pixora ophalen…"
         LBL_DONE="✓ Klaar — installer openen…"
+        ;;
+    de*|DE*)
+        LBL_BY="von LinuxGinger"
+        LBL_NEED="Fehler: Pixora benötigt Ubuntu oder Debian."
+        LBL_PREP="Vorbereitung…"
+        LBL_FETCH="Pixora wird abgerufen…"
+        LBL_DONE="✓ Fertig — Installer wird geöffnet…"
+        ;;
+    fr*|FR*)
+        LBL_BY="par LinuxGinger"
+        LBL_NEED="Erreur : Pixora nécessite Ubuntu ou Debian."
+        LBL_PREP="Préparation…"
+        LBL_FETCH="Récupération de Pixora…"
+        LBL_DONE="✓ Terminé — ouverture de l'installeur…"
         ;;
     *)
         LBL_BY="by LinuxGinger"

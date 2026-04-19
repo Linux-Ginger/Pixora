@@ -28,6 +28,8 @@ VERSION_FILE="$TARGET_HOME/.config/pixora/installed_version"
 if ! command -v apt-get &> /dev/null; then
     case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         nl*|NL*) echo "Fout: Pixora vereist Ubuntu of Debian." ;;
+        de*|DE*) echo "Fehler: Pixora benötigt Ubuntu oder Debian." ;;
+        fr*|FR*) echo "Erreur : Pixora nécessite Ubuntu ou Debian." ;;
         *)       echo "Error: Pixora requires Ubuntu or Debian." ;;
     esac
     exit 1

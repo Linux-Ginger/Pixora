@@ -34,6 +34,32 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_VER_IFUSE="ifuse versie:     "
         LBL_TEST="Sluit je iPhone aan en test met:"
         ;;
+    de*|DE*)
+        LBL_TITLE="libimobiledevice Builder für Pixora"
+        LBL_DEPS="Build-Abhängigkeiten werden installiert…"
+        LBL_DEPS_OK="Abhängigkeiten installiert"
+        LBL_STOP="Bestehenden usbmuxd stoppen…"
+        LBL_BUILD="wird gebaut…"
+        LBL_INSTALLED="installiert"
+        LBL_ACTIVATE="Aktivieren…"
+        LBL_DONE="Fertig!"
+        LBL_VER_IDEV="idevice_id Version:"
+        LBL_VER_IFUSE="ifuse Version:     "
+        LBL_TEST="Schließe dein iPhone an und teste mit:"
+        ;;
+    fr*|FR*)
+        LBL_TITLE="constructeur libimobiledevice pour Pixora"
+        LBL_DEPS="Installation des dépendances de build…"
+        LBL_DEPS_OK="Dépendances installées"
+        LBL_STOP="Arrêt de usbmuxd existant…"
+        LBL_BUILD="compilation…"
+        LBL_INSTALLED="installé"
+        LBL_ACTIVATE="Activation…"
+        LBL_DONE="Terminé !"
+        LBL_VER_IDEV="version idevice_id :"
+        LBL_VER_IFUSE="version ifuse :     "
+        LBL_TEST="Connectez votre iPhone et testez avec :"
+        ;;
     *)
         LBL_TITLE="libimobiledevice builder for Pixora"
         LBL_DEPS="Installing build dependencies…"

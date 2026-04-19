@@ -49,6 +49,8 @@ import locale as _locale_mod
 _LC_TIME_CANDIDATES = {
     "nl": ["nl_NL.UTF-8", "nl_NL.utf8", "nl_NL", "nl"],
     "en": ["en_US.UTF-8", "en_US.utf8", "en_US", "C.UTF-8", "C"],
+    "de": ["de_DE.UTF-8", "de_DE.utf8", "de_DE", "de"],
+    "fr": ["fr_FR.UTF-8", "fr_FR.utf8", "fr_FR", "fr"],
 }
 for _cand in _LC_TIME_CANDIDATES.get(_lang, []):
     try:
@@ -4164,8 +4166,8 @@ class MainWindow(Adw.ApplicationWindow):
             subtitle=_("Herstart van Pixora is nodig om een nieuwe taal te laden")
         )
         lang_model = Gtk.StringList()
-        self._lang_codes = ["nl", "en"]
-        self._lang_labels = ["🇳🇱  Nederlands", "🇬🇧  English"]
+        self._lang_codes = ["nl", "en", "de", "fr"]
+        self._lang_labels = ["🇳🇱  Nederlands", "🇬🇧  English", "🇩🇪  Deutsch", "🇫🇷  Français"]
         for label in self._lang_labels:
             lang_model.append(label)
         lang_combo = Gtk.DropDown(model=lang_model)

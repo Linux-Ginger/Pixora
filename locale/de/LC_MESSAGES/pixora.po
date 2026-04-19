@@ -1,0 +1,1201 @@
+# Deutsch.
+msgid ""
+msgstr ""
+"Language: de\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "0 foto's"
+msgstr "0 Fotos"
+
+msgid "0 geselecteerd"
+msgstr "0 ausgewählt"
+
+msgid "0:00 / 0:00"
+msgstr "0:00 / 0:00"
+
+msgid "2024/   2025/"
+msgstr "2024/   2025/"
+
+msgid "2024/2024-03/   2024/2024-04/"
+msgstr "2024/2024-03/   2024/2024-04/"
+
+msgid "Actief"
+msgstr "Aktiv"
+
+msgid "Activeren"
+msgstr "Aktivieren"
+
+msgid "Alle importeren"
+msgstr "Alle importieren"
+
+msgid "Alle overslaan"
+msgstr "Alle überspringen"
+
+msgid "Alleen exact dezelfde foto's"
+msgstr "Nur exakt identische Fotos"
+
+msgid "Alleen externe schijven"
+msgstr "Nur externe Laufwerke"
+
+msgid "Alleen externe schijven worden getoond"
+msgstr "Nur externe Laufwerke werden angezeigt"
+
+msgid "Alleen favorieten tonen"
+msgstr "Nur Favoriten anzeigen"
+
+msgid "Alles in één map"
+msgstr "Alles in einem Ordner"
+
+msgid "Annuleren"
+msgstr "Abbrechen"
+
+msgid "Apparaat"
+msgstr "Gerät"
+
+msgid "Apparaat gevonden"
+msgstr "Gerät gefunden"
+
+msgid "Apparaat koppelen…"
+msgstr "Gerät wird eingebunden…"
+
+msgid "Apparaat losgekoppeld"
+msgstr "Gerät getrennt"
+
+msgid "Apparaat scannen: {i}/{total}"
+msgstr "Gerät scannen: {i}/{total}"
+
+msgid "Apple USB-device aangesloten (vendor=05ac) — check na 2.5s"
+msgstr "Apple USB-Gerät verbunden (vendor=05ac) — Prüfung nach 2,5 s"
+
+msgid "Archief scannen: {i}/{total}"
+msgstr "Archiv scannen: {i}/{total}"
+
+msgid "Automatische backup"
+msgstr "Automatisches Backup"
+
+msgid "Back-up gedeeltelijk mislukt. De import zelf is wel geslaagd."
+msgstr "Backup teilweise fehlgeschlagen. Der Import selbst war erfolgreich."
+
+msgid "Back-up maken…"
+msgstr "Backup wird erstellt…"
+
+msgid "Back-up: {pct}"
+msgstr "Backup: {pct}"
+
+msgid "Back-upschijf niet gevonden. Sluit de schijf aan en probeer opnieuw via de instellingen."
+msgstr "Backup-Laufwerk nicht gefunden. Schließe das Laufwerk an und versuche es über die Einstellungen erneut."
+
+msgid "Backup naar externe USB schijf na elke import"
+msgstr "Backup auf externe USB-Festplatte nach jedem Import"
+
+msgid "Backup schijf"
+msgstr "Backup-Laufwerk"
+
+msgid "Beide bewaren"
+msgstr "Beide behalten"
+
+msgid "Bestaande behouden"
+msgstr "Bestehendes behalten"
+
+msgid "Bestandsformaat"
+msgstr "Dateiformat"
+
+msgid "Bezig…"
+msgstr "Wird ausgeführt…"
+
+msgid "Bij dev mode start Pixora in een terminal en gaan updates via de terminal zodat je output kunt zien. Pixora herstart direct."
+msgstr "Im Entwicklermodus startet Pixora in einem Terminal und Updates laufen über das Terminal, damit du die Ausgabe sehen kannst. Pixora startet sofort neu."
+
+msgid "Bijna identieke foto's worden gedetecteerd"
+msgstr "Nahezu identische Fotos werden erkannt"
+
+msgid "Bijsnijden"
+msgstr "Zuschneiden"
+
+msgid "Bijwerken"
+msgstr "Aktualisieren"
+
+msgid "Bladeren…"
+msgstr "Durchsuchen…"
+
+msgid "Cache: {p}"
+msgstr "Cache: {p}"
+
+msgid "Check /home/beau/.cache/pixora/pixora.log voor meer."
+msgstr "Siehe /home/beau/.cache/pixora/pixora.log für mehr."
+
+msgid "Cleanup-fout: {err}"
+msgstr "Cleanup-Fehler: {err}"
+
+msgid "Cluster-filter uitgezet → alle foto's"
+msgstr "Cluster-Filter aus → alle Fotos"
+
+msgid "Config: {p}"
+msgstr "Config: {p}"
+
+msgid "Configuratie + services"
+msgstr "Konfiguration + Dienste"
+
+msgid "Configuratie en services"
+msgstr "Konfiguration und Dienste"
+
+msgid "Controleer"
+msgstr "Prüfen"
+
+msgid "Controleer op updates"
+msgstr "Auf Updates prüfen"
+
+msgid "Controleren mislukt"
+msgstr "Prüfung fehlgeschlagen"
+
+msgid "Datum (nieuwste eerst)"
+msgstr "Datum (neueste zuerst)"
+
+msgid "Datum (oudste eerst)"
+msgstr "Datum (älteste zuerst)"
+
+msgid "Datum nieuwste"
+msgstr "Datum neueste"
+
+msgid "Datum oudste"
+msgstr "Datum älteste"
+
+msgid "Deactiveren"
+msgstr "Deaktivieren"
+
+msgid "Deselecteer alles"
+msgstr "Alle abwählen"
+
+msgid "Dev-mode toggle geannuleerd (was: {was})"
+msgstr "Dev-Modus-Umschaltung abgebrochen (war: {was})"
+
+msgid "Dev-mode {state} → herstarten…"
+msgstr "Dev-Modus {state} → neu starten…"
+
+msgid "Developer mode"
+msgstr "Entwicklermodus"
+
+msgid "Developer mode activeren?"
+msgstr "Entwicklermodus aktivieren?"
+
+msgid "Developer mode deactiveren?"
+msgstr "Entwicklermodus deaktivieren?"
+
+msgid "Developer mode toont Pixora met terminal-output en gebruikt de terminal-updater. Alleen aanzetten als je weet wat je doet."
+msgstr "Der Entwicklermodus zeigt Pixora mit Terminal-Ausgabe und verwendet den Terminal-Updater. Nur aktivieren, wenn du weißt, was du tust."
+
+msgid "Dit verwijdert alle bestaande iPhone-koppelingen in /var/lib/lockdown/. Je iPhone vraagt de volgende keer opnieuw om Trust."
+msgstr "Dies entfernt alle bestehenden iPhone-Kopplungen in /var/lib/lockdown/. Dein iPhone fragt beim nächsten Mal wieder nach Trust."
+
+msgid "Doorgaan"
+msgstr "Fortfahren"
+
+msgid "Doorgaan met importeren"
+msgstr "Import fortsetzen"
+
+msgid "Downloaden"
+msgstr "Herunterladen"
+
+msgid "Draaien links"
+msgstr "Nach links drehen"
+
+msgid "Draaien rechts"
+msgstr "Nach rechts drehen"
+
+msgid "Drive detectie fout: {err}"
+msgstr "Fehler bei Laufwerkserkennung: {err}"
+
+msgid "Duplicaat detectie"
+msgstr "Duplikat-Erkennung"
+
+msgid "Duplicate detectie"
+msgstr "Duplikat-Erkennung"
+
+msgid "Duplicaten controleren…"
+msgstr "Duplikate werden geprüft…"
+
+msgid "Editor crop-modus: {state}"
+msgstr "Editor-Crop-Modus: {state}"
+
+msgid "Editor geannuleerd"
+msgstr "Editor abgebrochen"
+
+msgid "Editor geopend voor: {name}"
+msgstr "Editor geöffnet für: {name}"
+
+msgid "Editor opslaan mislukt: {err}"
+msgstr "Editor-Speichern fehlgeschlagen: {err}"
+
+msgid "Editor opslaan: rotation={rot}° crop={crop} path={p}"
+msgstr "Editor speichern: rotation={rot}° crop={crop} path={p}"
+
+msgid "Editor: draaien links (-90°)"
+msgstr "Editor: nach links drehen (-90°)"
+
+msgid "Editor: draaien rechts (+90°)"
+msgstr "Editor: nach rechts drehen (+90°)"
+
+msgid "Er is een fout opgetreden"
+msgstr "Ein Fehler ist aufgetreten"
+
+msgid "Even geduld, dit duurt maar even."
+msgstr "Einen Moment, es dauert nicht lange."
+
+msgid "Externe schijf"
+msgstr "Externes Laufwerk"
+
+msgid "Favoriet toegevoegd: {p}"
+msgstr "Favorit hinzugefügt: {p}"
+
+msgid "Favoriet verwijderd: {p}"
+msgstr "Favorit entfernt: {p}"
+
+msgid "Favorieten-filter: {state}"
+msgstr "Favoriten-Filter: {state}"
+
+msgid "Favorites save fout: {err}"
+msgstr "Fehler beim Speichern der Favoriten: {err}"
+
+msgid "Foto &amp; video manager door LinuxGinger"
+msgstr "Foto- &amp; Video-Manager von LinuxGinger"
+
+msgid "Foto bewerken"
+msgstr "Foto bearbeiten"
+
+msgid "Foto map"
+msgstr "Fotoordner"
+
+msgid "Foto verwijderd: {p}"
+msgstr "Foto gelöscht: {p}"
+
+msgid "Foto verwijderen?"
+msgstr "Foto löschen?"
+
+msgid "Foto's laden..."
+msgstr "Fotos werden geladen..."
+
+msgid "Foto's laden… {loaded} / {total}"
+msgstr "Fotos werden geladen… {loaded} / {total}"
+
+msgid "Foto's scannen…"
+msgstr "Fotos werden gescannt…"
+
+msgid "Foto's worden gesynchroniseerd naar je externe schijf."
+msgstr "Fotos werden auf dein externes Laufwerk synchronisiert."
+
+msgid "Foto's worden vergeleken met je bestaande archief."
+msgstr "Fotos werden mit deinem bestehenden Archiv verglichen."
+
+msgid "Fout: {err}"
+msgstr "Fehler: {err}"
+
+msgid "GUI-updater gestart"
+msgstr "GUI-Updater gestartet"
+
+msgid "GUI-updater kon niet starten: {err}"
+msgstr "GUI-Updater konnte nicht starten: {err}"
+
+msgid "GUdev monitor kon niet starten: {err}"
+msgstr "GUdev-Monitor konnte nicht starten: {err}"
+
+msgid "Geavanceerd"
+msgstr "Erweitert"
+
+msgid "Gebruik bij voorkeur de originele Apple-kabel"
+msgstr "Verwende vorzugsweise das Original-Apple-Kabel"
+
+msgid "Gebruik een blauwe USB-poort"
+msgstr "Verwende einen blauen USB-Port"
+
+msgid "Geen externe schijven gevonden"
+msgstr "Keine externen Laufwerke gefunden"
+
+msgid "Geen foto's gevonden"
+msgstr "Keine Fotos gefunden"
+
+msgid "Geen foto's of video's gevonden op het apparaat.\nMogelijk zijn alle media al eerder geïmporteerd."
+msgstr "Keine Fotos oder Videos auf dem Gerät gefunden.\nMöglicherweise wurden alle Medien bereits importiert."
+
+msgid "Geen map gekozen"
+msgstr "Kein Ordner gewählt"
+
+msgid "Geen terminal gevonden voor dev-mode; Pixora start zonder."
+msgstr "Kein Terminal für Dev-Modus gefunden; Pixora startet ohne."
+
+msgid "Gefilterd ({count})"
+msgstr "Gefiltert ({count})"
+
+msgid "Gefilterd op locatie: {loc}"
+msgstr "Gefiltert nach Ort: {loc}"
+
+msgid "Herstart"
+msgstr "Neustart"
+
+msgid "Herstart duurde te lang (timeout)."
+msgstr "Neustart dauerte zu lange (Timeout)."
+
+msgid "Herstart mislukt"
+msgstr "Neustart fehlgeschlagen"
+
+msgid "Herstart mislukt (code {code}).\n{err}"
+msgstr "Neustart fehlgeschlagen (Code {code}).\n{err}"
+
+msgid "Herstart van Pixora is nodig om een nieuwe taal te laden"
+msgstr "Pixora muss neu gestartet werden, um eine neue Sprache zu laden"
+
+msgid "Hoe foto's in het grid worden getoond"
+msgstr "Wie Fotos im Raster angezeigt werden"
+
+msgid "Hoe streng worden duplicaten gedetecteerd"
+msgstr "Wie streng Duplikate erkannt werden"
+
+msgid "Hoe worden je foto's georganiseerd"
+msgstr "Wie deine Fotos organisiert werden"
+
+msgid "Huidige map"
+msgstr "Aktueller Ordner"
+
+msgid "Import voltooid"
+msgstr "Import abgeschlossen"
+
+msgid "Importeer van iPhone of iPad"
+msgstr "Von iPhone oder iPad importieren"
+
+msgid "Importer geopend (iOS device {state})"
+msgstr "Importer geöffnet (iOS-Gerät {state})"
+
+msgid "Importer gesloten"
+msgstr "Importer geschlossen"
+
+msgid "Importeren"
+msgstr "Importieren"
+
+msgid "Importeren…"
+msgstr "Importieren…"
+
+msgid "Inactief"
+msgstr "Inaktiv"
+
+msgid "Installeer een van:"
+msgstr "Installiere eines von:"
+
+msgid "Installeer vereiste pakketten"
+msgstr "Benötigte Pakete installieren"
+
+msgid "Installeren"
+msgstr "Installieren"
+
+msgid "Instellingen"
+msgstr "Einstellungen"
+
+msgid "Instellingen geopend"
+msgstr "Einstellungen geöffnet"
+
+msgid "JS push fout: {err}"
+msgstr "JS-Push-Fehler: {err}"
+
+msgid "Ja"
+msgstr "Ja"
+
+msgid "Je apparaat is losgekoppeld tijdens het selecteren van foto's.\nSluit het apparaat opnieuw aan en probeer het opnieuw."
+msgstr "Dein Gerät wurde während der Fotoauswahl getrennt.\nSchließe es wieder an und versuche es erneut."
+
+msgid "Je apparaat is verbonden en klaar om te importeren."
+msgstr "Dein Gerät ist verbunden und bereit zum Importieren."
+
+msgid "Je hebt de nieuwste versie"
+msgstr "Du hast die neueste Version"
+
+msgid "Kaart geopend ({n} foto's gaan naar GPS-scan)"
+msgstr "Karte geöffnet ({n} Fotos gehen zum GPS-Scan)"
+
+msgid "Kaart gesloten"
+msgstr "Karte geschlossen"
+
+msgid "Kaart → eerste tiles geladen"
+msgstr "Karte → erste Tiles geladen"
+
+msgid "Kaart → offline / tile-errors"
+msgstr "Karte → offline / Tile-Fehler"
+
+msgid "Kaart → open_photo: {p}"
+msgstr "Karte → open_photo: {p}"
+
+msgid "Kaart → open_photos: {n} foto's"
+msgstr "Karte → open_photos: {n} Fotos"
+
+msgid "Kaart-ready timeout — toon kaart alsnog"
+msgstr "Karte-Bereit-Timeout — Karte wird dennoch angezeigt"
+
+msgid "Kaart-weergave kon niet starten."
+msgstr "Kartenansicht konnte nicht gestartet werden."
+
+msgid "Kaartweergave"
+msgstr "Kartenansicht"
+
+msgid "Kies een map op je computer waar Pixora\nje foto's en video's naartoe kopieert."
+msgstr "Wähle einen Ordner auf deinem Computer, in den Pixora\ndeine Fotos und Videos kopiert."
+
+msgid "Kies een map waar je foto's opgeslagen worden."
+msgstr "Wähle einen Ordner, in dem deine Fotos gespeichert werden."
+
+msgid "Kies een map…"
+msgstr "Ordner wählen…"
+
+msgid "Kies foto map"
+msgstr "Fotoordner wählen"
+
+msgid "Kies map op backup schijf"
+msgstr "Ordner auf Backup-Laufwerk wählen"
+
+msgid "Kies welke foto's en video's je wilt importeren.\n💡 Tip: leeg eerst de prullenbak op je iPhone om verwijderde foto's uit te sluiten."
+msgstr "Wähle, welche Fotos und Videos importiert werden sollen.\n💡 Tipp: Leere zuerst den Papierkorb auf deinem iPhone, um gelöschte Fotos auszuschließen."
+
+msgid "Kiezen…"
+msgstr "Wählen…"
+
+msgid "Klaar"
+msgstr "Fertig"
+
+msgid "Klik cluster om gefilterd te bekijken"
+msgstr "Klicke auf Cluster für gefilterte Ansicht"
+
+msgid "Klik om te openen"
+msgstr "Zum Öffnen klicken"
+
+msgid "Kon het apparaat niet koppelen. Zorg dat het scherm ontgrendeld is en tik op 'Vertrouw' als dat wordt gevraagd."
+msgstr "Gerät konnte nicht eingebunden werden. Stelle sicher, dass der Bildschirm entsperrt ist, und tippe auf 'Vertrauen', wenn gefragt."
+
+msgid "Later"
+msgstr "Später"
+
+msgid "Launcher aanmaken"
+msgstr "Launcher erstellen"
+
+msgid "Leaflet-assets niet gevonden:\n{p}"
+msgstr "Leaflet-Assets nicht gefunden:\n{p}"
+
+msgid "Map op backup schijf"
+msgstr "Ordner auf Backup-Laufwerk"
+
+msgid "Mapstructuur"
+msgstr "Ordnerstruktur"
+
+msgid "Markeer als favoriet"
+msgstr "Als Favorit markieren"
+
+msgid "Markeer als favoriet (F)"
+msgstr "Als Favorit markieren (F)"
+
+msgid "Mislukt"
+msgstr "Fehlgeschlagen"
+
+msgid "Mogelijke duplicaten"
+msgstr "Mögliche Duplikate"
+
+msgid "Naam (A-Z)"
+msgstr "Name (A-Z)"
+
+msgid "Naam (Z-A)"
+msgstr "Name (Z-A)"
+
+msgid "Naam A-Z"
+msgstr "Name A-Z"
+
+msgid "Naam Z-A"
+msgstr "Name Z-A"
+
+msgid "Nee"
+msgstr "Nein"
+
+msgid "NetworkSession sandbox-disable faalde: {err}"
+msgstr "NetworkSession Sandbox-Deaktivierung fehlgeschlagen: {err}"
+
+msgid "Niet ingesteld"
+msgstr "Nicht konfiguriert"
+
+msgid "Nieuwe importeren"
+msgstr "Neues importieren"
+
+msgid "Nieuwste versie"
+msgstr "Neueste Version"
+
+msgid "Nog geen map gekozen"
+msgstr "Noch kein Ordner gewählt"
+
+msgid "Nog geen schijf geselecteerd"
+msgstr "Noch kein Laufwerk ausgewählt"
+
+msgid "Normaal"
+msgstr "Normal"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Onbekend"
+msgstr "Unbekannt"
+
+msgid "Ontgrendeld scherm"
+msgstr "Entsperrter Bildschirm"
+
+msgid "Onverwachte fout: {err}"
+msgstr "Unerwarteter Fehler: {err}"
+
+msgid "Ook licht bewerkte foto's worden gedetecteerd"
+msgstr "Auch leicht bearbeitete Fotos werden erkannt"
+
+msgid "Opnieuw installeren"
+msgstr "Neu installieren"
+
+msgid "Opnieuw proberen"
+msgstr "Erneut versuchen"
+
+msgid "Opslaan"
+msgstr "Speichern"
+
+msgid "Opslaan in"
+msgstr "Speichern in"
+
+msgid "Opslaan mislukt"
+msgstr "Speichern fehlgeschlagen"
+
+msgid "Over"
+msgstr "Über"
+
+msgid "PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks"
+msgstr "PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks"
+
+msgid "Pair-records gewist en usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust."
+msgstr "Pair-Records gelöscht und usbmuxd neu gestartet. Schließe dein iPhone an und tippe auf Trust."
+
+msgid "Pair-records wissen — bevestiging gevraagd"
+msgstr "Pair-Records löschen — Bestätigung angefordert"
+
+msgid "Pair-records wissen?"
+msgstr "Pair-Records löschen?"
+
+msgid "Per jaar"
+msgstr "Pro Jahr"
+
+msgid "Per jaar/maand"
+msgstr "Pro Jahr/Monat"
+
+msgid "Pixora"
+msgstr "Pixora"
+
+msgid "Pixora Installer"
+msgstr "Pixora Installer"
+
+msgid "Pixora Updater"
+msgstr "Pixora Updater"
+
+msgid "Pixora bestanden downloaden"
+msgstr "Pixora-Dateien herunterladen"
+
+msgid "Pixora bijwerken"
+msgstr "Pixora aktualisieren"
+
+msgid "Pixora importeert foto's en video's van je iPhone,\ndetecteert duplicaten en maakt automatisch backups.\n\nDeze wizard helpt je Pixora instellen in een paar stappen."
+msgstr "Pixora importiert Fotos und Videos von deinem iPhone,\nerkennt Duplikate und erstellt automatische Backups.\n\nDieser Assistent hilft dir, Pixora in wenigen Schritten einzurichten."
+
+msgid "Pixora is al geïnstalleerd"
+msgstr "Pixora ist bereits installiert"
+
+msgid "Pixora is bijgewerkt."
+msgstr "Pixora wurde aktualisiert."
+
+msgid "Pixora kan na elke import automatisch een backup\nmaken naar een externe USB schijf of HDD."
+msgstr "Pixora kann nach jedem Import automatisch ein Backup\nauf einer externen USB-Festplatte oder HDD erstellen."
+
+msgid "Pixora ophalen van GitHub"
+msgstr "Pixora von GitHub abrufen"
+
+msgid "Pixora proces forceert exit (lingering threads)"
+msgstr "Pixora-Prozess erzwingt Exit (verbleibende Threads)"
+
+msgid "Pixora start daarna zonder terminal en gebruikt de GUI-updater."
+msgstr "Pixora startet danach ohne Terminal und verwendet den GUI-Updater."
+
+msgid "Pixora starten"
+msgstr "Pixora starten"
+
+msgid "Pixora vergelijkt foto's visueel op inhoud.\nStel in hoe streng de detectie moet zijn."
+msgstr "Pixora vergleicht Fotos visuell nach Inhalt.\nStelle ein, wie streng die Erkennung sein soll."
+
+msgid "Pixora wordt afgesloten — opruimen…"
+msgstr "Pixora wird beendet — aufräumen…"
+
+msgid "Pixora wordt gestart…"
+msgstr "Pixora wird gestartet…"
+
+msgid "Pixora {v} is beschikbaar. Wil je nu bijwerken?"
+msgstr "Pixora {v} ist verfügbar. Jetzt aktualisieren?"
+
+msgid "Pixora — Instellen"
+msgstr "Pixora — Einrichtung"
+
+msgid "Plat"
+msgstr "Flach"
+
+msgid "Python packages installeren"
+msgstr "Python-Pakete installieren"
+
+msgid "Reisverhaal samenstellen…"
+msgstr "Reisebericht wird erstellt…"
+
+msgid "Relaunch na taal-wissel fout: {err}"
+msgstr "Neustart nach Sprachwechsel fehlgeschlagen: {err}"
+
+msgid "Reset usbmuxd aangeroepen (settings)"
+msgstr "Reset usbmuxd aufgerufen (Einstellungen)"
+
+msgid "Restart fout: {err}"
+msgstr "Neustart-Fehler: {err}"
+
+msgid "Restart gepland (1.2s delay voor GApplication unregister)"
+msgstr "Neustart geplant (1,2 s Verzögerung für GApplication-Unregister)"
+
+msgid "Selecteer alles"
+msgstr "Alle auswählen"
+
+msgid "Selecteer welke versie je wilt installeren"
+msgstr "Wähle, welche Version installiert werden soll"
+
+msgid "Selecteren"
+msgstr "Auswählen"
+
+msgid "Selectie-modus: {state}"
+msgstr "Auswahlmodus: {state}"
+
+msgid "Services activeren"
+msgstr "Dienste aktivieren"
+
+msgid "Sluit dit venster om Pixora te sluiten."
+msgstr "Schließe dieses Fenster, um Pixora zu beenden."
+
+msgid "Sluit je iPhone of iPad aan om foto's te importeren"
+msgstr "Schließe dein iPhone oder iPad an, um Fotos zu importieren"
+
+msgid "Sluit je iPhone of iPad aan via een USB-kabel en ontgrendel het scherm.\nAls je apparaat vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'."
+msgstr "Schließe dein iPhone oder iPad per USB-Kabel an und entsperre den Bildschirm.\nWenn dein Gerät fragt, diesem Computer zu vertrauen, tippe auf 'Vertrauen'."
+
+msgid "Sluiten"
+msgstr "Schließen"
+
+msgid "Sluiten (Esc)"
+msgstr "Schließen (Esc)"
+
+msgid "Soepel"
+msgstr "Locker"
+
+msgid "Sorteren klaar ({n})"
+msgstr "Sortieren fertig ({n})"
+
+msgid "Sorteren..."
+msgstr "Sortieren..."
+
+msgid "Sorteren: {i} / {total}"
+msgstr "Sortieren: {i} / {total}"
+
+msgid "Sortering gewijzigd: {opt}"
+msgstr "Sortierung geändert: {opt}"
+
+msgid "Starten"
+msgstr "Starten"
+
+msgid "Startup fase 1: MainWindow __init__ begonnen"
+msgstr "Startphase 1: MainWindow __init__ begonnen"
+
+msgid "Startup fase 2: pages opbouwen…"
+msgstr "Startphase 2: Seiten werden aufgebaut…"
+
+msgid "Startup fase 3: pages klaar"
+msgstr "Startphase 3: Seiten bereit"
+
+msgid "Startup fase 4: foto's laden gepland via idle_add"
+msgstr "Startphase 4: Laden der Fotos per idle_add geplant"
+
+msgid "Streng"
+msgstr "Streng"
+
+msgid "Synchroniseert na elke import"
+msgstr "Synchronisiert nach jedem Import"
+
+msgid "Synchroniseert na elke import naar externe schijf"
+msgstr "Synchronisiert nach jedem Import auf externes Laufwerk"
+
+msgid "Systeem packages controleren"
+msgstr "Systempakete prüfen"
+
+msgid "Systeem packages installeren"
+msgstr "Systempakete installieren"
+
+msgid "Taal"
+msgstr "Sprache"
+
+msgid "Taal gewijzigd naar: {lang} — Pixora wordt herstart"
+msgstr "Sprache geändert zu: {lang} — Pixora wird neu gestartet"
+
+msgid "Taal wordt gewijzigd…"
+msgstr "Sprache wird geändert…"
+
+msgid "Technische fout"
+msgstr "Technischer Fehler"
+
+msgid "Terug"
+msgstr "Zurück"
+
+msgid "Terug naar galerij"
+msgstr "Zurück zur Galerie"
+
+msgid "Terug naar standaard (200 px)"
+msgstr "Zurück zum Standard (200 px)"
+
+msgid "Thumbnail geklikt → open foto: idx={i} path={p}"
+msgstr "Thumbnail geklickt → Foto öffnen: idx={i} path={p}"
+
+msgid "Thumbnail grootte"
+msgstr "Miniaturgröße"
+
+msgid "Thumbnail load done: {n} photos — UI ready"
+msgstr "Thumbnail load done: {n} photos — UI ready"
+
+msgid "Thumbnail {action}: idx={i} path={p}"
+msgstr "Thumbnail {action}: idx={i} path={p}"
+
+msgid "Thumbnail-grootte gewijzigd: {old}px → {new}px"
+msgstr "Thumbnail-Größe geändert: {old}px → {new}px"
+
+msgid "Thumbs: {px}px — favorites: {n}"
+msgstr "Thumbs: {px}px — favorites: {n}"
+
+msgid "Tik op 'Vertrouw' als je apparaat dat vraagt"
+msgstr "Tippe auf 'Vertrauen', wenn dein Gerät fragt"
+
+msgid "USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten"
+msgstr "USB 3.0 (blau) ist viel schneller als schwarze USB 2.0-Ports"
+
+msgid "USB-kabel"
+msgstr "USB-Kabel"
+
+msgid "USB-verbinding herstart"
+msgstr "USB-Verbindung neu gestartet"
+
+msgid "Update beschikbaar"
+msgstr "Update verfügbar"
+
+msgid "Update beschikbaar: {local} → {remote}"
+msgstr "Update verfügbar: {local} → {remote}"
+
+msgid "Update beschikbaar: {v}"
+msgstr "Update verfügbar: {v}"
+
+msgid "Update mislukt."
+msgstr "Update fehlgeschlagen."
+
+msgid "Verbind je iPhone of iPad"
+msgstr "Verbinde dein iPhone oder iPad"
+
+msgid "Verbinden met kaart-server…"
+msgstr "Verbindung zum Kartenserver…"
+
+msgid "Vernieuwen"
+msgstr "Aktualisieren"
+
+msgid "Versie"
+msgstr "Version"
+
+msgid "Versie kiezen"
+msgstr "Version wählen"
+
+msgid "Versie {v} beschikbaar"
+msgstr "Version {v} verfügbar"
+
+msgid "Versie {v} — up to date"
+msgstr "Version {v} — aktuell"
+
+msgid "Vertrouw deze computer"
+msgstr "Diesem Computer vertrauen"
+
+msgid "Verwijder bevestiging gevraagd: {p}"
+msgstr "Löschbestätigung angefordert: {p}"
+
+msgid "Verwijder uit favorieten"
+msgstr "Aus Favoriten entfernen"
+
+msgid "Verwijder uit favorieten (F)"
+msgstr "Aus Favoriten entfernen (F)"
+
+msgid "Verwijderen"
+msgstr "Löschen"
+
+msgid "Verwijderen (Delete)"
+msgstr "Löschen (Delete)"
+
+msgid "Verwijderen geannuleerd: {p}"
+msgstr "Löschen abgebrochen: {p}"
+
+msgid "Verwijderen mislukt: {err}"
+msgstr "Löschen fehlgeschlagen: {err}"
+
+msgid "Viewer gesloten → terug naar grid"
+msgstr "Viewer geschlossen → zurück zum Raster"
+
+msgid "Volgende"
+msgstr "Weiter"
+
+msgid "Volgende (→)"
+msgstr "Weiter (→)"
+
+msgid "Volgende foto: idx={i} → {name}"
+msgstr "Nächstes Foto: idx={i} → {name}"
+
+msgid "Voltooien"
+msgstr "Fertigstellen"
+
+msgid "Voorbereiden"
+msgstr "Vorbereiten"
+
+msgid "Vorige"
+msgstr "Zurück"
+
+msgid "Vorige (←)"
+msgstr "Zurück (←)"
+
+msgid "Vorige foto: idx={i} → {name}"
+msgstr "Vorheriges Foto: idx={i} → {name}"
+
+msgid "Waar wil je je foto's opslaan?"
+msgstr "Wo möchtest du deine Fotos speichern?"
+
+msgid "Waar worden je foto's opgeslagen"
+msgstr "Wo deine Fotos gespeichert werden"
+
+msgid "Wachten op sudo…"
+msgstr "Warte auf sudo…"
+
+msgid "Wachtwoord geannuleerd of pkexec niet beschikbaar."
+msgstr "Passwort abgebrochen oder pkexec nicht verfügbar."
+
+msgid "WebContext sandbox-disable faalde: {err}"
+msgstr "WebContext Sandbox-Deaktivierung fehlgeschlagen: {err}"
+
+msgid "WebKit niet beschikbaar: {err}"
+msgstr "WebKit nicht verfügbar: {err}"
+
+msgid "WebKit typelib installeren"
+msgstr "WebKit-Typelib installieren"
+
+msgid "WebKitGTK kon niet geladen worden."
+msgstr "WebKitGTK konnte nicht geladen werden."
+
+msgid "WebView bridge setup fout: {err}"
+msgstr "WebView Bridge-Setup-Fehler: {err}"
+
+msgid "WebView init crashte:\n{tb}"
+msgstr "WebView-Initialisierung abgestürzt:\n{tb}"
+
+msgid "WebView settings niet volledig gezet: {err}"
+msgstr "WebView-Einstellungen nicht vollständig gesetzt: {err}"
+
+msgid "Weergave"
+msgstr "Ansicht"
+
+msgid "Weet je zeker dat je '{name}' wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+msgstr "Möchtest du '{name}' wirklich löschen? Dies kann nicht rückgängig gemacht werden."
+
+msgid "Welkom bij Pixora!"
+msgstr "Willkommen bei Pixora!"
+
+msgid "Wijzigen"
+msgstr "Ändern"
+
+msgid "Wissen"
+msgstr "Löschen"
+
+msgid "Wissen mislukt (code {code})."
+msgstr "Löschen fehlgeschlagen (Code {code})."
+
+msgid "Zet op je apparaat: Instellingen → Foto's → 'Zet over naar Mac of pc' → 'Behoud originelen'"
+msgstr "Auf deinem Gerät: Einstellungen → Fotos → 'Auf Mac oder PC übertragen' → 'Originale behalten'"
+
+msgid "Zoeken naar apparaat…"
+msgstr "Suche nach Gerät…"
+
+msgid "Zoeken naar foto's en video's op je apparaat."
+msgstr "Suche nach Fotos und Videos auf deinem Gerät."
+
+msgid "Zorg dat je apparaat ontgrendeld is tijdens de import"
+msgstr "Stelle sicher, dass dein Gerät während des Imports entsperrt ist"
+
+msgid "aan"
+msgstr "ein"
+
+msgid "aanwezig"
+msgstr "vorhanden"
+
+msgid "andere foto's in deze cluster"
+msgstr "andere Fotos in diesem Cluster"
+
+msgid "april"
+msgstr "April"
+
+msgid "apt mislukt"
+msgstr "apt fehlgeschlagen"
+
+msgid "augustus"
+msgstr "August"
+
+msgid "december"
+msgstr "Dezember"
+
+msgid "deselecteer"
+msgstr "abwählen"
+
+msgid "door LinuxGinger"
+msgstr "von LinuxGinger"
+
+msgid "downloaden mislukt"
+msgstr "Download fehlgeschlagen"
+
+msgid "februari"
+msgstr "Februar"
+
+msgid "foto"
+msgstr "Foto"
+
+msgid "geactiveerd"
+msgstr "aktiviert"
+
+msgid "gedeactiveerd"
+msgstr "deaktiviert"
+
+msgid "iCloud Foto's uitgeschakeld? Dan staan alle foto's lokaal op je toestel en worden ze allemaal gevonden."
+msgstr "iCloud-Fotos deaktiviert? Dann liegen alle Fotos lokal auf deinem Gerät und werden alle gefunden."
+
+msgid "iCloud foto's"
+msgstr "iCloud-Fotos"
+
+msgid "iPhone blijft onherkenbaar na reset"
+msgstr "iPhone bleibt nach Reset nicht erkannt"
+
+msgid "iPhone direct herkend door usbmuxd"
+msgstr "iPhone direkt von usbmuxd erkannt"
+
+msgid "iPhone herkend na reset"
+msgstr "iPhone nach Reset erkannt"
+
+msgid "iPhone niet herkend door usbmuxd — start auto-recovery"
+msgstr "iPhone nicht von usbmuxd erkannt — starte Auto-Wiederherstellung"
+
+msgid "iPhone of iPad gedetecteerd — klik om te importeren"
+msgstr "iPhone oder iPad erkannt — klicke zum Importieren"
+
+msgid "ifuse of libimobiledevice is niet geïnstalleerd. Installeer de vereiste pakketten hieronder."
+msgstr "ifuse oder libimobiledevice ist nicht installiert. Installiere die benötigten Pakete unten."
+
+msgid "januari"
+msgstr "Januar"
+
+msgid "juli"
+msgstr "Juli"
+
+msgid "juni"
+msgstr "Juni"
+
+msgid "load_photos: photo_path leeg of bestaat niet — empty state"
+msgstr "load_photos: photo_path empty or missing — empty state"
+
+msgid "load_photos: scanning in {p}"
+msgstr "load_photos: scanning in {p}"
+
+msgid "load_photos: {n} files found"
+msgstr "load_photos: {n} files found"
+
+msgid "maart"
+msgstr "März"
+
+msgid "mei"
+msgstr "Mai"
+
+msgid "niet gedetecteerd"
+msgstr "nicht erkannt"
+
+msgid "november"
+msgstr "November"
+
+msgid "oktober"
+msgstr "Oktober"
+
+msgid "open_photo: {kind} idx={i} path={p}"
+msgstr "open_photo: {kind} idx={i} path={p}"
+
+msgid "pip mislukt"
+msgstr "pip fehlgeschlagen"
+
+msgid "pkexec niet gevonden."
+msgstr "pkexec nicht gefunden."
+
+msgid "pkexec niet gevonden. Installeer policykit-1."
+msgstr "pkexec nicht gefunden. Installiere policykit-1."
+
+msgid "pkexec niet gevonden. Voer handmatig uit:\n  sudo killall usbmuxd; sudo usbmuxd"
+msgstr "pkexec nicht gefunden. Manuell ausführen:\n  sudo killall usbmuxd; sudo usbmuxd"
+
+msgid "register_script_message_handler mislukt met alle varianten"
+msgstr "register_script_message_handler mit allen Varianten fehlgeschlagen"
+
+msgid "selecteer"
+msgstr "auswählen"
+
+msgid "september"
+msgstr "September"
+
+msgid "signal"
+msgstr "signal"
+
+msgid "uit"
+msgstr "aus"
+
+msgid "usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust."
+msgstr "usbmuxd neu gestartet. Schließe dein iPhone an und tippe auf Trust."
+
+msgid "usbmuxd reset fout: {err}"
+msgstr "usbmuxd-Reset-Fehler: {err}"
+
+msgid "usbmuxd reset rc={rc}"
+msgstr "usbmuxd reset rc={rc}"
+
+msgid "video"
+msgstr "Video"
+
+msgid "viewport hydrate fout: {err}"
+msgstr "Viewport-Hydrate-Fehler: {err}"
+
+msgid "{count} (favorieten)"
+msgstr "{count} (Favoriten)"
+
+msgid "{day} {month} {year}  {time}"
+msgstr "{day}. {month} {year}  {time}"
+
+msgid "{n} van {total} geselecteerd"
+msgstr "{n} von {total} ausgewählt"
+
+msgid "─── Pixora (dev mode) ───"
+msgstr "─── Pixora (dev mode) ───"
+
+msgid "═══ Pixora gestart in Developer Mode ═══"
+msgstr "═══ Pixora im Entwicklermodus gestartet ═══"
+
+msgid "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"
+msgstr "⚠ Keine Internetverbindung — Karten-Tiles können nicht geladen werden"
+
+msgid "⚠️  Kies een backup schijf om door te gaan"
+msgstr "⚠️  Wähle ein Backup-Laufwerk, um fortzufahren"
+
+msgid "⚠️  Kies een map op de backup schijf, niet op je computer"
+msgstr "⚠️  Wähle einen Ordner auf dem Backup-Laufwerk, nicht auf dem Computer"
+
+msgid "⚠️  Kies ook een map op de backup schijf"
+msgstr "⚠️  Wähle auch einen Ordner auf dem Backup-Laufwerk"
+
+msgid "⚠️ iPhone niet herkend — probeer Instellingen > iPhone-verbinding"
+msgstr "⚠️ iPhone nicht erkannt — versuche Einstellungen > iPhone-Verbindung"
+
+msgid "✅ iPhone klaar — tap Trust op je iPhone indien gevraagd"
+msgstr "✅ iPhone bereit — tippe auf Trust auf deinem iPhone, falls gefragt"
+
+msgid "✅ iPhone verbonden"
+msgstr "✅ iPhone verbunden"
+
+msgid "✕ Toon alle foto's"
+msgstr "✕ Alle Fotos anzeigen"
+
+msgid "📱 iPhone gedetecteerd, even geduld…"
+msgstr "📱 iPhone erkannt, einen Moment bitte…"
+
+msgid "📱 iPhone — nieuw"
+msgstr "📱 iPhone — neu"
+
+msgid "🔧 Verbinding herstellen, even geduld…"
+msgstr "🔧 Verbindung wird wiederhergestellt, einen Moment bitte…"
+
+msgid "🗂️ Archief — bestaand"
+msgstr "🗂️ Archiv — vorhanden"
+
+msgid "🗺"
+msgstr "🗺"
+
+msgid "🗺 laden..."
+msgstr "🗺 wird geladen..."
+
+msgid "%d foto"
+msgid_plural "%d foto's"
+msgstr[0] "%d Foto"
+msgstr[1] "%d Fotos"
+
+msgid "%d foto verwijderen?"
+msgid_plural "%d foto's verwijderen?"
+msgstr[0] "%d Foto löschen?"
+msgstr[1] "%d Fotos löschen?"
+
+msgid "Weet je zeker dat je %d foto wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+msgid_plural "Weet je zeker dat je %d foto's wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+msgstr[0] "Möchtest du %d Foto wirklich löschen? Dies kann nicht rückgängig gemacht werden."
+msgstr[1] "Möchtest du %d Fotos wirklich löschen? Dies kann nicht rückgängig gemacht werden."
+
+msgid "%d verwijderen"
+msgid_plural "%d verwijderen"
+msgstr[0] "%d löschen"
+msgstr[1] "%d löschen"
+
+msgid "%d bestand gevonden"
+msgid_plural "%d bestanden gevonden"
+msgstr[0] "%d Datei gefunden"
+msgstr[1] "%d Dateien gefunden"
+
+msgid "%d foto lijkt al in je archief te staan. Kies wat je wilt doen, of gebruik de knoppen onderaan."
+msgid_plural "%d foto's lijken al in je archief te staan. Kies per foto wat je wilt doen, of gebruik de knoppen onderaan voor alles tegelijk."
+msgstr[0] "%d Foto scheint bereits in deinem Archiv zu sein. Wähle, was zu tun ist, oder nutze die Knöpfe unten."
+msgstr[1] "%d Fotos scheinen bereits in deinem Archiv zu sein. Wähle pro Foto, was zu tun ist, oder nutze die Knöpfe unten für alle."
+
+msgid "%d favoriet"
+msgid_plural "%d favorieten"
+msgstr[0] "%d Favorit"
+msgstr[1] "%d Favoriten"
+
+msgid "%d bestand gevonden…"
+msgid_plural "%d bestanden gevonden…"
+msgstr[0] "%d Datei gefunden…"
+msgstr[1] "%d Dateien gefunden…"
+
+msgid "%d bestand gevonden, sorteren op datum…"
+msgid_plural "%d bestanden gevonden, sorteren op datum…"
+msgstr[0] "%d Datei gefunden, sortieren nach Datum…"
+msgstr[1] "%d Dateien gefunden, sortieren nach Datum…"
+
+msgid "%d bestand wordt gekopieerd."
+msgid_plural "%d bestanden worden gekopieerd."
+msgstr[0] "%d Datei wird kopiert."
+msgstr[1] "%d Dateien werden kopiert."
+
+msgid "%d bestand geïmporteerd"
+msgid_plural "%d bestanden geïmporteerd"
+msgstr[0] "%d Datei importiert"
+msgstr[1] "%d Dateien importiert"
+
+msgid "%d duplicaat gevonden"
+msgid_plural "%d duplicaten gevonden"
+msgstr[0] "%d Duplikat gefunden"
+msgstr[1] "%d Duplikate gefunden"
+
+msgid "%d overgeslagen"
+msgid_plural "%d overgeslagen"
+msgstr[0] "%d übersprungen"
+msgstr[1] "%d übersprungen"
+
+msgid "%d geselecteerd"
+msgid_plural "%d geselecteerd"
+msgstr[0] "%d ausgewählt"
+msgstr[1] "%d ausgewählt"

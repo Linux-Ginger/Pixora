@@ -19,6 +19,20 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_DONE="✓ Pixora is verwijderd."
         YES_CHAR="j"
         ;;
+    de*|DE*)
+        LBL_BY="von LinuxGinger"
+        LBL_CONFIRM="Möchtest du Pixora wirklich deinstallieren? (j/N) "
+        LBL_CANCEL="Deinstallation abgebrochen."
+        LBL_DONE="✓ Pixora wurde deinstalliert."
+        YES_CHAR="j"
+        ;;
+    fr*|FR*)
+        LBL_BY="par LinuxGinger"
+        LBL_CONFIRM="Êtes-vous sûr de vouloir désinstaller Pixora ? (o/N) "
+        LBL_CANCEL="Désinstallation annulée."
+        LBL_DONE="✓ Pixora a été désinstallé."
+        YES_CHAR="o"
+        ;;
     *)
         LBL_BY="by LinuxGinger"
         LBL_CONFIRM="Are you sure you want to uninstall Pixora? (y/N) "
