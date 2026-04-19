@@ -1229,3 +1229,6 @@ msgstr "Shred animation draw error: {err}"
 
 msgid "Shred-animatie pre-render fout: {err}"
 msgstr "Shred animation pre-render error: {err}"
+
+msgid "photos-list: {before} → {after}"
+msgstr "photos list: {before} → {after}"

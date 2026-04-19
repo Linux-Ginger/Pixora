@@ -4376,6 +4376,14 @@ class MainWindow(Adw.ApplicationWindow):
                     self.viewer_area.remove_overlay(draw_area)
                 except Exception:
                     pass
+                # Wis de oude pixbuf vóór set_visible — anders zou photo_picture
+                # even de verwijderde foto tonen voordat on_done de nieuwe laadt.
+                try:
+                    self.photo_picture.set_pixbuf(None)
+                    self.viewer_title.set_text("")
+                    self.viewer_location.set_text("")
+                except Exception:
+                    pass
                 self.photo_picture.set_visible(True)
                 on_done(path)
                 return False
@@ -4385,6 +4393,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _finish_delete_after_shred(self, path):
         """Na-animatie: daadwerkelijk verwijderen + navigeren."""
+        n_before = len(self.photos)
         try:
             os.remove(path)
             cache_path = get_cache_path(path)
@@ -4398,10 +4407,13 @@ class MainWindow(Adw.ApplicationWindow):
         if path in self._favorites:
             self._favorites.discard(path)
             self._schedule_save_favorites()
-        try:
-            self.photos.remove(path)
-        except ValueError:
-            pass
+        # Gebruik list-comprehension i.p.v. self.photos.remove(path) zodat het
+        # altijd slaagt, ook als path om welke reden ook niet exact in de list
+        # zit (watcher-reload race e.d.). Log de count om bugs zichtbaar te
+        # maken in de dev-terminal.
+        self.photos = [p for p in self.photos if p != path]
+        n_after = len(self.photos)
+        log_info(_("photos-list: {before} → {after}").format(before=n_before, after=n_after))
         if not self.photos:
             self._shredding = False
             self.close_viewer()
@@ -4410,18 +4422,13 @@ class MainWindow(Adw.ApplicationWindow):
         if self.current_index >= len(self.photos):
             self.current_index = len(self.photos) - 1
         next_path = self.photos[self.current_index]
-        # Oude pixbuf direct wissen zodat de verwijderde foto niet 'terugflasht'
-        # tussen het einde van de animatie en het laden van de volgende foto.
+        # Filmstrip-thumbs opnieuw laten bouwen + queue_draw meteen zodat de
+        # tape niet meer de verwijderde foto toont.
+        self._filmstrip_thumbs = {}
         try:
-            self.photo_picture.set_pixbuf(None)
-            self.viewer_title.set_text("")
-            self.viewer_location.set_text("")
+            self.filmstrip_area.queue_draw()
         except Exception:
             pass
-        # Filmstrip-thumbs opnieuw laten bouwen en scrollen naar de nieuwe
-        # current_index — anders blijft de oude tape met de verwijderde foto
-        # staan totdat de grid-reload achter de schermen klaar is.
-        self._filmstrip_thumbs = {}
         GLib.idle_add(self._update_filmstrip)
         GLib.timeout_add(80, self._scroll_filmstrip_to_current)
         # Viewer-counter alvast bijwerken (_show_full_photo zou dat later doen)
