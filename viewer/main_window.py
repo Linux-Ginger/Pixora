@@ -1719,6 +1719,48 @@ class MainWindow(Adw.ApplicationWindow):
         outer.set_vexpand(True)
         outer.set_hexpand(True)
 
+        # ── Filter-info-banner (zichtbaar bij cluster-filter vanaf kaart) ──
+        self.filter_info_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.filter_info_bar.add_css_class("toolbar")
+        self.filter_info_bar.set_margin_top(8)
+        self.filter_info_bar.set_margin_start(12)
+        self.filter_info_bar.set_margin_end(12)
+        self.filter_info_bar.set_margin_bottom(4)
+        self.filter_info_bar.set_visible(False)
+
+        # Icoon links
+        _filter_icon = Gtk.Image.new_from_icon_name("mark-location-symbolic")
+        _filter_icon.set_pixel_size(24)
+        _filter_icon.set_valign(Gtk.Align.CENTER)
+        self.filter_info_bar.append(_filter_icon)
+
+        # Tekst-stack: titel + subtitel
+        _text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        _text_box.set_hexpand(True)
+        _text_box.set_valign(Gtk.Align.CENTER)
+        self.filter_title_lbl = Gtk.Label(label="")
+        self.filter_title_lbl.add_css_class("heading")
+        self.filter_title_lbl.set_halign(Gtk.Align.START)
+        self.filter_title_lbl.set_xalign(0)
+        _text_box.append(self.filter_title_lbl)
+        self.filter_subtitle_lbl = Gtk.Label(label="")
+        self.filter_subtitle_lbl.add_css_class("caption")
+        self.filter_subtitle_lbl.add_css_class("dim-label")
+        self.filter_subtitle_lbl.set_halign(Gtk.Align.START)
+        _text_box.append(self.filter_subtitle_lbl)
+        self.filter_info_bar.append(_text_box)
+
+        # ✕ knop rechts
+        _clear_btn = Gtk.Button(icon_name="window-close-symbolic")
+        _clear_btn.add_css_class("circular")
+        _clear_btn.add_css_class("flat")
+        _clear_btn.set_valign(Gtk.Align.CENTER)
+        _clear_btn.set_tooltip_text(_("Filter wissen"))
+        _clear_btn.connect("clicked", self.on_clear_cluster_filter)
+        self.filter_info_bar.append(_clear_btn)
+
+        outer.append(self.filter_info_bar)
+
         self.content_stack = Gtk.Stack()
         self.content_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.content_stack.set_transition_duration(150)
@@ -1966,20 +2008,79 @@ class MainWindow(Adw.ApplicationWindow):
             # Cluster: toon gefilterde grid met alleen die foto's
             self._photos_before_cluster = self.photos
             self.photos = valid
-            # Toon locatienaam in header als beschikbaar
-            loc = self._photo_location.get(valid[0], "")
-            if loc:
-                self._cluster_location_label = _("Gefilterd op locatie: {loc}").format(loc=loc)
-            else:
-                self._cluster_location_label = _("Gefilterd ({count})").format(
-                    count=ngettext("%d foto", "%d foto's", len(valid)) % len(valid)
-                )
-            self.photo_count_label.set_text(self._cluster_location_label)
+            # Bereken datumbereik (oudste → nieuwste) voor de info-banner
+            date_range = ""
             try:
-                self.clear_filter_btn.set_visible(True)
+                dates = []
+                for p in valid:
+                    try:
+                        dates.append(os.path.getmtime(p))
+                    except Exception:
+                        pass
+                if dates:
+                    dts = [datetime.datetime.fromtimestamp(t) for t in dates]
+                    earliest = min(dts)
+                    latest = max(dts)
+                    e_str = f"{earliest.day} {_(_MONTH_KEYS[earliest.month])} {earliest.year}"
+                    l_str = f"{latest.day} {_(_MONTH_KEYS[latest.month])} {latest.year}"
+                    if e_str == l_str:
+                        date_range = e_str
+                    else:
+                        date_range = f"{e_str} – {l_str}"
             except Exception:
                 pass
+
+            # Locatienaam voor de titel (reverse-geocoded via EXIF GPS)
+            loc = self._photo_location.get(valid[0], "")
+            if not loc:
+                # Nog niet gecached → trigger een lookup zodat de info-banner
+                # zo mogelijk alsnog de locatienaam krijgt.
+                threading.Thread(
+                    target=self._fetch_cluster_location,
+                    args=(valid[0],),
+                    daemon=True,
+                ).start()
+
+            title = loc if loc else _("Gefilterde locatie")
+            count_str = ngettext("%d foto", "%d foto's", len(valid)) % len(valid)
+            subtitle = count_str if not date_range else f"{count_str} · {date_range}"
+            self.filter_title_lbl.set_text(title)
+            self.filter_subtitle_lbl.set_text(subtitle)
+            self.filter_info_bar.set_visible(True)
+
+            # Behoud het korte label in de bottom-bar voor consistentie
+            self._cluster_location_label = title
+            self.photo_count_label.set_text(count_str)
             GLib.idle_add(self.start_load)
+
+    def _fetch_cluster_location(self, sample_path):
+        """Reverse-geocode een sample-foto zodat het filter-label alsnog een
+        locatienaam krijgt (op moment van cluster-open was de lookup nog niet
+        afgerond)."""
+        try:
+            if is_video(sample_path):
+                coords = get_video_gps_coords(sample_path)
+            else:
+                coords = get_gps_coords(sample_path)
+            if not coords:
+                return
+            loc = reverse_geocode(coords[0], coords[1])
+            if loc:
+                self._photo_location[sample_path] = loc
+                GLib.idle_add(self._apply_cluster_location, loc)
+        except Exception:
+            pass
+
+    def _apply_cluster_location(self, loc):
+        # Alleen toepassen als de filter-bar nog zichtbaar is (gebruiker kan
+        # inmiddels ✕ hebben geklikt).
+        try:
+            if self.filter_info_bar.get_visible():
+                self.filter_title_lbl.set_text(loc)
+                self._cluster_location_label = loc
+        except Exception:
+            pass
+        return False
 
     def on_clear_cluster_filter(self, btn=None):
         if not hasattr(self, "_photos_before_cluster") or not self._photos_before_cluster:
@@ -1991,7 +2092,7 @@ class MainWindow(Adw.ApplicationWindow):
         n = len(self.photos)
         self.photo_count_label.set_text(ngettext("%d foto", "%d foto's", n) % n)
         try:
-            self.clear_filter_btn.set_visible(False)
+            self.filter_info_bar.set_visible(False)
         except Exception:
             pass
         GLib.idle_add(self.start_load)
@@ -2364,11 +2465,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
 
-        self.clear_filter_btn = Gtk.Button(label=_("✕ Toon alle foto's"))
-        self.clear_filter_btn.add_css_class("flat")
-        self.clear_filter_btn.set_visible(False)
-        self.clear_filter_btn.connect("clicked", self.on_clear_cluster_filter)
-        normal_bar.pack_end(self.clear_filter_btn)
+        # Cluster-filter ✕ staat nu in de filter-info-bar bovenaan de grid;
+        # de oude onderkant-knop is vervangen.
 
         self.bottom_stack.add_named(normal_bar, "normal")
 
@@ -3162,16 +3260,9 @@ class MainWindow(Adw.ApplicationWindow):
             self.toolbar_view.set_reveal_bottom_bars(True)
         except Exception:
             pass
-        if hasattr(self, '_photos_before_cluster') and self._photos_before_cluster is not None:
-            self.photos = self._photos_before_cluster
-            self._photos_before_cluster = None
-            self._cluster_location_label = None
-            n = len(self.photos)
-            self.photo_count_label.set_text(ngettext("%d foto", "%d foto's", n) % n)
-            try:
-                self.clear_filter_btn.set_visible(False)
-            except Exception:
-                pass
+        # Cluster-filter NIET resetten bij viewer-sluiten — de gebruiker zit nog
+        # in een gefilterde grid en wil daar blijven. Filter gaat pas weg via
+        # on_clear_cluster_filter (✕ knop / info-banner).
         self.main_stack.set_visible_child_name("grid")
         GLib.idle_add(self._close_viewer_cleanup)
 

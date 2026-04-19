@@ -1205,3 +1205,9 @@ msgstr "Relance de langue planifiée (délai 1,2 s)"
 
 msgid "Kaart: {m} markers uit {p} foto's (GPS), uit {t} totaal"
 msgstr "Carte : {m} marqueurs sur {p} photos (GPS), sur {t} au total"
+
+msgid "Filter wissen"
+msgstr "Effacer le filtre"
+
+msgid "Gefilterde locatie"
+msgstr "Lieu filtré"

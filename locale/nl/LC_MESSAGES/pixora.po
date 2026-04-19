@@ -1214,3 +1214,9 @@ msgstr "Taal-relaunch gepland (1.2s delay)"
 
 msgid "Kaart: {m} markers uit {p} foto's (GPS), uit {t} totaal"
 msgstr "Kaart: {m} markers uit {p} foto's (GPS), uit {t} totaal"
+
+msgid "Filter wissen"
+msgstr "Filter wissen"
+
+msgid "Gefilterde locatie"
+msgstr "Gefilterde locatie"

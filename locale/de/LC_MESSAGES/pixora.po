@@ -1205,3 +1205,9 @@ msgstr "Sprach-Neustart geplant (1,2 s Verzögerung)"
 
 msgid "Kaart: {m} markers uit {p} foto's (GPS), uit {t} totaal"
 msgstr "Karte: {m} Marker aus {p} Fotos (GPS), von {t} gesamt"
+
+msgid "Filter wissen"
+msgstr "Filter zurücksetzen"
+
+msgid "Gefilterde locatie"
+msgstr "Gefilterter Ort"

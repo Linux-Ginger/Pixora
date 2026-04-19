@@ -1214,3 +1214,9 @@ msgstr "Language relaunch scheduled (1.2s delay)"
 
 msgid "Kaart: {m} markers uit {p} foto's (GPS), uit {t} totaal"
 msgstr "Map: {m} markers from {p} photos (GPS), out of {t} total"
+
+msgid "Filter wissen"
+msgstr "Clear filter"
+
+msgid "Gefilterde locatie"
+msgstr "Filtered location"
