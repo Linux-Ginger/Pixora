@@ -1691,7 +1691,11 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self.close)
 
     def _on_settings_check_update(self, btn):
-        self._update_check_btn.set_visible(False)
+        # set_sensitive i.p.v. set_visible — hiding forces GTK's focus-chain
+        # rebuild wat een Gtk-CRITICAL warning geeft over al gedisposed
+        # children. Disable volstaat voor het "kan niet nogmaals klikken"
+        # effect.
+        self._update_check_btn.set_sensitive(False)
         self._update_check_spinner.set_visible(True)
         self._update_check_spinner.start()
         threading.Thread(target=self._do_settings_update_check, daemon=True).start()
@@ -1717,37 +1721,42 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._settings_update_result, local_version, remote_version)
 
     def _settings_update_result(self, local_version, remote_version):
-        self._update_check_spinner.stop()
-        self._update_check_spinner.set_visible(False)
+        # Dialog kan ondertussen gesloten zijn → widgets gedisposed.
+        # Alle UI-calls in een try/except wrapperen zodat een async
+        # antwoord na sluiten geen Gtk-CRITICAL gooit.
+        try:
+            self._update_check_spinner.stop()
+            self._update_check_spinner.set_visible(False)
+            self._update_check_btn.set_sensitive(True)
 
-        # verwijder eerder toegevoegde suffix widgets (behalve spinner/knop)
-        for w in list(self._update_check_row._extra_suffixes if hasattr(self._update_check_row, "_extra_suffixes") else []):
-            self._update_check_row.remove(w)
-        self._update_check_row._extra_suffixes = []
+            for w in list(getattr(self._update_check_row, "_extra_suffixes", [])):
+                self._update_check_row.remove(w)
+            self._update_check_row._extra_suffixes = []
 
-        if remote_version is None:
-            self._update_check_row.set_subtitle(_("Controleren mislukt"))
-            self._update_check_btn.set_visible(True)
-            return False
+            if remote_version is None:
+                self._update_check_row.set_subtitle(_("Controleren mislukt"))
+                return False
 
-        if local_version == remote_version:
-            self._update_check_row.set_subtitle(_("Je hebt de nieuwste versie"))
-            ok_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-            ok_icon.add_css_class("success")
-            ok_icon.set_valign(Gtk.Align.CENTER)
-            self._update_check_row.add_suffix(ok_icon)
-            self._update_check_row._extra_suffixes = [ok_icon]
-        else:
-            self._update_check_row.set_subtitle(_("Versie {v} beschikbaar").format(v=remote_version))
-            warn_icon = Gtk.Image.new_from_icon_name("emblem-important-symbolic")
-            warn_icon.set_valign(Gtk.Align.CENTER)
-            self._update_check_row.add_suffix(warn_icon)
-            update_btn = Gtk.Button(label=_("Bijwerken"))
-            update_btn.add_css_class("suggested-action")
-            update_btn.set_valign(Gtk.Align.CENTER)
-            update_btn.connect("clicked", lambda b: self._open_installer())
-            self._update_check_row.add_suffix(update_btn)
-            self._update_check_row._extra_suffixes = [warn_icon, update_btn]
+            if local_version == remote_version:
+                self._update_check_row.set_subtitle(_("Je hebt de nieuwste versie"))
+                ok_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+                ok_icon.add_css_class("success")
+                ok_icon.set_valign(Gtk.Align.CENTER)
+                self._update_check_row.add_suffix(ok_icon)
+                self._update_check_row._extra_suffixes = [ok_icon]
+            else:
+                self._update_check_row.set_subtitle(_("Versie {v} beschikbaar").format(v=remote_version))
+                warn_icon = Gtk.Image.new_from_icon_name("emblem-important-symbolic")
+                warn_icon.set_valign(Gtk.Align.CENTER)
+                self._update_check_row.add_suffix(warn_icon)
+                update_btn = Gtk.Button(label=_("Bijwerken"))
+                update_btn.add_css_class("suggested-action")
+                update_btn.set_valign(Gtk.Align.CENTER)
+                update_btn.connect("clicked", lambda b: self._open_installer())
+                self._update_check_row.add_suffix(update_btn)
+                self._update_check_row._extra_suffixes = [warn_icon, update_btn]
+        except Exception:
+            pass
         return False
 
     # ── Dark mode ────────────────────────────────────────────────────
