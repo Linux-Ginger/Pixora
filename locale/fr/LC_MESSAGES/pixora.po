@@ -1399,3 +1399,24 @@ msgid "{n} verouderde bestand wordt verwijderd op USB"
 msgid_plural "{n} verouderde bestanden worden verwijderd op USB"
 msgstr[0] "{n} fichier obsolète sera supprimé de l'USB"
 msgstr[1] "{n} fichiers obsolètes seront supprimés de l'USB"
+
+msgid "Drive niet aangesloten — sluit de USB-schijf aan om te backuppen."
+msgstr "Lecteur non connecté — branchez le disque USB pour lancer la sauvegarde."
+
+msgid "Bekende backup-schijf"
+msgstr "Lecteur de sauvegarde enregistré"
+
+msgid "Drives opnieuw scannen"
+msgstr "Rechercher à nouveau les lecteurs"
+
+msgid "Gekozen backup-schijf vergeten"
+msgstr "Oublier le lecteur de sauvegarde choisi"
+
+msgid "Backup-schijf vergeten?"
+msgstr "Oublier le lecteur de sauvegarde ?"
+
+msgid "De gekozen schijf en map worden losgekoppeld van Pixora. De bestanden op de schijf blijven staan."
+msgstr "Le lecteur et le dossier choisis seront dissociés de Pixora. Les fichiers sur le lecteur sont conservés."
+
+msgid "Vergeten"
+msgstr "Oublier"

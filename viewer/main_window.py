@@ -4980,7 +4980,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         if backup_on and self.settings.get("backup_uuid") and not drive_present:
             backup_group.set_description(
-                _("Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken.")
+                _("Drive niet aangesloten — sluit de USB-schijf aan om te backuppen.")
             )
 
         self.settings_backup_switch = Gtk.Switch()
@@ -4994,7 +4994,7 @@ class MainWindow(Adw.ApplicationWindow):
         backup_group.add(backup_toggle_row)
 
         self.settings_drive_model = Gtk.StringList()
-        self.settings_drives = get_available_drives()
+        self.settings_drives = self._build_settings_drive_list()
         if self.settings_drives:
             for uuid, label in self.settings_drives:
                 self.settings_drive_model.append(label)
@@ -5016,17 +5016,24 @@ class MainWindow(Adw.ApplicationWindow):
         settings_refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
         settings_refresh_btn.add_css_class("flat")
         settings_refresh_btn.set_valign(Gtk.Align.CENTER)
+        settings_refresh_btn.set_tooltip_text(_("Drives opnieuw scannen"))
         settings_refresh_btn.connect("clicked", self.on_settings_refresh_drives)
 
+        self.settings_drive_reset_btn = Gtk.Button(icon_name="edit-clear-symbolic")
+        self.settings_drive_reset_btn.add_css_class("flat")
+        self.settings_drive_reset_btn.set_valign(Gtk.Align.CENTER)
+        self.settings_drive_reset_btn.set_tooltip_text(_("Gekozen backup-schijf vergeten"))
+        self.settings_drive_reset_btn.set_visible(bool(self.settings.get("backup_uuid")))
+        self.settings_drive_reset_btn.connect("clicked", self.on_settings_reset_drive)
+
         self.settings_drive_row = Adw.ActionRow(title=_("Backup schijf"), subtitle=_("Alleen externe schijven"))
+        self.settings_drive_row.add_suffix(self.settings_drive_reset_btn)
         self.settings_drive_row.add_suffix(settings_refresh_btn)
         self.settings_drive_row.add_suffix(self.settings_drive_combo)
         self.settings_drive_row.set_sensitive(backup_on)
         backup_group.add(self.settings_drive_row)
 
         current_backup_path = self.settings.get("backup_path") or _("Niet ingesteld")
-        if backup_on and self.settings.get("backup_uuid") and not drive_present:
-            current_backup_path = _("Drive niet aangesloten")
         self.settings_backup_folder_row = Adw.ActionRow(
             title=_("Map op backup schijf"),
             subtitle=current_backup_path
@@ -5431,33 +5438,106 @@ class MainWindow(Adw.ApplicationWindow):
         if active:
             GLib.idle_add(self._sync_now_if_ready)
 
+    def on_settings_reset_drive(self, btn):
+        dlg = Adw.AlertDialog(
+            heading=_("Backup-schijf vergeten?"),
+            body=_("De gekozen schijf en map worden losgekoppeld van Pixora. "
+                   "De bestanden op de schijf blijven staan."),
+        )
+        dlg.add_response("cancel", _("Annuleren"))
+        dlg.add_response("reset", _("Vergeten"))
+        dlg.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE)
+        dlg.set_close_response("cancel")
+        dlg.connect("response", self._on_reset_drive_response)
+        dlg.present(self)
+
+    def _on_reset_drive_response(self, dlg, response):
+        if response != "reset":
+            return
+        self.settings["backup_uuid"] = None
+        self.settings["backup_label"] = None
+        self.settings["backup_path"] = None
+        self.settings["backup_enabled"] = False
+        save_settings(self.settings)
+        # UI resyncen
+        if hasattr(self, "settings_backup_switch"):
+            self.settings_backup_switch.set_active(False)
+        if hasattr(self, "settings_drive_reset_btn"):
+            self.settings_drive_reset_btn.set_visible(False)
+        if hasattr(self, "settings_backup_folder_row"):
+            self.settings_backup_folder_row.set_subtitle(_("Niet ingesteld"))
+        if hasattr(self, "settings_backup_folder_btn"):
+            self.settings_backup_folder_btn.set_label(_("Instellen"))
+        # Drive-lijst opnieuw opbouwen (verwijdert de vergeten drive)
+        if hasattr(self, "settings_drive_model"):
+            while self.settings_drive_model.get_n_items() > 0:
+                self.settings_drive_model.remove(0)
+            self.settings_drives = self._build_settings_drive_list()
+            if self.settings_drives:
+                for uuid, label in self.settings_drives:
+                    self.settings_drive_model.append(label)
+            else:
+                self.settings_drive_model.append(_("Geen externe schijven gevonden"))
+
     def on_backup_mode_changed(self, mode, btn):
         if btn.get_active():
             self.settings["backup_mode"] = mode
             save_settings(self.settings)
 
+    def _build_settings_drive_list(self):
+        """Geef lijst van (uuid, label) terug. Als de geconfigureerde drive
+        niet fysiek aanwezig is, voeg hem toe met het opgeslagen label —
+        zo blijft de combo de naam tonen ook zonder verbinding."""
+        drives = list(get_available_drives())
+        saved_uuid = self.settings.get("backup_uuid")
+        if saved_uuid and not any(u == saved_uuid for u, _l in drives):
+            label = self.settings.get("backup_label") or _("Bekende backup-schijf")
+            drives.insert(0, (saved_uuid, label))
+        # Zet label opslag bij als we 'm nu nog niet hadden maar de drive
+        # wel aanwezig is.
+        if saved_uuid and not self.settings.get("backup_label"):
+            for u, lab in drives:
+                if u == saved_uuid:
+                    self.settings["backup_label"] = lab
+                    try:
+                        save_settings(self.settings)
+                    except Exception:
+                        pass
+                    break
+        return drives
+
     def on_settings_drive_selected(self, combo, _):
         selected = combo.get_selected()
         if self.settings_drives and selected < len(self.settings_drives):
-            new_uuid = self.settings_drives[selected][0]
+            new_uuid, new_label = self.settings_drives[selected]
             if new_uuid != self.settings.get("backup_uuid"):
                 # Andere schijf gekozen → oud pad is niet meer geldig
                 self.settings["backup_path"] = None
                 self.settings_backup_folder_row.set_subtitle(_("Niet ingesteld"))
                 self.settings_backup_folder_btn.set_label(_("Instellen"))
             self.settings["backup_uuid"] = new_uuid
+            self.settings["backup_label"] = new_label
             save_settings(self.settings)
+            if hasattr(self, "settings_drive_reset_btn"):
+                self.settings_drive_reset_btn.set_visible(True)
 
     def on_settings_refresh_drives(self, btn):
         while self.settings_drive_model.get_n_items() > 0:
             self.settings_drive_model.remove(0)
-        self.settings_drives = get_available_drives()
+        self.settings_drives = self._build_settings_drive_list()
         backup_on = bool(self.settings.get("backup_enabled"))
         if self.settings_drives:
             for uuid, label in self.settings_drives:
                 self.settings_drive_model.append(label)
         else:
             self.settings_drive_model.append(_("Geen externe schijven gevonden"))
+        # Re-select saved uuid
+        saved_uuid = self.settings.get("backup_uuid")
+        if saved_uuid:
+            for i, (uuid, _l) in enumerate(self.settings_drives):
+                if uuid == saved_uuid:
+                    self.settings_drive_combo.set_selected(i)
+                    break
         self.settings_drive_combo.set_sensitive(backup_on)
 
     def on_settings_change_backup_folder(self, btn):
@@ -5496,19 +5576,16 @@ class MainWindow(Adw.ApplicationWindow):
         has_uuid = bool(self.settings.get("backup_uuid"))
         try:
             self.settings_backup_folder_row.set_sensitive(backup_on and drive_present)
-            if backup_on and has_uuid and not drive_present:
-                self.settings_backup_folder_row.set_subtitle(_("Drive niet aangesloten"))
-            else:
-                self.settings_backup_folder_row.set_subtitle(
-                    self.settings.get("backup_path") or _("Niet ingesteld")
-                )
+            self.settings_backup_folder_row.set_subtitle(
+                self.settings.get("backup_path") or _("Niet ingesteld")
+            )
             if hasattr(self, "settings_mode_backup_row"):
                 self.settings_mode_backup_row.set_sensitive(backup_on and drive_present)
                 self.settings_mode_sync_row.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_backup_group"):
                 if backup_on and has_uuid and not drive_present:
                     self.settings_backup_group.set_description(_(
-                        "Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken."
+                        "Drive niet aangesloten — sluit de USB-schijf aan om te backuppen."
                     ))
                 else:
                     self.settings_backup_group.set_description(
@@ -5835,11 +5912,9 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _show_backup_pending_banner(self):
+        # Banner uitgeschakeld — feedback gebeurt in de settings-UI.
         try:
-            self.backup_pending_banner.set_title(
-                _("📀 Sluit je USB-backup-schijf aan voor de automatische backup")
-            )
-            self.backup_pending_banner.set_revealed(True)
+            self.backup_pending_banner.set_revealed(False)
         except Exception:
             pass
 

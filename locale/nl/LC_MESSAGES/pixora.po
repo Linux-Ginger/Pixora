@@ -1408,3 +1408,24 @@ msgid "{n} verouderde bestand wordt verwijderd op USB"
 msgid_plural "{n} verouderde bestanden worden verwijderd op USB"
 msgstr[0] "{n} verouderde bestand wordt verwijderd op USB"
 msgstr[1] "{n} verouderde bestanden worden verwijderd op USB"
+
+msgid "Drive niet aangesloten — sluit de USB-schijf aan om te backuppen."
+msgstr "Drive niet aangesloten — sluit de USB-schijf aan om te backuppen."
+
+msgid "Bekende backup-schijf"
+msgstr "Bekende backup-schijf"
+
+msgid "Drives opnieuw scannen"
+msgstr "Drives opnieuw scannen"
+
+msgid "Gekozen backup-schijf vergeten"
+msgstr "Gekozen backup-schijf vergeten"
+
+msgid "Backup-schijf vergeten?"
+msgstr "Backup-schijf vergeten?"
+
+msgid "De gekozen schijf en map worden losgekoppeld van Pixora. De bestanden op de schijf blijven staan."
+msgstr "De gekozen schijf en map worden losgekoppeld van Pixora. De bestanden op de schijf blijven staan."
+
+msgid "Vergeten"
+msgstr "Vergeten"
