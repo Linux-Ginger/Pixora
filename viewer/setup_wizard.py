@@ -329,8 +329,8 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label=_("Pixora vergelijkt foto's visueel op inhoud.\n"
-                    "Stel in hoe streng de detectie moet zijn.")
+            label=_("Pixora vergelijkt nieuwe foto's visueel met je bibliotheek\n"
+                    "en markeert visuele kopieën zodat je ze kunt overslaan.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -338,27 +338,30 @@ class SetupWizard(Adw.Window):
 
         group = Adw.PreferencesGroup()
 
-        self.radio_dup_on = Gtk.CheckButton()
-        self.radio_dup_on.set_active(True)
-        dup_on_row = Adw.ActionRow(
-            title=_("Aan"),
+        self.dup_switch = Gtk.Switch()
+        self.dup_switch.set_valign(Gtk.Align.CENTER)
+        self.dup_switch.set_active(True)
+        dup_row = Adw.ActionRow(
+            title=_("Duplicaat-detectie"),
             subtitle=_("Strikte controle op bijna-identieke foto's"),
         )
-        dup_on_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
-        dup_on_row.add_prefix(self.radio_dup_on)
-        dup_on_row.set_activatable_widget(self.radio_dup_on)
-        group.add(dup_on_row)
+        dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
+        dup_row.add_suffix(self.dup_switch)
+        dup_row.set_activatable_widget(self.dup_switch)
+        group.add(dup_row)
 
-        self.radio_dup_off = Gtk.CheckButton()
-        self.radio_dup_off.set_group(self.radio_dup_on)
-        dup_off_row = Adw.ActionRow(
-            title=_("Uit"),
-            subtitle=_("Geen duplicate-controle bij import"),
+        info_row = Adw.ActionRow(
+            title=_("Hoe het werkt"),
+            subtitle=_("Bij een match vraagt Pixora per foto wat je wilt: "
+                       "overslaan, toch importeren of beide bewaren."),
         )
-        dup_off_row.add_prefix(Gtk.Image.new_from_icon_name("window-close-symbolic"))
-        dup_off_row.add_prefix(self.radio_dup_off)
-        dup_off_row.set_activatable_widget(self.radio_dup_off)
-        group.add(dup_off_row)
+        info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
+        info_row.set_activatable(False)
+        try:
+            info_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        group.add(info_row)
 
         page.append(group)
         return page
@@ -531,7 +534,7 @@ class SetupWizard(Adw.Window):
         return None
 
     def _get_threshold(self):
-        return 1 if self.radio_dup_on.get_active() else 0
+        return 1 if self.dup_switch.get_active() else 0
 
     def _get_backup_uuid(self):
         if not self.backup_switch.get_active():

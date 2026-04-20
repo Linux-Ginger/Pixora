@@ -222,7 +222,7 @@ if not WEBKIT_AVAILABLE:
             _webkit_load_error = repr(_e)
             continue
 
-DOCS_DIR         = os.path.join(os.path.dirname(__file__), "..", "docs")
+ASSETS_DIR       = os.path.join(os.path.dirname(__file__), "..", "assets", "logo's")
 VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
 INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
 GITHUB_RELEASES_API = "https://api.github.com/repos/Linux-Ginger/pixora/releases/latest"
@@ -263,7 +263,7 @@ MONTHS_NL = [
 
 
 def get_logo_path(dark_mode):
-    return os.path.join(DOCS_DIR, f"pixora-logo-{'dark' if dark_mode else 'light'}.png")
+    return os.path.join(ASSETS_DIR, f"pixora-logo-{'dark' if dark_mode else 'light'}.png")
 
 def save_settings(settings):
     # Atomic write: eerst naar .tmp, dan rename. Voorkomt corrupt JSON
@@ -1285,6 +1285,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scan_anim_id = None
         self._backup_scan_dialog_open = False
         self._backup_excluded_paths = []
+        self._manual_scan_requested = False
 
         self.set_title("Pixora (Dev Mode)" if self.settings.get("dev_mode") else "Pixora")
         self.set_default_size(9999, 9999)
@@ -2562,10 +2563,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_title.set_halign(Gtk.Align.START)
         self.viewer_title_box.append(self.viewer_title)
 
+        self.viewer_location_box = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL, spacing=6
+        )
+        self.viewer_location_box.set_halign(Gtk.Align.START)
+        self.viewer_location_spinner = Gtk.Spinner()
+        self.viewer_location_spinner.set_visible(False)
+        self.viewer_location_spinner.set_valign(Gtk.Align.CENTER)
+        self.viewer_location_box.append(self.viewer_location_spinner)
         self.viewer_location = Gtk.Label(label="")
         self.viewer_location.add_css_class("dim-label")
         self.viewer_location.set_halign(Gtk.Align.START)
-        self.viewer_title_box.append(self.viewer_location)
+        self.viewer_location_box.append(self.viewer_location)
+        self.viewer_title_box.append(self.viewer_location_box)
 
         viewer_area.add_overlay(self.viewer_title_box)
 
@@ -3370,7 +3380,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         self._stop_video()
         self.photo_picture.set_pixbuf(None)
-        self.viewer_location.set_text("")
+        self._set_viewer_location("empty")
         self.main_stack.set_visible_child_name("viewer")
         self._filmstrip_thumbs = {}
         GLib.idle_add(self._update_filmstrip)
@@ -3386,11 +3396,11 @@ class MainWindow(Adw.ApplicationWindow):
 
 # ── Locatie-helpers ─────────────────────────────────────────────
     def _determine_initial_location(self, path):
-        """Geeft (initial_label, coords_for_geocode) terug, synchroon en snel.
-        - Als city-naam gecached → return (city, None)  [geen async nodig]
-        - Als coords in EXIF → return (raw coords, coords) [async upgrade naar city]
-        - Anders → return ('', None)
-        Cache ook "" voor foto's zonder GPS ouder dan 30s zodat we niet elke
+        """Geeft (label, coords_for_geocode) terug:
+        - cached city → (city, None)     → toon direct, geen spinner
+        - EXIF coords → ("", coords)     → toon spinner, async lookup
+        - niets        → ("", None)     → niets tonen
+        Cache "" voor foto's zonder GPS ouder dan 30s zodat we niet elke
         open opnieuw EXIF parsen."""
         cached = self._photo_location.get(path)
         if cached:
@@ -3400,7 +3410,7 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             coords = get_gps_coords(path)
         if coords:
-            return f"{coords[0]:.4f}, {coords[1]:.4f}", coords
+            return "", coords
         # Geen GPS
         try:
             if cached is None and time.time() - os.path.getmtime(path) > 30:
@@ -3409,23 +3419,49 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         return "", None
 
+    def _set_viewer_location(self, state, text=""):
+        """state ∈ {'empty', 'searching', 'done'}."""
+        try:
+            if state == "searching":
+                self.viewer_location_spinner.start()
+                self.viewer_location_spinner.set_visible(True)
+                self.viewer_location.set_text(_("Locatie zoeken…"))
+                self.viewer_location_box.set_visible(True)
+            elif state == "done":
+                self.viewer_location_spinner.stop()
+                self.viewer_location_spinner.set_visible(False)
+                self.viewer_location.set_text(text or "")
+                self.viewer_location_box.set_visible(bool(text))
+            else:  # empty
+                self.viewer_location_spinner.stop()
+                self.viewer_location_spinner.set_visible(False)
+                self.viewer_location.set_text("")
+                self.viewer_location_box.set_visible(False)
+        except Exception:
+            pass
+
     def _start_geocode_upgrade(self, path, coords, load_id):
-        """Async reverse-geocode; upgradet viewer_location van 'lat, lon' naar
-        'Stad, Land' wanneer Nominatim antwoordt. load_id-guard voorkomt dat
-        stale callbacks een andere foto's label overschrijven."""
+        """Async reverse-geocode. Bij succes: viewer_location toont 'Stad,
+        Land'. Bij falen (geen internet / timeout): fallback naar de rauwe
+        coördinaten zodat de gebruiker nooit de spinner blijft zien."""
         def _bg():
             city = reverse_geocode(coords[0], coords[1])
             if city:
+                resolved = f"📍 {city}"
                 self._photo_location[path] = city
-                if load_id == self._viewer_load_id:
-                    GLib.idle_add(self._update_viewer_location, f"📍 {city}", load_id)
+            else:
+                resolved = f"📍 {coords[0]:.4f}, {coords[1]:.4f}"
+                # Niet cachen — bij internet-terug proberen we opnieuw
+            if load_id == self._viewer_load_id:
+                GLib.idle_add(self._update_viewer_location, resolved, load_id)
         threading.Thread(target=_bg, daemon=True).start()
 
     def _load_full_photo(self, path, load_id):
         if is_video(path):
             initial, coords = self._determine_initial_location(path)
+            searching = bool(coords)
             if load_id == self._viewer_load_id:
-                GLib.idle_add(self._show_video, path, initial)
+                GLib.idle_add(self._show_video, path, initial, searching)
             if coords:
                 self._start_geocode_upgrade(path, coords, load_id)
             return
@@ -3443,8 +3479,9 @@ class MainWindow(Adw.ApplicationWindow):
                 while len(self._viewer_pixbuf_cache) > 3:
                     self._viewer_pixbuf_cache.popitem(last=False)
         initial, coords = self._determine_initial_location(path)
+        searching = bool(coords)
         if load_id == self._viewer_load_id:
-            GLib.idle_add(self._show_full_photo, pixbuf, path, initial)
+            GLib.idle_add(self._show_full_photo, pixbuf, path, initial, searching)
             GLib.idle_add(self._preload_adjacent_photos)
         if coords:
             self._start_geocode_upgrade(path, coords, load_id)
@@ -3454,13 +3491,10 @@ class MainWindow(Adw.ApplicationWindow):
         # genavigeerd zijn).
         if load_id != self._viewer_load_id:
             return False
-        try:
-            self.viewer_location.set_text(text)
-        except Exception:
-            pass
+        self._set_viewer_location("done", text)
         return False
 
-    def _show_full_photo(self, pixbuf, path, location=""):
+    def _show_full_photo(self, pixbuf, path, location="", searching=False):
         self._stop_video()
         self._show_viewer_ui()   # reset opacity/visibility from any previous fade
         self.video_display.set_visible(False)
@@ -3478,7 +3512,12 @@ class MainWindow(Adw.ApplicationWindow):
         mtime = os.path.getmtime(path)
         datum = format_viewer_date(datetime.datetime.fromtimestamp(mtime))
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
-        self.viewer_location.set_text(f"📍 {location}" if location else "")
+        if searching:
+            self._set_viewer_location("searching")
+        elif location:
+            self._set_viewer_location("done", f"📍 {location}")
+        else:
+            self._set_viewer_location("empty")
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
@@ -3510,7 +3549,7 @@ class MainWindow(Adw.ApplicationWindow):
         """Direct tonen bij cache-hit, anders thumbnail-placeholder + async load."""
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
-        self.viewer_location.set_text("")
+        self._set_viewer_location("empty")
         self.filmstrip_area.queue_draw()
         self._scroll_filmstrip_to_current()
 
@@ -3531,7 +3570,7 @@ class MainWindow(Adw.ApplicationWindow):
                 # Zonder deze call verdween het locatie-label bij prev/next-
                 # navigatie tussen gepreloade foto's (de bug).
                 initial, coords = self._determine_initial_location(path)
-                self._show_full_photo(cached, path, initial)
+                self._show_full_photo(cached, path, initial, searching=bool(coords))
                 if coords:
                     self._start_geocode_upgrade(path, coords, load_id)
                 GLib.idle_add(self._preload_adjacent_photos)
@@ -3736,7 +3775,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.current_index = idx
             self._viewer_load_id += 1
             load_id = self._viewer_load_id
-            self.viewer_location.set_text("")
+            self._set_viewer_location("empty")
             self.filmstrip_area.queue_draw()
             threading.Thread(
                 target=self._load_full_photo,
@@ -3759,7 +3798,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Video speler ──────────────────────────────────────────────────
 
-    def _show_video(self, path, location=""):
+    def _show_video(self, path, location="", searching=False):
         self._stop_video()
         self._preview_cache = OrderedDict()
         self._viewer_zoom   = 1.0
@@ -3787,7 +3826,12 @@ class MainWindow(Adw.ApplicationWindow):
         mtime = os.path.getmtime(path)
         datum = format_viewer_date(datetime.datetime.fromtimestamp(mtime))
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
-        self.viewer_location.set_text(f"📍 {location}" if location else "")
+        if searching:
+            self._set_viewer_location("searching")
+        elif location:
+            self._set_viewer_location("done", f"📍 {location}")
+        else:
+            self._set_viewer_location("empty")
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
@@ -4667,7 +4711,7 @@ class MainWindow(Adw.ApplicationWindow):
                 try:
                     self.photo_picture.set_pixbuf(None)
                     self.viewer_title.set_text("")
-                    self.viewer_location.set_text("")
+                    self._set_viewer_location("empty")
                 except Exception:
                     pass
                 self.photo_picture.set_visible(True)
@@ -4944,30 +4988,31 @@ class MainWindow(Adw.ApplicationWindow):
         # strict (=1) voor de hoogste accuratie.
         dup_on = self.settings.get("duplicate_threshold", 2) != 0
 
-        self.radio_dup_on = Gtk.CheckButton()
-        self.radio_dup_on.set_active(dup_on)
-        self.radio_dup_on.connect("toggled", lambda b: self.on_threshold_changed(1, b))
-        dup_on_row = Adw.ActionRow(
-            title=_("Aan"),
+        self.settings_dup_switch = Gtk.Switch()
+        self.settings_dup_switch.set_valign(Gtk.Align.CENTER)
+        self.settings_dup_switch.set_active(dup_on)
+        self.settings_dup_switch.connect("notify::active", self.on_dup_switch_toggled)
+        dup_row = Adw.ActionRow(
+            title=_("Duplicaat-detectie"),
             subtitle=_("Strikte controle op bijna-identieke foto's"),
         )
-        dup_on_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
-        dup_on_row.add_prefix(self.radio_dup_on)
-        dup_on_row.set_activatable_widget(self.radio_dup_on)
-        dup_group.add(dup_on_row)
+        dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
+        dup_row.add_suffix(self.settings_dup_switch)
+        dup_row.set_activatable_widget(self.settings_dup_switch)
+        dup_group.add(dup_row)
 
-        self.radio_dup_off = Gtk.CheckButton()
-        self.radio_dup_off.set_group(self.radio_dup_on)
-        self.radio_dup_off.set_active(not dup_on)
-        self.radio_dup_off.connect("toggled", lambda b: self.on_threshold_changed(0, b))
-        dup_off_row = Adw.ActionRow(
-            title=_("Uit"),
-            subtitle=_("Geen duplicate-controle bij import"),
+        dup_info_row = Adw.ActionRow(
+            title=_("Hoe het werkt"),
+            subtitle=_("Pixora vergelijkt elke nieuwe foto visueel met je bibliotheek en "
+                       "vraagt per match wat je wilt doen: overslaan, toch importeren of beide bewaren."),
         )
-        dup_off_row.add_prefix(Gtk.Image.new_from_icon_name("window-close-symbolic"))
-        dup_off_row.add_prefix(self.radio_dup_off)
-        dup_off_row.set_activatable_widget(self.radio_dup_off)
-        dup_group.add(dup_off_row)
+        dup_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
+        dup_info_row.set_activatable(False)
+        try:
+            dup_info_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        dup_group.add(dup_info_row)
 
         import_page.add(dup_group)
 
@@ -5098,6 +5143,20 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dedup_row = dedup_row
         backup_group.add(dedup_row)
 
+        self.settings_manual_scan_btn = Gtk.Button(label=_("Controleren"))
+        self.settings_manual_scan_btn.add_css_class("flat")
+        self.settings_manual_scan_btn.set_valign(Gtk.Align.CENTER)
+        self.settings_manual_scan_btn.connect("clicked", self.on_settings_manual_scan)
+        manual_scan_row = Adw.ActionRow(
+            title=_("Nu controleren"),
+            subtitle=_("Scan USB op ontbrekende foto's"),
+        )
+        manual_scan_row.add_prefix(Gtk.Image.new_from_icon_name("system-search-symbolic"))
+        manual_scan_row.add_suffix(self.settings_manual_scan_btn)
+        manual_scan_row.set_sensitive(backup_on and drive_present)
+        self.settings_manual_scan_row = manual_scan_row
+        backup_group.add(manual_scan_row)
+
         self.settings_backup_group = backup_group
 
         import_page.add(backup_group)
@@ -5109,7 +5168,7 @@ class MainWindow(Adw.ApplicationWindow):
         app_row = Adw.ActionRow(
             title=_("Pixora"),
             subtitle=_("Foto &amp; video manager door LinuxGinger"))
-        icon_path = os.path.join(DOCS_DIR, "pixora-icon.svg")
+        icon_path = os.path.join(ASSETS_DIR, "pixora-icon.svg")
         if os.path.exists(icon_path):
             app_icon = Gtk.Image.new_from_file(icon_path)
             app_icon.set_pixel_size(32)
@@ -5432,6 +5491,11 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings["duplicate_threshold"] = value
             save_settings(self.settings)
 
+    def on_dup_switch_toggled(self, switch, _):
+        # Aan = strict (1), Uit = 0 (detectie uit)
+        self.settings["duplicate_threshold"] = 1 if switch.get_active() else 0
+        save_settings(self.settings)
+
     def on_settings_backup_toggle(self, switch, _):
         active = switch.get_active()
         if not active and self.settings.get("backup_enabled") \
@@ -5466,6 +5530,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings_mode_sync_row.set_sensitive(active and drive_present)
         if hasattr(self, "settings_dedup_row"):
             self.settings_dedup_row.set_sensitive(active and drive_present)
+        if hasattr(self, "settings_manual_scan_row"):
+            self.settings_manual_scan_row.set_sensitive(active and drive_present)
         self.settings["backup_enabled"] = active
         if active:
             if not self.settings.get("backup_uuid") and self.settings_drives:
@@ -5533,6 +5599,18 @@ class MainWindow(Adw.ApplicationWindow):
     def on_backup_dedup_toggle(self, switch, _):
         self.settings["backup_dedup"] = switch.get_active()
         save_settings(self.settings)
+
+    def on_settings_manual_scan(self, btn):
+        if self._backup_running or self._backup_scanning:
+            return
+        if not (self.settings.get("backup_enabled")
+                and self.settings.get("backup_uuid")
+                and self.settings.get("backup_path")):
+            return
+        if self._backup_drive_mountpoint() is None:
+            return
+        self._manual_scan_requested = True
+        self._trigger_backup_scan()
 
     def on_backup_mode_changed(self, mode, btn):
         if btn.get_active():
@@ -5642,6 +5720,8 @@ class MainWindow(Adw.ApplicationWindow):
                 self.settings_mode_sync_row.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_dedup_row"):
                 self.settings_dedup_row.set_sensitive(backup_on and drive_present)
+            if hasattr(self, "settings_manual_scan_row"):
+                self.settings_manual_scan_row.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_backup_group"):
                 if backup_on and has_uuid and not drive_present:
                     self.settings_backup_group.set_description(_(
@@ -5869,7 +5949,18 @@ class MainWindow(Adw.ApplicationWindow):
                 log_info(_("Backup-scan: alles gesynct, {d} duplicaten overgeslagen").format(d=dup_count))
             else:
                 log_info(_("Backup-scan: alles gesynct"))
+            if self._manual_scan_requested:
+                self._manual_scan_requested = False
+                dlg = Adw.AlertDialog(
+                    heading=_("Alles al gesynct"),
+                    body=_("Je USB-schijf heeft al dezelfde foto's als Pixora."),
+                )
+                dlg.add_response("ok", _("OK"))
+                dlg.set_default_response("ok")
+                dlg.set_close_response("ok")
+                self._present_dialog(dlg)
             return False
+        self._manual_scan_requested = False
         log_info(_("Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes, {u} duplicaten overgeslagen").format(
             n=new_count, d=delete_count, b=bytes_to_transfer, u=dup_count,
         ))

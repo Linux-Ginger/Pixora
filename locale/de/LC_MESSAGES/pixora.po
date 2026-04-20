@@ -1470,3 +1470,36 @@ msgid "{n} duplicaat wordt overgeslagen"
 msgid_plural "{n} duplicaten worden overgeslagen"
 msgstr[0] "{n} Duplikat wird übersprungen"
 msgstr[1] "{n} Duplikate werden übersprungen"
+
+msgid "Controleren"
+msgstr "Prüfen"
+
+msgid "Nu controleren"
+msgstr "Jetzt prüfen"
+
+msgid "Scan USB op ontbrekende foto's"
+msgstr "USB auf fehlende Fotos prüfen"
+
+msgid "Alles al gesynct"
+msgstr "Bereits synchronisiert"
+
+msgid "Je USB-schijf heeft al dezelfde foto's als Pixora."
+msgstr "Auf der USB-Festplatte liegen bereits dieselben Fotos wie in Pixora."
+
+msgid "Duplicaat-detectie"
+msgstr "Duplikatserkennung"
+
+msgid "Hoe het werkt"
+msgstr "So funktioniert es"
+
+msgid "Pixora vergelijkt elke nieuwe foto visueel met je bibliotheek en vraagt per match wat je wilt doen: overslaan, toch importeren of beide bewaren."
+msgstr "Pixora vergleicht jedes neue Foto visuell mit deiner Bibliothek und fragt pro Treffer, was du willst: überspringen, trotzdem importieren oder beide behalten."
+
+msgid "Pixora vergelijkt nieuwe foto's visueel met je bibliotheek\nen markeert visuele kopieën zodat je ze kunt overslaan."
+msgstr "Pixora vergleicht neue Fotos visuell mit deiner Bibliothek\nund markiert visuelle Duplikate, damit du sie überspringen kannst."
+
+msgid "Bij een match vraagt Pixora per foto wat je wilt: overslaan, toch importeren of beide bewaren."
+msgstr "Bei einem Treffer fragt Pixora pro Foto: überspringen, trotzdem importieren oder beide behalten."
+
+msgid "Locatie zoeken…"
+msgstr "Ort wird gesucht…"
