@@ -130,6 +130,18 @@
     e.preventDefault();
   }, true);
 
+  // Pointer-capture: bij mousedown claimt het target ALLE pointer-events
+  // tot mouseup, ook als de cursor buiten de WebView komt. Voorkomt dat
+  // GTK/WM een eigen drag-surface initieert wanneer de muis de viewport
+  // verlaat tijdens een pan.
+  document.addEventListener('pointerdown', function(e) {
+    try {
+      if (e.target && e.target.setPointerCapture) {
+        e.target.setPointerCapture(e.pointerId);
+      }
+    } catch (_) {}
+  }, true);
+
   // Laat Pixora weten wanneer de eerste tiles klaar zijn, zodat de
   // spinner kan wisselen naar de kaart.
   let firstTileLoaded = false;
