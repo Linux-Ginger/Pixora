@@ -5137,7 +5137,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dup_switch.set_valign(Gtk.Align.CENTER)
         self.settings_dup_switch.set_active(dup_on)
         self.settings_dup_switch.connect("notify::active", self.on_dup_switch_toggled)
-        dup_row = Adw.ActionRow(title=_("Inschakelen"))
+        dup_row = Adw.ActionRow(title=_("Controleren bij import"))
         dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
         dup_row.add_suffix(self.settings_dup_switch)
         dup_row.set_activatable_widget(self.settings_dup_switch)
@@ -5328,7 +5328,11 @@ class MainWindow(Adw.ApplicationWindow):
             app_row.add_prefix(app_icon)
         github_btn = Gtk.Button()
         gh_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        gh_box.append(Gtk.Image.new_from_icon_name("code-context-symbolic"))
+        gh_svg = os.path.join(ASSETS_DIR, "github-mark.svg")
+        if os.path.exists(gh_svg):
+            gh_img = Gtk.Image.new_from_file(gh_svg)
+            gh_img.set_pixel_size(16)
+            gh_box.append(gh_img)
         gh_box.append(Gtk.Label(label=_("GitHub")))
         github_btn.set_child(gh_box)
         github_btn.add_css_class("flat")
@@ -5337,6 +5341,20 @@ class MainWindow(Adw.ApplicationWindow):
         github_btn.connect("clicked", self._on_open_github)
         app_row.add_suffix(github_btn)
         about_group.add(app_row)
+
+        # Credit regel voor GitHub-logo, conform brand.github.com.
+        credit_row = Adw.ActionRow(
+            title="",
+            subtitle=_("GitHub® en het Invertocat-logo zijn handelsmerken "
+                       "van GitHub, Inc."),
+        )
+        credit_row.add_css_class("caption")
+        credit_row.set_activatable(False)
+        try:
+            credit_row.set_subtitle_lines(2)
+        except Exception:
+            pass
+        about_group.add(credit_row)
 
         # Versie row
         installed_version_path = os.path.join(os.path.expanduser("~"), ".config", "pixora", "installed_version")

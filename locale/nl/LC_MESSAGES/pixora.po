@@ -1577,3 +1577,9 @@ msgstr "Restart gepland (1.5s delay voor GApplication unregister)"
 
 msgid "Taal-relaunch gepland (1.5s delay, log: {p})"
 msgstr "Taal-relaunch gepland (1.5s delay, log: {p})"
+
+msgid "Controleren bij import"
+msgstr "Controleren bij import"
+
+msgid "GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc."
+msgstr "GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc."

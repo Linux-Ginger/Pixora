@@ -1568,3 +1568,9 @@ msgstr "Redémarrage planifié (délai de 1,5 s pour désenregistrer GApplicatio
 
 msgid "Taal-relaunch gepland (1.5s delay, log: {p})"
 msgstr "Redémarrage pour changement de langue planifié (délai 1,5 s, log : {p})"
+
+msgid "Controleren bij import"
+msgstr "Vérifier à l'import"
+
+msgid "GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc."
+msgstr "GitHub® et le logo Invertocat sont des marques de GitHub, Inc."

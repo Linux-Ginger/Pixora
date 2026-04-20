@@ -1568,3 +1568,9 @@ msgstr "Neustart geplant (1,5 s Verzögerung für GApplication-Abmeldung)"
 
 msgid "Taal-relaunch gepland (1.5s delay, log: {p})"
 msgstr "Sprach-Neustart geplant (1,5 s Verzögerung, Log: {p})"
+
+msgid "Controleren bij import"
+msgstr "Beim Import prüfen"
+
+msgid "GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc."
+msgstr "GitHub® und das Invertocat-Logo sind Marken von GitHub, Inc."
