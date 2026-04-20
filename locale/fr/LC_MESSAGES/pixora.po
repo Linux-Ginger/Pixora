@@ -1659,3 +1659,61 @@ msgstr "Activer la confirmation automatique ?"
 
 msgid "Pixora gaat backup/sync direct starten zonder bevestigingsdialog wanneer er iets te doen is. Alleen foutmeldingen blijven verschijnen."
 msgstr "Pixora lancera la sauvegarde/synchro immédiatement sans dialogue de confirmation s'il y a quelque chose à faire. Seuls les messages d'erreur restent affichés."
+
+msgid "Mappenstructuur klopt al"
+msgstr "La structure des dossiers est déjà correcte"
+
+msgid "Alle foto's staan al volgens je gekozen structuur."
+msgstr "Toutes les photos suivent déjà la structure choisie."
+
+msgid "Gekozen structuur: {s}"
+msgstr "Structure choisie : {s}"
+
+msgid "Mappenstructuur aanpassen?"
+msgstr "Réorganiser la structure des dossiers ?"
+
+msgid "Nu ordenen"
+msgstr "Organiser maintenant"
+
+msgid "Mappenstructuur bijgewerkt"
+msgstr "Structure des dossiers mise à jour"
+
+msgid "Geen wijzigingen nodig"
+msgstr "Aucune modification nécessaire"
+
+msgid "Opruimen"
+msgstr "Ranger"
+
+msgid "Huidige mappen aanpassen"
+msgstr "Réorganiser les dossiers actuels"
+
+msgid "Scan de foto-map en verplaats foto's zodat ze kloppen met de gekozen structuur. Bit-identieke duplicaten worden verwijderd."
+msgstr "Analyser le dossier photos et déplacer les photos pour correspondre à la structure choisie. Les doublons bit-identiques sont supprimés."
+
+msgid "Reorganize: {m} verplaatst, {r} duplicaten weg, {e} fouten"
+msgstr "Réorganisation : {m} déplacés, {r} doublons supprimés, {e} erreurs"
+
+msgid "{n} foto wordt verplaatst naar de juiste map."
+msgid_plural "{n} foto's worden verplaatst naar de juiste map."
+msgstr[0] "{n} photo sera déplacée vers le bon dossier."
+msgstr[1] "{n} photos seront déplacées vers le bon dossier."
+
+msgid "{n} exact dezelfde foto op een andere plek wordt verwijderd."
+msgid_plural "{n} exact dezelfde foto's op andere plekken worden verwijderd."
+msgstr[0] "{n} photo exactement identique ailleurs sera supprimée."
+msgstr[1] "{n} photos exactement identiques ailleurs seront supprimées."
+
+msgid "{n} foto verplaatst"
+msgid_plural "{n} foto's verplaatst"
+msgstr[0] "{n} photo déplacée"
+msgstr[1] "{n} photos déplacées"
+
+msgid "{n} duplicaat verwijderd"
+msgid_plural "{n} duplicaten verwijderd"
+msgstr[0] "{n} doublon supprimé"
+msgstr[1] "{n} doublons supprimés"
+
+msgid "{n} fout — zie dev-log."
+msgid_plural "{n} fouten — zie dev-log."
+msgstr[0] "{n} erreur — voir le dev-log."
+msgstr[1] "{n} erreurs — voir le dev-log."

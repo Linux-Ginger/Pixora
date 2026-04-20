@@ -1668,3 +1668,61 @@ msgstr "Turn on auto-confirm?"
 
 msgid "Pixora gaat backup/sync direct starten zonder bevestigingsdialog wanneer er iets te doen is. Alleen foutmeldingen blijven verschijnen."
 msgstr "Pixora will start backup/sync immediately without a confirmation dialog when there is work to do. Only error messages will still appear."
+
+msgid "Mappenstructuur klopt al"
+msgstr "Folder structure is already correct"
+
+msgid "Alle foto's staan al volgens je gekozen structuur."
+msgstr "All photos already match your chosen structure."
+
+msgid "Gekozen structuur: {s}"
+msgstr "Chosen structure: {s}"
+
+msgid "Mappenstructuur aanpassen?"
+msgstr "Reorganize folder structure?"
+
+msgid "Nu ordenen"
+msgstr "Organize now"
+
+msgid "Mappenstructuur bijgewerkt"
+msgstr "Folder structure updated"
+
+msgid "Geen wijzigingen nodig"
+msgstr "No changes needed"
+
+msgid "Opruimen"
+msgstr "Tidy up"
+
+msgid "Huidige mappen aanpassen"
+msgstr "Reorganize current folders"
+
+msgid "Scan de foto-map en verplaats foto's zodat ze kloppen met de gekozen structuur. Bit-identieke duplicaten worden verwijderd."
+msgstr "Scan the photo folder and move photos to match the chosen structure. Bit-identical duplicates are removed."
+
+msgid "Reorganize: {m} verplaatst, {r} duplicaten weg, {e} fouten"
+msgstr "Reorganize: {m} moved, {r} duplicates removed, {e} errors"
+
+msgid "{n} foto wordt verplaatst naar de juiste map."
+msgid_plural "{n} foto's worden verplaatst naar de juiste map."
+msgstr[0] "{n} photo will be moved to the correct folder."
+msgstr[1] "{n} photos will be moved to the correct folder."
+
+msgid "{n} exact dezelfde foto op een andere plek wordt verwijderd."
+msgid_plural "{n} exact dezelfde foto's op andere plekken worden verwijderd."
+msgstr[0] "{n} exact same photo in another location will be removed."
+msgstr[1] "{n} exact same photos in other locations will be removed."
+
+msgid "{n} foto verplaatst"
+msgid_plural "{n} foto's verplaatst"
+msgstr[0] "{n} photo moved"
+msgstr[1] "{n} photos moved"
+
+msgid "{n} duplicaat verwijderd"
+msgid_plural "{n} duplicaten verwijderd"
+msgstr[0] "{n} duplicate removed"
+msgstr[1] "{n} duplicates removed"
+
+msgid "{n} fout — zie dev-log."
+msgid_plural "{n} fouten — zie dev-log."
+msgstr[0] "{n} error — see dev log."
+msgstr[1] "{n} errors — see dev log."

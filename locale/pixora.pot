@@ -1010,3 +1010,61 @@ msgstr ""
 
 msgid "Pixora gaat backup/sync direct starten zonder bevestigingsdialog wanneer er iets te doen is. Alleen foutmeldingen blijven verschijnen."
 msgstr ""
+
+msgid "Mappenstructuur klopt al"
+msgstr ""
+
+msgid "Alle foto's staan al volgens je gekozen structuur."
+msgstr ""
+
+msgid "Gekozen structuur: {s}"
+msgstr ""
+
+msgid "Mappenstructuur aanpassen?"
+msgstr ""
+
+msgid "Nu ordenen"
+msgstr ""
+
+msgid "Mappenstructuur bijgewerkt"
+msgstr ""
+
+msgid "Geen wijzigingen nodig"
+msgstr ""
+
+msgid "Opruimen"
+msgstr ""
+
+msgid "Huidige mappen aanpassen"
+msgstr ""
+
+msgid "Scan de foto-map en verplaats foto's zodat ze kloppen met de gekozen structuur. Bit-identieke duplicaten worden verwijderd."
+msgstr ""
+
+msgid "Reorganize: {m} verplaatst, {r} duplicaten weg, {e} fouten"
+msgstr ""
+
+msgid "{n} foto wordt verplaatst naar de juiste map."
+msgid_plural "{n} foto's worden verplaatst naar de juiste map."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} exact dezelfde foto op een andere plek wordt verwijderd."
+msgid_plural "{n} exact dezelfde foto's op andere plekken worden verwijderd."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} foto verplaatst"
+msgid_plural "{n} foto's verplaatst"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} duplicaat verwijderd"
+msgid_plural "{n} duplicaten verwijderd"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} fout — zie dev-log."
+msgid_plural "{n} fouten — zie dev-log."
+msgstr[0] ""
+msgstr[1] ""

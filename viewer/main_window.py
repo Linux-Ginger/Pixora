@@ -3496,6 +3496,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_stack.set_visible_child_name("grid")
         if self._home_ready_at is None:
             self._home_ready_at = time.time()
+            GLib.timeout_add(500, self._maybe_check_structure_on_startup)
         cluster_lbl = getattr(self, '_cluster_location_label', None)
         self.photo_count_label.set_text(
             cluster_lbl if cluster_lbl
@@ -5235,6 +5236,25 @@ class MainWindow(Adw.ApplicationWindow):
         month_row.add_prefix(self.radio_month)
         month_row.set_activatable_widget(self.radio_month)
         structure_group.add(month_row)
+
+        reorganize_btn = Gtk.Button(label=_("Opruimen"))
+        reorganize_btn.add_css_class("flat")
+        reorganize_btn.set_valign(Gtk.Align.CENTER)
+        reorganize_btn.connect(
+            "clicked", lambda b: self._prompt_reorganize(from_startup=False)
+        )
+        reorganize_row = Adw.ActionRow(
+            title=_("Huidige mappen aanpassen"),
+            subtitle=_("Scan de foto-map en verplaats foto's zodat ze kloppen met de gekozen structuur. Bit-identieke duplicaten worden verwijderd."),
+        )
+        reorganize_row.add_prefix(Gtk.Image.new_from_icon_name("view-refresh-symbolic"))
+        reorganize_row.add_suffix(reorganize_btn)
+        try:
+            reorganize_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        structure_group.add(reorganize_row)
+
         import_page.add(structure_group)
 
         dup_group = Adw.PreferencesGroup()
@@ -6014,6 +6034,207 @@ class MainWindow(Adw.ApplicationWindow):
         if btn.get_active():
             self.settings["structure"] = value
             save_settings(self.settings)
+
+    # ── Mapstructuur — re-organizer ─────────────────────────────────
+    def _scan_structure_mismatch(self):
+        """Return (moves, dups) waar moves = [(Path src, Path dst), ...]
+        en dups = [Path, ...] bit-identieke duplicaten die op een ander pad
+        staan dan target."""
+        from pathlib import Path as _P
+        from importer_page import dest_path as _dest_path, SUPPORTED_EXT
+        photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
+        if not photo_path.is_dir():
+            return [], []
+        structure = self.settings.get("structure", "year_month")
+        moves = []
+        dups = []
+        reserved_targets = set()
+        for root, _dirs, files in os.walk(str(photo_path)):
+            for fn in files:
+                src = _P(root) / fn
+                if src.suffix.lower() not in SUPPORTED_EXT:
+                    continue
+                try:
+                    st = src.stat()
+                except OSError:
+                    continue
+                mtime = datetime.datetime.fromtimestamp(st.st_mtime)
+                dst = _dest_path(photo_path, structure, src.name, mtime)
+                if src.resolve() == dst.resolve():
+                    reserved_targets.add(str(dst.resolve()))
+                    continue
+                # Target bestaat al of is al gereserveerd door een andere src
+                dst_str = str(dst.resolve() if dst.exists() else dst)
+                if dst.exists() or dst_str in reserved_targets:
+                    try:
+                        if dst.exists():
+                            dst_st = dst.stat()
+                            if dst_st.st_size == st.st_size \
+                                    and int(dst_st.st_mtime) == int(st.st_mtime):
+                                dups.append(src)
+                                continue
+                    except OSError:
+                        pass
+                    # Niet identiek → unieke suffix bedenken
+                    stem = dst.stem
+                    ext = dst.suffix
+                    counter = 1
+                    while True:
+                        cand = dst.parent / f"{stem}_{counter}{ext}"
+                        cand_str = str(cand.resolve() if cand.exists() else cand)
+                        if not cand.exists() and cand_str not in reserved_targets:
+                            dst = cand
+                            break
+                        counter += 1
+                reserved_targets.add(str(dst.resolve() if dst.exists() else dst))
+                moves.append((src, dst))
+        return moves, dups
+
+    def _prompt_reorganize(self, from_startup=False):
+        """Toon dialog met aantallen + confirm. Als from_startup=True en er
+        niks te doen is → geen dialog. Anders altijd feedback."""
+        def _scan():
+            moves, dups = self._scan_structure_mismatch()
+            GLib.idle_add(self._on_reorganize_scan_done, moves, dups, from_startup)
+        threading.Thread(target=_scan, daemon=True).start()
+
+    def _on_reorganize_scan_done(self, moves, dups, from_startup):
+        if not moves and not dups:
+            if not from_startup:
+                dlg = Adw.AlertDialog(
+                    heading=_("Mappenstructuur klopt al"),
+                    body=_("Alle foto's staan al volgens je gekozen structuur."),
+                )
+                dlg.add_response("ok", _("OK"))
+                dlg.set_default_response("ok")
+                dlg.set_close_response("ok")
+                self._present_dialog(dlg)
+            return False
+        structure = self.settings.get("structure", "year_month")
+        structure_label = {
+            "flat": _("Alles bij elkaar"),
+            "year": _("Per jaar"),
+            "year_month": _("Per jaar en maand"),
+        }.get(structure, structure)
+        body_lines = [
+            _("Gekozen structuur: {s}").format(s=structure_label),
+        ]
+        if moves:
+            body_lines.append(ngettext(
+                "{n} foto wordt verplaatst naar de juiste map.",
+                "{n} foto's worden verplaatst naar de juiste map.",
+                len(moves),
+            ).format(n=len(moves)))
+        if dups:
+            body_lines.append(ngettext(
+                "{n} exact dezelfde foto op een andere plek wordt verwijderd.",
+                "{n} exact dezelfde foto's op andere plekken worden verwijderd.",
+                len(dups),
+            ).format(n=len(dups)))
+        dlg = Adw.AlertDialog(
+            heading=_("Mappenstructuur aanpassen?"),
+            body="\n".join(body_lines),
+        )
+        dlg.add_response("cancel", _("Later"))
+        dlg.add_response("go", _("Nu ordenen"))
+        dlg.set_response_appearance("go", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("go")
+        dlg.set_close_response("cancel")
+        try:
+            dlg.set_body_use_markup(False)
+        except Exception:
+            pass
+        dlg.connect("response", self._on_reorganize_response, moves, dups)
+        self._present_dialog(dlg)
+        return False
+
+    def _on_reorganize_response(self, dlg, response, moves, dups):
+        if response != "go":
+            return
+        threading.Thread(
+            target=self._do_reorganize, args=(moves, dups), daemon=True,
+        ).start()
+
+    def _do_reorganize(self, moves, dups):
+        import shutil as _sh
+        from pathlib import Path as _P
+        photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
+        moved = 0
+        removed = 0
+        errors = []
+        for src, dst in moves:
+            try:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                _sh.move(str(src), str(dst))
+                moved += 1
+            except Exception as e:
+                errors.append(f"{src.name}: {e}")
+        for dup in dups:
+            try:
+                dup.unlink()
+                removed += 1
+            except OSError as e:
+                errors.append(f"{dup.name}: {e}")
+        # Lege mappen opruimen (bottom-up, behalve de root)
+        for root, _dirs, _files in os.walk(str(photo_path), topdown=False):
+            if root == str(photo_path):
+                continue
+            try:
+                if not os.listdir(root):
+                    os.rmdir(root)
+            except OSError:
+                pass
+        log_info(_("Reorganize: {m} verplaatst, {r} duplicaten weg, {e} fouten").format(
+            m=moved, r=removed, e=len(errors),
+        ))
+        GLib.idle_add(self._reorganize_done, moved, removed, errors)
+
+    def _reorganize_done(self, moved, removed, errors):
+        parts = []
+        if moved:
+            parts.append(ngettext(
+                "{n} foto verplaatst",
+                "{n} foto's verplaatst",
+                moved,
+            ).format(n=moved))
+        if removed:
+            parts.append(ngettext(
+                "{n} duplicaat verwijderd",
+                "{n} duplicaten verwijderd",
+                removed,
+            ).format(n=removed))
+        if not parts:
+            parts.append(_("Geen wijzigingen nodig"))
+        body = ", ".join(parts) + "."
+        if errors:
+            body += "\n" + ngettext(
+                "{n} fout — zie dev-log.",
+                "{n} fouten — zie dev-log.",
+                len(errors),
+            ).format(n=len(errors))
+        dlg = Adw.AlertDialog(
+            heading=_("Mappenstructuur bijgewerkt"),
+            body=body,
+        )
+        dlg.add_response("ok", _("OK"))
+        dlg.set_default_response("ok")
+        dlg.set_close_response("ok")
+        self._present_dialog(dlg)
+        self.reload_photos()
+        return False
+
+    def _maybe_check_structure_on_startup(self):
+        """Na home-grid+2s één keer per sessie: stille scan; popup alleen
+        als er mismatches zijn."""
+        if getattr(self, "_structure_check_done", False):
+            return False
+        ready_at = getattr(self, "_home_ready_at", None)
+        if ready_at is None or (time.time() - ready_at) < 2.0:
+            GLib.timeout_add(500, self._maybe_check_structure_on_startup)
+            return False
+        self._structure_check_done = True
+        self._prompt_reorganize(from_startup=True)
+        return False
 
     def on_threshold_changed(self, value, btn):
         if btn.get_active():
