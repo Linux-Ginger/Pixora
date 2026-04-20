@@ -6392,6 +6392,22 @@ class MainWindow(Adw.ApplicationWindow):
             to_transfer_rels = [rel for rel in src_files
                                 if not os.path.exists(os.path.join(str(backup_dest), rel))]
 
+        # rsync --dry-run --stats zet "Total transferred file size" vaak op
+        # 0 in dry-run — geen bytes gemoved, dus de stat is betekenisloos.
+        # We hebben to_transfer_rels al; som hun echte grootte zelf op zodat
+        # het scan-dialog een realistische ETA + ±MB/GB toont.
+        try:
+            manual_bytes = 0
+            for rel in to_transfer_rels:
+                try:
+                    manual_bytes += (photo_path / rel).stat().st_size
+                except OSError:
+                    pass
+            if manual_bytes > 0:
+                bytes_to_transfer = manual_bytes
+        except Exception:
+            pass
+
         # Optionele dedup: vergelijk pHash van bestanden-die-zouden-overdragen
         # tegen pHash van bestaande bestanden op USB.
         excluded_rels = []
@@ -7126,27 +7142,33 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_backup_done_banner(self, success, note):
         # Banner uitgeschakeld — voltooid-feedback gebeurt nu via een popup
-        # (zelfde stijl als de start-dialog).
+        # (zelfde stijl als de start-dialog). Heading kiest op backup_mode
+        # zodat sync-users "Sync voltooid" zien i.p.v. "Backup voltooid".
         try:
             self.backup_done_banner.set_revealed(False)
         except Exception:
             pass
+        mode = self.settings.get("backup_mode", "backup")
         if success:
-            dlg = Adw.AlertDialog(
-                heading=_("Backup voltooid"),
-                body=_("Alle foto's staan op de USB-schijf."),
-            )
-            dlg.add_response("ok", _("OK"))
-            dlg.set_default_response("ok")
-            dlg.set_close_response("ok")
+            if mode == "sync":
+                heading = _("Sync voltooid")
+                body = _("Je USB-schijf is nu identiek aan Pixora.")
+            else:
+                heading = _("Backup voltooid")
+                body = _("Alle foto's staan op de USB-schijf.")
+            dlg = Adw.AlertDialog(heading=heading, body=body)
         else:
+            if mode == "sync":
+                heading = _("Sync mislukt")
+            else:
+                heading = _("Backup mislukt")
             dlg = Adw.AlertDialog(
-                heading=_("Backup mislukt"),
+                heading=heading,
                 body=note or _("Onbekende fout."),
             )
-            dlg.add_response("ok", _("OK"))
-            dlg.set_default_response("ok")
-            dlg.set_close_response("ok")
+        dlg.add_response("ok", _("OK"))
+        dlg.set_default_response("ok")
+        dlg.set_close_response("ok")
         self._present_dialog(dlg)
 
 

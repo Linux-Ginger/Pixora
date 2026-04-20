@@ -1638,3 +1638,12 @@ msgstr "Sync klaar om te starten"
 
 msgid "Nu synchroniseren"
 msgstr "Nu synchroniseren"
+
+msgid "Sync voltooid"
+msgstr "Sync voltooid"
+
+msgid "Je USB-schijf is nu identiek aan Pixora."
+msgstr "Je USB-schijf is nu identiek aan Pixora."
+
+msgid "Sync mislukt"
+msgstr "Sync mislukt"

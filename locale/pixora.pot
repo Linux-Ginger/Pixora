@@ -980,3 +980,12 @@ msgstr ""
 
 msgid "Nu synchroniseren"
 msgstr ""
+
+msgid "Sync voltooid"
+msgstr ""
+
+msgid "Je USB-schijf is nu identiek aan Pixora."
+msgstr ""
+
+msgid "Sync mislukt"
+msgstr ""
