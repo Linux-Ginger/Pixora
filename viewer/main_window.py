@@ -5427,10 +5427,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._present_dialog(dlg)
 
     def _on_thumb_apply_response(self, dlg, response):
+        global THUMB_SIZE
         if response != "apply":
             return
         new_size = getattr(self, "_pending_thumb_size", THUMB_SIZE)
-        global THUMB_SIZE
         if new_size == THUMB_SIZE:
             return
         log_info(_("Thumbnail-grootte gewijzigd: {old}px → {new}px").format(
