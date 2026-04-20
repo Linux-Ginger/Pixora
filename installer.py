@@ -35,7 +35,7 @@ import urllib.request
 from pathlib import Path
 
 INSTALL_DIR  = Path.home() / ".local" / "share" / "pixora"
-ICON_PATH    = Path(__file__).parent / "docs" / "pixora-icon.svg"
+ICON_PATH    = Path(__file__).parent / "assets" / "logos" / "pixora-icon.svg"
 BIN_DIR      = Path.home() / ".local" / "bin"
 DESKTOP_DIR  = Path.home() / ".local" / "share" / "applications"
 REPO_URL     = "https://github.com/Linux-Ginger/Pixora.git"
@@ -482,7 +482,7 @@ class InstallerWindow(Adw.ApplicationWindow):
             )
             launcher.chmod(0o755)
 
-            icon = INSTALL_DIR / "docs" / "pixora-icon.svg"
+            icon = INSTALL_DIR / "assets" / "logos" / "pixora-icon.svg"
             desktop = DESKTOP_DIR / "pixora.desktop"
             # .desktop-file i18n: GenericName[xx]= / Comment[xx]= worden door de
             # desktop-environment gekozen op basis van $LANG van de gebruiker.

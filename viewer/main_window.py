@@ -227,7 +227,7 @@ if not WEBKIT_AVAILABLE:
             _webkit_load_error = repr(_e)
             continue
 
-ASSETS_DIR       = os.path.join(os.path.dirname(__file__), "..", "assets", "logo's")
+ASSETS_DIR       = os.path.join(os.path.dirname(__file__), "..", "assets", "logos")
 VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
 INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
 GITHUB_RELEASES_API = "https://api.github.com/repos/Linux-Ginger/pixora/releases/latest"

@@ -527,7 +527,8 @@ class SetupWizard(Adw.Window):
 
     def _logo_path(self):
         base = os.path.dirname(os.path.abspath(__file__))
-        for rel in ("../docs/pixora-icon.svg", "docs/pixora-icon.svg"):
+        for rel in ("../assets/logos/pixora-icon.svg",
+                    "assets/logos/pixora-icon.svg"):
             path = os.path.normpath(os.path.join(base, rel))
             if os.path.exists(path):
                 return path

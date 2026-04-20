@@ -7,16 +7,6 @@
 <style>
   html, body { margin: 0; padding: 0; height: 100%; background: #d8dde0; font-family: sans-serif; }
   #map { width: 100%; height: 100%; background: #d8dde0; }
-  /* Voorkom dat WebKit een HTML5-drag start op élk element in de kaart —
-     inclusief tile-images, popup-thumbnails en cluster-divs. Zonder dit
-     kon de gebruiker van binnen de kaart naar buiten slepen en kreeg een
-     losstaand wit vierkantje + een extra taakbalk-entry tot los laten. */
-  html, body, body *, #map, #map * {
-    -webkit-user-drag: none !important;
-    user-drag: none !important;
-    -webkit-user-select: none;
-    user-select: none;
-  }
   #offline-banner {
     position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
     background: rgba(30,30,30,0.92); color: #fff; padding: 10px 16px;
@@ -46,7 +36,7 @@
   .leaflet-control-attribution a { color: #0077cc; }
 </style>
 </head>
-<body ondragstart="return false" ondrop="return false">
+<body>
 <div id="map"></div>
 <div id="offline-banner">⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden</div>
 
@@ -114,33 +104,6 @@
     noWrap: true
   });
   tileLayer.addTo(map);
-
-  // Document-level drag-blockers in capture-fase zodat geen enkele
-  // dragstart door WebKit naar GTK wordt doorgegeven (anders spawnt
-  // GTK een drag-surface en taakbalk-entry).
-  ['dragstart', 'drag', 'dragover', 'dragenter', 'dragleave', 'drop',
-   'selectstart'].forEach(function(ev) {
-    document.addEventListener(ev, function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      return false;
-    }, true);
-  });
-  window.addEventListener('dragstart', function(e) {
-    e.preventDefault();
-  }, true);
-
-  // Pointer-capture: bij mousedown claimt het target ALLE pointer-events
-  // tot mouseup, ook als de cursor buiten de WebView komt. Voorkomt dat
-  // GTK/WM een eigen drag-surface initieert wanneer de muis de viewport
-  // verlaat tijdens een pan.
-  document.addEventListener('pointerdown', function(e) {
-    try {
-      if (e.target && e.target.setPointerCapture) {
-        e.target.setPointerCapture(e.pointerId);
-      }
-    } catch (_) {}
-  }, true);
 
   // Laat Pixora weten wanneer de eerste tiles klaar zijn, zodat de
   // spinner kan wisselen naar de kaart.

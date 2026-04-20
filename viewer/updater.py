@@ -34,7 +34,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, Gio
 
 INSTALL_DIR = Path.home() / ".local" / "share" / "pixora"
-ICON_PATH = INSTALL_DIR / "docs" / "pixora-icon.svg"
+ICON_PATH = INSTALL_DIR / "assets" / "logos" / "pixora-icon.svg"
 UPDATE_URL = "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/updater.sh"
 
 # Stappen die updater.sh emit via "STEP:<key>:<label>" regels
