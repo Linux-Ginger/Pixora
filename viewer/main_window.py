@@ -1649,9 +1649,16 @@ class MainWindow(Adw.ApplicationWindow):
                 return
             with open(local_version_file) as f:
                 local_version = f.read().strip()
+            # Cache-bust: Fastly cached raw.githubusercontent.com ~5 min,
+            # waardoor een verse push niet meteen zichtbaar is. Een unieke
+            # query-string forceert een fresh fetch.
             req = urllib.request.Request(
-                "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt",
-                headers={"User-Agent": "Pixora/1.0"}
+                f"https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt?t={int(time.time())}",
+                headers={
+                    "User-Agent": "Pixora/1.0",
+                    "Cache-Control": "no-cache",
+                    "Pragma": "no-cache",
+                },
             )
             with urllib.request.urlopen(req, timeout=5) as resp:
                 remote_version = resp.read().decode().strip()
@@ -1887,9 +1894,16 @@ class MainWindow(Adw.ApplicationWindow):
             if os.path.exists(local_version_file):
                 with open(local_version_file) as _lvf:
                     local_version = _lvf.read().strip()
+            # Cache-bust: Fastly cached raw.githubusercontent.com ~5 min,
+            # waardoor een verse push niet meteen zichtbaar is. Een unieke
+            # query-string forceert een fresh fetch.
             req = urllib.request.Request(
-                "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt",
-                headers={"User-Agent": "Pixora/1.0"}
+                f"https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt?t={int(time.time())}",
+                headers={
+                    "User-Agent": "Pixora/1.0",
+                    "Cache-Control": "no-cache",
+                    "Pragma": "no-cache",
+                },
             )
             with urllib.request.urlopen(req, timeout=5) as resp:
                 remote_version = resp.read().decode().strip()
