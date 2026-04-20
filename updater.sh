@@ -106,6 +106,36 @@ fi
 
 chown -R "$RUN_UID:$TARGET_GID" "$INSTALL_DIR" "$(dirname "$VERSION_FILE")"
 
+# .desktop-file regenereren zodat Icon=-pad meeloopt met code-rename van
+# assets/ (historisch: docs → assets → assets/logo's → assets/logos).
+DESKTOP_DIR="$TARGET_HOME/.local/share/applications"
+DESKTOP_FILE="$DESKTOP_DIR/pixora.desktop"
+LAUNCHER="$TARGET_HOME/.local/bin/pixora"
+ICON_FILE="$INSTALL_DIR/assets/logos/pixora-icon.svg"
+if [ -f "$ICON_FILE" ] && [ -f "$LAUNCHER" ]; then
+    mkdir -p "$DESKTOP_DIR"
+    cat > "$DESKTOP_FILE" <<DESKTOP_EOF
+[Desktop Entry]
+Name=Pixora
+GenericName=Photo & Video Manager
+GenericName[nl]=Foto & Video Manager
+GenericName[de]=Foto- & Video-Manager
+GenericName[fr]=Gestionnaire de photos et vidéos
+Comment=Photo & video manager by LinuxGinger
+Comment[nl]=Foto & video manager door LinuxGinger
+Comment[de]=Foto- & Video-Manager von LinuxGinger
+Comment[fr]=Gestionnaire de photos et vidéos par LinuxGinger
+Exec=$LAUNCHER
+Icon=$ICON_FILE
+Terminal=false
+Type=Application
+Categories=Graphics;Photography;
+DESKTOP_EOF
+    chown "$RUN_UID:$TARGET_GID" "$DESKTOP_FILE"
+    # Cache bijwerken zodat GNOME het nieuwe icon oppakt zonder logout
+    runuser -u "$TARGET_USER" -- update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
+fi
+
 if [ -d /etc/apparmor.d ]; then
     cat > /etc/apparmor.d/pixora << 'PROFILE_EOF'
 abi <abi/4.0>,

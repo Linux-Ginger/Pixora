@@ -1737,23 +1737,33 @@ class MainWindow(Adw.ApplicationWindow):
                 self._update_check_row.set_subtitle(_("Controleren mislukt"))
                 return False
 
+            # Om het status-icon vóór de Controleer-knop te krijgen moeten we
+            # de knop+spinner even losmaken en daarna opnieuw toevoegen;
+            # add_suffix appendt altijd aan het einde.
+            self._update_check_row.remove(self._update_check_btn)
+            self._update_check_row.remove(self._update_check_spinner)
+
             if local_version == remote_version:
                 self._update_check_row.set_subtitle(_("Je hebt de nieuwste versie"))
                 ok_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
                 ok_icon.add_css_class("success")
                 ok_icon.set_valign(Gtk.Align.CENTER)
                 self._update_check_row.add_suffix(ok_icon)
+                self._update_check_row.add_suffix(self._update_check_btn)
+                self._update_check_row.add_suffix(self._update_check_spinner)
                 self._update_check_row._extra_suffixes = [ok_icon]
             else:
                 self._update_check_row.set_subtitle(_("Versie {v} beschikbaar").format(v=remote_version))
                 warn_icon = Gtk.Image.new_from_icon_name("emblem-important-symbolic")
                 warn_icon.set_valign(Gtk.Align.CENTER)
-                self._update_check_row.add_suffix(warn_icon)
                 update_btn = Gtk.Button(label=_("Bijwerken"))
                 update_btn.add_css_class("suggested-action")
                 update_btn.set_valign(Gtk.Align.CENTER)
                 update_btn.connect("clicked", lambda b: self._open_installer())
+                self._update_check_row.add_suffix(warn_icon)
                 self._update_check_row.add_suffix(update_btn)
+                self._update_check_row.add_suffix(self._update_check_btn)
+                self._update_check_row.add_suffix(self._update_check_spinner)
                 self._update_check_row._extra_suffixes = [warn_icon, update_btn]
         except Exception:
             pass
