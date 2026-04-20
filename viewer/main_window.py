@@ -6813,6 +6813,41 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(_("Backup gestart"))
         threading.Thread(target=self._backup_thread, daemon=True).start()
 
+    def _check_backup_dest_writable(self, drive_root, backup_dest):
+        """Retourneert None als we kunnen schrijven, anders een nette
+        foutboodschap met fix-hint. Probeer eerst bestaande dest, val
+        dan terug op drive-root zodat we ook bij 'map bestaat niet nog'
+        de read-only-state detecteren."""
+        candidates = [p for p in (backup_dest, drive_root)
+                      if p is not None and os.path.isdir(str(p))]
+        if not candidates:
+            # Kan mappen niet vinden; normale mkdir-flow later zal melden.
+            return None
+        test_dir = str(candidates[0])
+        test_path = os.path.join(test_dir, f".pixora-write-test-{os.getpid()}")
+        try:
+            with open(test_path, "wb") as f:
+                f.write(b"ok")
+            os.remove(test_path)
+            return None
+        except OSError as exc:
+            if exc.errno == 30:  # EROFS — read-only filesystem
+                return _(
+                    "Backup-schijf is alleen-lezen gemount. Dit gebeurt vaak "
+                    "met NTFS/exFAT na onveilig verwijderen op Windows.\n\n"
+                    "Oplossing: ontkoppel de schijf in je bestandsbeheerder, "
+                    "sluit 'm opnieuw aan, of voer op de terminal uit:\n"
+                    "  sudo ntfsfix /dev/sdXN\n"
+                    "(vervang sdXN door je USB-device, bv. sdb1)"
+                )
+            if exc.errno == 13:  # EACCES
+                return _("Geen schrijfrechten op {p}: {err}").format(
+                    p=test_dir, err=exc
+                )
+            return _("Fout bij schrijven naar {p}: {err}").format(
+                p=test_dir, err=exc
+            )
+
     def _backup_thread(self):
         from pathlib import Path as _P
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
@@ -6823,6 +6858,13 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._backup_finished, False, _("Back-upschijf niet gevonden."))
             return
         backup_dest = _P(backup_path_str) if backup_path_str else drive_root / "Pixora"
+        # Veel gangbare oorzaak: NTFS/exFAT-drive mounted read-only na unsafe
+        # eject op Windows → laat de user meteen zien wat er speelt i.p.v.
+        # te crashen op de eerste rsync write.
+        ro_msg = self._check_backup_dest_writable(drive_root, backup_dest)
+        if ro_msg is not None:
+            GLib.idle_add(self._backup_finished, False, ro_msg)
+            return
         try:
             backup_dest.mkdir(parents=True, exist_ok=True)
         except Exception as e:
@@ -6867,11 +6909,14 @@ class MainWindow(Adw.ApplicationWindow):
                 self._backup_proc = proc
                 for line in proc.stdout:
                     _on_rsync_line(line)
+                _err = proc.stderr.read() if proc.stderr else ""
                 proc.wait(timeout=3600)
                 success = proc.returncode == 0
+                rsync_err = _err.strip()
             except Exception as e:
                 log_error(_("Backup fout: {err}").format(err=e))
                 success = False
+                rsync_err = str(e)
             finally:
                 if proc is not None and proc.poll() is None:
                     try:
@@ -6889,11 +6934,27 @@ class MainWindow(Adw.ApplicationWindow):
             success = self._manual_backup(
                 photo_path, backup_dest, mode == "sync", excluded=set(excluded)
             )
+            rsync_err = ""
 
         # Excluded-lijst leeg na deze run zodat volgende backup opnieuw scant
         self._backup_excluded_paths = []
-        GLib.idle_add(self._backup_finished, success,
-                      None if success else _("Backup gedeeltelijk mislukt."))
+        note = None
+        if not success:
+            err_low = (rsync_err or "").lower()
+            if "read-only" in err_low or "readonly" in err_low \
+                    or "permission denied" in err_low:
+                note = _(
+                    "USB is alleen-lezen gemount. Ontkoppel 'm en sluit "
+                    "opnieuw aan, of voer op de terminal `sudo ntfsfix "
+                    "/dev/sdXN` uit."
+                )
+            elif rsync_err:
+                # Eerste regel van rsync's stderr = meestal de echte reden.
+                first = rsync_err.splitlines()[0] if rsync_err else ""
+                note = _("Backup mislukt: {err}").format(err=first[:200])
+            else:
+                note = _("Backup gedeeltelijk mislukt.")
+        GLib.idle_add(self._backup_finished, success, note)
 
     def _manual_backup(self, src, dst, delete_extraneous=False, excluded=None):
         """Fallback zonder rsync: handmatig kopiëren met progress.

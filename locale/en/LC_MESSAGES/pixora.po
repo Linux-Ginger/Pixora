@@ -1617,3 +1617,18 @@ msgid "{n} foto op USB niet meer in Pixora (blijft bewaard)"
 msgid_plural "{n} foto's op USB niet meer in Pixora (blijven bewaard)"
 msgstr[0] "{n} photo on USB no longer in Pixora (kept)"
 msgstr[1] "{n} photos on USB no longer in Pixora (kept)"
+
+msgid "Backup-schijf is alleen-lezen gemount. Dit gebeurt vaak met NTFS/exFAT na onveilig verwijderen op Windows.\n\nOplossing: ontkoppel de schijf in je bestandsbeheerder, sluit 'm opnieuw aan, of voer op de terminal uit:\n  sudo ntfsfix /dev/sdXN\n(vervang sdXN door je USB-device, bv. sdb1)"
+msgstr "Backup drive is mounted read-only. This often happens with NTFS/exFAT after an unsafe eject on Windows.\n\nFix: unmount the drive in your file manager and reconnect it, or run in a terminal:\n  sudo ntfsfix /dev/sdXN\n(replace sdXN with your USB device, e.g. sdb1)"
+
+msgid "Geen schrijfrechten op {p}: {err}"
+msgstr "No write permission on {p}: {err}"
+
+msgid "Fout bij schrijven naar {p}: {err}"
+msgstr "Error writing to {p}: {err}"
+
+msgid "USB is alleen-lezen gemount. Ontkoppel 'm en sluit opnieuw aan, of voer op de terminal `sudo ntfsfix /dev/sdXN` uit."
+msgstr "USB is mounted read-only. Unmount and reconnect it, or run `sudo ntfsfix /dev/sdXN` in a terminal."
+
+msgid "Backup mislukt: {err}"
+msgstr "Backup failed: {err}"
