@@ -853,3 +853,69 @@ msgstr ""
 
 msgid "Locatie zoeken…"
 msgstr ""
+
+msgid "Inschakelen"
+msgstr ""
+
+msgid "Bepaalt hoe Pixora geïmporteerde foto's opslaat in je bibliotheek."
+msgstr ""
+
+msgid "Alles bij elkaar"
+msgstr ""
+
+msgid "Alle foto's komen direct in één map — geen submappen."
+msgstr ""
+
+msgid "Aparte map per jaar — bv. 2024/, 2025/."
+msgstr ""
+
+msgid "Per jaar en maand"
+msgstr ""
+
+msgid "Jaar-map met maand-submappen — bv. 2024/2024-03/."
+msgstr ""
+
+msgid "Pixora vergelijkt elke nieuwe foto visueel met je bibliotheek. Bij een match kies je per foto: overslaan, toch importeren of beide bewaren."
+msgstr ""
+
+msgid "Eenrichtings-kopie: alleen toevoegen. Foto's die je in Pixora wist, blijven op de USB als archief staan."
+msgstr ""
+
+msgid "Exacte kopie van je Pixora-bibliotheek. Foto's die je in Pixora wist, worden ook van de USB verwijderd bij de volgende backup."
+msgstr ""
+
+msgid "Slaat foto's over die al op de USB staan, óók als ze daar onder een andere naam of in een andere map liggen. Vereist dat duplicaat-detectie hierboven aan staat."
+msgstr ""
+
+msgid "Met ❤ gemaakt door LinuxGinger"
+msgstr ""
+
+msgid "GitHub"
+msgstr ""
+
+msgid "Open de GitHub-pagina van Pixora"
+msgstr ""
+
+msgid "GitHub openen mislukt: {err}"
+msgstr ""
+
+msgid "Voorbeeld"
+msgstr ""
+
+msgid "Zo groot worden je thumbnails bij deze instelling"
+msgstr ""
+
+msgid "Toepassen"
+msgstr ""
+
+msgid "Thumbnail-grootte wijzigen?"
+msgstr ""
+
+msgid "Pixora gaat alle thumbnails opnieuw genereren op {n} px. Dit kan even duren bij grote bibliotheken."
+msgstr ""
+
+msgid "Restart gepland (1.5s delay voor GApplication unregister)"
+msgstr ""
+
+msgid "Taal-relaunch gepland (1.5s delay, log: {p})"
+msgstr ""

@@ -292,10 +292,16 @@ class UpdaterWindow(Adw.ApplicationWindow):
             cmd = [pixora_bin]
         else:
             cmd = [sys.executable, str(INSTALL_DIR / "viewer" / "main.py")]
+        # PIXORA_IN_DEV_TERM strippen — Pixora zette die toen hij de updater
+        # spawnde. Als de flag blijft staan denkt de nieuwe main.py dat hij
+        # al binnen een dev-terminal draait en spawnt er geen.
+        child_env = {k: v for k, v in os.environ.items()
+                     if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")}
         try:
             subprocess.Popen(
                 cmd,
                 start_new_session=True,
+                env=child_env,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,

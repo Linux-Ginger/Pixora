@@ -1752,6 +1752,14 @@ class MainWindow(Adw.ApplicationWindow):
         # Pixora als zombie in process-lijst en blokkeert nieuwe launches.
         GLib.idle_add(self.close)
 
+    def _on_open_github(self, btn):
+        try:
+            Gio.AppInfo.launch_default_for_uri(
+                "https://github.com/Linux-Ginger/Pixora", None
+            )
+        except Exception as e:
+            log_warn(_("GitHub openen mislukt: {err}").format(err=e))
+
     def _on_settings_check_update(self, btn):
         # set_sensitive i.p.v. set_visible — hiding forces GTK's focus-chain
         # rebuild wat een Gtk-CRITICAL warning geeft over al gedisposed
@@ -4986,7 +4994,34 @@ class MainWindow(Adw.ApplicationWindow):
         )
         thumb_row.add_suffix(thumb_reset_btn)
 
+        # Vinkje-knop die pas scherpstelt en opslaat als de gebruiker klikt.
+        # Tot die tijd verandert er niets aan de grid → geen vastloper bij
+        # sliden.
+        self._thumb_apply_btn = Gtk.Button(icon_name="emblem-ok-symbolic")
+        self._thumb_apply_btn.add_css_class("flat")
+        self._thumb_apply_btn.add_css_class("circular")
+        self._thumb_apply_btn.set_valign(Gtk.Align.CENTER)
+        self._thumb_apply_btn.set_tooltip_text(_("Toepassen"))
+        self._thumb_apply_btn.set_sensitive(False)
+        self._thumb_apply_btn.connect("clicked", self._on_thumb_apply_clicked)
+        thumb_row.add_suffix(self._thumb_apply_btn)
+
         display_group.add(thumb_row)
+
+        # Voorbeeld onder de slider — schaalt mee tijdens sliden zonder de
+        # echte thumbnails aan te raken (anders vastloper op home).
+        self._thumb_preview = Gtk.DrawingArea()
+        self._thumb_preview.set_content_width(140)
+        self._thumb_preview.set_content_height(140)
+        self._thumb_preview.set_draw_func(self._draw_thumb_preview)
+        self._pending_thumb_size = THUMB_SIZE
+        preview_row = Adw.ActionRow(
+            title=_("Voorbeeld"),
+            subtitle=_("Zo groot worden je thumbnails bij deze instelling"),
+        )
+        preview_row.add_suffix(self._thumb_preview)
+        preview_row.set_activatable(False)
+        display_group.add(preview_row)
 
         # Taal-keuze
         lang_row = Adw.ActionRow(
@@ -5034,13 +5069,18 @@ class MainWindow(Adw.ApplicationWindow):
 
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title(_("Mapstructuur"))
-        structure_group.set_description(_("Hoe worden je foto's georganiseerd"))
+        structure_group.set_description(
+            _("Bepaalt hoe Pixora geïmporteerde foto's opslaat in je bibliotheek.")
+        )
         current_structure = self.settings.get("structure", "year_month")
 
         self.radio_flat = Gtk.CheckButton()
         self.radio_flat.set_active(current_structure == "flat")
         self.radio_flat.connect("toggled", lambda b: self.on_structure_changed("flat", b))
-        flat_row = Adw.ActionRow(title=_("Plat"), subtitle=_("Alles in één map"))
+        flat_row = Adw.ActionRow(
+            title=_("Alles bij elkaar"),
+            subtitle=_("Alle foto's komen direct in één map — geen submappen."),
+        )
         flat_row.add_prefix(Gtk.Image.new_from_icon_name("folder-symbolic"))
         flat_row.add_prefix(self.radio_flat)
         flat_row.set_activatable_widget(self.radio_flat)
@@ -5050,7 +5090,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_year.set_group(self.radio_flat)
         self.radio_year.set_active(current_structure == "year")
         self.radio_year.connect("toggled", lambda b: self.on_structure_changed("year", b))
-        year_row = Adw.ActionRow(title=_("Per jaar"), subtitle=_("2024/   2025/"))
+        year_row = Adw.ActionRow(
+            title=_("Per jaar"),
+            subtitle=_("Aparte map per jaar — bv. 2024/, 2025/."),
+        )
         year_row.add_prefix(Gtk.Image.new_from_icon_name("folder-open-symbolic"))
         year_row.add_prefix(self.radio_year)
         year_row.set_activatable_widget(self.radio_year)
@@ -5060,7 +5103,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_month.set_group(self.radio_flat)
         self.radio_month.set_active(current_structure == "year_month")
         self.radio_month.connect("toggled", lambda b: self.on_structure_changed("year_month", b))
-        month_row = Adw.ActionRow(title=_("Per jaar/maand"), subtitle=_("2024/2024-03/   2024/2024-04/"))
+        month_row = Adw.ActionRow(
+            title=_("Per jaar en maand"),
+            subtitle=_("Jaar-map met maand-submappen — bv. 2024/2024-03/."),
+        )
         month_row.add_prefix(Gtk.Image.new_from_icon_name("view-list-symbolic"))
         month_row.add_prefix(self.radio_month)
         month_row.set_activatable_widget(self.radio_month)
@@ -5068,29 +5114,16 @@ class MainWindow(Adw.ApplicationWindow):
         import_page.add(structure_group)
 
         dup_group = Adw.PreferencesGroup()
-        dup_group.set_title(_("Duplicate detectie"))
+        dup_group.set_title(_("Duplicaat-detectie"))
         dup_group.set_description(_("Controleer bij import of foto's al bestaan"))
         # Threshold=0 betekent uit, >=1 betekent aan. Aan gebruikt altijd
         # strict (=1) voor de hoogste accuratie.
         dup_on = self.settings.get("duplicate_threshold", 2) != 0
 
-        self.settings_dup_switch = Gtk.Switch()
-        self.settings_dup_switch.set_valign(Gtk.Align.CENTER)
-        self.settings_dup_switch.set_active(dup_on)
-        self.settings_dup_switch.connect("notify::active", self.on_dup_switch_toggled)
-        dup_row = Adw.ActionRow(
-            title=_("Duplicaat-detectie"),
-            subtitle=_("Strikte controle op bijna-identieke foto's"),
-        )
-        dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
-        dup_row.add_suffix(self.settings_dup_switch)
-        dup_row.set_activatable_widget(self.settings_dup_switch)
-        dup_group.add(dup_row)
-
         dup_info_row = Adw.ActionRow(
             title=_("Hoe het werkt"),
-            subtitle=_("Pixora vergelijkt elke nieuwe foto visueel met je bibliotheek en "
-                       "vraagt per match wat je wilt doen: overslaan, toch importeren of beide bewaren."),
+            subtitle=_("Pixora vergelijkt elke nieuwe foto visueel met je bibliotheek. "
+                       "Bij een match kies je per foto: overslaan, toch importeren of beide bewaren."),
         )
         dup_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
         dup_info_row.set_activatable(False)
@@ -5099,6 +5132,16 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         dup_group.add(dup_info_row)
+
+        self.settings_dup_switch = Gtk.Switch()
+        self.settings_dup_switch.set_valign(Gtk.Align.CENTER)
+        self.settings_dup_switch.set_active(dup_on)
+        self.settings_dup_switch.connect("notify::active", self.on_dup_switch_toggled)
+        dup_row = Adw.ActionRow(title=_("Inschakelen"))
+        dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
+        dup_row.add_suffix(self.settings_dup_switch)
+        dup_row.set_activatable_widget(self.settings_dup_switch)
+        dup_group.add(dup_row)
 
         import_page.add(dup_group)
 
@@ -5188,12 +5231,17 @@ class MainWindow(Adw.ApplicationWindow):
         )
         mode_backup_row = Adw.ActionRow(
             title=_("Backup"),
-            subtitle=_("Kopieert foto's naar USB. Verwijderen uit Pixora laat de backup staan."),
+            subtitle=_("Eenrichtings-kopie: alleen toevoegen. Foto's die je in Pixora wist, "
+                       "blijven op de USB als archief staan."),
         )
         mode_backup_row.add_prefix(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic"))
         mode_backup_row.add_prefix(self.radio_mode_backup)
         mode_backup_row.set_activatable_widget(self.radio_mode_backup)
         mode_backup_row.set_sensitive(backup_on and drive_present)
+        try:
+            mode_backup_row.set_subtitle_lines(3)
+        except Exception:
+            pass
         self.settings_mode_backup_row = mode_backup_row
         backup_group.add(mode_backup_row)
 
@@ -5205,27 +5253,46 @@ class MainWindow(Adw.ApplicationWindow):
         )
         mode_sync_row = Adw.ActionRow(
             title=_("Sync"),
-            subtitle=_("Spiegelt Pixora naar USB. Verwijderen uit Pixora verwijdert ook op USB."),
+            subtitle=_("Exacte kopie van je Pixora-bibliotheek. Foto's die je in Pixora "
+                       "wist, worden ook van de USB verwijderd bij de volgende backup."),
         )
         mode_sync_row.add_prefix(Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic"))
         mode_sync_row.add_prefix(self.radio_mode_sync)
         mode_sync_row.set_activatable_widget(self.radio_mode_sync)
         mode_sync_row.set_sensitive(backup_on and drive_present)
+        try:
+            mode_sync_row.set_subtitle_lines(3)
+        except Exception:
+            pass
         self.settings_mode_sync_row = mode_sync_row
         backup_group.add(mode_sync_row)
 
         self.settings_dedup_switch = Gtk.Switch()
         self.settings_dedup_switch.set_valign(Gtk.Align.CENTER)
-        self.settings_dedup_switch.set_active(bool(self.settings.get("backup_dedup")))
+        # Automatisch uit als hoofd-dup-detectie uit staat — de USB-check hergebruikt
+        # dezelfde pHash-engine en is zinloos zonder.
+        if not dup_on:
+            self.settings_dedup_switch.set_active(False)
+            if self.settings.get("backup_dedup"):
+                self.settings["backup_dedup"] = False
+                save_settings(self.settings)
+        else:
+            self.settings_dedup_switch.set_active(bool(self.settings.get("backup_dedup")))
         self.settings_dedup_switch.connect("notify::active", self.on_backup_dedup_toggle)
         dedup_row = Adw.ActionRow(
             title=_("Duplicaat-detector voor backup"),
-            subtitle=_("Foto's die al op USB staan (ook onder andere naam) worden overgeslagen"),
+            subtitle=_("Slaat foto's over die al op de USB staan, óók als ze daar onder een "
+                       "andere naam of in een andere map liggen. Vereist dat duplicaat-"
+                       "detectie hierboven aan staat."),
         )
         dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
         dedup_row.add_suffix(self.settings_dedup_switch)
+        try:
+            dedup_row.set_subtitle_lines(3)
+        except Exception:
+            pass
         dedup_row.set_activatable_widget(self.settings_dedup_switch)
-        dedup_row.set_sensitive(backup_on and drive_present)
+        dedup_row.set_sensitive(backup_on and drive_present and dup_on)
         self.settings_dedup_row = dedup_row
         backup_group.add(dedup_row)
 
@@ -5253,12 +5320,22 @@ class MainWindow(Adw.ApplicationWindow):
         # App info row
         app_row = Adw.ActionRow(
             title=_("Pixora"),
-            subtitle=_("Foto &amp; video manager door LinuxGinger"))
+            subtitle=_("Met ❤ gemaakt door LinuxGinger"))
         icon_path = os.path.join(ASSETS_DIR, "pixora-icon.svg")
         if os.path.exists(icon_path):
             app_icon = Gtk.Image.new_from_file(icon_path)
             app_icon.set_pixel_size(32)
             app_row.add_prefix(app_icon)
+        github_btn = Gtk.Button()
+        gh_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        gh_box.append(Gtk.Image.new_from_icon_name("code-context-symbolic"))
+        gh_box.append(Gtk.Label(label=_("GitHub")))
+        github_btn.set_child(gh_box)
+        github_btn.add_css_class("flat")
+        github_btn.set_valign(Gtk.Align.CENTER)
+        github_btn.set_tooltip_text(_("Open de GitHub-pagina van Pixora"))
+        github_btn.connect("clicked", self._on_open_github)
+        app_row.add_suffix(github_btn)
         about_group.add(app_row)
 
         # Versie row
@@ -5300,25 +5377,71 @@ class MainWindow(Adw.ApplicationWindow):
         new_size = (new_size // 20) * 20
         row.set_subtitle(f"{new_size} px")
         self._pending_thumb_size = new_size
-        if hasattr(self, '_thumb_size_timer') and self._thumb_size_timer:
+        if hasattr(self, "_thumb_preview"):
             try:
-                GLib.source_remove(self._thumb_size_timer)
+                self._thumb_preview.queue_draw()
             except Exception:
                 pass
-        self._thumb_size_timer = GLib.timeout_add(400, self._apply_thumb_size_change)
+        if hasattr(self, "_thumb_apply_btn"):
+            self._thumb_apply_btn.set_sensitive(new_size != THUMB_SIZE)
 
-    def _apply_thumb_size_change(self):
-        self._thumb_size_timer = None
-        new_size = self._pending_thumb_size
+    def _draw_thumb_preview(self, area, cr, w, h):
+        try:
+            size = getattr(self, "_pending_thumb_size", THUMB_SIZE)
+            # 200px → ~56 preview, 500px → 140 preview — behoudt verhoudingen.
+            side = max(40.0, min(140.0, size * 140.0 / 500.0))
+            x = (w - side) / 2
+            y = (h - side) / 2
+            r = 8
+            # Achtergrondkader
+            cr.set_source_rgba(0.5, 0.5, 0.5, 0.15)
+            cr.rectangle(0, 0, w, h)
+            cr.fill()
+            # Rounded thumbnail-silhouette
+            cr.set_source_rgb(0.914, 0.329, 0.125)
+            cr.new_sub_path()
+            cr.arc(x + side - r, y + r, r, -math.pi / 2, 0)
+            cr.arc(x + side - r, y + side - r, r, 0, math.pi / 2)
+            cr.arc(x + r, y + side - r, r, math.pi / 2, math.pi)
+            cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+            cr.close_path()
+            cr.fill()
+        except Exception:
+            pass
+
+    def _on_thumb_apply_clicked(self, btn):
+        new_size = getattr(self, "_pending_thumb_size", THUMB_SIZE)
+        if new_size == THUMB_SIZE:
+            return
+        dlg = Adw.AlertDialog(
+            heading=_("Thumbnail-grootte wijzigen?"),
+            body=_("Pixora gaat alle thumbnails opnieuw genereren op {n} px. "
+                   "Dit kan even duren bij grote bibliotheken.").format(n=new_size),
+        )
+        dlg.add_response("cancel", _("Annuleren"))
+        dlg.add_response("apply", _("Opslaan"))
+        dlg.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("apply")
+        dlg.set_close_response("cancel")
+        dlg.connect("response", self._on_thumb_apply_response)
+        self._present_dialog(dlg)
+
+    def _on_thumb_apply_response(self, dlg, response):
+        if response != "apply":
+            return
+        new_size = getattr(self, "_pending_thumb_size", THUMB_SIZE)
         global THUMB_SIZE
         if new_size == THUMB_SIZE:
-            return False
-        log_info(_("Thumbnail-grootte gewijzigd: {old}px → {new}px").format(old=THUMB_SIZE, new=new_size))
+            return
+        log_info(_("Thumbnail-grootte gewijzigd: {old}px → {new}px").format(
+            old=THUMB_SIZE, new=new_size,
+        ))
         THUMB_SIZE = new_size
         self.settings["thumbnail_size"] = new_size
         save_settings(self.settings)
+        if hasattr(self, "_thumb_apply_btn"):
+            self._thumb_apply_btn.set_sensitive(False)
         self.load_photos()
-        return False
 
     def _on_reset_usbmuxd(self, btn):
         log_info(_("Reset usbmuxd aangeroepen (settings)"))
@@ -5478,29 +5601,23 @@ class MainWindow(Adw.ApplicationWindow):
             else:
                 script = os.path.join(INSTALL_DIR, "viewer", "main.py")
                 relaunch_cmd = f'{sys.executable!s} {script!r}'
-            # Strip PIXORA_IN_DEV_TERM zodat de relaunch opnieuw een
-            # dev-terminal kan spawnen als dev-mode actief is. Strip ook
-            # PIXORA_DEV_LOG_OPENED voor consistentie met _restart_app.
             child_env = {k: v for k, v in os.environ.items()
                          if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")}
             try:
-                # 1.2s sleep zodat GApplication op D-Bus is uitgeschreven
-                # voordat de nieuwe instance zich probeert te registreren
-                # (anders ziet GTK bestaande unique app en geeft alleen
-                # een activate i.p.v. nieuwe window).
+                log_file = os.path.expanduser("~/.cache/pixora/relaunch.log")
+                os.makedirs(os.path.dirname(log_file), exist_ok=True)
                 subprocess.Popen(
-                    ["bash", "-c", f"sleep 1.2 && exec {relaunch_cmd}"],
+                    ["bash", "-c",
+                     f"sleep 1.5 && exec {relaunch_cmd} >>{log_file!s} 2>&1"],
                     env=child_env,
                     start_new_session=True,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,
                 )
-                log_info(_("Taal-relaunch gepland (1.2s delay)"))
+                log_info(_("Taal-relaunch gepland (1.5s delay, log: {p})").format(p=log_file))
             except Exception as e:
                 log_error(_("Relaunch na taal-wissel fout: {err}").format(err=e))
-            # Gebruik app.quit() i.p.v. self.close() zodat het oude proces
-            # écht volledig afsluit en D-Bus z'n registratie vrijgeeft.
             self.get_application().quit()
             return False
         GLib.timeout_add(1000, _relaunch)
@@ -5544,24 +5661,35 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _restart_app(self):
         try:
-            script = os.path.abspath(os.path.join(
-                os.path.dirname(__file__), "main.py"
-            ))
-            # Wacht 1.2s zodat de unique GApplication volledig verdwenen is
-            # voor de nieuwe instance zich via D-Bus registreert
+            # Strip zowel IN_DEV_TERM als DEV_LOG_OPENED zodat de nieuwe
+            # main.py weer opnieuw een dev-terminal kan spawnen i.p.v. te
+            # denken dat hij al in één draait.
             env = {
                 k: v for k, v in os.environ.items()
-                if k != "PIXORA_DEV_LOG_OPENED"  # nieuw main.py mag tail-venster opnieuw openen
+                if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")
             }
+            pixora_bin = os.path.expanduser("~/.local/bin/pixora")
+            if os.path.exists(pixora_bin):
+                relaunch = f'"{pixora_bin}"'
+            else:
+                script = os.path.abspath(os.path.join(
+                    os.path.dirname(__file__), "main.py"
+                ))
+                relaunch = f'{sys.executable!s} {script!s}'
+            # 1.5s sleep voor D-Bus unique-name release; extra marge voor
+            # trage systemen. Log naar een bestand zodat we eventuele
+            # relaunch-fouten zien ook als de dev-terminal weg is.
+            log_file = os.path.expanduser("~/.cache/pixora/relaunch.log")
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
             subprocess.Popen(
                 ["bash", "-c",
-                 f"sleep 1.2 && exec {sys.executable!s} {script!s}"],
+                 f"sleep 1.5 && exec {relaunch} >>{log_file!s} 2>&1"],
                 env=env,
                 start_new_session=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            log_info(_("Restart gepland (1.2s delay voor GApplication unregister)"))
+            log_info(_("Restart gepland (1.5s delay voor GApplication unregister)"))
         except Exception as e:
             log_error(_("Restart fout: {err}").format(err=e))
         self.get_application().quit()
@@ -5579,8 +5707,19 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_dup_switch_toggled(self, switch, _):
         # Aan = strict (1), Uit = 0 (detectie uit)
-        self.settings["duplicate_threshold"] = 1 if switch.get_active() else 0
+        active = switch.get_active()
+        self.settings["duplicate_threshold"] = 1 if active else 0
+        if not active and self.settings.get("backup_dedup"):
+            # Hoofd-detectie uit → USB-dedup kan niet aan zijn.
+            self.settings["backup_dedup"] = False
+            if hasattr(self, "settings_dedup_switch"):
+                self.settings_dedup_switch.set_active(False)
         save_settings(self.settings)
+        # Live sensitivity-update op de USB-dedup rij
+        if hasattr(self, "settings_dedup_row"):
+            backup_on = bool(self.settings.get("backup_enabled"))
+            drive_present = self._backup_drive_mountpoint() is not None
+            self.settings_dedup_row.set_sensitive(backup_on and drive_present and active)
 
     def on_settings_backup_toggle(self, switch, _):
         active = switch.get_active()
@@ -5615,7 +5754,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings_mode_backup_row.set_sensitive(active and drive_present)
             self.settings_mode_sync_row.set_sensitive(active and drive_present)
         if hasattr(self, "settings_dedup_row"):
-            self.settings_dedup_row.set_sensitive(active and drive_present)
+            dup_on_now = self.settings.get("duplicate_threshold", 2) != 0
+            self.settings_dedup_row.set_sensitive(active and drive_present and dup_on_now)
         if hasattr(self, "settings_manual_scan_row"):
             self.settings_manual_scan_row.set_sensitive(active and drive_present)
         self.settings["backup_enabled"] = active
@@ -5805,7 +5945,8 @@ class MainWindow(Adw.ApplicationWindow):
                 self.settings_mode_backup_row.set_sensitive(backup_on and drive_present)
                 self.settings_mode_sync_row.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_dedup_row"):
-                self.settings_dedup_row.set_sensitive(backup_on and drive_present)
+                dup_on_now = self.settings.get("duplicate_threshold", 2) != 0
+                self.settings_dedup_row.set_sensitive(backup_on and drive_present and dup_on_now)
             if hasattr(self, "settings_manual_scan_row"):
                 self.settings_manual_scan_row.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_backup_group"):

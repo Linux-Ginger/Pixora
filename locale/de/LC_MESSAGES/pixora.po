@@ -1503,3 +1503,68 @@ msgstr "Bei einem Treffer fragt Pixora pro Foto: überspringen, trotzdem importi
 
 msgid "Locatie zoeken…"
 msgstr "Ort wird gesucht…"
+
+msgid "Inschakelen"
+msgstr "Aktivieren"
+
+msgid "Bepaalt hoe Pixora geïmporteerde foto's opslaat in je bibliotheek."
+msgstr "Legt fest, wie Pixora importierte Fotos in deiner Bibliothek ablegt."
+
+msgid "Alles bij elkaar"
+msgstr "Alles zusammen"
+
+msgid "Alle foto's komen direct in één map — geen submappen."
+msgstr "Alle Fotos landen in einem Ordner — keine Unterordner."
+
+msgid "Aparte map per jaar — bv. 2024/, 2025/."
+msgstr "Eigener Ordner pro Jahr — z. B. 2024/, 2025/."
+
+msgid "Per jaar en maand"
+msgstr "Pro Jahr und Monat"
+
+msgid "Jaar-map met maand-submappen — bv. 2024/2024-03/."
+msgstr "Jahresordner mit Monats-Unterordnern — z. B. 2024/2024-03/."
+
+msgid "Pixora vergelijkt elke nieuwe foto visueel met je bibliotheek. Bij een match kies je per foto: overslaan, toch importeren of beide bewaren."
+msgstr "Pixora vergleicht jedes neue Foto visuell mit deiner Bibliothek. Bei einem Treffer wählst du pro Foto: überspringen, trotzdem importieren oder beide behalten."
+
+msgid "Eenrichtings-kopie: alleen toevoegen. Foto's die je in Pixora wist, blijven op de USB als archief staan."
+msgstr "Einseitige Kopie: nur Hinzufügen. In Pixora gelöschte Fotos bleiben als Archiv auf dem USB-Stick."
+
+msgid "Exacte kopie van je Pixora-bibliotheek. Foto's die je in Pixora wist, worden ook van de USB verwijderd bij de volgende backup."
+msgstr "Exaktes Abbild deiner Pixora-Bibliothek. In Pixora gelöschte Fotos werden beim nächsten Backup auch vom USB entfernt."
+
+msgid "Slaat foto's over die al op de USB staan, óók als ze daar onder een andere naam of in een andere map liggen. Vereist dat duplicaat-detectie hierboven aan staat."
+msgstr "Überspringt Fotos, die bereits auf dem USB liegen — auch unter anderem Namen oder in anderem Ordner. Erfordert, dass die Duplikaterkennung oben aktiviert ist."
+
+msgid "Met ❤ gemaakt door LinuxGinger"
+msgstr "Mit ❤ gemacht von LinuxGinger"
+
+msgid "GitHub"
+msgstr "GitHub"
+
+msgid "Open de GitHub-pagina van Pixora"
+msgstr "GitHub-Seite von Pixora öffnen"
+
+msgid "GitHub openen mislukt: {err}"
+msgstr "GitHub konnte nicht geöffnet werden: {err}"
+
+msgid "Voorbeeld"
+msgstr "Vorschau"
+
+msgid "Zo groot worden je thumbnails bij deze instelling"
+msgstr "So groß werden deine Thumbnails mit dieser Einstellung"
+
+msgid "Toepassen"
+msgstr "Anwenden"
+
+msgid "Thumbnail-grootte wijzigen?"
+msgstr "Thumbnail-Größe ändern?"
+
+msgid "Pixora gaat alle thumbnails opnieuw genereren op {n} px. Dit kan even duren bij grote bibliotheken."
+msgstr "Pixora erstellt alle Thumbnails neu mit {n} px. Bei großen Bibliotheken kann das etwas dauern."
+msgid "Restart gepland (1.5s delay voor GApplication unregister)"
+msgstr "Neustart geplant (1,5 s Verzögerung für GApplication-Abmeldung)"
+
+msgid "Taal-relaunch gepland (1.5s delay, log: {p})"
+msgstr "Sprach-Neustart geplant (1,5 s Verzögerung, Log: {p})"
