@@ -152,7 +152,7 @@ class SetupWizard(Adw.Window):
 
     # ── Dark mode ────────────────────────────────────────────────────
 
-    def _on_dark_mode_changed(self, manager, _):
+    def _on_dark_mode_changed(self, manager, _pspec):
         pass  # SVG icon werkt in beide thema's
 
     # ── Pagina: Welkom ───────────────────────────────────────────────
@@ -428,14 +428,14 @@ class SetupWizard(Adw.Window):
         except Exception:
             pass
 
-    def _on_backup_toggle(self, switch, _):
+    def _on_backup_toggle(self, switch, _pspec):
         active = switch.get_active()
         self.drive_row.set_sensitive(active)
         self.drive_combo.set_sensitive(active and bool(self.drives))
         if active and not self.drives:
             self._on_refresh_drives(None)
 
-    def _on_drive_selected(self, combo, _):
+    def _on_drive_selected(self, combo, _pspec):
         selected = combo.get_selected()
         if self.drives and selected < len(self.drives):
             self.backup_folder_row.set_sensitive(True)

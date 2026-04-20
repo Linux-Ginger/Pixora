@@ -1940,7 +1940,7 @@ class MainWindow(Adw.ApplicationWindow):
     def is_dark(self):
         return self.style_manager.get_dark()
 
-    def on_dark_mode_changed(self, manager, _):
+    def on_dark_mode_changed(self, manager, _pspec):
         logo_path = get_logo_path(self.is_dark())
         if os.path.exists(logo_path):
             self.logo_picture.set_filename(logo_path)
@@ -3521,7 +3521,7 @@ class MainWindow(Adw.ApplicationWindow):
         elif index == 3:
             self.photos.sort(key=lambda p: os.path.basename(p).lower(), reverse=True)
 
-    def on_sort_changed(self, combo, _):
+    def on_sort_changed(self, combo, _pspec):
         if not self.photos:
             return
         options = [_("Datum nieuwste"), _("Datum oudste"), _("Naam A-Z"), _("Naam Z-A")]
@@ -5995,7 +5995,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings["duplicate_threshold"] = value
             save_settings(self.settings)
 
-    def on_dup_switch_toggled(self, switch, _):
+    def on_dup_switch_toggled(self, switch, _pspec):
         # Aan = strict (1), Uit = 0 (detectie uit)
         active = switch.get_active()
         self.settings["duplicate_threshold"] = 1 if active else 0
@@ -6011,7 +6011,7 @@ class MainWindow(Adw.ApplicationWindow):
             drive_present = self._backup_drive_mountpoint() is not None
             self.settings_dedup_row.set_sensitive(backup_on and drive_present and active)
 
-    def on_settings_backup_toggle(self, switch, _):
+    def on_settings_backup_toggle(self, switch, _pspec):
         active = switch.get_active()
         if not active and self.settings.get("backup_enabled") \
                 and self.settings.get("backup_uuid"):
@@ -6114,11 +6114,11 @@ class MainWindow(Adw.ApplicationWindow):
             else:
                 self.settings_drive_model.append(_("Geen externe schijven gevonden"))
 
-    def on_backup_dedup_toggle(self, switch, _):
+    def on_backup_dedup_toggle(self, switch, _pspec):
         self.settings["backup_dedup"] = switch.get_active()
         save_settings(self.settings)
 
-    def on_backup_silent_toggle(self, switch, _):
+    def on_backup_silent_toggle(self, switch, _pspec):
         active = switch.get_active()
         if active and not self.settings.get("backup_silent"):
             # User zet 'm AAN → confirm dialog. Bij cancel: switch terug.
@@ -6232,7 +6232,7 @@ class MainWindow(Adw.ApplicationWindow):
                     break
         return drives
 
-    def on_settings_drive_selected(self, combo, _):
+    def on_settings_drive_selected(self, combo, _pspec):
         selected = combo.get_selected()
         if self.settings_drives and selected < len(self.settings_drives):
             new_uuid, new_label = self.settings_drives[selected]
