@@ -6438,28 +6438,31 @@ class MainWindow(Adw.ApplicationWindow):
         )
 
     def _parse_rsync_stats(self, stdout):
+        """rsync --stats schrijft regels als
+            Number of deleted files: 1 (reg: 1)
+        op moderne versies. Door altijd alleen het eerste woord na de `:`
+        te nemen werkt de parser op zowel "1" als "1 (reg: 1)"."""
+        def _int_after_colon(s):
+            parts = s.split(":", 1)
+            if len(parts) != 2:
+                return 0
+            val = parts[1].strip().split()[0].replace(",", "") if parts[1].strip() else ""
+            try:
+                return int(val)
+            except ValueError:
+                return 0
+
         new_count = 0
         bytes_to_transfer = 0
         delete_count = 0
         for line in stdout.splitlines():
             s = line.strip()
             if s.startswith("Number of regular files transferred:"):
-                try:
-                    new_count = int(s.split(":", 1)[1].replace(",", "").strip())
-                except Exception:
-                    pass
+                new_count = _int_after_colon(s)
             elif s.startswith("Total transferred file size:"):
-                try:
-                    val = s.split(":", 1)[1].strip()
-                    val = val.split()[0].replace(",", "")
-                    bytes_to_transfer = int(val)
-                except Exception:
-                    pass
+                bytes_to_transfer = _int_after_colon(s)
             elif s.startswith("Number of deleted files:"):
-                try:
-                    delete_count = int(s.split(":", 1)[1].replace(",", "").strip())
-                except Exception:
-                    pass
+                delete_count = _int_after_colon(s)
         return new_count, bytes_to_transfer, delete_count
 
     def _handle_scan_result(self, result):
