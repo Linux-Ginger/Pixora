@@ -1220,6 +1220,11 @@ class MainWindow(Adw.ApplicationWindow):
         # aanwezig = backup aan) zodat bestaande configs blijven werken.
         if "backup_enabled" not in self.settings and self.settings.get("backup_uuid"):
             self.settings["backup_enabled"] = True
+        # Zorg dat pixora.desktop een kloppend Icon=-pad heeft. Gebruikers die
+        # alleen 'git pull' doen in .local/share/pixora draaien updater.sh
+        # nooit, dus de .desktop van een oudere install houdt het kapotte
+        # docs/pixora-icon.svg-pad vast. Repareer zelf op startup.
+        self._repair_desktop_entry()
         # Thumbnail-grootte uit instellingen (globale constante wordt hier overschreven)
         global THUMB_SIZE
         try:
@@ -1672,6 +1677,63 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_update_banner_clicked(self, banner):
         self._open_installer()
+
+    def _repair_desktop_entry(self):
+        """Check ~/.local/share/applications/pixora.desktop: als het Icon=
+        pad niet (meer) bestaat, regenereer het bestand. Draait silent —
+        een falen hier mag Pixora nooit blokkeren."""
+        try:
+            install_dir = os.path.expanduser("~/.local/share/pixora")
+            icon = os.path.join(install_dir, "assets", "logos", "pixora-icon.svg")
+            launcher = os.path.expanduser("~/.local/bin/pixora")
+            desktop_dir = os.path.expanduser("~/.local/share/applications")
+            desktop = os.path.join(desktop_dir, "pixora.desktop")
+            if not os.path.exists(icon) or not os.path.exists(launcher):
+                return  # Draait vanuit dev-tree of niet-geïnstalleerd
+            needs_write = True
+            if os.path.exists(desktop):
+                try:
+                    with open(desktop) as _df:
+                        for line in _df:
+                            if line.startswith("Icon="):
+                                current = line[5:].strip()
+                                if current == icon and os.path.exists(current):
+                                    needs_write = False
+                                break
+                except Exception:
+                    pass
+            if not needs_write:
+                return
+            os.makedirs(desktop_dir, exist_ok=True)
+            content = (
+                "[Desktop Entry]\n"
+                "Name=Pixora\n"
+                "GenericName=Photo & Video Manager\n"
+                "GenericName[nl]=Foto & Video Manager\n"
+                "GenericName[de]=Foto- & Video-Manager\n"
+                "GenericName[fr]=Gestionnaire de photos et vidéos\n"
+                "Comment=Photo & video manager by LinuxGinger\n"
+                "Comment[nl]=Foto & video manager door LinuxGinger\n"
+                "Comment[de]=Foto- & Video-Manager von LinuxGinger\n"
+                "Comment[fr]=Gestionnaire de photos et vidéos par LinuxGinger\n"
+                f"Exec={launcher}\n"
+                f"Icon={icon}\n"
+                "Terminal=false\n"
+                "Type=Application\n"
+                "Categories=Graphics;Photography;\n"
+            )
+            with open(desktop, "w") as _df:
+                _df.write(content)
+            try:
+                subprocess.run(
+                    ["update-desktop-database", desktop_dir],
+                    capture_output=True, timeout=5,
+                )
+            except Exception:
+                pass
+            log_info(_("pixora.desktop gerepareerd: Icon={p}").format(p=icon))
+        except Exception:
+            pass
 
     def _open_installer(self):
         log_info(_("GUI-updater gestart"))
