@@ -1650,3 +1650,12 @@ msgstr "Mode silencieux : la sauvegarde démarre automatiquement sans dialogue"
 
 msgid "Silent-mode: backup voltooid zonder popup"
 msgstr "Mode silencieux : sauvegarde terminée sans pop-up"
+
+msgid "Aanzetten"
+msgstr "Activer"
+
+msgid "Automatisch bevestigen aanzetten?"
+msgstr "Activer la confirmation automatique ?"
+
+msgid "Pixora gaat backup/sync direct starten zonder bevestigingsdialog wanneer er iets te doen is. Alleen foutmeldingen blijven verschijnen."
+msgstr "Pixora lancera la sauvegarde/synchro immédiatement sans dialogue de confirmation s'il y a quelque chose à faire. Seuls les messages d'erreur restent affichés."

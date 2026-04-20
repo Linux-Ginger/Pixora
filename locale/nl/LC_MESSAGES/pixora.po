@@ -1659,3 +1659,12 @@ msgstr "Silent-mode: backup start automatisch zonder dialog"
 
 msgid "Silent-mode: backup voltooid zonder popup"
 msgstr "Silent-mode: backup voltooid zonder popup"
+
+msgid "Aanzetten"
+msgstr "Aanzetten"
+
+msgid "Automatisch bevestigen aanzetten?"
+msgstr "Automatisch bevestigen aanzetten?"
+
+msgid "Pixora gaat backup/sync direct starten zonder bevestigingsdialog wanneer er iets te doen is. Alleen foutmeldingen blijven verschijnen."
+msgstr "Pixora gaat backup/sync direct starten zonder bevestigingsdialog wanneer er iets te doen is. Alleen foutmeldingen blijven verschijnen."

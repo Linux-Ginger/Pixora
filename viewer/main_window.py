@@ -6119,8 +6119,40 @@ class MainWindow(Adw.ApplicationWindow):
         save_settings(self.settings)
 
     def on_backup_silent_toggle(self, switch, _):
-        self.settings["backup_silent"] = switch.get_active()
+        active = switch.get_active()
+        if active and not self.settings.get("backup_silent"):
+            # User zet 'm AAN → confirm dialog. Bij cancel: switch terug.
+            def _confirm():
+                dlg = Adw.AlertDialog(
+                    heading=_("Automatisch bevestigen aanzetten?"),
+                    body=_("Pixora gaat backup/sync direct starten zonder "
+                           "bevestigingsdialog wanneer er iets te doen is. "
+                           "Alleen foutmeldingen blijven verschijnen."),
+                )
+                dlg.add_response("cancel", _("Annuleren"))
+                dlg.add_response("enable", _("Aanzetten"))
+                dlg.set_response_appearance("enable", Adw.ResponseAppearance.SUGGESTED)
+                dlg.set_close_response("cancel")
+                dlg.connect("response", self._on_silent_confirm_response)
+                self._present_dialog(dlg)
+                return False
+            GLib.idle_add(_confirm)
+            return
+        self.settings["backup_silent"] = active
         save_settings(self.settings)
+
+    def _on_silent_confirm_response(self, dlg, response):
+        if response == "enable":
+            self.settings["backup_silent"] = True
+            save_settings(self.settings)
+        else:
+            self.settings_silent_switch.handler_block_by_func(
+                self.on_backup_silent_toggle
+            )
+            self.settings_silent_switch.set_active(False)
+            self.settings_silent_switch.handler_unblock_by_func(
+                self.on_backup_silent_toggle
+            )
 
     def on_settings_manual_scan(self, btn):
         if self._backup_running or self._backup_scanning:
@@ -6516,14 +6548,16 @@ class MainWindow(Adw.ApplicationWindow):
                 self._backup_donut.queue_draw()
             except Exception:
                 pass
-        if hasattr(self, "_backup_donut_btn"):
-            self._backup_donut_btn.set_visible(self._backup_running)
-        # Als er een manual-scan knop met eigen state-machine bestaat:
-        # reset naar uptodate (fade) of idle afhankelijk van resultaat.
+        # Donut-visibility beslissen we verderop, nadat we weten of silent-
+        # mode een backup gaat starten. Anders zou hij kort uitgaan tussen
+        # scan-end en backup-start.
         manual_requested = self._manual_scan_requested
         self._manual_scan_requested = False
+        silent = bool(self.settings.get("backup_silent"))
         if result is None:
             log_warn(_("Backup-scan niet voltooid"))
+            if hasattr(self, "_backup_donut_btn"):
+                self._backup_donut_btn.set_visible(self._backup_running)
             self._set_manual_scan_state("idle")
             return False
         new_count = result["new"]
@@ -6547,9 +6581,10 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
             self._hide_backup_pending_banner()
             log_info(_("Backup-scan: alles gesynct"))
-            # In backup-modus kunnen er orphans zijn; bij handmatige scan
-            # tóón we dat dan als info-dialog. Anders helemaal stil.
-            if manual_requested:
+            if hasattr(self, "_backup_donut_btn"):
+                self._backup_donut_btn.set_visible(self._backup_running)
+            # Silent-mode: geen popup, ook niet bij manuele klik.
+            if not silent and manual_requested:
                 if delete_count > 0 and mode == "backup":
                     self._show_orphans_only_dialog(delete_count)
                 else:
@@ -6567,14 +6602,20 @@ class MainWindow(Adw.ApplicationWindow):
             n=new_count, d=delete_count, m=mode,
             b=bytes_to_transfer, u=dup_count,
         ))
-        # Silent-mode: sla de scan-dialog over en start de backup direct.
-        # Manual-scan negeert silent-mode, want de user klikte expliciet op
-        # Controleer en wil het resultaat zien.
-        if self.settings.get("backup_silent") and not manual_requested:
+        # Silent-mode: scan-dialog overslaan en backup direct starten, óók
+        # als dit een handmatige Controleer-klik was. User heeft immers
+        # gekozen voor "alles automatisch bevestigen".
+        if silent:
             log_info(_("Silent-mode: backup start automatisch zonder dialog"))
+            # Donut mag niet uitflikkeren tussen scan-end en backup-start.
+            if hasattr(self, "_backup_donut_btn"):
+                self._backup_donut_btn.set_visible(True)
             self.start_backup()
             self._set_manual_scan_state("idle")
             return False
+        # Niet-silent: donut verbergen (scan is klaar, backup draait niet).
+        if hasattr(self, "_backup_donut_btn"):
+            self._backup_donut_btn.set_visible(self._backup_running)
         self._show_backup_scan_dialog(
             new_count, delete_count, bytes_to_transfer, dup_count, mode
         )
