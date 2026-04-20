@@ -7,17 +7,16 @@
 <style>
   html, body { margin: 0; padding: 0; height: 100%; background: #d8dde0; font-family: sans-serif; }
   #map { width: 100%; height: 100%; background: #d8dde0; }
-  /* Voorkom dat de browser een HTML5-drag start op tile-images of popup-
-     thumbnails — dat gaf een "losstaand wit vierkantje" en een extra
-     entry in de taakbalk wanneer de gebruiker van binnen de kaart naar
-     buiten dragged. */
-  #map img, #map .leaflet-tile {
-    -webkit-user-drag: none;
-    user-drag: none;
-    user-select: none;
+  /* Voorkom dat WebKit een HTML5-drag start op élk element in de kaart —
+     inclusief tile-images, popup-thumbnails en cluster-divs. Zonder dit
+     kon de gebruiker van binnen de kaart naar buiten slepen en kreeg een
+     losstaand wit vierkantje + een extra taakbalk-entry tot los laten. */
+  html, body, body *, #map, #map * {
+    -webkit-user-drag: none !important;
+    user-drag: none !important;
     -webkit-user-select: none;
+    user-select: none;
   }
-  #map { -webkit-user-select: none; user-select: none; }
   #offline-banner {
     position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
     background: rgba(30,30,30,0.92); color: #fff; padding: 10px 16px;
@@ -47,7 +46,7 @@
   .leaflet-control-attribution a { color: #0077cc; }
 </style>
 </head>
-<body>
+<body ondragstart="return false" ondrop="return false">
 <div id="map"></div>
 <div id="offline-banner">⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden</div>
 
@@ -116,10 +115,20 @@
   });
   tileLayer.addTo(map);
 
-  // Extra guard tegen HTML5-drag: fire dragstart → preventDefault.
-  map.getContainer().addEventListener('dragstart', function(e) {
-    e.preventDefault();
+  // Document-level drag-blockers in capture-fase zodat geen enkele
+  // dragstart door WebKit naar GTK wordt doorgegeven (anders spawnt
+  // GTK een drag-surface en taakbalk-entry).
+  ['dragstart', 'drag', 'dragover', 'dragenter', 'dragleave', 'drop',
+   'selectstart'].forEach(function(ev) {
+    document.addEventListener(ev, function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }, true);
   });
+  window.addEventListener('dragstart', function(e) {
+    e.preventDefault();
+  }, true);
 
   // Laat Pixora weten wanneer de eerste tiles klaar zijn, zodat de
   // spinner kan wisselen naar de kaart.
