@@ -1847,10 +1847,10 @@ class MainWindow(Adw.ApplicationWindow):
                     _("Nieuwe versie beschikbaar — klik om bij te werken")
                 )
                 self._update_btn_stack.set_visible_child_name("available")
-                # Pulse: 1s update-icon, 1s idle-label, repeat.
+                # Pulse: 1.5s update-icon, 1.5s "Bijwerken"-label, repeat.
                 self._update_pulse_on = True
                 self._update_check_pulse_id = GLib.timeout_add(
-                    1000, self._update_pulse_tick
+                    1500, self._update_pulse_tick
                 )
         except Exception:
             pass
@@ -1878,7 +1878,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._update_pulse_on = not self._update_pulse_on
         try:
             self._update_btn_stack.set_visible_child_name(
-                "available" if self._update_pulse_on else "idle"
+                "available" if self._update_pulse_on else "available_label"
             )
         except Exception:
             self._update_check_pulse_id = None
@@ -5485,6 +5485,10 @@ class MainWindow(Adw.ApplicationWindow):
         warn_icon = Gtk.Image.new_from_icon_name("software-update-available-symbolic")
         warn_icon.add_css_class("accent")
         self._update_btn_stack.add_named(warn_icon, "available")
+
+        update_lbl = Gtk.Label(label=_("Bijwerken"))
+        update_lbl.add_css_class("accent")
+        self._update_btn_stack.add_named(update_lbl, "available_label")
 
         self._update_check_btn.set_child(self._update_btn_stack)
         self._update_check_row.add_suffix(self._update_check_btn)
