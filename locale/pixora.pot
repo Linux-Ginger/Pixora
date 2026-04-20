@@ -925,3 +925,15 @@ msgstr ""
 
 msgid "GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc."
 msgstr ""
+
+msgid "Backup mislukt"
+msgstr ""
+
+msgid "Kon {term} niet starten: {err}"
+msgstr ""
+
+msgid "Updater-script downloaden mislukt: {err}"
+msgstr ""
+
+msgid "pixora.desktop gerepareerd: Icon={p}"
+msgstr ""

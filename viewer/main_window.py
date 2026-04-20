@@ -5137,7 +5137,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dup_switch.set_valign(Gtk.Align.CENTER)
         self.settings_dup_switch.set_active(dup_on)
         self.settings_dup_switch.connect("notify::active", self.on_dup_switch_toggled)
-        dup_row = Adw.ActionRow(title=_("Controleren bij import"))
+        dup_row = Adw.ActionRow(title=_("Duplicaat-detectie"))
         dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
         dup_row.add_suffix(self.settings_dup_switch)
         dup_row.set_activatable_widget(self.settings_dup_switch)
@@ -5342,28 +5342,23 @@ class MainWindow(Adw.ApplicationWindow):
         app_row.add_suffix(github_btn)
         about_group.add(app_row)
 
-        # Credit regel voor GitHub-logo, conform brand.github.com.
-        credit_row = Adw.ActionRow(
-            title="",
-            subtitle=_("GitHub® en het Invertocat-logo zijn handelsmerken "
-                       "van GitHub, Inc."),
-        )
-        credit_row.add_css_class("caption")
-        credit_row.set_activatable(False)
-        try:
-            credit_row.set_subtitle_lines(2)
-        except Exception:
-            pass
-        about_group.add(credit_row)
-
-        # Versie row
+        # Versie row — bevat ook de GitHub-logo credit als tweede regel,
+        # visueel aan de Versie-rij gekoppeld zonder lege tussenruimte.
         installed_version_path = os.path.join(os.path.expanduser("~"), ".config", "pixora", "installed_version")
         try:
             with open(installed_version_path) as _ivf:
                 installed_ver = _ivf.read().strip()
         except Exception:
             installed_ver = _("Onbekend")
-        version_row = Adw.ActionRow(title=_("Versie"), subtitle=installed_ver)
+        gh_credit = _("GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc.")
+        version_row = Adw.ActionRow(
+            title=_("Versie"),
+            subtitle=f"{installed_ver}\n{gh_credit}",
+        )
+        try:
+            version_row.set_subtitle_lines(3)
+        except Exception:
+            pass
         about_group.add(version_row)
 
         # Controleer op updates row

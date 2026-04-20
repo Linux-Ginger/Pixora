@@ -1574,3 +1574,15 @@ msgstr "Vérifier à l'import"
 
 msgid "GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc."
 msgstr "GitHub® et le logo Invertocat sont des marques de GitHub, Inc."
+
+msgid "Backup mislukt"
+msgstr "Échec de la sauvegarde"
+
+msgid "Kon {term} niet starten: {err}"
+msgstr "Impossible de démarrer {term} : {err}"
+
+msgid "Updater-script downloaden mislukt: {err}"
+msgstr "Échec du téléchargement du script de mise à jour : {err}"
+
+msgid "pixora.desktop gerepareerd: Icon={p}"
+msgstr "pixora.desktop réparé : Icon={p}"
