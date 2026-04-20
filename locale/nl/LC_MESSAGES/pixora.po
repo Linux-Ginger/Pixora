@@ -1292,3 +1292,45 @@ msgstr "Toch sluiten"
 
 msgid "Drive-scan: {n} externe schijven gevonden"
 msgstr "Drive-scan: {n} externe schijven gevonden"
+
+msgid "Instellen"
+msgstr "Instellen"
+
+msgid "Kies backup-map"
+msgstr "Kies backup-map"
+
+msgid "Hoofdmap van USB-schijf"
+msgstr "Hoofdmap van USB-schijf"
+
+msgid "Nieuwe map maken"
+msgstr "Nieuwe map maken"
+
+msgid "Gebruik deze map"
+msgstr "Gebruik deze map"
+
+msgid "Nieuwe map"
+msgstr "Nieuwe map"
+
+msgid "Geef een naam voor de nieuwe map:"
+msgstr "Geef een naam voor de nieuwe map:"
+
+msgid "Map-naam"
+msgstr "Map-naam"
+
+msgid "Aanmaken"
+msgstr "Aanmaken"
+
+msgid "Kon map niet aanmaken"
+msgstr "Kon map niet aanmaken"
+
+msgid "Geen submappen"
+msgstr "Geen submappen"
+
+msgid "Maak er eentje aan met de knop hieronder"
+msgstr "Maak er eentje aan met de knop hieronder"
+
+msgid "Geen backup-schijf"
+msgstr "Geen backup-schijf"
+
+msgid "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."
+msgstr "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."

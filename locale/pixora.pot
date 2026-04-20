@@ -633,3 +633,45 @@ msgstr ""
 msgid "🗺 laden..."
 msgstr ""
 
+
+msgid "Instellen"
+msgstr ""
+
+msgid "Kies backup-map"
+msgstr ""
+
+msgid "Hoofdmap van USB-schijf"
+msgstr ""
+
+msgid "Nieuwe map maken"
+msgstr ""
+
+msgid "Gebruik deze map"
+msgstr ""
+
+msgid "Nieuwe map"
+msgstr ""
+
+msgid "Geef een naam voor de nieuwe map:"
+msgstr ""
+
+msgid "Map-naam"
+msgstr ""
+
+msgid "Aanmaken"
+msgstr ""
+
+msgid "Kon map niet aanmaken"
+msgstr ""
+
+msgid "Geen submappen"
+msgstr ""
+
+msgid "Maak er eentje aan met de knop hieronder"
+msgstr ""
+
+msgid "Geen backup-schijf"
+msgstr ""
+
+msgid "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."
+msgstr ""

@@ -1292,3 +1292,45 @@ msgstr "Close anyway"
 
 msgid "Drive-scan: {n} externe schijven gevonden"
 msgstr "Drive scan: {n} external drives found"
+
+msgid "Instellen"
+msgstr "Set up"
+
+msgid "Kies backup-map"
+msgstr "Choose backup folder"
+
+msgid "Hoofdmap van USB-schijf"
+msgstr "Root of USB drive"
+
+msgid "Nieuwe map maken"
+msgstr "New folder"
+
+msgid "Gebruik deze map"
+msgstr "Use this folder"
+
+msgid "Nieuwe map"
+msgstr "New folder"
+
+msgid "Geef een naam voor de nieuwe map:"
+msgstr "Enter a name for the new folder:"
+
+msgid "Map-naam"
+msgstr "Folder name"
+
+msgid "Aanmaken"
+msgstr "Create"
+
+msgid "Kon map niet aanmaken"
+msgstr "Could not create folder"
+
+msgid "Geen submappen"
+msgstr "No subfolders"
+
+msgid "Maak er eentje aan met de knop hieronder"
+msgstr "Create one with the button below"
+
+msgid "Geen backup-schijf"
+msgstr "No backup drive"
+
+msgid "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."
+msgstr "Plug in a USB drive first and select it under 'Backup drive'."

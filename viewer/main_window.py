@@ -1032,11 +1032,189 @@ class MapWidget(Gtk.Box):
                 GLib.idle_add(self.status_cb, "offline")
 
 
+# ── Backup-map picker ────────────────────────────────────────────────
+class BackupFolderPicker(Adw.Dialog):
+    """Een simpele picker die je niet buiten de USB-schijf laat navigeren en
+    een knop heeft om ter plekke een nieuwe submap aan te maken."""
+
+    def __init__(self, mountpoint, current_path, on_selected):
+        super().__init__()
+        from pathlib import Path as _P
+        self._root = _P(mountpoint).resolve()
+        self._on_selected = on_selected
+        try:
+            start = _P(current_path).resolve() if current_path else self._root
+            start.relative_to(self._root)
+            if not start.is_dir():
+                start = self._root
+        except Exception:
+            start = self._root
+        self._cursor = start
+
+        self.set_title(_("Kies backup-map"))
+        self.set_content_width(480)
+        self.set_content_height(520)
+
+        toolbar = Adw.ToolbarView()
+        toolbar.add_top_bar(Adw.HeaderBar())
+
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=8,
+            margin_start=12, margin_end=12, margin_top=12, margin_bottom=12,
+        )
+
+        self._path_label = Gtk.Label(xalign=0)
+        self._path_label.add_css_class("dim-label")
+        self._path_label.set_wrap(True)
+        box.append(self._path_label)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self._listbox = Gtk.ListBox()
+        self._listbox.add_css_class("boxed-list")
+        self._listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        scroll.set_child(self._listbox)
+        box.append(scroll)
+
+        new_btn = Gtk.Button(label=_("Nieuwe map maken"))
+        new_btn.set_icon_name("folder-new-symbolic")
+        new_btn.connect("clicked", self._on_new_folder_clicked)
+        box.append(new_btn)
+
+        actions = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL, spacing=8,
+            halign=Gtk.Align.END,
+        )
+        cancel = Gtk.Button(label=_("Annuleren"))
+        cancel.connect("clicked", lambda *_a: self.close())
+        use = Gtk.Button(label=_("Gebruik deze map"))
+        use.add_css_class("suggested-action")
+        use.connect("clicked", self._on_use_clicked)
+        actions.append(cancel)
+        actions.append(use)
+        box.append(actions)
+
+        toolbar.set_content(box)
+        self.set_child(toolbar)
+        self._refresh()
+
+    def _refresh(self):
+        from pathlib import Path as _P
+        try:
+            rel = self._cursor.relative_to(self._root)
+        except ValueError:
+            self._cursor = self._root
+            rel = _P(".")
+        if str(rel) == ".":
+            self._path_label.set_label(_("Hoofdmap van USB-schijf"))
+        else:
+            self._path_label.set_label(f"/{rel}")
+
+        while True:
+            row = self._listbox.get_first_child()
+            if row is None:
+                break
+            self._listbox.remove(row)
+
+        if self._cursor != self._root:
+            up = Adw.ActionRow(title=_("Terug"))
+            up.add_prefix(Gtk.Image.new_from_icon_name("go-up-symbolic"))
+            up.set_activatable(True)
+            up.connect("activated", lambda *_a: self._navigate(self._cursor.parent))
+            self._listbox.append(up)
+
+        try:
+            entries = sorted(
+                (e for e in self._cursor.iterdir()
+                 if e.is_dir() and not e.name.startswith(".")),
+                key=lambda p: p.name.lower(),
+            )
+        except Exception:
+            entries = []
+
+        if not entries and self._cursor == self._root:
+            empty = Adw.ActionRow(
+                title=_("Geen submappen"),
+                subtitle=_("Maak er eentje aan met de knop hieronder"),
+            )
+            empty.set_sensitive(False)
+            self._listbox.append(empty)
+        else:
+            for e in entries:
+                row = Adw.ActionRow(title=e.name)
+                row.add_prefix(Gtk.Image.new_from_icon_name("folder-symbolic"))
+                row.set_activatable(True)
+                row.connect("activated", lambda _r, p=e: self._navigate(p))
+                self._listbox.append(row)
+
+    def _navigate(self, path):
+        try:
+            resolved = path.resolve()
+            resolved.relative_to(self._root)
+        except Exception:
+            return
+        if not resolved.is_dir():
+            return
+        self._cursor = resolved
+        self._refresh()
+
+    def _on_new_folder_clicked(self, btn):
+        dlg = Adw.AlertDialog(
+            heading=_("Nieuwe map"),
+            body=_("Geef een naam voor de nieuwe map:"),
+        )
+        entry = Gtk.Entry()
+        entry.set_placeholder_text(_("Map-naam"))
+        dlg.set_extra_child(entry)
+        dlg.add_response("cancel", _("Annuleren"))
+        dlg.add_response("create", _("Aanmaken"))
+        dlg.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("create")
+        dlg.set_close_response("cancel")
+        entry.connect("activate", lambda *_a: dlg.response("create"))
+        dlg.connect("response", self._on_create_response, entry)
+        dlg.present(self)
+
+    def _on_create_response(self, dlg, response, entry):
+        if response != "create":
+            return
+        name = entry.get_text().strip()
+        if not name or "/" in name or name in (".", ".."):
+            return
+        new_path = self._cursor / name
+        try:
+            new_path.mkdir(parents=False, exist_ok=True)
+        except Exception as exc:
+            err = Adw.AlertDialog(
+                heading=_("Kon map niet aanmaken"),
+                body=str(exc),
+            )
+            err.add_response("ok", _("OK"))
+            err.present(self)
+            return
+        self._cursor = new_path
+        self._refresh()
+
+    def _on_use_clicked(self, btn):
+        try:
+            self._cursor.relative_to(self._root)
+        except ValueError:
+            return
+        self._on_selected(str(self._cursor))
+        self.close()
+
+
 # ── Hoofdvenster ─────────────────────────────────────────────────────
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
         self.settings        = settings
+        # Migratie: pre-v1.16 installs hadden geen backup_enabled-flag, maar
+        # wel een backup_uuid. Neem de oude impliciete semantiek over (uuid
+        # aanwezig = backup aan) zodat bestaande configs blijven werken.
+        if "backup_enabled" not in self.settings and self.settings.get("backup_uuid"):
+            self.settings["backup_enabled"] = True
         # Thumbnail-grootte uit instellingen (globale constante wordt hier overschreven)
         global THUMB_SIZE
         try:
@@ -4793,9 +4971,11 @@ class MainWindow(Adw.ApplicationWindow):
         backup_group.set_title(_("Automatische backup"))
         backup_group.set_description(_("Backup naar externe USB schijf na elke import"))
 
+        backup_on = bool(self.settings.get("backup_enabled"))
+
         self.settings_backup_switch = Gtk.Switch()
         self.settings_backup_switch.set_valign(Gtk.Align.CENTER)
-        self.settings_backup_switch.set_active(bool(self.settings.get("backup_uuid")))
+        self.settings_backup_switch.set_active(backup_on)
         self.settings_backup_switch.connect("notify::active", self.on_settings_backup_toggle)
 
         backup_toggle_row = Adw.ActionRow(title=_("Automatische backup"), subtitle=_("Synchroniseert na elke import"))
@@ -4813,7 +4993,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.settings_drive_combo = Gtk.DropDown(model=self.settings_drive_model)
         self.settings_drive_combo.set_size_request(220, -1)
-        self.settings_drive_combo.set_sensitive(bool(self.settings.get("backup_uuid")))
+        self.settings_drive_combo.set_sensitive(backup_on)
         self.settings_drive_combo.connect("notify::selected", self.on_settings_drive_selected)
 
         current_uuid = self.settings.get("backup_uuid")
@@ -4831,7 +5011,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_drive_row = Adw.ActionRow(title=_("Backup schijf"), subtitle=_("Alleen externe schijven"))
         self.settings_drive_row.add_suffix(settings_refresh_btn)
         self.settings_drive_row.add_suffix(self.settings_drive_combo)
-        self.settings_drive_row.set_sensitive(bool(self.settings.get("backup_uuid")))
+        self.settings_drive_row.set_sensitive(backup_on)
         backup_group.add(self.settings_drive_row)
 
         current_backup_path = self.settings.get("backup_path") or _("Niet ingesteld")
@@ -4839,13 +5019,14 @@ class MainWindow(Adw.ApplicationWindow):
             title=_("Map op backup schijf"),
             subtitle=current_backup_path
         )
-        self.settings_backup_folder_row.set_sensitive(bool(self.settings.get("backup_uuid")))
+        self.settings_backup_folder_row.set_sensitive(backup_on)
 
-        change_backup_folder_btn = Gtk.Button(label=_("Wijzigen"))
-        change_backup_folder_btn.add_css_class("flat")
-        change_backup_folder_btn.set_valign(Gtk.Align.CENTER)
-        change_backup_folder_btn.connect("clicked", self.on_settings_change_backup_folder)
-        self.settings_backup_folder_row.add_suffix(change_backup_folder_btn)
+        folder_btn_label = _("Wijzigen") if self.settings.get("backup_path") else _("Instellen")
+        self.settings_backup_folder_btn = Gtk.Button(label=folder_btn_label)
+        self.settings_backup_folder_btn.add_css_class("flat")
+        self.settings_backup_folder_btn.set_valign(Gtk.Align.CENTER)
+        self.settings_backup_folder_btn.connect("clicked", self.on_settings_change_backup_folder)
+        self.settings_backup_folder_row.add_suffix(self.settings_backup_folder_btn)
         backup_group.add(self.settings_backup_folder_row)
         import_page.add(backup_group)
 
@@ -5184,59 +5365,64 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_drive_row.set_sensitive(active)
         self.settings_drive_combo.set_sensitive(active)
         self.settings_backup_folder_row.set_sensitive(active)
-        if not active:
-            self.settings["backup_uuid"] = None
-            self.settings["backup_path"] = None
-            save_settings(self.settings)
+        self.settings["backup_enabled"] = active
+        if active:
+            # Zorg dat we een uuid hebben zodra de schakelaar aan gaat — ook
+            # als de combo nooit getriggerd werd (bij één enkele drive blijft
+            # notify::selected uit omdat de selectie niet wijzigt).
+            if not self.settings.get("backup_uuid") and self.settings_drives:
+                sel = self.settings_drive_combo.get_selected()
+                if 0 <= sel < len(self.settings_drives):
+                    self.settings["backup_uuid"] = self.settings_drives[sel][0]
+        save_settings(self.settings)
 
     def on_settings_drive_selected(self, combo, _):
         selected = combo.get_selected()
         if self.settings_drives and selected < len(self.settings_drives):
-            self.settings["backup_uuid"] = self.settings_drives[selected][0]
+            new_uuid = self.settings_drives[selected][0]
+            if new_uuid != self.settings.get("backup_uuid"):
+                # Andere schijf gekozen → oud pad is niet meer geldig
+                self.settings["backup_path"] = None
+                self.settings_backup_folder_row.set_subtitle(_("Niet ingesteld"))
+                self.settings_backup_folder_btn.set_label(_("Instellen"))
+            self.settings["backup_uuid"] = new_uuid
             save_settings(self.settings)
 
     def on_settings_refresh_drives(self, btn):
         while self.settings_drive_model.get_n_items() > 0:
             self.settings_drive_model.remove(0)
         self.settings_drives = get_available_drives()
-        # Combo blijft sensitive zolang de backup-switch aan staat, ook als
-        # de lijst (nog) leeg is — anders kan de gebruiker na een refresh-
-        # mislukking nergens meer op klikken.
-        backup_enabled = bool(self.settings.get("backup_uuid")) or \
-            (hasattr(self, "settings_backup_switch") and
-             self.settings_backup_switch.get_active())
+        backup_on = bool(self.settings.get("backup_enabled"))
         if self.settings_drives:
             for uuid, label in self.settings_drives:
                 self.settings_drive_model.append(label)
         else:
             self.settings_drive_model.append(_("Geen externe schijven gevonden"))
-        self.settings_drive_combo.set_sensitive(backup_enabled)
+        self.settings_drive_combo.set_sensitive(backup_on)
 
     def on_settings_change_backup_folder(self, btn):
-        dialog = Gtk.FileDialog()
-        dialog.set_title(_("Kies map op backup schijf"))
         current_uuid = self.settings.get("backup_uuid")
-        if current_uuid:
-            mountpoint = get_mountpoint_for_uuid(current_uuid)
-            if mountpoint:
-                dialog.set_initial_folder(Gio.File.new_for_path(mountpoint))
-        dialog.select_folder(self, None, self.on_settings_backup_folder_selected)
+        mountpoint = get_mountpoint_for_uuid(current_uuid) if current_uuid else None
+        if not mountpoint:
+            dlg = Adw.AlertDialog(
+                heading=_("Geen backup-schijf"),
+                body=_("Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."),
+            )
+            dlg.add_response("ok", _("OK"))
+            dlg.present(self)
+            return
+        picker = BackupFolderPicker(
+            mountpoint=mountpoint,
+            current_path=self.settings.get("backup_path"),
+            on_selected=self._apply_backup_folder,
+        )
+        picker.present(self)
 
-    def on_settings_backup_folder_selected(self, dialog, result):
-        try:
-            folder = dialog.select_folder_finish(result)
-            if folder:
-                chosen = folder.get_path()
-                current_uuid = self.settings.get("backup_uuid")
-                if current_uuid:
-                    mountpoint = get_mountpoint_for_uuid(current_uuid)
-                    if mountpoint and not chosen.startswith(mountpoint):
-                        return
-                self.settings["backup_path"] = chosen
-                save_settings(self.settings)
-                self.settings_backup_folder_row.set_subtitle(chosen)
-        except Exception:
-            pass
+    def _apply_backup_folder(self, chosen):
+        self.settings["backup_path"] = chosen
+        save_settings(self.settings)
+        self.settings_backup_folder_row.set_subtitle(chosen)
+        self.settings_backup_folder_btn.set_label(_("Wijzigen"))
 
     def change_folder(self, parent_dialog):
         file_dialog = Gtk.FileDialog()
@@ -5289,6 +5475,8 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Backup-manager ───────────────────────────────────────────────
     def _is_backup_pending(self):
         """True als er nieuwe import is geweest sinds de laatste backup."""
+        if not self.settings.get("backup_enabled"):
+            return False
         if not self.settings.get("backup_uuid"):
             return False
         last_import = self.settings.get("last_import_time", 0) or 0

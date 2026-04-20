@@ -1283,3 +1283,45 @@ msgstr "Fermer quand même"
 
 msgid "Drive-scan: {n} externe schijven gevonden"
 msgstr "Scan des lecteurs : {n} lecteurs externes trouvés"
+
+msgid "Instellen"
+msgstr "Configurer"
+
+msgid "Kies backup-map"
+msgstr "Choisir le dossier de sauvegarde"
+
+msgid "Hoofdmap van USB-schijf"
+msgstr "Racine du lecteur USB"
+
+msgid "Nieuwe map maken"
+msgstr "Nouveau dossier"
+
+msgid "Gebruik deze map"
+msgstr "Utiliser ce dossier"
+
+msgid "Nieuwe map"
+msgstr "Nouveau dossier"
+
+msgid "Geef een naam voor de nieuwe map:"
+msgstr "Nom du nouveau dossier :"
+
+msgid "Map-naam"
+msgstr "Nom du dossier"
+
+msgid "Aanmaken"
+msgstr "Créer"
+
+msgid "Kon map niet aanmaken"
+msgstr "Impossible de créer le dossier"
+
+msgid "Geen submappen"
+msgstr "Aucun sous-dossier"
+
+msgid "Maak er eentje aan met de knop hieronder"
+msgstr "Créez-en un avec le bouton ci-dessous"
+
+msgid "Geen backup-schijf"
+msgstr "Aucun lecteur de sauvegarde"
+
+msgid "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."
+msgstr "Branchez d'abord un lecteur USB et sélectionnez-le sous « Lecteur de sauvegarde »."
