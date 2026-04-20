@@ -1623,3 +1623,9 @@ msgstr "USB ist schreibgeschützt eingebunden. Aushängen und erneut anschließe
 
 msgid "Backup mislukt: {err}"
 msgstr "Backup fehlgeschlagen: {err}"
+
+msgid "Sync klaar om te starten"
+msgstr "Sync bereit zum Start"
+
+msgid "Nu synchroniseren"
+msgstr "Jetzt synchronisieren"

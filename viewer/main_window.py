@@ -6573,6 +6573,15 @@ class MainWindow(Adw.ApplicationWindow):
                                  dup_count=0, mode="backup"):
         if self._backup_scan_dialog_open:
             return
+        # Tijdens startup (home-grid nog niet ≥2s zichtbaar): uitstellen —
+        # anders landt de popup bovenop een halfgeladen UI. Alleen voor
+        # niet-manuele scans, want een manuele klik = expliciete intentie.
+        ready_at = getattr(self, "_home_ready_at", None)
+        if ready_at is None or (time.time() - ready_at) < 2.0:
+            GLib.timeout_add(500, self._show_backup_scan_dialog,
+                             new_count, delete_count, bytes_to_transfer,
+                             dup_count, mode)
+            return
         self._backup_scan_dialog_open = True
         lines = []
         if new_count > 0:
@@ -6605,12 +6614,15 @@ class MainWindow(Adw.ApplicationWindow):
             eta=self._format_eta(bytes_to_transfer)
         ))
         body = "\n".join(lines)
-        dlg = Adw.AlertDialog(
-            heading=_("Backup klaar om te starten"),
-            body=body,
-        )
+        if mode == "sync":
+            heading = _("Sync klaar om te starten")
+            now_label = _("Nu synchroniseren")
+        else:
+            heading = _("Backup klaar om te starten")
+            now_label = _("Nu backuppen")
+        dlg = Adw.AlertDialog(heading=heading, body=body)
         dlg.add_response("later", _("Later"))
-        dlg.add_response("now", _("Nu backuppen"))
+        dlg.add_response("now", now_label)
         dlg.set_response_appearance("now", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("now")
         dlg.set_close_response("later")

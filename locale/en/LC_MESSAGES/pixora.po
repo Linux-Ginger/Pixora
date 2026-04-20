@@ -1632,3 +1632,9 @@ msgstr "USB is mounted read-only. Unmount and reconnect it, or run `sudo ntfsfix
 
 msgid "Backup mislukt: {err}"
 msgstr "Backup failed: {err}"
+
+msgid "Sync klaar om te starten"
+msgstr "Sync ready to start"
+
+msgid "Nu synchroniseren"
+msgstr "Sync now"

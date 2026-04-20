@@ -1632,3 +1632,9 @@ msgstr "USB is alleen-lezen gemount. Ontkoppel 'm en sluit opnieuw aan, of voer 
 
 msgid "Backup mislukt: {err}"
 msgstr "Backup mislukt: {err}"
+
+msgid "Sync klaar om te starten"
+msgstr "Sync klaar om te starten"
+
+msgid "Nu synchroniseren"
+msgstr "Nu synchroniseren"

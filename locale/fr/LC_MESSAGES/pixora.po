@@ -1623,3 +1623,9 @@ msgstr "L'USB est monté en lecture seule. Démontez-le et reconnectez-le, ou ex
 
 msgid "Backup mislukt: {err}"
 msgstr "Échec de la sauvegarde : {err}"
+
+msgid "Sync klaar om te starten"
+msgstr "Synchronisation prête à démarrer"
+
+msgid "Nu synchroniseren"
+msgstr "Synchroniser maintenant"

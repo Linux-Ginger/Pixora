@@ -974,3 +974,9 @@ msgstr ""
 
 msgid "Backup mislukt: {err}"
 msgstr ""
+
+msgid "Sync klaar om te starten"
+msgstr ""
+
+msgid "Nu synchroniseren"
+msgstr ""
