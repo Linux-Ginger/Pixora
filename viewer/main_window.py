@@ -1422,6 +1422,11 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add_seconds(4, self._poll_backup_drive)
         # Bij startup: als pending + drive aangesloten → meteen popup
         GLib.idle_add(self._check_pending_backup)
+        # Elke 15 min een stille scan: alleen als config compleet, drive
+        # aanwezig, en er niet al iets draait. Resultaat gaat via de
+        # normale handler — die toont de scan-dialog alleen als er iets
+        # te doen is.
+        GLib.timeout_add_seconds(15 * 60, self._periodic_backup_scan)
 
     def _start_services(self):
         try:
@@ -5391,10 +5396,29 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dedup_row = dedup_row
         backup_group.add(dedup_row)
 
-        self.settings_manual_scan_btn = Gtk.Button(label=_("Controleren"))
+        self.settings_manual_scan_btn = Gtk.Button()
         self.settings_manual_scan_btn.add_css_class("flat")
         self.settings_manual_scan_btn.set_valign(Gtk.Align.CENTER)
+        self.settings_manual_scan_btn.set_size_request(120, 32)
         self.settings_manual_scan_btn.connect("clicked", self.on_settings_manual_scan)
+        # Drie states: idle (label), checking (spinner), uptodate (✓ 5s fade)
+        self._scan_btn_stack = Gtk.Stack()
+        self._scan_btn_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self._scan_btn_stack.set_transition_duration(250)
+        self._scan_btn_stack.add_named(Gtk.Label(label=_("Controleren")), "idle")
+        _scan_spin_box = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL, spacing=0,
+            halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER,
+        )
+        self._scan_check_spinner = Gtk.Spinner()
+        self._scan_check_spinner.set_size_request(18, 18)
+        _scan_spin_box.append(self._scan_check_spinner)
+        self._scan_btn_stack.add_named(_scan_spin_box, "checking")
+        _scan_ok = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+        _scan_ok.add_css_class("success")
+        self._scan_btn_stack.add_named(_scan_ok, "uptodate")
+        self.settings_manual_scan_btn.set_child(self._scan_btn_stack)
+        self._scan_btn_fade_id = None
         manual_scan_row = Adw.ActionRow(
             title=_("Nu controleren"),
             subtitle=_("Scan USB op ontbrekende foto's"),
@@ -6082,7 +6106,46 @@ class MainWindow(Adw.ApplicationWindow):
         if self._backup_drive_mountpoint() is None:
             return
         self._manual_scan_requested = True
+        self._set_manual_scan_state("checking")
         self._trigger_backup_scan()
+
+    def _set_manual_scan_state(self, state):
+        """state ∈ {'idle', 'checking', 'uptodate'}."""
+        if not hasattr(self, "_scan_btn_stack"):
+            return
+        if self._scan_btn_fade_id is not None:
+            try:
+                GLib.source_remove(self._scan_btn_fade_id)
+            except Exception:
+                pass
+            self._scan_btn_fade_id = None
+        try:
+            if state == "checking":
+                self._scan_btn_stack.set_visible_child_name("checking")
+                self._scan_check_spinner.start()
+                self.settings_manual_scan_btn.set_sensitive(False)
+            elif state == "uptodate":
+                self._scan_check_spinner.stop()
+                self._scan_btn_stack.set_visible_child_name("uptodate")
+                self.settings_manual_scan_btn.set_sensitive(True)
+                self._scan_btn_fade_id = GLib.timeout_add_seconds(
+                    5, self._scan_fade_done
+                )
+            else:  # idle
+                self._scan_check_spinner.stop()
+                self._scan_btn_stack.set_visible_child_name("idle")
+                self.settings_manual_scan_btn.set_sensitive(True)
+        except Exception:
+            pass
+
+    def _scan_fade_done(self):
+        self._scan_btn_fade_id = None
+        try:
+            if self._scan_btn_stack.get_root() is not None:
+                self._set_manual_scan_state("idle")
+        except Exception:
+            pass
+        return False
 
     def on_backup_mode_changed(self, mode, btn):
         if btn.get_active():
@@ -6268,10 +6331,13 @@ class MainWindow(Adw.ApplicationWindow):
         dedup_enabled = bool(self.settings.get("backup_dedup"))
         to_transfer_rels = []
         if _cmd_available_bk("rsync"):
+            # Altijd --delete in dry-run: we willen weten of er orphans op
+            # USB staan (bestanden die niet meer in Pixora zijn). In
+            # backup-modus verwijderen we ze niet — dan is de count puur
+            # informatief. In sync-modus → echt weg bij volgende backup.
             cmd = ["rsync", "-a", "--dry-run", "--stats",
-                   "--modify-window=2", "--out-format=__RELPATH__%n"]
-            if mode == "sync":
-                cmd.append("--delete")
+                   "--modify-window=2", "--delete",
+                   "--out-format=__RELPATH__%n"]
             cmd += [str(photo_path) + "/", str(backup_dest) + "/"]
             try:
                 out = subprocess.run(
@@ -6312,8 +6378,10 @@ class MainWindow(Adw.ApplicationWindow):
                 if not os.path.exists(df):
                     new_count += 1
                     bytes_to_transfer += size
+            # Altijd orphans op USB tellen; mode bepaalt later of ze
+            # daadwerkelijk weg gaan.
             delete_count = 0
-            if mode == "sync" and os.path.isdir(str(backup_dest)):
+            if os.path.isdir(str(backup_dest)):
                 for root, _dirs, files in os.walk(str(backup_dest)):
                     for fn in files:
                         df = os.path.join(root, fn)
@@ -6365,6 +6433,7 @@ class MainWindow(Adw.ApplicationWindow):
                 "delete": delete_count,
                 "dup_count": dup_count,
                 "excluded": excluded_rels,
+                "mode": mode,
             },
         )
 
@@ -6402,43 +6471,76 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
         if hasattr(self, "_backup_donut_btn"):
             self._backup_donut_btn.set_visible(self._backup_running)
+        # Als er een manual-scan knop met eigen state-machine bestaat:
+        # reset naar uptodate (fade) of idle afhankelijk van resultaat.
+        manual_requested = self._manual_scan_requested
+        self._manual_scan_requested = False
         if result is None:
             log_warn(_("Backup-scan niet voltooid"))
+            self._set_manual_scan_state("idle")
             return False
         new_count = result["new"]
         delete_count = result["delete"]
         bytes_to_transfer = result["bytes"]
         dup_count = result.get("dup_count", 0)
+        mode = result.get("mode", self.settings.get("backup_mode", "backup"))
         self._backup_excluded_paths = result.get("excluded", [])
-        if new_count == 0 and delete_count == 0:
-            # Alles al gesynct — markeer als voltooid zodat pending-state klopt
+
+        # In backup-modus zijn orphans (delete_count) informatief — ze worden
+        # bewaard. Voor de "is alles al gesynct?"-check behandelen we ze dan
+        # alsof er niks te doen is.
+        actionable_delete = delete_count if mode == "sync" else 0
+
+        if new_count == 0 and actionable_delete == 0 and dup_count == 0:
+            # Alles al gesynct — last_backup_time bijwerken.
             self.settings["last_backup_time"] = time.time()
             try:
                 save_settings(self.settings)
             except Exception:
                 pass
             self._hide_backup_pending_banner()
-            if dup_count > 0:
-                log_info(_("Backup-scan: alles gesynct, {d} duplicaten overgeslagen").format(d=dup_count))
-            else:
-                log_info(_("Backup-scan: alles gesynct"))
-            if self._manual_scan_requested:
-                self._manual_scan_requested = False
-                dlg = Adw.AlertDialog(
-                    heading=_("Alles al gesynct"),
-                    body=_("Je USB-schijf heeft al dezelfde foto's als Pixora."),
-                )
-                dlg.add_response("ok", _("OK"))
-                dlg.set_default_response("ok")
-                dlg.set_close_response("ok")
-                self._present_dialog(dlg)
+            log_info(_("Backup-scan: alles gesynct"))
+            # In backup-modus kunnen er orphans zijn; bij handmatige scan
+            # tóón we dat dan als info-dialog. Anders helemaal stil.
+            if manual_requested:
+                if delete_count > 0 and mode == "backup":
+                    self._show_orphans_only_dialog(delete_count)
+                else:
+                    dlg = Adw.AlertDialog(
+                        heading=_("Alles al gesynct"),
+                        body=_("Je USB-schijf heeft al dezelfde foto's als Pixora."),
+                    )
+                    dlg.add_response("ok", _("OK"))
+                    dlg.set_default_response("ok")
+                    dlg.set_close_response("ok")
+                    self._present_dialog(dlg)
+            self._set_manual_scan_state("uptodate")
             return False
-        self._manual_scan_requested = False
-        log_info(_("Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes, {u} duplicaten overgeslagen").format(
-            n=new_count, d=delete_count, b=bytes_to_transfer, u=dup_count,
+        log_info(_("Backup-scan: {n} nieuw, {d} orphans (mode={m}), {b} bytes, {u} duplicaten").format(
+            n=new_count, d=delete_count, m=mode,
+            b=bytes_to_transfer, u=dup_count,
         ))
-        self._show_backup_scan_dialog(new_count, delete_count, bytes_to_transfer, dup_count)
+        self._show_backup_scan_dialog(
+            new_count, delete_count, bytes_to_transfer, dup_count, mode
+        )
+        self._set_manual_scan_state("idle")
         return False
+
+    def _show_orphans_only_dialog(self, orphan_count):
+        dlg = Adw.AlertDialog(
+            heading=_("Alles in Pixora staat op de USB"),
+            body=ngettext(
+                "Er staat nog {n} foto op de USB die niet meer in Pixora is. "
+                "In Backup-modus blijft die bewaard als archief.",
+                "Er staan nog {n} foto's op de USB die niet meer in Pixora zijn. "
+                "In Backup-modus blijven ze bewaard als archief.",
+                orphan_count,
+            ).format(n=orphan_count),
+        )
+        dlg.add_response("ok", _("OK"))
+        dlg.set_default_response("ok")
+        dlg.set_close_response("ok")
+        self._present_dialog(dlg)
 
     def _format_bytes(self, n):
         for unit in ("B", "KB", "MB", "GB", "TB"):
@@ -6464,7 +6566,8 @@ class MainWindow(Adw.ApplicationWindow):
             return ngettext("± {n} uur", "± {n} uur", hours).format(n=hours)
         return _("± {h} u {m} min").format(h=hours, m=rem)
 
-    def _show_backup_scan_dialog(self, new_count, delete_count, bytes_to_transfer, dup_count=0):
+    def _show_backup_scan_dialog(self, new_count, delete_count, bytes_to_transfer,
+                                 dup_count=0, mode="backup"):
         if self._backup_scan_dialog_open:
             return
         self._backup_scan_dialog_open = True
@@ -6476,11 +6579,19 @@ class MainWindow(Adw.ApplicationWindow):
                 new_count,
             ).format(n=new_count, s=self._format_bytes(bytes_to_transfer)))
         if delete_count > 0:
-            lines.append(ngettext(
-                "{n} verouderde bestand wordt verwijderd op USB",
-                "{n} verouderde bestanden worden verwijderd op USB",
-                delete_count,
-            ).format(n=delete_count))
+            if mode == "sync":
+                lines.append(ngettext(
+                    "{n} verouderde bestand wordt verwijderd op USB",
+                    "{n} verouderde bestanden worden verwijderd op USB",
+                    delete_count,
+                ).format(n=delete_count))
+            else:
+                # backup-modus: orphans blijven bewaard — alleen info.
+                lines.append(ngettext(
+                    "{n} foto op USB niet meer in Pixora (blijft bewaard)",
+                    "{n} foto's op USB niet meer in Pixora (blijven bewaard)",
+                    delete_count,
+                ).format(n=delete_count))
         if dup_count > 0:
             lines.append(ngettext(
                 "{n} duplicaat wordt overgeslagen",
@@ -6624,6 +6735,25 @@ class MainWindow(Adw.ApplicationWindow):
             self.backup_pending_banner.set_revealed(False)
         except Exception:
             pass
+
+    def _periodic_backup_scan(self):
+        """15-min tick: stille achtergrondscan. Alleen als alles klopt en
+        er niks draait. De scan-dialog poppt zelf pas op als er iets te
+        doen is, dus dit is niet-storend bij een volledig gesyncte USB."""
+        try:
+            if self._backup_running or self._backup_scanning:
+                return True
+            if not (self.settings.get("backup_enabled")
+                    and self.settings.get("backup_uuid")
+                    and self.settings.get("backup_path")):
+                return True
+            if self._backup_drive_mountpoint() is None:
+                return True
+            log_info(_("Periodieke backup-scan gestart"))
+            self._trigger_backup_scan()
+        except Exception:
+            pass
+        return True  # blijf herhalen
 
     def _poll_backup_drive(self):
         """Detecteer drive-insert/remove en update de UI daarop:

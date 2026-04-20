@@ -1589,3 +1589,22 @@ msgstr "pixora.desktop réparé : Icon={p}"
 
 msgid "Nieuwe versie beschikbaar — klik om bij te werken"
 msgstr "Nouvelle version disponible — cliquez pour mettre à jour"
+
+msgid "Alles in Pixora staat op de USB"
+msgstr "Tout ce qui est dans Pixora est sur l'USB"
+
+msgid "Backup-scan: {n} nieuw, {d} orphans (mode={m}), {b} bytes, {u} duplicaten"
+msgstr "Analyse : {n} nouveau(x), {d} orphelins (mode={m}), {b} octets, {u} doublons"
+
+msgid "Periodieke backup-scan gestart"
+msgstr "Analyse périodique de sauvegarde démarrée"
+
+msgid "Er staat nog {n} foto op de USB die niet meer in Pixora is. In Backup-modus blijft die bewaard als archief."
+msgid_plural "Er staan nog {n} foto's op de USB die niet meer in Pixora zijn. In Backup-modus blijven ze bewaard als archief."
+msgstr[0] "Il reste {n} photo sur l'USB qui n'est plus dans Pixora. En mode Sauvegarde elle est conservée comme archive."
+msgstr[1] "Il reste {n} photos sur l'USB qui ne sont plus dans Pixora. En mode Sauvegarde elles sont conservées comme archive."
+
+msgid "{n} foto op USB niet meer in Pixora (blijft bewaard)"
+msgid_plural "{n} foto's op USB niet meer in Pixora (blijven bewaard)"
+msgstr[0] "{n} photo sur USB plus dans Pixora (conservée)"
+msgstr[1] "{n} photos sur USB plus dans Pixora (conservées)"
