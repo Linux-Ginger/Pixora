@@ -1296,6 +1296,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scan_dialog_open = False
         self._backup_excluded_paths = []
         self._manual_scan_requested = False
+        # Update-notify state
+        self._home_ready_at = None         # set zodra homepage eerst zichtbaar is
+        self._pending_update_version = None  # versie van niet-getoonde popup
+        self._update_dialog_shown = False    # tijdens deze sessie al getoond?
 
         self.set_title("Pixora (Dev Mode)" if self.settings.get("dev_mode") else "Pixora")
         self.set_default_size(9999, 9999)
@@ -1652,9 +1656,23 @@ class MainWindow(Adw.ApplicationWindow):
             with urllib.request.urlopen(req, timeout=5) as resp:
                 remote_version = resp.read().decode().strip()
             if remote_version and remote_version != local_version:
-                GLib.idle_add(self._show_update_message_dialog, remote_version)
+                self._pending_update_version = remote_version
+                GLib.idle_add(self._maybe_show_update_popup)
         except Exception:
             pass
+
+    def _maybe_show_update_popup(self):
+        """Toon de update-popup pas wanneer de homepage minstens 2s zichtbaar
+        is. Anders: retry elke 500ms tot die voorwaarde klopt."""
+        if self._update_dialog_shown or not self._pending_update_version:
+            return False
+        ready_at = getattr(self, "_home_ready_at", None)
+        if ready_at is None or (time.time() - ready_at) < 2.0:
+            GLib.timeout_add(500, self._maybe_show_update_popup)
+            return False
+        self._update_dialog_shown = True
+        self._show_update_message_dialog(self._pending_update_version)
+        return False
 
     def _show_update_message_dialog(self, new_version):
         dlg = Adw.AlertDialog(
@@ -1822,10 +1840,10 @@ class MainWindow(Adw.ApplicationWindow):
                     _("Nieuwe versie beschikbaar — klik om bij te werken")
                 )
                 self._update_btn_stack.set_visible_child_name("available")
-                # Pulse: 500ms uitroepteken, 500ms idle-label, repeat.
+                # Pulse: 1s update-icon, 1s idle-label, repeat.
                 self._update_pulse_on = True
                 self._update_check_pulse_id = GLib.timeout_add(
-                    500, self._update_pulse_tick
+                    1000, self._update_pulse_tick
                 )
         except Exception:
             pass
@@ -1840,13 +1858,24 @@ class MainWindow(Adw.ApplicationWindow):
         if self._update_check_state != "available":
             self._update_check_pulse_id = None
             return False
+        # Stop als settings-dialog is gesloten — het stack-widget hangt dan
+        # niet meer in een root en set_visible_child_name zou een
+        # Gtk-CRITICAL geven.
+        try:
+            if self._update_check_btn.get_root() is None:
+                self._update_check_pulse_id = None
+                return False
+        except Exception:
+            self._update_check_pulse_id = None
+            return False
         self._update_pulse_on = not self._update_pulse_on
         try:
             self._update_btn_stack.set_visible_child_name(
                 "available" if self._update_pulse_on else "idle"
             )
         except Exception:
-            pass
+            self._update_check_pulse_id = None
+            return False
         return True
 
     def _do_settings_update_check(self):
@@ -3426,6 +3455,8 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(_("Thumbnail load done: {n} photos — UI ready").format(n=total))
         self.spinner.stop()
         self.content_stack.set_visible_child_name("grid")
+        if self._home_ready_at is None:
+            self._home_ready_at = time.time()
         cluster_lbl = getattr(self, '_cluster_location_label', None)
         self.photo_count_label.set_text(
             cluster_lbl if cluster_lbl
@@ -5437,8 +5468,8 @@ class MainWindow(Adw.ApplicationWindow):
         ok_icon.add_css_class("success")
         self._update_btn_stack.add_named(ok_icon, "uptodate")
 
-        warn_icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
-        warn_icon.add_css_class("warning")
+        warn_icon = Gtk.Image.new_from_icon_name("software-update-available-symbolic")
+        warn_icon.add_css_class("accent")
         self._update_btn_stack.add_named(warn_icon, "available")
 
         self._update_check_btn.set_child(self._update_btn_stack)
@@ -5446,6 +5477,14 @@ class MainWindow(Adw.ApplicationWindow):
 
         about_group.add(self._update_check_row)
         about_page.add(about_group)
+
+        # Als de auto-startup-check al een update vond: knop direct pulseren.
+        if self._pending_update_version:
+            self._update_remote_version = self._pending_update_version
+            self._update_check_row.set_subtitle(
+                _("Versie {v} beschikbaar").format(v=self._pending_update_version)
+            )
+            self._set_update_state("available")
 
         # Credit-regel ONDER de Over-box, in de open ruimte van de About-page.
         # Adw.PreferencesGroup met alleen set_description en geen rijen rendert
