@@ -1280,6 +1280,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_proc      = None  # actieve rsync Popen (of None)
         self._backup_total     = 0     # totaal te backuppen (voor manual-fallback)
         self._backup_done      = 0
+        self._backup_scanning  = False
+        self._backup_scan_phase = 0.0
+        self._backup_scan_anim_id = None
+        self._backup_scan_dialog_open = False
 
         self.set_title("Pixora (Dev Mode)" if self.settings.get("dev_mode") else "Pixora")
         self.set_default_size(9999, 9999)
@@ -4972,6 +4976,12 @@ class MainWindow(Adw.ApplicationWindow):
         backup_group.set_description(_("Backup naar externe USB schijf na elke import"))
 
         backup_on = bool(self.settings.get("backup_enabled"))
+        drive_present = self._backup_drive_mountpoint() is not None
+
+        if backup_on and self.settings.get("backup_uuid") and not drive_present:
+            backup_group.set_description(
+                _("Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken.")
+            )
 
         self.settings_backup_switch = Gtk.Switch()
         self.settings_backup_switch.set_valign(Gtk.Align.CENTER)
@@ -5015,11 +5025,13 @@ class MainWindow(Adw.ApplicationWindow):
         backup_group.add(self.settings_drive_row)
 
         current_backup_path = self.settings.get("backup_path") or _("Niet ingesteld")
+        if backup_on and self.settings.get("backup_uuid") and not drive_present:
+            current_backup_path = _("Drive niet aangesloten")
         self.settings_backup_folder_row = Adw.ActionRow(
             title=_("Map op backup schijf"),
             subtitle=current_backup_path
         )
-        self.settings_backup_folder_row.set_sensitive(backup_on)
+        self.settings_backup_folder_row.set_sensitive(backup_on and drive_present)
 
         folder_btn_label = _("Wijzigen") if self.settings.get("backup_path") else _("Instellen")
         self.settings_backup_folder_btn = Gtk.Button(label=folder_btn_label)
@@ -5028,6 +5040,43 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_backup_folder_btn.connect("clicked", self.on_settings_change_backup_folder)
         self.settings_backup_folder_row.add_suffix(self.settings_backup_folder_btn)
         backup_group.add(self.settings_backup_folder_row)
+
+        current_mode = self.settings.get("backup_mode", "backup")
+
+        self.radio_mode_backup = Gtk.CheckButton()
+        self.radio_mode_backup.set_active(current_mode == "backup")
+        self.radio_mode_backup.connect(
+            "toggled", lambda b: self.on_backup_mode_changed("backup", b)
+        )
+        mode_backup_row = Adw.ActionRow(
+            title=_("Backup"),
+            subtitle=_("Kopieert foto's naar USB. Verwijderen uit Pixora laat de backup staan."),
+        )
+        mode_backup_row.add_prefix(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic"))
+        mode_backup_row.add_prefix(self.radio_mode_backup)
+        mode_backup_row.set_activatable_widget(self.radio_mode_backup)
+        mode_backup_row.set_sensitive(backup_on and drive_present)
+        self.settings_mode_backup_row = mode_backup_row
+        backup_group.add(mode_backup_row)
+
+        self.radio_mode_sync = Gtk.CheckButton()
+        self.radio_mode_sync.set_group(self.radio_mode_backup)
+        self.radio_mode_sync.set_active(current_mode == "sync")
+        self.radio_mode_sync.connect(
+            "toggled", lambda b: self.on_backup_mode_changed("sync", b)
+        )
+        mode_sync_row = Adw.ActionRow(
+            title=_("Sync"),
+            subtitle=_("Spiegelt Pixora naar USB. Verwijderen uit Pixora verwijdert ook op USB."),
+        )
+        mode_sync_row.add_prefix(Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic"))
+        mode_sync_row.add_prefix(self.radio_mode_sync)
+        mode_sync_row.set_activatable_widget(self.radio_mode_sync)
+        mode_sync_row.set_sensitive(backup_on and drive_present)
+        self.settings_mode_sync_row = mode_sync_row
+        backup_group.add(mode_sync_row)
+        self.settings_backup_group = backup_group
+
         import_page.add(backup_group)
 
         about_group = Adw.PreferencesGroup()
@@ -5362,9 +5411,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_settings_backup_toggle(self, switch, _):
         active = switch.get_active()
+        drive_present = self._backup_drive_mountpoint() is not None
         self.settings_drive_row.set_sensitive(active)
         self.settings_drive_combo.set_sensitive(active)
-        self.settings_backup_folder_row.set_sensitive(active)
+        self.settings_backup_folder_row.set_sensitive(active and drive_present)
+        if hasattr(self, "settings_mode_backup_row"):
+            self.settings_mode_backup_row.set_sensitive(active and drive_present)
+            self.settings_mode_sync_row.set_sensitive(active and drive_present)
         self.settings["backup_enabled"] = active
         if active:
             # Zorg dat we een uuid hebben zodra de schakelaar aan gaat — ook
@@ -5377,6 +5430,11 @@ class MainWindow(Adw.ApplicationWindow):
         save_settings(self.settings)
         if active:
             GLib.idle_add(self._sync_now_if_ready)
+
+    def on_backup_mode_changed(self, mode, btn):
+        if btn.get_active():
+            self.settings["backup_mode"] = mode
+            save_settings(self.settings)
 
     def on_settings_drive_selected(self, combo, _):
         selected = combo.get_selected()
@@ -5427,13 +5485,44 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_backup_folder_btn.set_label(_("Wijzigen"))
         GLib.idle_add(self._sync_now_if_ready)
 
+    def _refresh_settings_drive_state(self):
+        """Live-update van de backup-sectie wanneer de drive wordt aan- of
+        afgekoppeld terwijl het settings-venster open is. No-op als de UI
+        niet is opgebouwd."""
+        if not hasattr(self, "settings_backup_folder_row"):
+            return False
+        backup_on = bool(self.settings.get("backup_enabled"))
+        drive_present = self._backup_drive_mountpoint() is not None
+        has_uuid = bool(self.settings.get("backup_uuid"))
+        try:
+            self.settings_backup_folder_row.set_sensitive(backup_on and drive_present)
+            if backup_on and has_uuid and not drive_present:
+                self.settings_backup_folder_row.set_subtitle(_("Drive niet aangesloten"))
+            else:
+                self.settings_backup_folder_row.set_subtitle(
+                    self.settings.get("backup_path") or _("Niet ingesteld")
+                )
+            if hasattr(self, "settings_mode_backup_row"):
+                self.settings_mode_backup_row.set_sensitive(backup_on and drive_present)
+                self.settings_mode_sync_row.set_sensitive(backup_on and drive_present)
+            if hasattr(self, "settings_backup_group"):
+                if backup_on and has_uuid and not drive_present:
+                    self.settings_backup_group.set_description(_(
+                        "Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken."
+                    ))
+                else:
+                    self.settings_backup_group.set_description(
+                        _("Backup naar externe USB schijf na elke import")
+                    )
+        except Exception:
+            pass
+        return False
+
     def _sync_now_if_ready(self):
-        """Start direct een backup als alle instellingen compleet zijn en de
-        schijf aanwezig is. Wordt aangeroepen na configuratie-wijzigingen,
-        zodat de gebruiker niet eerst hoeft te importeren om de eerste sync
-        te triggeren. rsync is idempotent — een tweede run over gesyncte data
-        is effectief een no-op."""
-        if self._backup_running:
+        """Triggert een scan op de backup-diff zodra alle instellingen
+        compleet zijn en de schijf aanwezig is. Wordt aangeroepen na
+        configuratie-wijzigingen en na drive-attach."""
+        if self._backup_running or self._backup_scanning:
             return False
         if not (self.settings.get("backup_enabled")
                 and self.settings.get("backup_uuid")
@@ -5442,9 +5531,219 @@ class MainWindow(Adw.ApplicationWindow):
         if self._backup_drive_mountpoint() is None:
             self._show_backup_pending_banner()
             return False
-        log_info(_("Backup gestart via settings-setup"))
-        self.start_backup()
+        self._trigger_backup_scan()
         return False
+
+    # ── Backup-scan ──────────────────────────────────────────────────
+    def _trigger_backup_scan(self):
+        if self._backup_running or self._backup_scanning:
+            return
+        self._backup_scanning = True
+        self._backup_scan_phase = 0.0
+        self._backup_detail = _("Scannen…")
+        if hasattr(self, "_backup_donut_btn"):
+            self._backup_donut_btn.set_visible(True)
+            self._backup_donut_btn.set_tooltip_text(_("Scannen op nieuwe foto's…"))
+        if self._backup_scan_anim_id is None:
+            self._backup_scan_anim_id = GLib.timeout_add(80, self._tick_backup_scan)
+        log_info(_("Backup-scan gestart"))
+        threading.Thread(target=self._backup_scan_thread, daemon=True).start()
+
+    def _tick_backup_scan(self):
+        if not self._backup_scanning:
+            self._backup_scan_anim_id = None
+            return False
+        self._backup_scan_phase = (self._backup_scan_phase + 0.18) % (2 * math.pi)
+        if hasattr(self, "_backup_donut"):
+            try:
+                self._backup_donut.queue_draw()
+            except Exception:
+                pass
+        return True
+
+    def _backup_scan_thread(self):
+        from pathlib import Path as _P
+        photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
+        backup_path_str = self.settings.get("backup_path")
+        drive_root = self._backup_drive_mountpoint()
+        if not drive_root:
+            GLib.idle_add(self._handle_scan_result, None)
+            return
+        backup_dest = _P(backup_path_str) if backup_path_str else drive_root / "Pixora"
+        try:
+            backup_dest.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        mode = self.settings.get("backup_mode", "backup")
+        if _cmd_available_bk("rsync"):
+            cmd = ["rsync", "-a", "--dry-run", "--stats"]
+            if mode == "sync":
+                cmd.append("--delete")
+            cmd += [str(photo_path) + "/", str(backup_dest) + "/"]
+            try:
+                out = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=300
+                ).stdout
+                new_count, bytes_to_transfer, delete_count = \
+                    self._parse_rsync_stats(out)
+            except Exception as e:
+                log_error(_("Scan fout: {err}").format(err=e))
+                GLib.idle_add(self._handle_scan_result, None)
+                return
+        else:
+            # Fallback: handmatig diff
+            src_files = {}
+            try:
+                for root, _dirs, files in os.walk(str(photo_path)):
+                    for fn in files:
+                        sf = os.path.join(root, fn)
+                        rel = os.path.relpath(sf, str(photo_path))
+                        try:
+                            src_files[rel] = os.path.getsize(sf)
+                        except Exception:
+                            src_files[rel] = 0
+            except Exception:
+                GLib.idle_add(self._handle_scan_result, None)
+                return
+            new_count = 0
+            bytes_to_transfer = 0
+            for rel, size in src_files.items():
+                df = os.path.join(str(backup_dest), rel)
+                if not os.path.exists(df):
+                    new_count += 1
+                    bytes_to_transfer += size
+            delete_count = 0
+            if mode == "sync" and os.path.isdir(str(backup_dest)):
+                for root, _dirs, files in os.walk(str(backup_dest)):
+                    for fn in files:
+                        df = os.path.join(root, fn)
+                        rel = os.path.relpath(df, str(backup_dest))
+                        if rel not in src_files:
+                            delete_count += 1
+        GLib.idle_add(
+            self._handle_scan_result,
+            {"new": new_count, "bytes": bytes_to_transfer, "delete": delete_count},
+        )
+
+    def _parse_rsync_stats(self, stdout):
+        new_count = 0
+        bytes_to_transfer = 0
+        delete_count = 0
+        for line in stdout.splitlines():
+            s = line.strip()
+            if s.startswith("Number of regular files transferred:"):
+                try:
+                    new_count = int(s.split(":", 1)[1].replace(",", "").strip())
+                except Exception:
+                    pass
+            elif s.startswith("Total transferred file size:"):
+                try:
+                    val = s.split(":", 1)[1].strip()
+                    val = val.split()[0].replace(",", "")
+                    bytes_to_transfer = int(val)
+                except Exception:
+                    pass
+            elif s.startswith("Number of deleted files:"):
+                try:
+                    delete_count = int(s.split(":", 1)[1].replace(",", "").strip())
+                except Exception:
+                    pass
+        return new_count, bytes_to_transfer, delete_count
+
+    def _handle_scan_result(self, result):
+        self._backup_scanning = False
+        if hasattr(self, "_backup_donut"):
+            try:
+                self._backup_donut.queue_draw()
+            except Exception:
+                pass
+        if hasattr(self, "_backup_donut_btn"):
+            self._backup_donut_btn.set_visible(self._backup_running)
+        if result is None:
+            log_warn(_("Backup-scan niet voltooid"))
+            return False
+        new_count = result["new"]
+        delete_count = result["delete"]
+        bytes_to_transfer = result["bytes"]
+        if new_count == 0 and delete_count == 0:
+            # Alles al gesynct — markeer als voltooid zodat pending-state klopt
+            self.settings["last_backup_time"] = time.time()
+            try:
+                save_settings(self.settings)
+            except Exception:
+                pass
+            self._hide_backup_pending_banner()
+            log_info(_("Backup-scan: alles gesynct"))
+            return False
+        log_info(_("Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes").format(
+            n=new_count, d=delete_count, b=bytes_to_transfer,
+        ))
+        self._show_backup_scan_dialog(new_count, delete_count, bytes_to_transfer)
+        return False
+
+    def _format_bytes(self, n):
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if n < 1024 or unit == "TB":
+                if unit in ("B", "KB"):
+                    return f"{int(n)} {unit}"
+                return f"{n:.1f} {unit}"
+            n /= 1024
+        return f"{n:.1f} TB"
+
+    def _format_eta(self, bytes_total, bytes_per_sec=30 * 1024 * 1024):
+        if bytes_total <= 0:
+            return _("minder dan een minuut")
+        secs = bytes_total / bytes_per_sec
+        if secs < 60:
+            return _("minder dan een minuut")
+        mins = int(secs / 60 + 0.5)
+        if mins < 60:
+            return ngettext("± {n} minuut", "± {n} minuten", mins).format(n=mins)
+        hours = mins // 60
+        rem = mins % 60
+        if rem == 0:
+            return ngettext("± {n} uur", "± {n} uur", hours).format(n=hours)
+        return _("± {h} u {m} min").format(h=hours, m=rem)
+
+    def _show_backup_scan_dialog(self, new_count, delete_count, bytes_to_transfer):
+        if self._backup_scan_dialog_open:
+            return
+        self._backup_scan_dialog_open = True
+        lines = []
+        if new_count > 0:
+            lines.append(ngettext(
+                "{n} nieuwe foto (±{s})",
+                "{n} nieuwe foto's (±{s})",
+                new_count,
+            ).format(n=new_count, s=self._format_bytes(bytes_to_transfer)))
+        if delete_count > 0:
+            lines.append(ngettext(
+                "{n} verouderde bestand wordt verwijderd op USB",
+                "{n} verouderde bestanden worden verwijderd op USB",
+                delete_count,
+            ).format(n=delete_count))
+        lines.append(_("Geschatte tijd: {eta}").format(
+            eta=self._format_eta(bytes_to_transfer)
+        ))
+        body = "\n".join(lines)
+        dlg = Adw.AlertDialog(
+            heading=_("Backup klaar om te starten"),
+            body=body,
+        )
+        dlg.add_response("later", _("Later"))
+        dlg.add_response("now", _("Nu backuppen"))
+        dlg.set_response_appearance("now", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("now")
+        dlg.set_close_response("later")
+        dlg.connect("response", self._on_scan_dialog_response)
+        dlg.present(self)
+
+    def _on_scan_dialog_response(self, dlg, response):
+        self._backup_scan_dialog_open = False
+        if response == "now":
+            self.start_backup()
+        else:
+            self._show_backup_pending_banner()
 
     def change_folder(self, parent_dialog):
         file_dialog = Gtk.FileDialog()
@@ -5520,16 +5819,18 @@ class MainWindow(Adw.ApplicationWindow):
             return None
 
     def _check_pending_backup(self):
-        """Bij import-done en bij drive-insert aangeroepen: start backup als
-        pending + drive aangesloten, anders toon banner 'sluit USB aan'."""
-        if not self._is_backup_pending() or self._backup_running:
+        """Na import of drive-attach: scan op nieuwe foto's; de scan toont
+        zelf een dialog bij een non-empty diff, anders stilletjes niks."""
+        if self._backup_running or self._backup_scanning:
+            return False
+        if not (self.settings.get("backup_enabled")
+                and self.settings.get("backup_uuid")
+                and self.settings.get("backup_path")):
             return False
         drive = self._backup_drive_mountpoint()
         if drive:
-            # Drive er is → start meteen
-            self.start_backup()
+            self._trigger_backup_scan()
         else:
-            # Geen drive → banner laten zien (implementatie komt in Task 6)
             self._show_backup_pending_banner()
         return False
 
@@ -5549,18 +5850,27 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _poll_backup_drive(self):
-        """Detecteer drive-insert: bij overgang no-drive → drive én pending →
-        toon popup 'Wil je nu backuppen?'."""
+        """Detecteer drive-insert/remove en update de UI daarop:
+        - attach: scan op diff (scan toont dialog als er iets is)
+        - detach: grey-out settings-backup-sectie + banner tonen"""
         drive_now = self._backup_drive_mountpoint() is not None
         just_attached = drive_now and not self._backup_drive_last_seen
+        just_detached = (not drive_now) and self._backup_drive_last_seen
         self._backup_drive_last_seen = drive_now
-        if just_attached and self._is_backup_pending() and not self._backup_running:
-            GLib.idle_add(self._prompt_backup_on_insert)
-        # Als drive weer weg is en we niet actief backuppen maar wel pending →
-        # zorg dat de banner aan staat.
+        backup_configured = bool(
+            self.settings.get("backup_enabled")
+            and self.settings.get("backup_uuid")
+            and self.settings.get("backup_path")
+        )
+        if just_attached and backup_configured \
+                and not self._backup_running \
+                and not self._backup_scanning:
+            GLib.idle_add(self._trigger_backup_scan)
         if (not drive_now and self._is_backup_pending()
                 and not self._backup_running):
             self._show_backup_pending_banner()
+        if just_attached or just_detached:
+            GLib.idle_add(self._refresh_settings_drive_state)
         return True  # repeat
 
     def _prompt_backup_on_insert(self):
@@ -5622,13 +5932,17 @@ class MainWindow(Adw.ApplicationWindow):
                     except ValueError:
                         pass
 
+        mode = self.settings.get("backup_mode", "backup")
         success = False
         if _cmd_available_bk("rsync"):
             proc = None
             try:
+                rsync_cmd = ["rsync", "-a", "--info=progress2"]
+                if mode == "sync":
+                    rsync_cmd.append("--delete")
+                rsync_cmd += [str(photo_path) + "/", str(backup_dest) + "/"]
                 proc = subprocess.Popen(
-                    ["rsync", "-a", "--info=progress2",
-                     str(photo_path) + "/", str(backup_dest) + "/"],
+                    rsync_cmd,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                     text=True
                 )
@@ -5649,13 +5963,15 @@ class MainWindow(Adw.ApplicationWindow):
                         pass
                 self._backup_proc = None
         else:
-            success = self._manual_backup(photo_path, backup_dest)
+            success = self._manual_backup(photo_path, backup_dest, mode == "sync")
 
         GLib.idle_add(self._backup_finished, success,
                       None if success else _("Backup gedeeltelijk mislukt."))
 
-    def _manual_backup(self, src, dst):
-        """Fallback zonder rsync: handmatig kopiëren met progress."""
+    def _manual_backup(self, src, dst, delete_extraneous=False):
+        """Fallback zonder rsync: handmatig kopiëren met progress.
+        delete_extraneous=True → sync-gedrag: files in dst die niet in src
+        staan worden verwijderd."""
         try:
             all_src = []
             for root, _, files in os.walk(src):
@@ -5663,8 +5979,10 @@ class MainWindow(Adw.ApplicationWindow):
                     all_src.append(os.path.join(root, fn))
             total = len(all_src)
             self._backup_total = total
+            src_rels = set()
             for i, sf in enumerate(all_src):
                 rel = os.path.relpath(sf, str(src))
+                src_rels.add(rel)
                 df = os.path.join(str(dst), rel)
                 os.makedirs(os.path.dirname(df), exist_ok=True)
                 if not os.path.exists(df):
@@ -5674,6 +5992,16 @@ class MainWindow(Adw.ApplicationWindow):
                 self._backup_done = i + 1
                 GLib.idle_add(self._update_backup_progress, frac,
                               f"{i + 1} / {total}")
+            if delete_extraneous:
+                for root, _dirs, files in os.walk(str(dst)):
+                    for fn in files:
+                        df = os.path.join(root, fn)
+                        rel = os.path.relpath(df, str(dst))
+                        if rel not in src_rels:
+                            try:
+                                os.remove(df)
+                            except Exception:
+                                pass
             return True
         except Exception as e:
             log_error(_("Backup fout: {err}").format(err=e))
@@ -5701,13 +6029,14 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _draw_backup_donut(self, area, cr, w, h):
-        """Donut/pie-chart die vult van 0° tot progress × 360°."""
+        """Donut/pie-chart die vult van 0° tot progress × 360°. Tijdens
+        scannen rouleert er een kwart-boog rond de ring als indeterminate-
+        indicator."""
         try:
             cx = w / 2
             cy = h / 2
             r_outer = min(w, h) / 2 - 1
             r_inner = r_outer * 0.55
-            frac = max(0.0, min(1.0, self._backup_fraction))
 
             # Background ring (grijs)
             cr.set_source_rgba(0.5, 0.5, 0.5, 0.3)
@@ -5715,7 +6044,21 @@ class MainWindow(Adw.ApplicationWindow):
             cr.arc_negative(cx, cy, r_inner, 2 * math.pi, 0)
             cr.fill()
 
-            # Progress-arc (Pixora-oranje)
+            if self._backup_scanning:
+                start = self._backup_scan_phase - math.pi / 2
+                end = start + math.pi / 2  # kwart cirkel
+                cr.set_source_rgb(0.914, 0.329, 0.125)
+                cr.move_to(cx, cy)
+                cr.arc(cx, cy, r_outer, start, end)
+                cr.close_path()
+                cr.fill()
+                cr.set_operator(cairo.OPERATOR_CLEAR)
+                cr.arc(cx, cy, r_inner, 0, 2 * math.pi)
+                cr.fill()
+                cr.set_operator(cairo.OPERATOR_OVER)
+                return
+
+            frac = max(0.0, min(1.0, self._backup_fraction))
             if frac > 0.001:
                 start = -math.pi / 2  # top
                 end = start + frac * 2 * math.pi

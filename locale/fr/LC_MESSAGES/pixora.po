@@ -1328,3 +1328,74 @@ msgstr "Branchez d'abord un lecteur USB et sélectionnez-le sous « Lecteur de s
 
 msgid "Backup gestart via settings-setup"
 msgstr "Sauvegarde lancée via les paramètres"
+
+msgid "Backup"
+msgstr "Sauvegarde"
+
+msgid "Sync"
+msgstr "Synchro"
+
+msgid "Kopieert foto's naar USB. Verwijderen uit Pixora laat de backup staan."
+msgstr "Copie les photos sur l'USB. Supprimer depuis Pixora conserve la sauvegarde."
+
+msgid "Spiegelt Pixora naar USB. Verwijderen uit Pixora verwijdert ook op USB."
+msgstr "Miroir de Pixora sur l'USB. Supprimer depuis Pixora supprime aussi sur l'USB."
+
+msgid "Scannen…"
+msgstr "Analyse…"
+
+msgid "Scannen op nieuwe foto's…"
+msgstr "Recherche de nouvelles photos…"
+
+msgid "Backup-scan gestart"
+msgstr "Analyse de sauvegarde lancée"
+
+msgid "Scan fout: {err}"
+msgstr "Erreur d'analyse : {err}"
+
+msgid "Backup-scan niet voltooid"
+msgstr "Analyse de sauvegarde non terminée"
+
+msgid "Backup-scan: alles gesynct"
+msgstr "Analyse de sauvegarde : tout est synchronisé"
+
+msgid "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes"
+msgstr "Analyse de sauvegarde : {n} nouveau(x), {d} à supprimer, {b} octets"
+
+msgid "minder dan een minuut"
+msgstr "moins d'une minute"
+
+msgid "± {h} u {m} min"
+msgstr "± {h} h {m} min"
+
+msgid "Geschatte tijd: {eta}"
+msgstr "Durée estimée : {eta}"
+
+msgid "Backup klaar om te starten"
+msgstr "Sauvegarde prête à démarrer"
+
+msgid "Drive niet aangesloten"
+msgstr "Lecteur non connecté"
+
+msgid "Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken."
+msgstr "Lecteur non connecté — branchez votre disque USB pour utiliser la sauvegarde."
+
+msgid "± {n} minuut"
+msgid_plural "± {n} minuten"
+msgstr[0] "± {n} minute"
+msgstr[1] "± {n} minutes"
+
+msgid "± {n} uur"
+msgid_plural "± {n} uur"
+msgstr[0] "± {n} heure"
+msgstr[1] "± {n} heures"
+
+msgid "{n} nieuwe foto (±{s})"
+msgid_plural "{n} nieuwe foto's (±{s})"
+msgstr[0] "{n} nouvelle photo (±{s})"
+msgstr[1] "{n} nouvelles photos (±{s})"
+
+msgid "{n} verouderde bestand wordt verwijderd op USB"
+msgid_plural "{n} verouderde bestanden worden verwijderd op USB"
+msgstr[0] "{n} fichier obsolète sera supprimé de l'USB"
+msgstr[1] "{n} fichiers obsolètes seront supprimés de l'USB"

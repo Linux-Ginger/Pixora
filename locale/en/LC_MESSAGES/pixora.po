@@ -1337,3 +1337,74 @@ msgstr "Plug in a USB drive first and select it under 'Backup drive'."
 
 msgid "Backup gestart via settings-setup"
 msgstr "Backup started via settings setup"
+
+msgid "Backup"
+msgstr "Backup"
+
+msgid "Sync"
+msgstr "Sync"
+
+msgid "Kopieert foto's naar USB. Verwijderen uit Pixora laat de backup staan."
+msgstr "Copies photos to USB. Deleting from Pixora leaves the backup intact."
+
+msgid "Spiegelt Pixora naar USB. Verwijderen uit Pixora verwijdert ook op USB."
+msgstr "Mirrors Pixora to USB. Deleting from Pixora also deletes on USB."
+
+msgid "Scannen…"
+msgstr "Scanning…"
+
+msgid "Scannen op nieuwe foto's…"
+msgstr "Scanning for new photos…"
+
+msgid "Backup-scan gestart"
+msgstr "Backup scan started"
+
+msgid "Scan fout: {err}"
+msgstr "Scan error: {err}"
+
+msgid "Backup-scan niet voltooid"
+msgstr "Backup scan did not complete"
+
+msgid "Backup-scan: alles gesynct"
+msgstr "Backup scan: everything in sync"
+
+msgid "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes"
+msgstr "Backup scan: {n} new, {d} to delete, {b} bytes"
+
+msgid "minder dan een minuut"
+msgstr "less than a minute"
+
+msgid "± {h} u {m} min"
+msgstr "± {h} h {m} min"
+
+msgid "Geschatte tijd: {eta}"
+msgstr "Estimated time: {eta}"
+
+msgid "Backup klaar om te starten"
+msgstr "Backup ready to start"
+
+msgid "Drive niet aangesloten"
+msgstr "Drive not connected"
+
+msgid "Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken."
+msgstr "Drive not connected — plug in your USB drive to use the backup."
+
+msgid "± {n} minuut"
+msgid_plural "± {n} minuten"
+msgstr[0] "± {n} minute"
+msgstr[1] "± {n} minutes"
+
+msgid "± {n} uur"
+msgid_plural "± {n} uur"
+msgstr[0] "± {n} hour"
+msgstr[1] "± {n} hours"
+
+msgid "{n} nieuwe foto (±{s})"
+msgid_plural "{n} nieuwe foto's (±{s})"
+msgstr[0] "{n} new photo (±{s})"
+msgstr[1] "{n} new photos (±{s})"
+
+msgid "{n} verouderde bestand wordt verwijderd op USB"
+msgid_plural "{n} verouderde bestanden worden verwijderd op USB"
+msgstr[0] "{n} stale file will be removed from USB"
+msgstr[1] "{n} stale files will be removed from USB"

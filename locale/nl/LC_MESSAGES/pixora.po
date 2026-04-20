@@ -1337,3 +1337,74 @@ msgstr "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."
 
 msgid "Backup gestart via settings-setup"
 msgstr "Backup gestart via settings-setup"
+
+msgid "Backup"
+msgstr "Backup"
+
+msgid "Sync"
+msgstr "Sync"
+
+msgid "Kopieert foto's naar USB. Verwijderen uit Pixora laat de backup staan."
+msgstr "Kopieert foto's naar USB. Verwijderen uit Pixora laat de backup staan."
+
+msgid "Spiegelt Pixora naar USB. Verwijderen uit Pixora verwijdert ook op USB."
+msgstr "Spiegelt Pixora naar USB. Verwijderen uit Pixora verwijdert ook op USB."
+
+msgid "Scannen…"
+msgstr "Scannen…"
+
+msgid "Scannen op nieuwe foto's…"
+msgstr "Scannen op nieuwe foto's…"
+
+msgid "Backup-scan gestart"
+msgstr "Backup-scan gestart"
+
+msgid "Scan fout: {err}"
+msgstr "Scan fout: {err}"
+
+msgid "Backup-scan niet voltooid"
+msgstr "Backup-scan niet voltooid"
+
+msgid "Backup-scan: alles gesynct"
+msgstr "Backup-scan: alles gesynct"
+
+msgid "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes"
+msgstr "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes"
+
+msgid "minder dan een minuut"
+msgstr "minder dan een minuut"
+
+msgid "± {h} u {m} min"
+msgstr "± {h} u {m} min"
+
+msgid "Geschatte tijd: {eta}"
+msgstr "Geschatte tijd: {eta}"
+
+msgid "Backup klaar om te starten"
+msgstr "Backup klaar om te starten"
+
+msgid "Drive niet aangesloten"
+msgstr "Drive niet aangesloten"
+
+msgid "Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken."
+msgstr "Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken."
+
+msgid "± {n} minuut"
+msgid_plural "± {n} minuten"
+msgstr[0] "± {n} minuut"
+msgstr[1] "± {n} minuten"
+
+msgid "± {n} uur"
+msgid_plural "± {n} uur"
+msgstr[0] "± {n} uur"
+msgstr[1] "± {n} uur"
+
+msgid "{n} nieuwe foto (±{s})"
+msgid_plural "{n} nieuwe foto's (±{s})"
+msgstr[0] "{n} nieuwe foto (±{s})"
+msgstr[1] "{n} nieuwe foto's (±{s})"
+
+msgid "{n} verouderde bestand wordt verwijderd op USB"
+msgid_plural "{n} verouderde bestanden worden verwijderd op USB"
+msgstr[0] "{n} verouderde bestand wordt verwijderd op USB"
+msgstr[1] "{n} verouderde bestanden worden verwijderd op USB"

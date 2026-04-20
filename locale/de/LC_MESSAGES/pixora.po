@@ -1328,3 +1328,74 @@ msgstr "Schließe zuerst eine USB-Festplatte an und wähle sie unter 'Backup-Fes
 
 msgid "Backup gestart via settings-setup"
 msgstr "Backup über Einstellungen gestartet"
+
+msgid "Backup"
+msgstr "Backup"
+
+msgid "Sync"
+msgstr "Sync"
+
+msgid "Kopieert foto's naar USB. Verwijderen uit Pixora laat de backup staan."
+msgstr "Kopiert Fotos auf USB. Beim Löschen aus Pixora bleibt das Backup erhalten."
+
+msgid "Spiegelt Pixora naar USB. Verwijderen uit Pixora verwijdert ook op USB."
+msgstr "Spiegelt Pixora auf USB. Beim Löschen aus Pixora wird auch auf USB gelöscht."
+
+msgid "Scannen…"
+msgstr "Scannen…"
+
+msgid "Scannen op nieuwe foto's…"
+msgstr "Scanne nach neuen Fotos…"
+
+msgid "Backup-scan gestart"
+msgstr "Backup-Scan gestartet"
+
+msgid "Scan fout: {err}"
+msgstr "Scan-Fehler: {err}"
+
+msgid "Backup-scan niet voltooid"
+msgstr "Backup-Scan nicht abgeschlossen"
+
+msgid "Backup-scan: alles gesynct"
+msgstr "Backup-Scan: alles synchronisiert"
+
+msgid "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes"
+msgstr "Backup-Scan: {n} neu, {d} zu löschen, {b} Bytes"
+
+msgid "minder dan een minuut"
+msgstr "weniger als eine Minute"
+
+msgid "± {h} u {m} min"
+msgstr "± {h} Std {m} Min"
+
+msgid "Geschatte tijd: {eta}"
+msgstr "Geschätzte Dauer: {eta}"
+
+msgid "Backup klaar om te starten"
+msgstr "Backup bereit zum Start"
+
+msgid "Drive niet aangesloten"
+msgstr "Laufwerk nicht angeschlossen"
+
+msgid "Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken."
+msgstr "Laufwerk nicht angeschlossen — schließe deine USB-Festplatte an, um das Backup zu nutzen."
+
+msgid "± {n} minuut"
+msgid_plural "± {n} minuten"
+msgstr[0] "± {n} Minute"
+msgstr[1] "± {n} Minuten"
+
+msgid "± {n} uur"
+msgid_plural "± {n} uur"
+msgstr[0] "± {n} Stunde"
+msgstr[1] "± {n} Stunden"
+
+msgid "{n} nieuwe foto (±{s})"
+msgid_plural "{n} nieuwe foto's (±{s})"
+msgstr[0] "{n} neues Foto (±{s})"
+msgstr[1] "{n} neue Fotos (±{s})"
+
+msgid "{n} verouderde bestand wordt verwijderd op USB"
+msgid_plural "{n} verouderde bestanden worden verwijderd op USB"
+msgstr[0] "{n} veraltete Datei wird von USB entfernt"
+msgstr[1] "{n} veraltete Dateien werden von USB entfernt"

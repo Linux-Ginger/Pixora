@@ -678,3 +678,74 @@ msgstr ""
 
 msgid "Backup gestart via settings-setup"
 msgstr ""
+
+msgid "Backup"
+msgstr ""
+
+msgid "Sync"
+msgstr ""
+
+msgid "Kopieert foto's naar USB. Verwijderen uit Pixora laat de backup staan."
+msgstr ""
+
+msgid "Spiegelt Pixora naar USB. Verwijderen uit Pixora verwijdert ook op USB."
+msgstr ""
+
+msgid "Scannen…"
+msgstr ""
+
+msgid "Scannen op nieuwe foto's…"
+msgstr ""
+
+msgid "Backup-scan gestart"
+msgstr ""
+
+msgid "Scan fout: {err}"
+msgstr ""
+
+msgid "Backup-scan niet voltooid"
+msgstr ""
+
+msgid "Backup-scan: alles gesynct"
+msgstr ""
+
+msgid "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes"
+msgstr ""
+
+msgid "minder dan een minuut"
+msgstr ""
+
+msgid "± {h} u {m} min"
+msgstr ""
+
+msgid "Geschatte tijd: {eta}"
+msgstr ""
+
+msgid "Backup klaar om te starten"
+msgstr ""
+
+msgid "Drive niet aangesloten"
+msgstr ""
+
+msgid "Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken."
+msgstr ""
+
+msgid "± {n} minuut"
+msgid_plural "± {n} minuten"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "± {n} uur"
+msgid_plural "± {n} uur"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} nieuwe foto (±{s})"
+msgid_plural "{n} nieuwe foto's (±{s})"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} verouderde bestand wordt verwijderd op USB"
+msgid_plural "{n} verouderde bestanden worden verwijderd op USB"
+msgstr[0] ""
+msgstr[1] ""
