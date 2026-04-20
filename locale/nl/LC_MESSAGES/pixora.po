@@ -1647,3 +1647,15 @@ msgstr "Je USB-schijf is nu identiek aan Pixora."
 
 msgid "Sync mislukt"
 msgstr "Sync mislukt"
+
+msgid "Automatisch bevestigen"
+msgstr "Automatisch bevestigen"
+
+msgid "Sla de pop-up over en start backup/sync direct wanneer er iets te doen is."
+msgstr "Sla de pop-up over en start backup/sync direct wanneer er iets te doen is."
+
+msgid "Silent-mode: backup start automatisch zonder dialog"
+msgstr "Silent-mode: backup start automatisch zonder dialog"
+
+msgid "Silent-mode: backup voltooid zonder popup"
+msgstr "Silent-mode: backup voltooid zonder popup"

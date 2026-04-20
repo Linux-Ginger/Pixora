@@ -989,3 +989,15 @@ msgstr ""
 
 msgid "Sync mislukt"
 msgstr ""
+
+msgid "Automatisch bevestigen"
+msgstr ""
+
+msgid "Sla de pop-up over en start backup/sync direct wanneer er iets te doen is."
+msgstr ""
+
+msgid "Silent-mode: backup start automatisch zonder dialog"
+msgstr ""
+
+msgid "Silent-mode: backup voltooid zonder popup"
+msgstr ""

@@ -1638,3 +1638,15 @@ msgstr "Votre lecteur USB est maintenant identique à Pixora."
 
 msgid "Sync mislukt"
 msgstr "Échec de la synchronisation"
+
+msgid "Automatisch bevestigen"
+msgstr "Confirmation automatique"
+
+msgid "Sla de pop-up over en start backup/sync direct wanneer er iets te doen is."
+msgstr "Ignorer la pop-up et lancer la sauvegarde/synchro immédiatement s'il y a quelque chose à faire."
+
+msgid "Silent-mode: backup start automatisch zonder dialog"
+msgstr "Mode silencieux : la sauvegarde démarre automatiquement sans dialogue"
+
+msgid "Silent-mode: backup voltooid zonder popup"
+msgstr "Mode silencieux : sauvegarde terminée sans pop-up"

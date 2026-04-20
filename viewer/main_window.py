@@ -1422,11 +1422,10 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add_seconds(4, self._poll_backup_drive)
         # Bij startup: als pending + drive aangesloten → meteen popup
         GLib.idle_add(self._check_pending_backup)
-        # Elke 15 min een stille scan: alleen als config compleet, drive
-        # aanwezig, en er niet al iets draait. Resultaat gaat via de
-        # normale handler — die toont de scan-dialog alleen als er iets
-        # te doen is.
-        GLib.timeout_add_seconds(15 * 60, self._periodic_backup_scan)
+        # Elke 60s een stille scan zolang de drive aangesloten is. Resultaat
+        # gaat via de normale handler — die toont de scan-dialog alleen als
+        # er iets te doen is, of start bij silent-mode direct de backup.
+        GLib.timeout_add_seconds(60, self._periodic_backup_scan)
 
     def _start_services(self):
         try:
@@ -5396,6 +5395,27 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dedup_row = dedup_row
         backup_group.add(dedup_row)
 
+        # Silent-mode switch: scan-dialog wordt overgeslagen, backup start
+        # automatisch. Error-popups blijven staan.
+        self.settings_silent_switch = Gtk.Switch()
+        self.settings_silent_switch.set_valign(Gtk.Align.CENTER)
+        self.settings_silent_switch.set_active(bool(self.settings.get("backup_silent")))
+        self.settings_silent_switch.connect("notify::active", self.on_backup_silent_toggle)
+        silent_row = Adw.ActionRow(
+            title=_("Automatisch bevestigen"),
+            subtitle=_("Sla de pop-up over en start backup/sync direct wanneer er iets te doen is."),
+        )
+        silent_row.add_prefix(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+        silent_row.add_suffix(self.settings_silent_switch)
+        silent_row.set_activatable_widget(self.settings_silent_switch)
+        silent_row.set_sensitive(backup_on and drive_present)
+        try:
+            silent_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        self.settings_silent_row = silent_row
+        backup_group.add(silent_row)
+
         self.settings_manual_scan_btn = Gtk.Button()
         self.settings_manual_scan_btn.add_css_class("flat")
         self.settings_manual_scan_btn.set_valign(Gtk.Align.CENTER)
@@ -6026,6 +6046,8 @@ class MainWindow(Adw.ApplicationWindow):
         if hasattr(self, "settings_dedup_row"):
             dup_on_now = self.settings.get("duplicate_threshold", 2) != 0
             self.settings_dedup_row.set_sensitive(active and drive_present and dup_on_now)
+        if hasattr(self, "settings_silent_row"):
+            self.settings_silent_row.set_sensitive(active and drive_present)
         if hasattr(self, "settings_manual_scan_row"):
             self.settings_manual_scan_row.set_sensitive(active and drive_present)
         self.settings["backup_enabled"] = active
@@ -6094,6 +6116,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_backup_dedup_toggle(self, switch, _):
         self.settings["backup_dedup"] = switch.get_active()
+        save_settings(self.settings)
+
+    def on_backup_silent_toggle(self, switch, _):
+        self.settings["backup_silent"] = switch.get_active()
         save_settings(self.settings)
 
     def on_settings_manual_scan(self, btn):
@@ -6256,6 +6282,8 @@ class MainWindow(Adw.ApplicationWindow):
             if hasattr(self, "settings_dedup_row"):
                 dup_on_now = self.settings.get("duplicate_threshold", 2) != 0
                 self.settings_dedup_row.set_sensitive(backup_on and drive_present and dup_on_now)
+            if hasattr(self, "settings_silent_row"):
+                self.settings_silent_row.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_manual_scan_row"):
                 self.settings_manual_scan_row.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_backup_group"):
@@ -6539,6 +6567,14 @@ class MainWindow(Adw.ApplicationWindow):
             n=new_count, d=delete_count, m=mode,
             b=bytes_to_transfer, u=dup_count,
         ))
+        # Silent-mode: sla de scan-dialog over en start de backup direct.
+        # Manual-scan negeert silent-mode, want de user klikte expliciet op
+        # Controleer en wil het resultaat zien.
+        if self.settings.get("backup_silent") and not manual_requested:
+            log_info(_("Silent-mode: backup start automatisch zonder dialog"))
+            self.start_backup()
+            self._set_manual_scan_state("idle")
+            return False
         self._show_backup_scan_dialog(
             new_count, delete_count, bytes_to_transfer, dup_count, mode
         )
@@ -7148,6 +7184,11 @@ class MainWindow(Adw.ApplicationWindow):
             self.backup_done_banner.set_revealed(False)
         except Exception:
             pass
+        # Silent-mode: success-popup overslaan. Fouten blijven wél zichtbaar —
+        # anders merkt de gebruiker een kapotte backup nooit.
+        if success and self.settings.get("backup_silent"):
+            log_info(_("Silent-mode: backup voltooid zonder popup"))
+            return
         mode = self.settings.get("backup_mode", "backup")
         if success:
             if mode == "sync":
