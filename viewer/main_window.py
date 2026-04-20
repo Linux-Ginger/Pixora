@@ -5342,23 +5342,14 @@ class MainWindow(Adw.ApplicationWindow):
         app_row.add_suffix(github_btn)
         about_group.add(app_row)
 
-        # Versie row — bevat ook de GitHub-logo credit als tweede regel,
-        # visueel aan de Versie-rij gekoppeld zonder lege tussenruimte.
+        # Versie row
         installed_version_path = os.path.join(os.path.expanduser("~"), ".config", "pixora", "installed_version")
         try:
             with open(installed_version_path) as _ivf:
                 installed_ver = _ivf.read().strip()
         except Exception:
             installed_ver = _("Onbekend")
-        gh_credit = _("GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc.")
-        version_row = Adw.ActionRow(
-            title=_("Versie"),
-            subtitle=f"{installed_ver}\n{gh_credit}",
-        )
-        try:
-            version_row.set_subtitle_lines(3)
-        except Exception:
-            pass
+        version_row = Adw.ActionRow(title=_("Versie"), subtitle=installed_ver)
         about_group.add(version_row)
 
         # Controleer op updates row
@@ -5377,6 +5368,15 @@ class MainWindow(Adw.ApplicationWindow):
 
         about_group.add(self._update_check_row)
         about_page.add(about_group)
+
+        # Credit-regel ONDER de Over-box, in de open ruimte van de About-page.
+        # Adw.PreferencesGroup met alleen set_description en geen rijen rendert
+        # als freestanding dim-label tekst zonder eigen boxed-list.
+        credit_group = Adw.PreferencesGroup()
+        credit_group.set_description(
+            _("GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc.")
+        )
+        about_page.add(credit_group)
 
         dialog.add(display_page)
         dialog.add(import_page)
@@ -5399,26 +5399,51 @@ class MainWindow(Adw.ApplicationWindow):
             self._thumb_apply_btn.set_sensitive(new_size != THUMB_SIZE)
 
     def _draw_thumb_preview(self, area, cr, w, h):
+        """Mini-mockup van de homepage-grid. Grijze afgeronde kaders
+        schalen mee met de gekozen thumbnail-grootte, zodat de gebruiker
+        ziet hoeveel foto's er op een rij passen."""
         try:
             size = getattr(self, "_pending_thumb_size", THUMB_SIZE)
-            # 200px → ~56 preview, 500px → 140 preview — behoudt verhoudingen.
-            side = max(40.0, min(140.0, size * 140.0 / 500.0))
-            x = (w - side) / 2
-            y = (h - side) / 2
-            r = 8
-            # Achtergrondkader
-            cr.set_source_rgba(0.5, 0.5, 0.5, 0.15)
+            # Achtergrond: donkergrijs kader met afgeronde hoeken (alsof
+            # je een uitsnede van de app ziet).
+            cr.set_source_rgba(0.5, 0.5, 0.5, 0.08)
             cr.rectangle(0, 0, w, h)
             cr.fill()
-            # Rounded thumbnail-silhouette
-            cr.set_source_rgb(0.914, 0.329, 0.125)
-            cr.new_sub_path()
-            cr.arc(x + side - r, y + r, r, -math.pi / 2, 0)
-            cr.arc(x + side - r, y + side - r, r, 0, math.pi / 2)
-            cr.arc(x + r, y + side - r, r, math.pi / 2, math.pi)
-            cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
-            cr.close_path()
-            cr.fill()
+
+            # Schaling: 200 px echt → kleinste preview-thumb,
+            # 500 px echt → grootste. Elk echt px komt overeen met
+            # `scale` preview-px.
+            scale = 0.12
+            thumb = size * scale
+            gap = max(3.0, thumb * 0.08)
+            pad = 8.0
+            radius = max(3.0, thumb * 0.06)
+
+            # Hoeveel kolommen x rijen passen er in het preview-canvas?
+            inner_w = w - 2 * pad
+            inner_h = h - 2 * pad
+            cols = max(1, int((inner_w + gap) // (thumb + gap)))
+            rows = max(1, int((inner_h + gap) // (thumb + gap)))
+
+            def rounded_rect(x, y, tw, th, r):
+                cr.new_sub_path()
+                cr.arc(x + tw - r, y + r, r, -math.pi / 2, 0)
+                cr.arc(x + tw - r, y + th - r, r, 0, math.pi / 2)
+                cr.arc(x + r, y + th - r, r, math.pi / 2, math.pi)
+                cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+                cr.close_path()
+
+            # Rijen/kolommen links-uitlijnen met een vaste padding zodat het
+            # mockup-grid meegroeit maar niet ineens overspringt.
+            for ry in range(rows):
+                for cx in range(cols):
+                    x = pad + cx * (thumb + gap)
+                    y = pad + ry * (thumb + gap)
+                    if x + thumb > w - pad or y + thumb > h - pad:
+                        continue
+                    cr.set_source_rgba(0.5, 0.5, 0.5, 0.35)
+                    rounded_rect(x, y, thumb, thumb, radius)
+                    cr.fill()
         except Exception:
             pass
 

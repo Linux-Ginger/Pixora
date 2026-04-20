@@ -22,6 +22,50 @@ PIXORA_DEV_MODE = False
 _PIXORA_APP = None
 
 
+def _compile_stale_mo_files():
+    """Regenereer .mo-bestanden per taal als de .po nieuwer is dan de .mo
+    (of de .mo mist). Belangrijk bij 'git pull' flows waarbij alleen de
+    .po's worden geüpdatet en de oude .mo blijft staan — main_window.py
+    laadt z'n gettext-translation ineens met stale vertalingen → nieuwe
+    strings vallen terug op het Nederlandse msgid.
+
+    Silent als msgfmt er niet is of een locale-dir niet bestaat."""
+    try:
+        if not shutil.which("msgfmt"):
+            return
+        locale_dir = os.path.abspath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "locale"
+        ))
+        if not os.path.isdir(locale_dir):
+            return
+        for lang in os.listdir(locale_dir):
+            lc_dir = os.path.join(locale_dir, lang, "LC_MESSAGES")
+            if not os.path.isdir(lc_dir):
+                continue
+            po = os.path.join(lc_dir, "pixora.po")
+            mo = os.path.join(lc_dir, "pixora.mo")
+            if not os.path.isfile(po):
+                continue
+            try:
+                po_mtime = os.path.getmtime(po)
+                mo_mtime = os.path.getmtime(mo) if os.path.exists(mo) else 0
+            except OSError:
+                continue
+            if po_mtime > mo_mtime:
+                try:
+                    subprocess.run(
+                        ["msgfmt", "-o", mo, po],
+                        capture_output=True, timeout=10,
+                    )
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+_compile_stale_mo_files()
+
+
 def load_settings():
     if not os.path.exists(CONFIG_PATH):
         return None
