@@ -1694,12 +1694,11 @@ class MainWindow(Adw.ApplicationWindow):
             if os.path.exists(desktop):
                 try:
                     with open(desktop) as _df:
-                        for line in _df:
-                            if line.startswith("Icon="):
-                                current = line[5:].strip()
-                                if current == icon and os.path.exists(current):
-                                    needs_write = False
-                                break
+                        content_existing = _df.read()
+                    icon_ok = f"Icon={icon}" in content_existing and os.path.exists(icon)
+                    wm_ok = "StartupWMClass=com.linuxginger.pixora" in content_existing
+                    if icon_ok and wm_ok:
+                        needs_write = False
                 except Exception:
                     pass
             if not needs_write:
@@ -1721,6 +1720,7 @@ class MainWindow(Adw.ApplicationWindow):
                 "Terminal=false\n"
                 "Type=Application\n"
                 "Categories=Graphics;Photography;\n"
+                "StartupWMClass=com.linuxginger.pixora\n"
             )
             with open(desktop, "w") as _df:
                 _df.write(content)

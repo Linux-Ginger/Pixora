@@ -502,6 +502,7 @@ class InstallerWindow(Adw.ApplicationWindow):
                 "Terminal=false\n"
                 "Type=Application\n"
                 "Categories=Graphics;Photography;\n"
+                "StartupWMClass=com.linuxginger.pixora\n"
                 "StartupNotify=true\n"
                 "StartupWMClass=com.linuxginger.pixora\n"
             )

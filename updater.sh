@@ -130,6 +130,7 @@ Icon=$ICON_FILE
 Terminal=false
 Type=Application
 Categories=Graphics;Photography;
+StartupWMClass=com.linuxginger.pixora
 DESKTOP_EOF
     chown "$RUN_UID:$TARGET_GID" "$DESKTOP_FILE"
     # Cache bijwerken zodat GNOME het nieuwe icon oppakt zonder logout
