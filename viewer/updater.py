@@ -26,6 +26,7 @@ import re
 import sys
 import threading
 import subprocess
+import urllib.request
 from pathlib import Path
 
 import gi
@@ -39,12 +40,8 @@ UPDATE_URL = "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/updater
 
 # Stappen die updater.sh emit via "STEP:<key>:<label>" regels
 PHASES = [
-    ("Voorbereiden", [
-        ("Systeem packages controleren", "apt"),
-        ("WebKit typelib installeren", "webkit"),
-        ("Python packages installeren", "pip"),
-    ]),
     ("Bijwerken", [
+        ("Dependencies installeren", "deps"),
         ("Pixora ophalen van GitHub", "clone"),
         ("Configuratie + services", "finalize"),
     ]),
@@ -208,16 +205,32 @@ class UpdaterWindow(Adw.ApplicationWindow):
             self._pulse_timer = GLib.timeout_add(120, self._pulse_tick)
 
     def _run_update(self):
+        # Script eerst lokaal downloaden zodat de pkexec-prompt een kort,
+        # leesbaar commando toont ("pkexec bash /tmp/pixora-updater.sh")
+        # i.p.v. een bash -c met curl-pipe — minder eng voor de gebruiker.
+        import tempfile
+        script_path = None
+        try:
+            req = urllib.request.Request(
+                UPDATE_URL, headers={"User-Agent": "Pixora-Updater/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                script_bytes = resp.read()
+            with tempfile.NamedTemporaryFile(
+                mode="wb", prefix="pixora-updater-", suffix=".sh", delete=False
+            ) as f:
+                f.write(script_bytes)
+                script_path = f.name
+            os.chmod(script_path, 0o755)
+        except Exception as e:
+            GLib.idle_add(self._finish, False,
+                          _("Updater-script downloaden mislukt: {err}").format(err=e))
+            return
+
         uid = str(os.getuid())
         cmd = [
             "pkexec", "env", f"PKEXEC_UID={uid}",
-            "bash", "-c",
-            f"set -e; "
-            f"TMP=$(mktemp -d); "
-            f"cd $TMP && "
-            f"curl -fsSL '{UPDATE_URL}' -o updater.sh && "
-            f"bash updater.sh 2>&1; "
-            f"RC=$?; rm -rf $TMP; exit $RC"
+            "bash", script_path,
         ]
         try:
             proc = subprocess.Popen(
@@ -226,6 +239,10 @@ class UpdaterWindow(Adw.ApplicationWindow):
                 env={**os.environ, "TERM": "dumb"}
             )
         except FileNotFoundError:
+            try:
+                os.unlink(script_path)
+            except Exception:
+                pass
             GLib.idle_add(self._finish, False,
                           _("pkexec niet gevonden. Installeer policykit-1."))
             return
@@ -241,6 +258,10 @@ class UpdaterWindow(Adw.ApplicationWindow):
                     GLib.idle_add(self._set_step_active, key, label)
         proc.wait()
         ok = (proc.returncode == 0)
+        try:
+            os.unlink(script_path)
+        except Exception:
+            pass
         GLib.idle_add(self._finish, ok,
                       _("Pixora is bijgewerkt.") if ok else _("Update mislukt."))
 

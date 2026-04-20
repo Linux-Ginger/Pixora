@@ -49,24 +49,18 @@ fi
 step() { echo "STEP:$1:$2"; }
 step_done() { echo "STEP:$1:DONE"; }
 
-step apt "Systeem packages controleren"
+step deps "Dependencies installeren"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     python3 python3-gi python3-gi-cairo \
     gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-gudev-1.0 \
     git ifuse libimobiledevice-utils usbmuxd ffmpeg python3-pip \
     gettext >/dev/null 2>&1
-step_done apt
-
-step webkit "WebKit typelib installeren"
 apt-get install -y -qq gir1.2-webkit-6.0 >/dev/null 2>&1 || \
 apt-get install -y -qq gir1.2-webkit2-4.1 >/dev/null 2>&1 || true
-step_done webkit
-
-step pip "Python packages installeren"
 runuser -u "$TARGET_USER" -- python3 -m pip install -q \
     --break-system-packages \
     Pillow pillow-heif imagehash watchdog >/dev/null 2>&1 || true
-step_done pip
+step_done deps
 
 step clone "Pixora ophalen van GitHub"
 if [ -d "$INSTALL_DIR/.git" ]; then
