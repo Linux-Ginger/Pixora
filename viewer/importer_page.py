@@ -64,7 +64,7 @@ SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".dng", ".mp4", ".m
 EXCLUDED_EXT   = {".aae"}
 SKIP_DIRS      = {".Trash", "Recently Deleted", "Onlangs verwijderd", ".recently-deleted"}
 
-# Duplicate threshold → maximale hash-afstand
+# Duplicate threshold → maximale hash-afstand. 0 betekent: check overslaan.
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
 
 # Eigen vierkante thumbnail-cache voor de importer
@@ -1246,6 +1246,10 @@ class ImporterPage(Gtk.Box):
     def _do_hashing(self, iphone_files: list[Path]):
         photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
         threshold_key = self.settings.get("duplicate_threshold", 2)
+        # threshold 0 = detectie uit → alles als nieuw behandelen.
+        if threshold_key == 0:
+            GLib.idle_add(self._on_hashing_done, [], list(iphone_files))
+            return
         max_dist = THRESHOLD_MAP.get(threshold_key, 6)
 
         def lib_progress(i, total, name):

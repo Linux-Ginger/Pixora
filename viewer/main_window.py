@@ -1653,7 +1653,7 @@ class MainWindow(Adw.ApplicationWindow):
         dlg.add_response("bijwerken", _("Bijwerken"))
         dlg.set_response_appearance("bijwerken", Adw.ResponseAppearance.SUGGESTED)
         dlg.connect("response", self._on_update_dialog_response, new_version)
-        dlg.present(self)
+        self._present_dialog(dlg)
         return False
 
     def _on_update_dialog_response(self, dlg, response, new_version):
@@ -1805,7 +1805,7 @@ class MainWindow(Adw.ApplicationWindow):
             )
             dlg.set_default_response("cancel")
             dlg.connect("response", self._on_close_guard_response)
-            dlg.present(self)
+            self._present_dialog(dlg)
             return True  # annuleer close event — we beslissen via de dialog
         log_info(_("Pixora wordt afgesloten — opruimen…"))
         # Indien backup actief en gebruiker bevestigde → probeer rsync-proc
@@ -4938,37 +4938,36 @@ class MainWindow(Adw.ApplicationWindow):
 
         dup_group = Adw.PreferencesGroup()
         dup_group.set_title(_("Duplicate detectie"))
-        dup_group.set_description(_("Hoe streng worden duplicaten gedetecteerd"))
-        current_threshold = self.settings.get("duplicate_threshold", 2)
+        dup_group.set_description(_("Controleer bij import of foto's al bestaan"))
+        # Threshold=0 betekent uit, >=1 betekent aan. Aan gebruikt altijd
+        # strict (=1) voor de hoogste accuratie.
+        dup_on = self.settings.get("duplicate_threshold", 2) != 0
 
-        self.radio_strict = Gtk.CheckButton()
-        self.radio_strict.set_active(current_threshold == 1)
-        self.radio_strict.connect("toggled", lambda b: self.on_threshold_changed(1, b))
-        strict_row = Adw.ActionRow(title=_("Streng"), subtitle=_("Alleen exact dezelfde foto's"))
-        strict_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
-        strict_row.add_prefix(self.radio_strict)
-        strict_row.set_activatable_widget(self.radio_strict)
-        dup_group.add(strict_row)
+        self.radio_dup_on = Gtk.CheckButton()
+        self.radio_dup_on.set_active(dup_on)
+        self.radio_dup_on.connect("toggled", lambda b: self.on_threshold_changed(1, b))
+        dup_on_row = Adw.ActionRow(
+            title=_("Aan"),
+            subtitle=_("Strikte controle op bijna-identieke foto's"),
+        )
+        dup_on_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
+        dup_on_row.add_prefix(self.radio_dup_on)
+        dup_on_row.set_activatable_widget(self.radio_dup_on)
+        dup_group.add(dup_on_row)
 
-        self.radio_normal = Gtk.CheckButton()
-        self.radio_normal.set_group(self.radio_strict)
-        self.radio_normal.set_active(current_threshold == 2)
-        self.radio_normal.connect("toggled", lambda b: self.on_threshold_changed(2, b))
-        normal_row = Adw.ActionRow(title=_("Normaal"), subtitle=_("Bijna identieke foto's worden gedetecteerd"))
-        normal_row.add_prefix(Gtk.Image.new_from_icon_name("security-medium-symbolic"))
-        normal_row.add_prefix(self.radio_normal)
-        normal_row.set_activatable_widget(self.radio_normal)
-        dup_group.add(normal_row)
+        self.radio_dup_off = Gtk.CheckButton()
+        self.radio_dup_off.set_group(self.radio_dup_on)
+        self.radio_dup_off.set_active(not dup_on)
+        self.radio_dup_off.connect("toggled", lambda b: self.on_threshold_changed(0, b))
+        dup_off_row = Adw.ActionRow(
+            title=_("Uit"),
+            subtitle=_("Geen duplicate-controle bij import"),
+        )
+        dup_off_row.add_prefix(Gtk.Image.new_from_icon_name("window-close-symbolic"))
+        dup_off_row.add_prefix(self.radio_dup_off)
+        dup_off_row.set_activatable_widget(self.radio_dup_off)
+        dup_group.add(dup_off_row)
 
-        self.radio_loose = Gtk.CheckButton()
-        self.radio_loose.set_group(self.radio_strict)
-        self.radio_loose.set_active(current_threshold == 3)
-        self.radio_loose.connect("toggled", lambda b: self.on_threshold_changed(3, b))
-        loose_row = Adw.ActionRow(title=_("Soepel"), subtitle=_("Ook licht bewerkte foto's worden gedetecteerd"))
-        loose_row.add_prefix(Gtk.Image.new_from_icon_name("security-low-symbolic"))
-        loose_row.add_prefix(self.radio_loose)
-        loose_row.set_activatable_widget(self.radio_loose)
-        dup_group.add(loose_row)
         import_page.add(dup_group)
 
         backup_group = Adw.PreferencesGroup()
@@ -5003,7 +5002,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.settings_drive_combo = Gtk.DropDown(model=self.settings_drive_model)
         self.settings_drive_combo.set_size_request(220, -1)
-        self.settings_drive_combo.set_sensitive(backup_on)
+        self.settings_drive_combo.set_sensitive(backup_on and drive_present)
         self.settings_drive_combo.connect("notify::selected", self.on_settings_drive_selected)
 
         current_uuid = self.settings.get("backup_uuid")
@@ -5418,18 +5417,38 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_settings_backup_toggle(self, switch, _):
         active = switch.get_active()
+        if not active and self.settings.get("backup_enabled") \
+                and self.settings.get("backup_uuid"):
+            # User probeert backup uit te zetten terwijl er een config staat
+            # → confirm dialog. We mogen de switch niet tijdens de signal-
+            # emit terugdraaien, dus schedulen we het op idle.
+            def _confirm():
+                dlg = Adw.AlertDialog(
+                    heading=_("Automatische backup uitzetten?"),
+                    body=_("Pixora stopt met backuppen tot je hem weer aanzet. "
+                           "De huidige instellingen blijven bewaard."),
+                )
+                dlg.add_response("cancel", _("Annuleren"))
+                dlg.add_response("disable", _("Uitzetten"))
+                dlg.set_response_appearance("disable", Adw.ResponseAppearance.DESTRUCTIVE)
+                dlg.set_close_response("cancel")
+                dlg.connect("response", self._on_backup_disable_response)
+                self._present_dialog(dlg)
+                return False
+            GLib.idle_add(_confirm)
+            return
+        self._apply_backup_toggle(active)
+
+    def _apply_backup_toggle(self, active):
         drive_present = self._backup_drive_mountpoint() is not None
         self.settings_drive_row.set_sensitive(active)
-        self.settings_drive_combo.set_sensitive(active)
+        self.settings_drive_combo.set_sensitive(active and drive_present)
         self.settings_backup_folder_row.set_sensitive(active and drive_present)
         if hasattr(self, "settings_mode_backup_row"):
             self.settings_mode_backup_row.set_sensitive(active and drive_present)
             self.settings_mode_sync_row.set_sensitive(active and drive_present)
         self.settings["backup_enabled"] = active
         if active:
-            # Zorg dat we een uuid hebben zodra de schakelaar aan gaat — ook
-            # als de combo nooit getriggerd werd (bij één enkele drive blijft
-            # notify::selected uit omdat de selectie niet wijzigt).
             if not self.settings.get("backup_uuid") and self.settings_drives:
                 sel = self.settings_drive_combo.get_selected()
                 if 0 <= sel < len(self.settings_drives):
@@ -5437,6 +5456,19 @@ class MainWindow(Adw.ApplicationWindow):
         save_settings(self.settings)
         if active:
             GLib.idle_add(self._sync_now_if_ready)
+
+    def _on_backup_disable_response(self, dlg, response):
+        if response == "disable":
+            self._apply_backup_toggle(False)
+        else:
+            # Switch terugdraaien zonder de toggle-handler opnieuw te vuren
+            self.settings_backup_switch.handler_block_by_func(
+                self.on_settings_backup_toggle
+            )
+            self.settings_backup_switch.set_active(True)
+            self.settings_backup_switch.handler_unblock_by_func(
+                self.on_settings_backup_toggle
+            )
 
     def on_settings_reset_drive(self, btn):
         dlg = Adw.AlertDialog(
@@ -5449,7 +5481,7 @@ class MainWindow(Adw.ApplicationWindow):
         dlg.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE)
         dlg.set_close_response("cancel")
         dlg.connect("response", self._on_reset_drive_response)
-        dlg.present(self)
+        self._present_dialog(dlg)
 
     def _on_reset_drive_response(self, dlg, response):
         if response != "reset":
@@ -5538,7 +5570,8 @@ class MainWindow(Adw.ApplicationWindow):
                 if uuid == saved_uuid:
                     self.settings_drive_combo.set_selected(i)
                     break
-        self.settings_drive_combo.set_sensitive(backup_on)
+        drive_present = self._backup_drive_mountpoint() is not None
+        self.settings_drive_combo.set_sensitive(backup_on and drive_present)
 
     def on_settings_change_backup_folder(self, btn):
         current_uuid = self.settings.get("backup_uuid")
@@ -5549,14 +5582,14 @@ class MainWindow(Adw.ApplicationWindow):
                 body=_("Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."),
             )
             dlg.add_response("ok", _("OK"))
-            dlg.present(self)
+            self._present_dialog(dlg)
             return
         picker = BackupFolderPicker(
             mountpoint=mountpoint,
             current_path=self.settings.get("backup_path"),
             on_selected=self._apply_backup_folder,
         )
-        picker.present(self)
+        self._present_dialog(picker)
 
     def _apply_backup_folder(self, chosen):
         self.settings["backup_path"] = chosen
@@ -5579,6 +5612,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings_backup_folder_row.set_subtitle(
                 self.settings.get("backup_path") or _("Niet ingesteld")
             )
+            if hasattr(self, "settings_drive_combo"):
+                self.settings_drive_combo.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_mode_backup_row"):
                 self.settings_mode_backup_row.set_sensitive(backup_on and drive_present)
                 self.settings_mode_sync_row.set_sensitive(backup_on and drive_present)
@@ -5653,7 +5688,8 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         mode = self.settings.get("backup_mode", "backup")
         if _cmd_available_bk("rsync"):
-            cmd = ["rsync", "-a", "--dry-run", "--stats"]
+            cmd = ["rsync", "-a", "--dry-run", "--stats",
+                   "--modify-window=2"]
             if mode == "sync":
                 cmd.append("--delete")
             cmd += [str(photo_path) + "/", str(backup_dest) + "/"]
@@ -5813,7 +5849,7 @@ class MainWindow(Adw.ApplicationWindow):
         dlg.set_default_response("now")
         dlg.set_close_response("later")
         dlg.connect("response", self._on_scan_dialog_response)
-        dlg.present(self)
+        self._present_dialog(dlg)
 
     def _on_scan_dialog_response(self, dlg, response):
         self._backup_scan_dialog_open = False
@@ -5911,6 +5947,19 @@ class MainWindow(Adw.ApplicationWindow):
             self._show_backup_pending_banner()
         return False
 
+    def _present_dialog(self, dlg):
+        """Toon een AlertDialog/Adw.Dialog, maar breng eerst het hoofdvenster
+        naar voren zodat de popup niet 'losstaand' verschijnt als de gebruiker
+        in een ander venster (bv bestandsbeheer) zit."""
+        try:
+            self.present()
+        except Exception:
+            pass
+        try:
+            dlg.present(self)
+        except Exception:
+            pass
+
     def _show_backup_pending_banner(self):
         # Banner uitgeschakeld — feedback gebeurt in de settings-UI.
         try:
@@ -5960,7 +6009,7 @@ class MainWindow(Adw.ApplicationWindow):
         dlg.add_response("start", _("Nu backuppen"))
         dlg.set_response_appearance("start", Adw.ResponseAppearance.SUGGESTED)
         dlg.connect("response", self._on_backup_prompt_response)
-        dlg.present(self)
+        self._present_dialog(dlg)
         return False
 
     def _on_backup_prompt_response(self, dlg, response):
@@ -6012,7 +6061,11 @@ class MainWindow(Adw.ApplicationWindow):
         if _cmd_available_bk("rsync"):
             proc = None
             try:
-                rsync_cmd = ["rsync", "-a", "--info=progress2"]
+                # --modify-window=2 voorkomt onterechte re-transfer op
+                # FAT/exFAT/NTFS waar mtime op 2s afgerond wordt terwijl
+                # ext4 nanoseconde-resolutie heeft.
+                rsync_cmd = ["rsync", "-a", "--info=progress2",
+                             "--modify-window=2"]
                 if mode == "sync":
                     rsync_cmd.append("--delete")
                 rsync_cmd += [str(photo_path) + "/", str(backup_dest) + "/"]
@@ -6193,19 +6246,28 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _show_backup_done_banner(self, success, note):
+        # Banner uitgeschakeld — voltooid-feedback gebeurt nu via een popup
+        # (zelfde stijl als de start-dialog).
         try:
-            if success:
-                self.backup_done_banner.set_title(_("✓ Backup voltooid"))
-            else:
-                self.backup_done_banner.set_title(
-                    _("⚠ Backup mislukt: {note}").format(note=note or "")
-                )
-            self.backup_done_banner.set_revealed(True)
-            # Auto-verdwijnt na 10s
-            GLib.timeout_add_seconds(10, lambda: (
-                self.backup_done_banner.set_revealed(False) or False
-            ))
+            self.backup_done_banner.set_revealed(False)
         except Exception:
             pass
+        if success:
+            dlg = Adw.AlertDialog(
+                heading=_("Backup voltooid"),
+                body=_("Alle foto's staan op de USB-schijf."),
+            )
+            dlg.add_response("ok", _("OK"))
+            dlg.set_default_response("ok")
+            dlg.set_close_response("ok")
+        else:
+            dlg = Adw.AlertDialog(
+                heading=_("Backup mislukt"),
+                body=note or _("Onbekende fout."),
+            )
+            dlg.add_response("ok", _("OK"))
+            dlg.set_default_response("ok")
+            dlg.set_close_response("ok")
+        self._present_dialog(dlg)
 
 

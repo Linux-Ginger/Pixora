@@ -1420,3 +1420,33 @@ msgstr "Die gewählte Festplatte und der Ordner werden von Pixora getrennt. Date
 
 msgid "Vergeten"
 msgstr "Vergessen"
+
+msgid "Automatische backup uitzetten?"
+msgstr "Automatisches Backup deaktivieren?"
+
+msgid "Pixora stopt met backuppen tot je hem weer aanzet. De huidige instellingen blijven bewaard."
+msgstr "Pixora pausiert das Backup, bis du es wieder einschaltest. Die Einstellungen bleiben erhalten."
+
+msgid "Uitzetten"
+msgstr "Deaktivieren"
+
+msgid "Alle foto's staan op de USB-schijf."
+msgstr "Alle Fotos sind auf der USB-Festplatte."
+
+msgid "Onbekende fout."
+msgstr "Unbekannter Fehler."
+
+msgid "Controleer bij import of foto's al bestaan"
+msgstr "Beim Import auf vorhandene Fotos prüfen"
+
+msgid "Aan"
+msgstr "An"
+
+msgid "Uit"
+msgstr "Aus"
+
+msgid "Strikte controle op bijna-identieke foto's"
+msgstr "Strenge Prüfung auf nahezu identische Fotos"
+
+msgid "Geen duplicate-controle bij import"
+msgstr "Keine Duplikatprüfung beim Import"

@@ -1429,3 +1429,33 @@ msgstr "De gekozen schijf en map worden losgekoppeld van Pixora. De bestanden op
 
 msgid "Vergeten"
 msgstr "Vergeten"
+
+msgid "Automatische backup uitzetten?"
+msgstr "Automatische backup uitzetten?"
+
+msgid "Pixora stopt met backuppen tot je hem weer aanzet. De huidige instellingen blijven bewaard."
+msgstr "Pixora stopt met backuppen tot je hem weer aanzet. De huidige instellingen blijven bewaard."
+
+msgid "Uitzetten"
+msgstr "Uitzetten"
+
+msgid "Alle foto's staan op de USB-schijf."
+msgstr "Alle foto's staan op de USB-schijf."
+
+msgid "Onbekende fout."
+msgstr "Onbekende fout."
+
+msgid "Controleer bij import of foto's al bestaan"
+msgstr "Controleer bij import of foto's al bestaan"
+
+msgid "Aan"
+msgstr "Aan"
+
+msgid "Uit"
+msgstr "Uit"
+
+msgid "Strikte controle op bijna-identieke foto's"
+msgstr "Strikte controle op bijna-identieke foto's"
+
+msgid "Geen duplicate-controle bij import"
+msgstr "Geen duplicate-controle bij import"

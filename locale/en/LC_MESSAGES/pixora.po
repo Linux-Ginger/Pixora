@@ -1429,3 +1429,33 @@ msgstr "The chosen drive and folder will be unlinked from Pixora. Files on the d
 
 msgid "Vergeten"
 msgstr "Forget"
+
+msgid "Automatische backup uitzetten?"
+msgstr "Turn off automatic backup?"
+
+msgid "Pixora stopt met backuppen tot je hem weer aanzet. De huidige instellingen blijven bewaard."
+msgstr "Pixora will stop backing up until you turn it back on. The current settings are preserved."
+
+msgid "Uitzetten"
+msgstr "Turn off"
+
+msgid "Alle foto's staan op de USB-schijf."
+msgstr "All photos are on the USB drive."
+
+msgid "Onbekende fout."
+msgstr "Unknown error."
+
+msgid "Controleer bij import of foto's al bestaan"
+msgstr "Check for existing photos during import"
+
+msgid "Aan"
+msgstr "On"
+
+msgid "Uit"
+msgstr "Off"
+
+msgid "Strikte controle op bijna-identieke foto's"
+msgstr "Strict check for near-identical photos"
+
+msgid "Geen duplicate-controle bij import"
+msgstr "No duplicate checking during import"

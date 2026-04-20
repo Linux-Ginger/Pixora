@@ -338,29 +338,27 @@ class SetupWizard(Adw.Window):
 
         group = Adw.PreferencesGroup()
 
-        self.radio_strict = Gtk.CheckButton()
-        strict_row = Adw.ActionRow(title=_("Streng"), subtitle=_("Alleen exact dezelfde foto's"))
-        strict_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
-        strict_row.add_prefix(self.radio_strict)
-        strict_row.set_activatable_widget(self.radio_strict)
-        group.add(strict_row)
+        self.radio_dup_on = Gtk.CheckButton()
+        self.radio_dup_on.set_active(True)
+        dup_on_row = Adw.ActionRow(
+            title=_("Aan"),
+            subtitle=_("Strikte controle op bijna-identieke foto's"),
+        )
+        dup_on_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
+        dup_on_row.add_prefix(self.radio_dup_on)
+        dup_on_row.set_activatable_widget(self.radio_dup_on)
+        group.add(dup_on_row)
 
-        self.radio_normal = Gtk.CheckButton()
-        self.radio_normal.set_group(self.radio_strict)
-        self.radio_normal.set_active(True)
-        normal_row = Adw.ActionRow(title=_("Normaal"), subtitle=_("Bijna identieke foto's worden gedetecteerd"))
-        normal_row.add_prefix(Gtk.Image.new_from_icon_name("security-medium-symbolic"))
-        normal_row.add_prefix(self.radio_normal)
-        normal_row.set_activatable_widget(self.radio_normal)
-        group.add(normal_row)
-
-        self.radio_loose = Gtk.CheckButton()
-        self.radio_loose.set_group(self.radio_strict)
-        loose_row = Adw.ActionRow(title=_("Soepel"), subtitle=_("Ook licht bewerkte foto's worden gedetecteerd"))
-        loose_row.add_prefix(Gtk.Image.new_from_icon_name("security-low-symbolic"))
-        loose_row.add_prefix(self.radio_loose)
-        loose_row.set_activatable_widget(self.radio_loose)
-        group.add(loose_row)
+        self.radio_dup_off = Gtk.CheckButton()
+        self.radio_dup_off.set_group(self.radio_dup_on)
+        dup_off_row = Adw.ActionRow(
+            title=_("Uit"),
+            subtitle=_("Geen duplicate-controle bij import"),
+        )
+        dup_off_row.add_prefix(Gtk.Image.new_from_icon_name("window-close-symbolic"))
+        dup_off_row.add_prefix(self.radio_dup_off)
+        dup_off_row.set_activatable_widget(self.radio_dup_off)
+        group.add(dup_off_row)
 
         page.append(group)
         return page
@@ -533,11 +531,7 @@ class SetupWizard(Adw.Window):
         return None
 
     def _get_threshold(self):
-        if self.radio_strict.get_active():
-            return 1
-        elif self.radio_normal.get_active():
-            return 2
-        return 3
+        return 1 if self.radio_dup_on.get_active() else 0
 
     def _get_backup_uuid(self):
         if not self.backup_switch.get_active():

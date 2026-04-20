@@ -1420,3 +1420,33 @@ msgstr "Le lecteur et le dossier choisis seront dissociés de Pixora. Les fichie
 
 msgid "Vergeten"
 msgstr "Oublier"
+
+msgid "Automatische backup uitzetten?"
+msgstr "Désactiver la sauvegarde automatique ?"
+
+msgid "Pixora stopt met backuppen tot je hem weer aanzet. De huidige instellingen blijven bewaard."
+msgstr "Pixora arrête la sauvegarde jusqu'à ce que vous la réactiviez. Les réglages sont conservés."
+
+msgid "Uitzetten"
+msgstr "Désactiver"
+
+msgid "Alle foto's staan op de USB-schijf."
+msgstr "Toutes les photos sont sur le lecteur USB."
+
+msgid "Onbekende fout."
+msgstr "Erreur inconnue."
+
+msgid "Controleer bij import of foto's al bestaan"
+msgstr "Vérifier les photos existantes lors de l'import"
+
+msgid "Aan"
+msgstr "Activé"
+
+msgid "Uit"
+msgstr "Désactivé"
+
+msgid "Strikte controle op bijna-identieke foto's"
+msgstr "Contrôle strict des photos presque identiques"
+
+msgid "Geen duplicate-controle bij import"
+msgstr "Pas de contrôle de doublons à l'import"

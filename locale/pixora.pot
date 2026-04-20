@@ -770,3 +770,33 @@ msgstr ""
 
 msgid "Vergeten"
 msgstr ""
+
+msgid "Automatische backup uitzetten?"
+msgstr ""
+
+msgid "Pixora stopt met backuppen tot je hem weer aanzet. De huidige instellingen blijven bewaard."
+msgstr ""
+
+msgid "Uitzetten"
+msgstr ""
+
+msgid "Alle foto's staan op de USB-schijf."
+msgstr ""
+
+msgid "Onbekende fout."
+msgstr ""
+
+msgid "Controleer bij import of foto's al bestaan"
+msgstr ""
+
+msgid "Aan"
+msgstr ""
+
+msgid "Uit"
+msgstr ""
+
+msgid "Strikte controle op bijna-identieke foto's"
+msgstr ""
+
+msgid "Geen duplicate-controle bij import"
+msgstr ""
