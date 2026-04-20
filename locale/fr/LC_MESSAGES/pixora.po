@@ -1450,3 +1450,23 @@ msgstr "Contrôle strict des photos presque identiques"
 
 msgid "Geen duplicate-controle bij import"
 msgstr "Pas de contrôle de doublons à l'import"
+
+msgid "Duplicaat-detector voor backup"
+msgstr "Détecteur de doublons pour la sauvegarde"
+
+msgid "Foto's die al op USB staan (ook onder andere naam) worden overgeslagen"
+msgstr "Les photos déjà sur l'USB (même sous un autre nom) seront ignorées"
+
+msgid "Dedup-check overgeslagen: {err}"
+msgstr "Vérification des doublons ignorée : {err}"
+
+msgid "Backup-scan: alles gesynct, {d} duplicaten overgeslagen"
+msgstr "Analyse : tout est synchronisé, {d} doublons ignorés"
+
+msgid "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes, {u} duplicaten overgeslagen"
+msgstr "Analyse : {n} nouveau(x), {d} à supprimer, {b} octets, {u} doublons ignorés"
+
+msgid "{n} duplicaat wordt overgeslagen"
+msgid_plural "{n} duplicaten worden overgeslagen"
+msgstr[0] "{n} doublon sera ignoré"
+msgstr[1] "{n} doublons seront ignorés"

@@ -1284,6 +1284,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scan_phase = 0.0
         self._backup_scan_anim_id = None
         self._backup_scan_dialog_open = False
+        self._backup_excluded_paths = []
 
         self.set_title("Pixora (Dev Mode)" if self.settings.get("dev_mode") else "Pixora")
         self.set_default_size(9999, 9999)
@@ -5081,6 +5082,22 @@ class MainWindow(Adw.ApplicationWindow):
         mode_sync_row.set_sensitive(backup_on and drive_present)
         self.settings_mode_sync_row = mode_sync_row
         backup_group.add(mode_sync_row)
+
+        self.settings_dedup_switch = Gtk.Switch()
+        self.settings_dedup_switch.set_valign(Gtk.Align.CENTER)
+        self.settings_dedup_switch.set_active(bool(self.settings.get("backup_dedup")))
+        self.settings_dedup_switch.connect("notify::active", self.on_backup_dedup_toggle)
+        dedup_row = Adw.ActionRow(
+            title=_("Duplicaat-detector voor backup"),
+            subtitle=_("Foto's die al op USB staan (ook onder andere naam) worden overgeslagen"),
+        )
+        dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
+        dedup_row.add_suffix(self.settings_dedup_switch)
+        dedup_row.set_activatable_widget(self.settings_dedup_switch)
+        dedup_row.set_sensitive(backup_on and drive_present)
+        self.settings_dedup_row = dedup_row
+        backup_group.add(dedup_row)
+
         self.settings_backup_group = backup_group
 
         import_page.add(backup_group)
@@ -5447,6 +5464,8 @@ class MainWindow(Adw.ApplicationWindow):
         if hasattr(self, "settings_mode_backup_row"):
             self.settings_mode_backup_row.set_sensitive(active and drive_present)
             self.settings_mode_sync_row.set_sensitive(active and drive_present)
+        if hasattr(self, "settings_dedup_row"):
+            self.settings_dedup_row.set_sensitive(active and drive_present)
         self.settings["backup_enabled"] = active
         if active:
             if not self.settings.get("backup_uuid") and self.settings_drives:
@@ -5510,6 +5529,10 @@ class MainWindow(Adw.ApplicationWindow):
                     self.settings_drive_model.append(label)
             else:
                 self.settings_drive_model.append(_("Geen externe schijven gevonden"))
+
+    def on_backup_dedup_toggle(self, switch, _):
+        self.settings["backup_dedup"] = switch.get_active()
+        save_settings(self.settings)
 
     def on_backup_mode_changed(self, mode, btn):
         if btn.get_active():
@@ -5617,6 +5640,8 @@ class MainWindow(Adw.ApplicationWindow):
             if hasattr(self, "settings_mode_backup_row"):
                 self.settings_mode_backup_row.set_sensitive(backup_on and drive_present)
                 self.settings_mode_sync_row.set_sensitive(backup_on and drive_present)
+            if hasattr(self, "settings_dedup_row"):
+                self.settings_dedup_row.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_backup_group"):
                 if backup_on and has_uuid and not drive_present:
                     self.settings_backup_group.set_description(_(
@@ -5687,9 +5712,11 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         mode = self.settings.get("backup_mode", "backup")
+        dedup_enabled = bool(self.settings.get("backup_dedup"))
+        to_transfer_rels = []
         if _cmd_available_bk("rsync"):
             cmd = ["rsync", "-a", "--dry-run", "--stats",
-                   "--modify-window=2"]
+                   "--modify-window=2", "--out-format=__RELPATH__%n"]
             if mode == "sync":
                 cmd.append("--delete")
             cmd += [str(photo_path) + "/", str(backup_dest) + "/"]
@@ -5699,6 +5726,13 @@ class MainWindow(Adw.ApplicationWindow):
                 ).stdout
                 new_count, bytes_to_transfer, delete_count = \
                     self._parse_rsync_stats(out)
+                for line in out.splitlines():
+                    if not line.startswith("__RELPATH__"):
+                        continue
+                    rel = line[len("__RELPATH__"):].strip()
+                    if not rel or rel.endswith("/") or rel.startswith("*"):
+                        continue
+                    to_transfer_rels.append(rel)
             except Exception as e:
                 log_error(_("Scan fout: {err}").format(err=e))
                 GLib.idle_add(self._handle_scan_result, None)
@@ -5733,9 +5767,52 @@ class MainWindow(Adw.ApplicationWindow):
                         rel = os.path.relpath(df, str(backup_dest))
                         if rel not in src_files:
                             delete_count += 1
+            # to_transfer_rels = relatieve paden van nieuwe bestanden
+            to_transfer_rels = [rel for rel in src_files
+                                if not os.path.exists(os.path.join(str(backup_dest), rel))]
+
+        # Optionele dedup: vergelijk pHash van bestanden-die-zouden-overdragen
+        # tegen pHash van bestaande bestanden op USB.
+        excluded_rels = []
+        dup_count = 0
+        if dedup_enabled and to_transfer_rels:
+            try:
+                from importer_page import (
+                    perceptual_hash, build_library_hashes, find_duplicate,
+                    SUPPORTED_EXT,
+                )
+                usb_hashes = build_library_hashes(backup_dest)
+                MAX_DIST = 2  # strict (zelfde als "Aan" in dup-detectie)
+                for rel in to_transfer_rels:
+                    src_file = photo_path / rel
+                    if not src_file.is_file():
+                        continue
+                    if src_file.suffix.lower() not in SUPPORTED_EXT:
+                        continue
+                    ph = perceptual_hash(src_file)
+                    if ph and find_duplicate(ph, usb_hashes, MAX_DIST):
+                        excluded_rels.append(rel)
+                        dup_count += 1
+            except Exception as e:
+                log_warn(_("Dedup-check overgeslagen: {err}").format(err=e))
+            # Adjust counts/bytes voor de getoonde schatting
+            for rel in excluded_rels:
+                try:
+                    sz = (photo_path / rel).stat().st_size
+                    bytes_to_transfer -= sz
+                except OSError:
+                    pass
+            new_count = max(0, new_count - dup_count)
+            bytes_to_transfer = max(0, bytes_to_transfer)
         GLib.idle_add(
             self._handle_scan_result,
-            {"new": new_count, "bytes": bytes_to_transfer, "delete": delete_count},
+            {
+                "new": new_count,
+                "bytes": bytes_to_transfer,
+                "delete": delete_count,
+                "dup_count": dup_count,
+                "excluded": excluded_rels,
+            },
         )
 
     def _parse_rsync_stats(self, stdout):
@@ -5778,6 +5855,8 @@ class MainWindow(Adw.ApplicationWindow):
         new_count = result["new"]
         delete_count = result["delete"]
         bytes_to_transfer = result["bytes"]
+        dup_count = result.get("dup_count", 0)
+        self._backup_excluded_paths = result.get("excluded", [])
         if new_count == 0 and delete_count == 0:
             # Alles al gesynct — markeer als voltooid zodat pending-state klopt
             self.settings["last_backup_time"] = time.time()
@@ -5786,12 +5865,15 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 pass
             self._hide_backup_pending_banner()
-            log_info(_("Backup-scan: alles gesynct"))
+            if dup_count > 0:
+                log_info(_("Backup-scan: alles gesynct, {d} duplicaten overgeslagen").format(d=dup_count))
+            else:
+                log_info(_("Backup-scan: alles gesynct"))
             return False
-        log_info(_("Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes").format(
-            n=new_count, d=delete_count, b=bytes_to_transfer,
+        log_info(_("Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes, {u} duplicaten overgeslagen").format(
+            n=new_count, d=delete_count, b=bytes_to_transfer, u=dup_count,
         ))
-        self._show_backup_scan_dialog(new_count, delete_count, bytes_to_transfer)
+        self._show_backup_scan_dialog(new_count, delete_count, bytes_to_transfer, dup_count)
         return False
 
     def _format_bytes(self, n):
@@ -5818,7 +5900,7 @@ class MainWindow(Adw.ApplicationWindow):
             return ngettext("± {n} uur", "± {n} uur", hours).format(n=hours)
         return _("± {h} u {m} min").format(h=hours, m=rem)
 
-    def _show_backup_scan_dialog(self, new_count, delete_count, bytes_to_transfer):
+    def _show_backup_scan_dialog(self, new_count, delete_count, bytes_to_transfer, dup_count=0):
         if self._backup_scan_dialog_open:
             return
         self._backup_scan_dialog_open = True
@@ -5835,6 +5917,12 @@ class MainWindow(Adw.ApplicationWindow):
                 "{n} verouderde bestanden worden verwijderd op USB",
                 delete_count,
             ).format(n=delete_count))
+        if dup_count > 0:
+            lines.append(ngettext(
+                "{n} duplicaat wordt overgeslagen",
+                "{n} duplicaten worden overgeslagen",
+                dup_count,
+            ).format(n=dup_count))
         lines.append(_("Geschatte tijd: {eta}").format(
             eta=self._format_eta(bytes_to_transfer)
         ))
@@ -6057,17 +6145,25 @@ class MainWindow(Adw.ApplicationWindow):
                         pass
 
         mode = self.settings.get("backup_mode", "backup")
+        excluded = list(getattr(self, "_backup_excluded_paths", []) or [])
+        exclude_file = None
         success = False
         if _cmd_available_bk("rsync"):
             proc = None
             try:
-                # --modify-window=2 voorkomt onterechte re-transfer op
-                # FAT/exFAT/NTFS waar mtime op 2s afgerond wordt terwijl
-                # ext4 nanoseconde-resolutie heeft.
                 rsync_cmd = ["rsync", "-a", "--info=progress2",
                              "--modify-window=2"]
                 if mode == "sync":
                     rsync_cmd.append("--delete")
+                if excluded:
+                    import tempfile
+                    exclude_file = tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".rsync-exclude", delete=False
+                    )
+                    for rel in excluded:
+                        exclude_file.write(f"/{rel}\n")
+                    exclude_file.close()
+                    rsync_cmd += [f"--exclude-from={exclude_file.name}"]
                 rsync_cmd += [str(photo_path) + "/", str(backup_dest) + "/"]
                 proc = subprocess.Popen(
                     rsync_cmd,
@@ -6090,16 +6186,27 @@ class MainWindow(Adw.ApplicationWindow):
                     except Exception:
                         pass
                 self._backup_proc = None
+                if exclude_file is not None:
+                    try:
+                        os.unlink(exclude_file.name)
+                    except OSError:
+                        pass
         else:
-            success = self._manual_backup(photo_path, backup_dest, mode == "sync")
+            success = self._manual_backup(
+                photo_path, backup_dest, mode == "sync", excluded=set(excluded)
+            )
 
+        # Excluded-lijst leeg na deze run zodat volgende backup opnieuw scant
+        self._backup_excluded_paths = []
         GLib.idle_add(self._backup_finished, success,
                       None if success else _("Backup gedeeltelijk mislukt."))
 
-    def _manual_backup(self, src, dst, delete_extraneous=False):
+    def _manual_backup(self, src, dst, delete_extraneous=False, excluded=None):
         """Fallback zonder rsync: handmatig kopiëren met progress.
         delete_extraneous=True → sync-gedrag: files in dst die niet in src
-        staan worden verwijderd."""
+        staan worden verwijderd. excluded = set van relatieve paden (vanaf
+        src) die overgeslagen moeten worden (dedup-matches)."""
+        excluded = excluded or set()
         try:
             all_src = []
             for root, _, files in os.walk(src):
@@ -6111,6 +6218,8 @@ class MainWindow(Adw.ApplicationWindow):
             for i, sf in enumerate(all_src):
                 rel = os.path.relpath(sf, str(src))
                 src_rels.add(rel)
+                if rel in excluded:
+                    continue
                 df = os.path.join(str(dst), rel)
                 os.makedirs(os.path.dirname(df), exist_ok=True)
                 if not os.path.exists(df):

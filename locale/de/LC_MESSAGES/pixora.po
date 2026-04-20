@@ -1450,3 +1450,23 @@ msgstr "Strenge Prüfung auf nahezu identische Fotos"
 
 msgid "Geen duplicate-controle bij import"
 msgstr "Keine Duplikatprüfung beim Import"
+
+msgid "Duplicaat-detector voor backup"
+msgstr "Duplikat-Detektor für Backup"
+
+msgid "Foto's die al op USB staan (ook onder andere naam) worden overgeslagen"
+msgstr "Fotos, die bereits auf USB liegen (auch unter anderem Namen), werden übersprungen"
+
+msgid "Dedup-check overgeslagen: {err}"
+msgstr "Dedup-Prüfung übersprungen: {err}"
+
+msgid "Backup-scan: alles gesynct, {d} duplicaten overgeslagen"
+msgstr "Backup-Scan: alles synchronisiert, {d} Duplikate übersprungen"
+
+msgid "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes, {u} duplicaten overgeslagen"
+msgstr "Backup-Scan: {n} neu, {d} zu löschen, {b} Bytes, {u} Duplikate übersprungen"
+
+msgid "{n} duplicaat wordt overgeslagen"
+msgid_plural "{n} duplicaten worden overgeslagen"
+msgstr[0] "{n} Duplikat wird übersprungen"
+msgstr[1] "{n} Duplikate werden übersprungen"

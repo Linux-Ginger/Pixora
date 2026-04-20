@@ -800,3 +800,23 @@ msgstr ""
 
 msgid "Geen duplicate-controle bij import"
 msgstr ""
+
+msgid "Duplicaat-detector voor backup"
+msgstr ""
+
+msgid "Foto's die al op USB staan (ook onder andere naam) worden overgeslagen"
+msgstr ""
+
+msgid "Dedup-check overgeslagen: {err}"
+msgstr ""
+
+msgid "Backup-scan: alles gesynct, {d} duplicaten overgeslagen"
+msgstr ""
+
+msgid "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes, {u} duplicaten overgeslagen"
+msgstr ""
+
+msgid "{n} duplicaat wordt overgeslagen"
+msgid_plural "{n} duplicaten worden overgeslagen"
+msgstr[0] ""
+msgstr[1] ""
