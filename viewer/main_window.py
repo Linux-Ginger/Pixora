@@ -2673,8 +2673,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_donut_btn.set_child(self._viewer_donut)
         self._viewer_donut_btn.set_halign(Gtk.Align.END)
         self._viewer_donut_btn.set_valign(Gtk.Align.START)
-        self._viewer_donut_btn.set_margin_top(16)
-        self._viewer_donut_btn.set_margin_end(170)
+        # Onder de verwijder-knop (margin_end=68, margin_top=16 + 40 + 8).
+        self._viewer_donut_btn.set_margin_top(64)
+        self._viewer_donut_btn.set_margin_end(68)
         self._viewer_donut_btn.set_size_request(40, 40)
         self._viewer_donut_btn.set_visible(False)
         self._viewer_donut_btn.connect("clicked", self._on_backup_donut_clicked)
@@ -4239,6 +4240,10 @@ class MainWindow(Adw.ApplicationWindow):
         widgets = self._video_fade_widgets()
         for w in widgets:
             w.set_opacity(opacity)
+        # De backup-donut mag nooit wegfaden — hij is actieve status-
+        # feedback, geen decoratieve OSD.
+        if hasattr(self, "_viewer_donut_btn"):
+            self._viewer_donut_btn.set_opacity(1.0)
         if opacity <= 0.0:
             for w in widgets:
                 w.set_visible(False)
