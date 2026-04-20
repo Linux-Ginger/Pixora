@@ -199,6 +199,11 @@ os.environ.setdefault("WEBKIT_FORCE_COMPOSITING_MODE", "1")
 # EGL/DMA-BUF renderer werkt vaak beter in VMs (VMware SVGA3D) dan GLX.
 os.environ.setdefault("WEBKIT_USE_EGL", "1")
 os.environ.setdefault("GDK_GL", "gles")
+# JavaScriptCore gebruikt standaard SIGUSR1 (=10) voor garbage collection
+# en overschrijft dan de faulthandler die we in dev-mode zetten voor
+# 'kill -USR1 <pid>'-threadstacks. Wijs JSC naar SIGUSR2 (=12) zodat beide
+# features naast elkaar werken.
+os.environ.setdefault("JSC_SIGNAL_FOR_GC", "12")
 
 # Probeer eerst WebKit 6.0 (GTK4-native, nieuwste). Daarna WebKit2 4.1 / 4.0.
 try:
