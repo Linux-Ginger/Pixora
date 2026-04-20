@@ -58,10 +58,34 @@
     zoomSnap: 1,
     minZoom: 2,
     maxBoundsViscosity: 1.0
-  }).setView([52.3, 5.3], 7);
+  });
 
   // Voorkom herhaalde werelden bij ver uitzoomen
   map.setMaxBounds([[-85.05, -180], [85.05, 180]]);
+
+  // Dynamische minZoom zodat tiles altijd het viewport vullen — voorkomt
+  // grijze vlakte rondom de wereld én foutieve "offline" meldingen door
+  // tile-requests buiten de wereld-bounds.
+  function updateMinZoom() {
+    const size = map.getSize();
+    if (size.x === 0 || size.y === 0) return;
+    const tileSize = 256;
+    const needed = Math.ceil(
+      Math.log2(Math.max(size.x, size.y) / tileSize)
+    );
+    const minZ = Math.max(2, needed);
+    if (map.getMinZoom() !== minZ) {
+      map.setMinZoom(minZ);
+      if (map.getZoom() < minZ) map.setZoom(minZ);
+    }
+  }
+  updateMinZoom();
+  map.on('resize', updateMinZoom);
+
+  // Fallback-view: toon de hele wereld binnen de huidige bounds totdat
+  // Python markers stuurt (pixoraSetMarkers doet dan fitBounds op de
+  // markers, dus de "ergens in Nederland spawnen"-bug verdwijnt).
+  map.fitWorld({ animate: false });
 
   L.control.attribution({
     prefix: '<a href="https://leafletjs.com/" target="_blank">Leaflet</a>'
@@ -267,6 +291,11 @@
       bounds.extend(latlng);
     });
     if (bounds.isValid()) {
+      // Eerst size invalideren: als de WebView nog niet zijn eindgrootte
+      // had toen de page laadde, zou fitBounds op verkeerde dimensies
+      // rekenen en de map op de default-view (wereld) blijven staan.
+      map.invalidateSize(false);
+      updateMinZoom();
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
     }
   };
