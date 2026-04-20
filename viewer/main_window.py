@@ -5375,6 +5375,8 @@ class MainWindow(Adw.ApplicationWindow):
                 if 0 <= sel < len(self.settings_drives):
                     self.settings["backup_uuid"] = self.settings_drives[sel][0]
         save_settings(self.settings)
+        if active:
+            GLib.idle_add(self._sync_now_if_ready)
 
     def on_settings_drive_selected(self, combo, _):
         selected = combo.get_selected()
@@ -5423,6 +5425,26 @@ class MainWindow(Adw.ApplicationWindow):
         save_settings(self.settings)
         self.settings_backup_folder_row.set_subtitle(chosen)
         self.settings_backup_folder_btn.set_label(_("Wijzigen"))
+        GLib.idle_add(self._sync_now_if_ready)
+
+    def _sync_now_if_ready(self):
+        """Start direct een backup als alle instellingen compleet zijn en de
+        schijf aanwezig is. Wordt aangeroepen na configuratie-wijzigingen,
+        zodat de gebruiker niet eerst hoeft te importeren om de eerste sync
+        te triggeren. rsync is idempotent — een tweede run over gesyncte data
+        is effectief een no-op."""
+        if self._backup_running:
+            return False
+        if not (self.settings.get("backup_enabled")
+                and self.settings.get("backup_uuid")
+                and self.settings.get("backup_path")):
+            return False
+        if self._backup_drive_mountpoint() is None:
+            self._show_backup_pending_banner()
+            return False
+        log_info(_("Backup gestart via settings-setup"))
+        self.start_backup()
+        return False
 
     def change_folder(self, parent_dialog):
         file_dialog = Gtk.FileDialog()

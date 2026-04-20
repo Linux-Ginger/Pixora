@@ -1325,3 +1325,6 @@ msgstr "Keine Backup-Festplatte"
 
 msgid "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."
 msgstr "Schließe zuerst eine USB-Festplatte an und wähle sie unter 'Backup-Festplatte' aus."
+
+msgid "Backup gestart via settings-setup"
+msgstr "Backup über Einstellungen gestartet"

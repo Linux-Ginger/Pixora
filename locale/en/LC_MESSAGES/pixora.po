@@ -1334,3 +1334,6 @@ msgstr "No backup drive"
 
 msgid "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."
 msgstr "Plug in a USB drive first and select it under 'Backup drive'."
+
+msgid "Backup gestart via settings-setup"
+msgstr "Backup started via settings setup"

@@ -675,3 +675,6 @@ msgstr ""
 
 msgid "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."
 msgstr ""
+
+msgid "Backup gestart via settings-setup"
+msgstr ""

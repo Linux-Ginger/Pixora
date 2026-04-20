@@ -1325,3 +1325,6 @@ msgstr "Aucun lecteur de sauvegarde"
 
 msgid "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."
 msgstr "Branchez d'abord un lecteur USB et sélectionnez-le sous « Lecteur de sauvegarde »."
+
+msgid "Backup gestart via settings-setup"
+msgstr "Sauvegarde lancée via les paramètres"
