@@ -937,3 +937,6 @@ msgstr ""
 
 msgid "pixora.desktop gerepareerd: Icon={p}"
 msgstr ""
+
+msgid "Nieuwe versie beschikbaar — klik om bij te werken"
+msgstr ""

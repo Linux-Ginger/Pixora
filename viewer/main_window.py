@@ -1753,22 +1753,101 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self.close)
 
     def _on_open_github(self, btn):
+        # subprocess.Popen i.p.v. Gio.AppInfo.launch_default_for_uri omdat
+        # browsers bij opstarten GTK-warnings naar stderr sturen ("atk-bridge"
+        # e.d.) die anders in Pixora's terminal belanden. Met DEVNULL zien we
+        # die niet meer — tevens de start-new-session zodat de browser niet
+        # aan Pixora's lifetime hangt.
         try:
-            Gio.AppInfo.launch_default_for_uri(
-                "https://github.com/Linux-Ginger/Pixora", None
+            subprocess.Popen(
+                ["xdg-open", "https://github.com/Linux-Ginger/Pixora"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
             )
         except Exception as e:
             log_warn(_("GitHub openen mislukt: {err}").format(err=e))
 
     def _on_settings_check_update(self, btn):
-        # set_sensitive i.p.v. set_visible — hiding forces GTK's focus-chain
-        # rebuild wat een Gtk-CRITICAL warning geeft over al gedisposed
-        # children. Disable volstaat voor het "kan niet nogmaals klikken"
-        # effect.
-        self._update_check_btn.set_sensitive(False)
-        self._update_check_spinner.set_visible(True)
-        self._update_check_spinner.start()
+        # Als er een update klaarstaat → knop-klik start de updater.
+        if self._update_check_state == "available":
+            self._open_installer()
+            return
+        # Anders: start een nieuwe check.
+        self._set_update_state("checking")
         threading.Thread(target=self._do_settings_update_check, daemon=True).start()
+
+    def _set_update_state(self, state):
+        """state ∈ {'idle', 'checking', 'uptodate', 'available'}."""
+        self._update_check_state = state
+        # Stop eventuele lopende animaties.
+        if self._update_check_pulse_id is not None:
+            try:
+                GLib.source_remove(self._update_check_pulse_id)
+            except Exception:
+                pass
+            self._update_check_pulse_id = None
+        if self._update_check_fade_id is not None:
+            try:
+                GLib.source_remove(self._update_check_fade_id)
+            except Exception:
+                pass
+            self._update_check_fade_id = None
+
+        try:
+            if state == "idle":
+                self._update_btn_stack.set_visible_child_name("idle")
+                self._update_check_btn.set_sensitive(True)
+                self._update_check_btn.set_opacity(1.0)
+                self._update_check_spinner.stop()
+            elif state == "checking":
+                self._update_btn_stack.set_visible_child_name("checking")
+                self._update_check_spinner.start()
+                self._update_check_btn.set_sensitive(False)
+            elif state == "uptodate":
+                self._update_btn_stack.set_visible_child_name("uptodate")
+                self._update_check_spinner.stop()
+                # Na 5s terug naar idle; knop is direct klikbaar.
+                self._update_check_btn.set_sensitive(True)
+                self._update_check_btn.set_opacity(1.0)
+                self._update_check_fade_id = GLib.timeout_add_seconds(
+                    5, self._update_uptodate_fade_done
+                )
+            elif state == "available":
+                self._update_check_spinner.stop()
+                self._update_check_btn.set_sensitive(True)
+                self._update_check_btn.set_opacity(1.0)
+                self._update_check_btn.set_tooltip_text(
+                    _("Nieuwe versie beschikbaar — klik om bij te werken")
+                )
+                self._update_btn_stack.set_visible_child_name("available")
+                # Pulse: 500ms uitroepteken, 500ms idle-label, repeat.
+                self._update_pulse_on = True
+                self._update_check_pulse_id = GLib.timeout_add(
+                    500, self._update_pulse_tick
+                )
+        except Exception:
+            pass
+
+    def _update_uptodate_fade_done(self):
+        self._update_check_fade_id = None
+        if self._update_check_state == "uptodate":
+            self._set_update_state("idle")
+        return False
+
+    def _update_pulse_tick(self):
+        if self._update_check_state != "available":
+            self._update_check_pulse_id = None
+            return False
+        self._update_pulse_on = not self._update_pulse_on
+        try:
+            self._update_btn_stack.set_visible_child_name(
+                "available" if self._update_pulse_on else "idle"
+            )
+        except Exception:
+            pass
+        return True
 
     def _do_settings_update_check(self):
         try:
@@ -1792,49 +1871,20 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _settings_update_result(self, local_version, remote_version):
         # Dialog kan ondertussen gesloten zijn → widgets gedisposed.
-        # Alle UI-calls in een try/except wrapperen zodat een async
-        # antwoord na sluiten geen Gtk-CRITICAL gooit.
         try:
-            self._update_check_spinner.stop()
-            self._update_check_spinner.set_visible(False)
-            self._update_check_btn.set_sensitive(True)
-
-            for w in list(getattr(self._update_check_row, "_extra_suffixes", [])):
-                self._update_check_row.remove(w)
-            self._update_check_row._extra_suffixes = []
-
             if remote_version is None:
                 self._update_check_row.set_subtitle(_("Controleren mislukt"))
+                self._set_update_state("idle")
                 return False
-
-            # Om het status-icon vóór de Controleer-knop te krijgen moeten we
-            # de knop+spinner even losmaken en daarna opnieuw toevoegen;
-            # add_suffix appendt altijd aan het einde.
-            self._update_check_row.remove(self._update_check_btn)
-            self._update_check_row.remove(self._update_check_spinner)
-
+            self._update_remote_version = remote_version
             if local_version == remote_version:
                 self._update_check_row.set_subtitle(_("Je hebt de nieuwste versie"))
-                ok_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-                ok_icon.add_css_class("success")
-                ok_icon.set_valign(Gtk.Align.CENTER)
-                self._update_check_row.add_suffix(ok_icon)
-                self._update_check_row.add_suffix(self._update_check_btn)
-                self._update_check_row.add_suffix(self._update_check_spinner)
-                self._update_check_row._extra_suffixes = [ok_icon]
+                self._set_update_state("uptodate")
             else:
-                self._update_check_row.set_subtitle(_("Versie {v} beschikbaar").format(v=remote_version))
-                warn_icon = Gtk.Image.new_from_icon_name("emblem-important-symbolic")
-                warn_icon.set_valign(Gtk.Align.CENTER)
-                update_btn = Gtk.Button(label=_("Bijwerken"))
-                update_btn.add_css_class("suggested-action")
-                update_btn.set_valign(Gtk.Align.CENTER)
-                update_btn.connect("clicked", lambda b: self._open_installer())
-                self._update_check_row.add_suffix(warn_icon)
-                self._update_check_row.add_suffix(update_btn)
-                self._update_check_row.add_suffix(self._update_check_btn)
-                self._update_check_row.add_suffix(self._update_check_spinner)
-                self._update_check_row._extra_suffixes = [warn_icon, update_btn]
+                self._update_check_row.set_subtitle(
+                    _("Versie {v} beschikbaar").format(v=remote_version)
+                )
+                self._set_update_state("available")
         except Exception:
             pass
         return False
@@ -5355,16 +5405,44 @@ class MainWindow(Adw.ApplicationWindow):
         # Controleer op updates row
         self._update_check_row = Adw.ActionRow(title=_("Controleer op updates"))
 
-        self._update_check_btn = Gtk.Button(label=_("Controleer"))
+        # De Controleer-knop heeft vier states die we via een Gtk.Stack
+        # schakelen — idle (label), checking (spinner), uptodate (vinkje),
+        # available (uitroepteken dat pulseert).
+        self._update_check_state = "idle"
+        self._update_check_pulse_id = None
+        self._update_check_fade_id = None
+        self._update_remote_version = None
+
+        self._update_check_btn = Gtk.Button()
         self._update_check_btn.add_css_class("flat")
         self._update_check_btn.set_valign(Gtk.Align.CENTER)
+        self._update_check_btn.set_size_request(120, 32)
         self._update_check_btn.connect("clicked", self._on_settings_check_update)
-        self._update_check_row.add_suffix(self._update_check_btn)
 
+        self._update_btn_stack = Gtk.Stack()
+        self._update_btn_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self._update_btn_stack.set_transition_duration(250)
+
+        idle_lbl = Gtk.Label(label=_("Controleer"))
+        self._update_btn_stack.add_named(idle_lbl, "idle")
+
+        spin_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0,
+                           halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER)
         self._update_check_spinner = Gtk.Spinner()
-        self._update_check_spinner.set_valign(Gtk.Align.CENTER)
-        self._update_check_spinner.set_visible(False)
-        self._update_check_row.add_suffix(self._update_check_spinner)
+        self._update_check_spinner.set_size_request(18, 18)
+        spin_box.append(self._update_check_spinner)
+        self._update_btn_stack.add_named(spin_box, "checking")
+
+        ok_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+        ok_icon.add_css_class("success")
+        self._update_btn_stack.add_named(ok_icon, "uptodate")
+
+        warn_icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
+        warn_icon.add_css_class("warning")
+        self._update_btn_stack.add_named(warn_icon, "available")
+
+        self._update_check_btn.set_child(self._update_btn_stack)
+        self._update_check_row.add_suffix(self._update_check_btn)
 
         about_group.add(self._update_check_row)
         about_page.add(about_group)
@@ -5399,31 +5477,95 @@ class MainWindow(Adw.ApplicationWindow):
             self._thumb_apply_btn.set_sensitive(new_size != THUMB_SIZE)
 
     def _draw_thumb_preview(self, area, cr, w, h):
-        """Mini-mockup van de homepage-grid. Grijze afgeronde kaders
-        schalen mee met de gekozen thumbnail-grootte, zodat de gebruiker
-        ziet hoeveel foto's er op een rij passen."""
+        """Mockup van Pixora's home-grid met portret+landscape mix,
+        gecentreerd. Klein Pixora-icoon in de header-zone."""
         try:
             size = getattr(self, "_pending_thumb_size", THUMB_SIZE)
-            # Achtergrond: donkergrijs kader met afgeronde hoeken (alsof
-            # je een uitsnede van de app ziet).
+            # Canvas-achtergrond (licht-grijs kader).
             cr.set_source_rgba(0.5, 0.5, 0.5, 0.08)
             cr.rectangle(0, 0, w, h)
             cr.fill()
 
-            # Schaling: 200 px echt → kleinste preview-thumb,
-            # 500 px echt → grootste. Elk echt px komt overeen met
-            # `scale` preview-px.
-            scale = 0.12
-            thumb = size * scale
-            gap = max(3.0, thumb * 0.08)
-            pad = 8.0
-            radius = max(3.0, thumb * 0.06)
+            # Header-balk met mini-logo (als er plek voor is).
+            header_h = 14.0
+            cr.set_source_rgba(0.5, 0.5, 0.5, 0.14)
+            cr.rectangle(0, 0, w, header_h)
+            cr.fill()
+            # Mini Pixora-icoon linksboven — rendered via Gdk.Pixbuf naar Cairo
+            if not hasattr(self, "_thumb_preview_logo"):
+                try:
+                    icon_path = os.path.join(ASSETS_DIR, "pixora-icon.svg")
+                    if os.path.exists(icon_path):
+                        self._thumb_preview_logo = (
+                            GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                                icon_path, 10, 10, True
+                            )
+                        )
+                    else:
+                        self._thumb_preview_logo = None
+                except Exception:
+                    self._thumb_preview_logo = None
+            if self._thumb_preview_logo is not None:
+                try:
+                    Gdk.cairo_set_source_pixbuf(
+                        cr, self._thumb_preview_logo, 4, (header_h - 10) / 2
+                    )
+                    cr.paint()
+                except Exception:
+                    pass
+            # Een paar "titel"-lijntjes naast logo voor app-feel.
+            cr.set_source_rgba(0.5, 0.5, 0.5, 0.35)
+            cr.rectangle(18, header_h / 2 - 1, 28, 2)
+            cr.fill()
 
-            # Hoeveel kolommen x rijen passen er in het preview-canvas?
-            inner_w = w - 2 * pad
-            inner_h = h - 2 * pad
-            cols = max(1, int((inner_w + gap) // (thumb + gap)))
-            rows = max(1, int((inner_h + gap) // (thumb + gap)))
+            # Schaling: 200→500 px echt. 12% lijkt prettig in 140-wide canvas.
+            scale = 0.12
+            base = size * scale
+            gap = max(3.0, base * 0.08)
+            pad_x = 6.0
+            pad_top = header_h + 6.0
+            radius = max(3.0, base * 0.06)
+
+            # Mockup-patroon: mix van landscape (breed) + portret (smal) +
+            # vierkant. Herhaalbare serie die over meerdere rijen doorloopt.
+            # Elke tuple = (w-factor, h-factor).
+            pattern = [
+                (1.3, 1.0),   # landscape
+                (0.75, 1.0),  # portret
+                (1.0, 1.0),   # square
+                (0.75, 1.0),  # portret
+                (1.3, 1.0),   # landscape
+                (1.0, 1.0),   # square
+            ]
+
+            # Centreer de grid horizontaal door eerst de layout te plannen.
+            inner_w = w - 2 * pad_x
+            inner_h = h - pad_top - pad_x
+            rows_layout = []
+            current_row = []
+            current_w = 0.0
+            idx = 0
+            row_h = base  # alle tegels delen dezelfde rij-hoogte voor netheid
+            while True:
+                fw, _fh = pattern[idx % len(pattern)]
+                tile_w = base * fw
+                needed = current_w + tile_w + (gap if current_row else 0)
+                if needed > inner_w:
+                    if current_row:
+                        rows_layout.append((current_row, current_w))
+                    current_row, current_w = [], 0.0
+                    # Begrens aantal rijen op wat past.
+                    if (len(rows_layout)) * (row_h + gap) >= inner_h:
+                        break
+                    continue
+                current_row.append((tile_w, row_h))
+                current_w += (gap if len(current_row) > 1 else 0) + tile_w
+                idx += 1
+                if idx > 60:  # sanity
+                    break
+            if current_row and \
+               (len(rows_layout) + 1) * (row_h + gap) - gap <= inner_h:
+                rows_layout.append((current_row, current_w))
 
             def rounded_rect(x, y, tw, th, r):
                 cr.new_sub_path()
@@ -5433,17 +5575,16 @@ class MainWindow(Adw.ApplicationWindow):
                 cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
                 cr.close_path()
 
-            # Rijen/kolommen links-uitlijnen met een vaste padding zodat het
-            # mockup-grid meegroeit maar niet ineens overspringt.
-            for ry in range(rows):
-                for cx in range(cols):
-                    x = pad + cx * (thumb + gap)
-                    y = pad + ry * (thumb + gap)
-                    if x + thumb > w - pad or y + thumb > h - pad:
-                        continue
+            y = pad_top
+            for tiles, total_w in rows_layout:
+                # Horizontaal centreren per rij.
+                x = pad_x + (inner_w - total_w) / 2
+                for tw, th in tiles:
                     cr.set_source_rgba(0.5, 0.5, 0.5, 0.35)
-                    rounded_rect(x, y, thumb, thumb, radius)
+                    rounded_rect(x, y, tw, th, radius)
                     cr.fill()
+                    x += tw + gap
+                y += row_h + gap
         except Exception:
             pass
 

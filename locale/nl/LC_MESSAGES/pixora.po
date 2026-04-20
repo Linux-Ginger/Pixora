@@ -1595,3 +1595,6 @@ msgstr "Updater-script downloaden mislukt: {err}"
 
 msgid "pixora.desktop gerepareerd: Icon={p}"
 msgstr "pixora.desktop gerepareerd: Icon={p}"
+
+msgid "Nieuwe versie beschikbaar — klik om bij te werken"
+msgstr "Nieuwe versie beschikbaar — klik om bij te werken"

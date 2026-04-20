@@ -1586,3 +1586,6 @@ msgstr "Download des Updater-Skripts fehlgeschlagen: {err}"
 
 msgid "pixora.desktop gerepareerd: Icon={p}"
 msgstr "pixora.desktop repariert: Icon={p}"
+
+msgid "Nieuwe versie beschikbaar — klik om bij te werken"
+msgstr "Neue Version verfügbar — zum Aktualisieren klicken"
