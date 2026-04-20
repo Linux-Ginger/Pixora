@@ -5538,6 +5538,16 @@ class MainWindow(Adw.ApplicationWindow):
         gecentreerd. Klein Pixora-icoon in de header-zone."""
         try:
             size = getattr(self, "_pending_thumb_size", THUMB_SIZE)
+            # Clip het hele canvas naar een rounded rect zodat achtergrond,
+            # header-balk en tegels automatisch binnen de ronde vorm blijven.
+            outer_r = 10.0
+            cr.new_sub_path()
+            cr.arc(w - outer_r, outer_r, outer_r, -math.pi / 2, 0)
+            cr.arc(w - outer_r, h - outer_r, outer_r, 0, math.pi / 2)
+            cr.arc(outer_r, h - outer_r, outer_r, math.pi / 2, math.pi)
+            cr.arc(outer_r, outer_r, outer_r, math.pi, 3 * math.pi / 2)
+            cr.close_path()
+            cr.clip()
             # Canvas-achtergrond (licht-grijs kader).
             cr.set_source_rgba(0.5, 0.5, 0.5, 0.08)
             cr.rectangle(0, 0, w, h)
