@@ -2660,6 +2660,26 @@ class MainWindow(Adw.ApplicationWindow):
         self.edit_btn.connect("clicked", self.on_edit_current)
         viewer_area.add_overlay(self.edit_btn)
 
+        # Donut in de viewer-overlay — spiegelt de header-donut zodat de
+        # gebruiker backup-voortgang ook ziet tijdens foto-viewing (header
+        # is dan verborgen). Deelt dezelfde _draw_backup_donut en state,
+        # dus altijd in sync.
+        self._viewer_donut = Gtk.DrawingArea()
+        self._viewer_donut.set_size_request(24, 24)
+        self._viewer_donut.set_draw_func(self._draw_backup_donut)
+        self._viewer_donut_btn = Gtk.Button()
+        self._viewer_donut_btn.add_css_class("osd")
+        self._viewer_donut_btn.add_css_class("circular")
+        self._viewer_donut_btn.set_child(self._viewer_donut)
+        self._viewer_donut_btn.set_halign(Gtk.Align.END)
+        self._viewer_donut_btn.set_valign(Gtk.Align.START)
+        self._viewer_donut_btn.set_margin_top(16)
+        self._viewer_donut_btn.set_margin_end(170)
+        self._viewer_donut_btn.set_size_request(40, 40)
+        self._viewer_donut_btn.set_visible(False)
+        self._viewer_donut_btn.connect("clicked", self._on_backup_donut_clicked)
+        viewer_area.add_overlay(self._viewer_donut_btn)
+
         self.favorite_btn = Gtk.Button(icon_name="non-starred-symbolic")
         self.favorite_btn.add_css_class("osd")
         self.favorite_btn.add_css_class("circular")
@@ -6355,7 +6375,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scan_phase = 0.0
         self._backup_detail = _("Scannen…")
         if hasattr(self, "_backup_donut_btn"):
-            self._backup_donut_btn.set_visible(True)
+            self._set_donuts_visible(True)
             self._backup_donut_btn.set_tooltip_text(_("Scannen op nieuwe foto's…"))
         if self._backup_scan_anim_id is None:
             self._backup_scan_anim_id = GLib.timeout_add(80, self._tick_backup_scan)
@@ -6368,10 +6388,7 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         self._backup_scan_phase = (self._backup_scan_phase + 0.18) % (2 * math.pi)
         if hasattr(self, "_backup_donut"):
-            try:
-                self._backup_donut.queue_draw()
-            except Exception:
-                pass
+            self._redraw_donuts()
         return True
 
     def _backup_scan_thread(self):
@@ -6544,10 +6561,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _handle_scan_result(self, result):
         self._backup_scanning = False
         if hasattr(self, "_backup_donut"):
-            try:
-                self._backup_donut.queue_draw()
-            except Exception:
-                pass
+            self._redraw_donuts()
         # Donut-visibility beslissen we verderop, nadat we weten of silent-
         # mode een backup gaat starten. Anders zou hij kort uitgaan tussen
         # scan-end en backup-start.
@@ -6557,7 +6571,7 @@ class MainWindow(Adw.ApplicationWindow):
         if result is None:
             log_warn(_("Backup-scan niet voltooid"))
             if hasattr(self, "_backup_donut_btn"):
-                self._backup_donut_btn.set_visible(self._backup_running)
+                self._set_donuts_visible(self._backup_running)
             self._set_manual_scan_state("idle")
             return False
         new_count = result["new"]
@@ -6582,7 +6596,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._hide_backup_pending_banner()
             log_info(_("Backup-scan: alles gesynct"))
             if hasattr(self, "_backup_donut_btn"):
-                self._backup_donut_btn.set_visible(self._backup_running)
+                self._set_donuts_visible(self._backup_running)
             # Silent-mode: geen popup, ook niet bij manuele klik.
             if not silent and manual_requested:
                 if delete_count > 0 and mode == "backup":
@@ -6609,13 +6623,13 @@ class MainWindow(Adw.ApplicationWindow):
             log_info(_("Silent-mode: backup start automatisch zonder dialog"))
             # Donut mag niet uitflikkeren tussen scan-end en backup-start.
             if hasattr(self, "_backup_donut_btn"):
-                self._backup_donut_btn.set_visible(True)
+                self._set_donuts_visible(True)
             self.start_backup()
             self._set_manual_scan_state("idle")
             return False
         # Niet-silent: donut verbergen (scan is klaar, backup draait niet).
         if hasattr(self, "_backup_donut_btn"):
-            self._backup_donut_btn.set_visible(self._backup_running)
+            self._set_donuts_visible(self._backup_running)
         self._show_backup_scan_dialog(
             new_count, delete_count, bytes_to_transfer, dup_count, mode
         )
@@ -7111,22 +7125,38 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_fraction = max(0.0, min(1.0, fraction))
         self._backup_detail = detail or ""
         if hasattr(self, "_backup_donut"):
-            try:
-                self._backup_donut.queue_draw()
-            except Exception:
-                pass
+            self._redraw_donuts()
         if hasattr(self, "_backup_donut_btn"):
             try:
-                # Donut zichtbaar zolang backup loopt
-                self._backup_donut_btn.set_visible(self._backup_running)
-                self._backup_donut_btn.set_tooltip_text(
-                    _("Backup: {pct}%").format(
-                        pct=int(self._backup_fraction * 100)
-                    )
+                self._set_donuts_visible(self._backup_running)
+                tip = _("Backup: {pct}%").format(
+                    pct=int(self._backup_fraction * 100)
                 )
+                self._backup_donut_btn.set_tooltip_text(tip)
+                if hasattr(self, "_viewer_donut_btn"):
+                    self._viewer_donut_btn.set_tooltip_text(tip)
             except Exception:
                 pass
         return False
+
+    def _set_donuts_visible(self, visible):
+        """Hou de header-donut en de viewer-overlay-donut in sync."""
+        for name in ("_backup_donut_btn", "_viewer_donut_btn"):
+            btn = getattr(self, name, None)
+            if btn is not None:
+                try:
+                    btn.set_visible(bool(visible))
+                except Exception:
+                    pass
+
+    def _redraw_donuts(self):
+        for name in ("_backup_donut", "_viewer_donut"):
+            area = getattr(self, name, None)
+            if area is not None:
+                try:
+                    area.queue_draw()
+                except Exception:
+                    pass
 
     def _draw_backup_donut(self, area, cr, w, h):
         """Donut/pie-chart die vult van 0° tot progress × 360°. Tijdens
@@ -7211,7 +7241,7 @@ class MainWindow(Adw.ApplicationWindow):
             log_warn(_("Backup mislukt: {note}").format(note=note or ""))
         if hasattr(self, "_backup_donut_btn"):
             try:
-                self._backup_donut_btn.set_visible(False)
+                self._set_donuts_visible(False)
             except Exception:
                 pass
         self._show_backup_done_banner(success, note)
