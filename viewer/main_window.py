@@ -1296,6 +1296,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scan_dialog_open = False
         self._backup_excluded_paths = []
         self._manual_scan_requested = False
+        # Reorganize-flow state: blokkeert backup/sync zolang popup/ordenen
+        # loopt én 10s erna (zie _trigger_backup_scan).
+        self._reorganize_active = False
+        self._reorganize_block_until = 0.0
         # Update-notify state
         self._home_ready_at = None         # set zodra homepage eerst zichtbaar is
         self._pending_update_version = None  # versie van niet-getoonde popup
@@ -6093,6 +6097,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _prompt_reorganize(self, from_startup=False):
         """Toon dialog met aantallen + confirm. Als from_startup=True en er
         niks te doen is → geen dialog. Anders altijd feedback."""
+        self._reorganize_active = True
         def _scan():
             moves, dups = self._scan_structure_mismatch()
             GLib.idle_add(self._on_reorganize_scan_done, moves, dups, from_startup)
@@ -6100,6 +6105,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_reorganize_scan_done(self, moves, dups, from_startup):
         if not moves and not dups:
+            self._reorganize_active = False
             if not from_startup:
                 dlg = Adw.AlertDialog(
                     heading=_("Mappenstructuur klopt al"),
@@ -6150,6 +6156,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_reorganize_response(self, dlg, response, moves, dups):
         if response != "go":
+            self._reorganize_active = False
             return
         threading.Thread(
             target=self._do_reorganize, args=(moves, dups), daemon=True,
@@ -6221,6 +6228,27 @@ class MainWindow(Adw.ApplicationWindow):
         dlg.set_close_response("ok")
         self._present_dialog(dlg)
         self.reload_photos()
+        self._reorganize_active = False
+        self._reorganize_block_until = time.time() + 10.0
+        GLib.timeout_add_seconds(10, self._maybe_trigger_backup_after_reorganize)
+        return False
+
+    def _maybe_trigger_backup_after_reorganize(self):
+        """One-shot: 10s na _reorganize_done. Start backup-scan als alles
+        geconfigureerd is en er niks anders loopt."""
+        try:
+            if self._backup_running or self._backup_scanning:
+                return False
+            if not (self.settings.get("backup_enabled")
+                    and self.settings.get("backup_uuid")
+                    and self.settings.get("backup_path")):
+                return False
+            if self._backup_drive_mountpoint() is None:
+                return False
+            log_info(_("Backup-scan na reorganize-cooldown"))
+            self._trigger_backup_scan()
+        except Exception:
+            pass
         return False
 
     def _maybe_check_structure_on_startup(self):
@@ -6596,6 +6624,11 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Backup-scan ──────────────────────────────────────────────────
     def _trigger_backup_scan(self):
         if self._backup_running or self._backup_scanning:
+            return
+        # Reorganize-flow heeft voorrang: popup open, scan/moves bezig, of
+        # binnen 10s na afloop → niet starten. Periodieke tick/post-cooldown
+        # timer pikt het later vanzelf op.
+        if self._reorganize_active or time.time() < self._reorganize_block_until:
             return
         self._backup_scanning = True
         self._backup_scan_phase = 0.0
