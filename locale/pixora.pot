@@ -947,7 +947,13 @@ msgstr ""
 msgid "Backup-scan: {n} nieuw, {d} orphans (mode={m}), {b} bytes, {u} duplicaten"
 msgstr ""
 
-msgid "Periodieke backup-scan gestart"
+msgid "Structuur-scan gestart"
+msgstr ""
+
+msgid "Controleren op mappenstructuur…"
+msgstr ""
+
+msgid "Backup-scan na reorganize-cooldown"
 msgstr ""
 
 msgid "Er staat nog {n} foto op de USB die niet meer in Pixora is. In Backup-modus blijft die bewaard als archief."

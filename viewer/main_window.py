@@ -1300,6 +1300,12 @@ class MainWindow(Adw.ApplicationWindow):
         # loopt én 10s erna (zie _trigger_backup_scan).
         self._reorganize_active = False
         self._reorganize_block_until = 0.0
+        # Structuur-scan state (detecteert mappen die niet bij de gekozen
+        # structuur horen, ook zonder backup-drive). Donut is donkerblauw
+        # in plaats van oranje zolang er geen backup-context is.
+        self._structure_scanning = False
+        self._structure_startup_scanned = False
+        self._structure_popup_dismissed = False
         # Update-notify state
         self._home_ready_at = None         # set zodra homepage eerst zichtbaar is
         self._pending_update_version = None  # versie van niet-getoonde popup
@@ -1426,10 +1432,10 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add_seconds(4, self._poll_backup_drive)
         # Bij startup: als pending + drive aangesloten → meteen popup
         GLib.idle_add(self._check_pending_backup)
-        # Elke 60s een stille scan zolang de drive aangesloten is. Resultaat
-        # gaat via de normale handler — die toont de scan-dialog alleen als
-        # er iets te doen is, of start bij silent-mode direct de backup.
-        GLib.timeout_add_seconds(60, self._periodic_backup_scan)
+        # Elke 60s: structuur-scan + backup-scan in één tick. Structuur-scan
+        # werkt ook zonder drive; backup-scan alleen als alles geconfigureerd
+        # is. Zie _periodic_scan.
+        GLib.timeout_add_seconds(60, self._periodic_scan)
 
     def _start_services(self):
         try:
@@ -6157,6 +6163,9 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_reorganize_response(self, dlg, response, moves, dups):
         if response != "go":
             self._reorganize_active = False
+            # User koos "Later" → geen auto-popup meer deze sessie.
+            # Manual "Opruimen"-knop werkt wel.
+            self._structure_popup_dismissed = True
             return
         threading.Thread(
             target=self._do_reorganize, args=(moves, dups), daemon=True,
@@ -6252,17 +6261,79 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _maybe_check_structure_on_startup(self):
-        """Na home-grid+2s één keer per sessie: stille scan; popup alleen
-        als er mismatches zijn."""
-        if getattr(self, "_structure_check_done", False):
+        """Na home-grid+2s: kick off de eerste structuur+backup-scan via
+        _periodic_scan. Daarna blijft de 60s-tick het werk doen."""
+        if self._structure_startup_scanned:
             return False
         ready_at = getattr(self, "_home_ready_at", None)
         if ready_at is None or (time.time() - ready_at) < 2.0:
             GLib.timeout_add(500, self._maybe_check_structure_on_startup)
             return False
-        self._structure_check_done = True
-        self._prompt_reorganize(from_startup=True)
+        self._structure_startup_scanned = True
+        self._periodic_scan()
         return False
+
+    def _trigger_structure_scan(self):
+        """Start een stille structuur-scan op een thread; de callback
+        laat de reorganize-popup zien (bij mismatch én niet-dismissed) of
+        triggert een backup-scan als er niks te doen is."""
+        if self._structure_scanning:
+            return
+        self._structure_scanning = True
+        self._backup_scan_phase = 0.0
+        tip = _("Controleren op mappenstructuur…")
+        if hasattr(self, "_backup_donut_btn"):
+            self._set_donuts_visible(True)
+            self._backup_donut_btn.set_tooltip_text(tip)
+        if hasattr(self, "_viewer_donut_btn"):
+            self._viewer_donut_btn.set_tooltip_text(tip)
+        if self._backup_scan_anim_id is None:
+            self._backup_scan_anim_id = GLib.timeout_add(
+                80, self._tick_backup_scan)
+        log_info(_("Structuur-scan gestart"))
+
+        def _scan():
+            try:
+                moves, dups = self._scan_structure_mismatch()
+            except Exception:
+                moves, dups = [], []
+            GLib.idle_add(self._on_periodic_structure_done, moves, dups)
+        threading.Thread(target=_scan, daemon=True).start()
+
+    def _on_periodic_structure_done(self, moves, dups):
+        self._structure_scanning = False
+        # Donut alleen verbergen als er ook geen backup-scan/run draait.
+        if not self._backup_scanning and not self._backup_running:
+            self._set_donuts_visible(False)
+        self._redraw_donuts()
+        had_mismatch = bool(moves or dups)
+        if had_mismatch and not self._structure_popup_dismissed \
+                and not self._reorganize_active:
+            self._reorganize_active = True
+            self._on_reorganize_scan_done(moves, dups, True)
+            return False
+        # Geen mismatch (of popup al afgewezen deze sessie) → backup mag.
+        self._maybe_trigger_backup_now()
+        return False
+
+    def _maybe_trigger_backup_now(self):
+        """Start backup-scan als niks draait, backup is ingeschakeld en de
+        drive beschikbaar is. Stil als een voorwaarde niet geldt."""
+        try:
+            if self._backup_running or self._backup_scanning:
+                return
+            if self._reorganize_active \
+                    or time.time() < self._reorganize_block_until:
+                return
+            if not (self.settings.get("backup_enabled")
+                    and self.settings.get("backup_uuid")
+                    and self.settings.get("backup_path")):
+                return
+            if self._backup_drive_mountpoint() is None:
+                return
+            self._trigger_backup_scan()
+        except Exception:
+            pass
 
     def on_threshold_changed(self, value, btn):
         if btn.get_active():
@@ -6642,7 +6713,7 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._backup_scan_thread, daemon=True).start()
 
     def _tick_backup_scan(self):
-        if not self._backup_scanning:
+        if not self._backup_scanning and not self._structure_scanning:
             self._backup_scan_anim_id = None
             return False
         self._backup_scan_phase = (self._backup_scan_phase + 0.18) % (2 * math.pi)
@@ -7117,21 +7188,22 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
-    def _periodic_backup_scan(self):
-        """15-min tick: stille achtergrondscan. Alleen als alles klopt en
-        er niks draait. De scan-dialog poppt zelf pas op als er iets te
-        doen is, dus dit is niet-storend bij een volledig gesyncte USB."""
+    def _periodic_scan(self):
+        """60s tick: eerst structuur-scan (detecteert mappen buiten de
+        gekozen structuur, ook zonder backup-drive), daarna backup-scan
+        als er een drive is. De backup-trigger loopt via de
+        _on_periodic_structure_done-keten zodra structuur klaar is."""
         try:
-            if self._backup_running or self._backup_scanning:
+            ready_at = getattr(self, "_home_ready_at", None)
+            if ready_at is None or (time.time() - ready_at) < 2.0:
                 return True
-            if not (self.settings.get("backup_enabled")
-                    and self.settings.get("backup_uuid")
-                    and self.settings.get("backup_path")):
+            if self._reorganize_active \
+                    or time.time() < self._reorganize_block_until:
                 return True
-            if self._backup_drive_mountpoint() is None:
+            if self._structure_scanning \
+                    or self._backup_scanning or self._backup_running:
                 return True
-            log_info(_("Periodieke backup-scan gestart"))
-            self._trigger_backup_scan()
+            self._trigger_structure_scan()
         except Exception:
             pass
         return True  # blijf herhalen
@@ -7433,10 +7505,19 @@ class MainWindow(Adw.ApplicationWindow):
             cr.arc_negative(cx, cy, r_inner, 2 * math.pi, 0)
             cr.fill()
 
-            if self._backup_scanning:
+            # Kleur: oranje voor backup-activiteit, donker-blauw als alleen
+            # de structuur-scan loopt (geen backup-drive of backup uit).
+            if self._structure_scanning \
+                    and not self._backup_scanning \
+                    and not self._backup_running:
+                color = (0.10, 0.20, 0.55)  # dark blue
+            else:
+                color = (0.914, 0.329, 0.125)  # orange
+
+            if self._backup_scanning or self._structure_scanning:
                 start = self._backup_scan_phase - math.pi / 2
                 end = start + math.pi / 2  # kwart cirkel
-                cr.set_source_rgb(0.914, 0.329, 0.125)
+                cr.set_source_rgb(*color)
                 cr.move_to(cx, cy)
                 cr.arc(cx, cy, r_outer, start, end)
                 cr.close_path()
@@ -7451,7 +7532,7 @@ class MainWindow(Adw.ApplicationWindow):
             if frac > 0.001:
                 start = -math.pi / 2  # top
                 end = start + frac * 2 * math.pi
-                cr.set_source_rgb(0.914, 0.329, 0.125)
+                cr.set_source_rgb(*color)
                 cr.move_to(cx, cy)
                 cr.arc(cx, cy, r_outer, start, end)
                 cr.close_path()

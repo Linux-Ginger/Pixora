@@ -1596,8 +1596,14 @@ msgstr "Tout ce qui est dans Pixora est sur l'USB"
 msgid "Backup-scan: {n} nieuw, {d} orphans (mode={m}), {b} bytes, {u} duplicaten"
 msgstr "Analyse : {n} nouveau(x), {d} orphelins (mode={m}), {b} octets, {u} doublons"
 
-msgid "Periodieke backup-scan gestart"
-msgstr "Analyse périodique de sauvegarde démarrée"
+msgid "Structuur-scan gestart"
+msgstr "Analyse de la structure démarrée"
+
+msgid "Controleren op mappenstructuur…"
+msgstr "Vérification de la structure des dossiers…"
+
+msgid "Backup-scan na reorganize-cooldown"
+msgstr "Analyse de sauvegarde après le délai de réorganisation"
 
 msgid "Er staat nog {n} foto op de USB die niet meer in Pixora is. In Backup-modus blijft die bewaard als archief."
 msgid_plural "Er staan nog {n} foto's op de USB die niet meer in Pixora zijn. In Backup-modus blijven ze bewaard als archief."
