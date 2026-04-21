@@ -8035,42 +8035,79 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _on_backup_donut_clicked(self, btn):
-        """Klik op donut → popover met actuele status. Scannen én
-        backup-runnen tonen elk hun eigen label; geen "0%" tijdens scan."""
+        """Klik op donut → live-updatende popover. Labels worden als attrs
+        bewaard zodat _refresh_donut_popover ze kan herschrijven zonder
+        dat de user 'm hoeft te sluiten + heropenen."""
         pop = Gtk.Popover()
         pop.set_parent(btn)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.set_margin_top(8); box.set_margin_bottom(8)
         box.set_margin_start(12); box.set_margin_end(12)
-        if self._structure_scanning:
-            title_txt = _("Mappenstructuur controleren…")
-        elif self._backup_scanning:
-            title_txt = _("Backup scannen…")
-        elif self._backup_running:
-            title_txt = _("Backup bezig")
-        else:
-            title_txt = _("Backup bezig")
-        title = Gtk.Label(label=title_txt)
-        title.add_css_class("heading")
-        title.set_halign(Gtk.Align.START)
-        box.append(title)
-        # Alleen % tonen tijdens een actieve backup-run (niet tijdens scan).
-        if self._backup_running and not self._backup_scanning:
-            pct = Gtk.Label(label=f"{int(self._backup_fraction * 100)}%")
-            pct.set_halign(Gtk.Align.START)
-            box.append(pct)
-        # Detail alleen tonen als 't meer info is dan alleen de %. Rsync
-        # vult `_backup_detail` namelijk met de % zelf (bv "24%"), dan zou
-        # hij dubbel op het scherm komen.
-        detail = (self._backup_detail or "").strip()
-        if detail and not detail.rstrip("%").strip().isdigit():
-            det = Gtk.Label(label=detail)
-            det.add_css_class("caption")
-            det.add_css_class("dim-label")
-            det.set_halign(Gtk.Align.START)
-            box.append(det)
+        self._donut_pop_title = Gtk.Label()
+        self._donut_pop_title.add_css_class("heading")
+        self._donut_pop_title.set_halign(Gtk.Align.START)
+        box.append(self._donut_pop_title)
+        self._donut_pop_pct = Gtk.Label()
+        self._donut_pop_pct.set_halign(Gtk.Align.START)
+        box.append(self._donut_pop_pct)
+        self._donut_pop_detail = Gtk.Label()
+        self._donut_pop_detail.add_css_class("caption")
+        self._donut_pop_detail.add_css_class("dim-label")
+        self._donut_pop_detail.set_halign(Gtk.Align.START)
+        box.append(self._donut_pop_detail)
         pop.set_child(box)
+        self._donut_popover = pop
+        self._refresh_donut_popover()
+        # Refresh elke 250ms zolang popover zichtbaar is.
+        self._donut_pop_tick_id = GLib.timeout_add(
+            250, self._refresh_donut_popover)
+        def _on_closed(_p):
+            tid = getattr(self, "_donut_pop_tick_id", None)
+            if tid is not None:
+                try:
+                    GLib.source_remove(tid)
+                except Exception:
+                    pass
+                self._donut_pop_tick_id = None
+            self._donut_popover = None
+        pop.connect("closed", _on_closed)
         pop.popup()
+
+    def _refresh_donut_popover(self):
+        pop = getattr(self, "_donut_popover", None)
+        if pop is None or not hasattr(self, "_donut_pop_title"):
+            return False
+        # Kies titel + welke velden we laten zien op basis van wat loopt.
+        if self._reorganize_moving:
+            title = _("Mappenstructuur bijwerken")
+            pct_val = int(max(0.0, min(1.0, self._reorganize_fraction)) * 100)
+            pct = f"{pct_val}%"
+            detail = self._reorganize_current_name or ""
+        elif self._structure_scanning:
+            title = _("Mappenstructuur controleren…")
+            pct = ""
+            detail = ""
+        elif self._backup_running and not self._backup_scanning:
+            title = _("Backup bezig")
+            pct = f"{int(self._backup_fraction * 100)}%"
+            d = (self._backup_detail or "").strip()
+            detail = "" if (d and d.rstrip("%").strip().isdigit()) else d
+        elif self._backup_scanning:
+            title = _("Backup scannen…")
+            pct = ""
+            detail = (self._backup_detail or "").strip()
+            if detail and detail.rstrip("%").strip().isdigit():
+                detail = ""
+        else:
+            title = _("Backup bezig")
+            pct = ""
+            detail = ""
+        self._donut_pop_title.set_text(title)
+        self._donut_pop_pct.set_text(pct)
+        self._donut_pop_pct.set_visible(bool(pct))
+        self._donut_pop_detail.set_text(detail)
+        self._donut_pop_detail.set_visible(bool(detail))
+        return True
 
     def _backup_finished(self, success, note):
         self._backup_running = False
