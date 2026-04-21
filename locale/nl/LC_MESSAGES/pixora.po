@@ -1666,6 +1666,9 @@ msgstr "Automatisch bevestigen"
 msgid "Sla de pop-up over en start backup/sync direct wanneer er iets te doen is."
 msgstr "Sla de pop-up over en start backup/sync direct wanneer er iets te doen is."
 
+msgid "Sla de pop-up over en start opruimen direct wanneer er iets te doen is."
+msgstr "Sla de pop-up over en start opruimen direct wanneer er iets te doen is."
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Silent-mode: backup start automatisch zonder dialog"
 

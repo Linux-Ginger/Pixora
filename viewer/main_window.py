@@ -5298,11 +5298,11 @@ class MainWindow(Adw.ApplicationWindow):
         structure_group.add(reorganize_row)
 
         silent_row = Adw.ActionRow(
-            title=_("Stil uitvoeren"),
-            subtitle=_("Bij automatische detectie direct opruimen zonder popup of fullscreen. Handmatige 'Opruimen' werkt normaal."),
+            title=_("Automatisch bevestigen"),
+            subtitle=_("Sla de pop-up over en start opruimen direct wanneer er iets te doen is."),
         )
         silent_row.add_prefix(
-            Gtk.Image.new_from_icon_name("emblem-ok-symbolic"))
+            Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
         silent_switch = Gtk.Switch()
         silent_switch.set_valign(Gtk.Align.CENTER)
         silent_switch.set_active(

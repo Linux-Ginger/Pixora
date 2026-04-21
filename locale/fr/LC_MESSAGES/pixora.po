@@ -1657,6 +1657,9 @@ msgstr "Confirmation automatique"
 msgid "Sla de pop-up over en start backup/sync direct wanneer er iets te doen is."
 msgstr "Ignorer la pop-up et lancer la sauvegarde/synchro immédiatement s'il y a quelque chose à faire."
 
+msgid "Sla de pop-up over en start opruimen direct wanneer er iets te doen is."
+msgstr "Ignorer la pop-up et lancer le nettoyage immédiatement s'il y a quelque chose à faire."
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Mode silencieux : la sauvegarde démarre automatiquement sans dialogue"
 
