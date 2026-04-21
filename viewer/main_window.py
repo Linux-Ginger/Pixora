@@ -7210,9 +7210,12 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             self._backup_scan_est_total = 30.0
         self._backup_detail = _("Scannen 0%")
+        tip = _("Scannen op nieuwe foto's…")
         if hasattr(self, "_backup_donut_btn"):
             self._set_donuts_visible(True)
-            self._backup_donut_btn.set_tooltip_text(_("Scannen op nieuwe foto's…"))
+            self._backup_donut_btn.set_tooltip_text(tip)
+        if hasattr(self, "_viewer_donut_btn"):
+            self._viewer_donut_btn.set_tooltip_text(tip)
         if self._backup_scan_anim_id is None:
             self._backup_scan_anim_id = GLib.timeout_add(80, self._tick_backup_scan)
         log_info(_("Backup-scan gestart"))
