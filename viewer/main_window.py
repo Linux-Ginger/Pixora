@@ -7625,13 +7625,11 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _present_dialog(self, dlg):
-        """Toon een AlertDialog/Adw.Dialog, maar breng eerst het hoofdvenster
-        naar voren zodat de popup niet 'losstaand' verschijnt als de gebruiker
-        in een ander venster (bv bestandsbeheer) zit."""
-        try:
-            self.present()
-        except Exception:
-            pass
+        """Toon een AlertDialog/Adw.Dialog. NIET self.present() aanroepen —
+        op GNOME Shell triggert dat een "Pixora is klaar"-notificatie én een
+        tweede bolletje in de taakbalk bij elke popup. De dialog wordt in
+        het bestaande hoofdvenster gerenderd; de taakbalk-highlight die we
+        willen houden komt vanzelf als de app ongelezen content heeft."""
         try:
             dlg.present(self)
         except Exception:
