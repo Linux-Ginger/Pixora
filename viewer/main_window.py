@@ -7625,15 +7625,20 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _present_dialog(self, dlg):
-        """Toon een AlertDialog/Adw.Dialog. NIET self.present() aanroepen —
-        op GNOME Shell triggert dat een "Pixora is klaar"-notificatie én een
-        tweede bolletje in de taakbalk bij elke popup. De dialog wordt in
-        het bestaande hoofdvenster gerenderd; de taakbalk-highlight die we
-        willen houden komt vanzelf als de app ongelezen content heeft."""
+        """Toon een AlertDialog/Adw.Dialog. Als het instellingen-dialog
+        open staat, parenten we de popup dáárop — anders landt 'ie achter
+        de settings-modal en blokkeert alles (je kan settings dan niet
+        meer sluiten, ook niet via de taakbalk). NIET self.present()
+        aanroepen: dat triggert op GNOME Shell een "Pixora is klaar"-
+        notificatie plus een tweede bolletje in de taakbalk."""
+        parent = self._settings_dialog if self._settings_dialog is not None else self
         try:
-            dlg.present(self)
+            dlg.present(parent)
         except Exception:
-            pass
+            try:
+                dlg.present(self)
+            except Exception:
+                pass
 
     def _show_backup_pending_banner(self):
         # Banner uitgeschakeld — feedback gebeurt in de settings-UI.
