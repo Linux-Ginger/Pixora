@@ -8077,6 +8077,7 @@ class MainWindow(Adw.ApplicationWindow):
         pop = getattr(self, "_donut_popover", None)
         if pop is None or not hasattr(self, "_donut_pop_title"):
             return False
+        is_sync = self.settings.get("backup_mode", "backup") == "sync"
         # Kies titel + welke velden we laten zien op basis van wat loopt.
         if self._reorganize_moving:
             title = _("Mappenstructuur bijwerken")
@@ -8088,18 +8089,18 @@ class MainWindow(Adw.ApplicationWindow):
             pct = ""
             detail = ""
         elif self._backup_running and not self._backup_scanning:
-            title = _("Backup bezig")
+            title = _("Sync bezig") if is_sync else _("Backup bezig")
             pct = f"{int(self._backup_fraction * 100)}%"
             d = (self._backup_detail or "").strip()
             detail = "" if (d and d.rstrip("%").strip().isdigit()) else d
         elif self._backup_scanning:
-            title = _("Backup scannen…")
+            title = _("Sync scannen…") if is_sync else _("Backup scannen…")
             pct = ""
             detail = (self._backup_detail or "").strip()
             if detail and detail.rstrip("%").strip().isdigit():
                 detail = ""
         else:
-            title = _("Backup bezig")
+            title = _("Sync bezig") if is_sync else _("Backup bezig")
             pct = ""
             detail = ""
         self._donut_pop_title.set_text(title)

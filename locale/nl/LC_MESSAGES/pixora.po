@@ -1678,6 +1678,12 @@ msgstr "Mappenstructuur controleren…"
 msgid "Backup scannen…"
 msgstr "Backup scannen…"
 
+msgid "Sync bezig"
+msgstr "Sync bezig"
+
+msgid "Sync scannen…"
+msgstr "Sync scannen…"
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Silent-mode: backup start automatisch zonder dialog"
 

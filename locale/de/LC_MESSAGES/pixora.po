@@ -1669,6 +1669,12 @@ msgstr "Ordnerstruktur wird geprüft…"
 msgid "Backup scannen…"
 msgstr "Backup wird gescannt…"
 
+msgid "Sync bezig"
+msgstr "Sync läuft"
+
+msgid "Sync scannen…"
+msgstr "Sync wird gescannt…"
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Silent-Modus: Backup startet automatisch ohne Dialog"
 

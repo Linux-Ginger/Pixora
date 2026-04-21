@@ -1669,6 +1669,12 @@ msgstr "Vérification de la structure des dossiers…"
 msgid "Backup scannen…"
 msgstr "Analyse de la sauvegarde…"
 
+msgid "Sync bezig"
+msgstr "Synchro en cours"
+
+msgid "Sync scannen…"
+msgstr "Analyse de la synchro…"
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Mode silencieux : la sauvegarde démarre automatiquement sans dialogue"
 
