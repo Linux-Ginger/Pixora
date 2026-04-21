@@ -1059,6 +1059,34 @@ msgstr ""
 msgid "Pixora is bezig met mappenstructuur opruimen. Als je nu sluit kunnen foto's halverwege verplaatst zijn."
 msgstr ""
 
+msgid "{n} foto"
+msgid_plural "{n} foto's"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} video"
+msgid_plural "{n} video's"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{a} en {b}"
+msgstr ""
+
+msgid "{c} worden verplaatst naar de juiste map."
+msgstr ""
+
+msgid "{c} zijn exact dezelfde en worden verwijderd."
+msgstr ""
+
+msgid "{c} verplaatst"
+msgstr ""
+
+msgid "{c} verwijderd (duplicaat)"
+msgstr ""
+
+msgid "{done} van {total_label}"
+msgstr ""
+
 msgid "{done} van {total} foto"
 msgid_plural "{done} van {total} foto's"
 msgstr[0] ""

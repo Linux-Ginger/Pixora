@@ -1717,6 +1717,34 @@ msgstr "Silent reorganize started: {m} moves, {d} dups"
 msgid "Pixora is bezig met mappenstructuur opruimen. Als je nu sluit kunnen foto's halverwege verplaatst zijn."
 msgstr "Pixora is cleaning up the folder structure. Closing now may leave photos half-moved."
 
+msgid "{n} foto"
+msgid_plural "{n} foto's"
+msgstr[0] "{n} photo"
+msgstr[1] "{n} photos"
+
+msgid "{n} video"
+msgid_plural "{n} video's"
+msgstr[0] "{n} video"
+msgstr[1] "{n} videos"
+
+msgid "{a} en {b}"
+msgstr "{a} and {b}"
+
+msgid "{c} worden verplaatst naar de juiste map."
+msgstr "{c} will be moved to the right folder."
+
+msgid "{c} zijn exact dezelfde en worden verwijderd."
+msgstr "{c} are exact duplicates and will be removed."
+
+msgid "{c} verplaatst"
+msgstr "{c} moved"
+
+msgid "{c} verwijderd (duplicaat)"
+msgstr "{c} removed (duplicate)"
+
+msgid "{done} van {total_label}"
+msgstr "{done} of {total_label}"
+
 msgid "{done} van {total} foto"
 msgid_plural "{done} van {total} foto's"
 msgstr[0] "{done} of {total} photo"

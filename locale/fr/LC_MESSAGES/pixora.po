@@ -1708,6 +1708,34 @@ msgstr "Réorganisation silencieuse démarrée : {m} déplacements, {d} doublons
 msgid "Pixora is bezig met mappenstructuur opruimen. Als je nu sluit kunnen foto's halverwege verplaatst zijn."
 msgstr "Pixora nettoie la structure des dossiers. Fermer maintenant peut laisser des photos à moitié déplacées."
 
+msgid "{n} foto"
+msgid_plural "{n} foto's"
+msgstr[0] "{n} photo"
+msgstr[1] "{n} photos"
+
+msgid "{n} video"
+msgid_plural "{n} video's"
+msgstr[0] "{n} vidéo"
+msgstr[1] "{n} vidéos"
+
+msgid "{a} en {b}"
+msgstr "{a} et {b}"
+
+msgid "{c} worden verplaatst naar de juiste map."
+msgstr "{c} seront déplacés vers le bon dossier."
+
+msgid "{c} zijn exact dezelfde en worden verwijderd."
+msgstr "{c} sont des doublons exacts et seront supprimés."
+
+msgid "{c} verplaatst"
+msgstr "{c} déplacés"
+
+msgid "{c} verwijderd (duplicaat)"
+msgstr "{c} supprimés (doublon)"
+
+msgid "{done} van {total_label}"
+msgstr "{done} sur {total_label}"
+
 msgid "{done} van {total} foto"
 msgid_plural "{done} van {total} foto's"
 msgstr[0] "{done} sur {total} photo"

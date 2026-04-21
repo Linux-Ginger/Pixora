@@ -1717,6 +1717,34 @@ msgstr "Reorganize stil gestart: {m} moves, {d} dups"
 msgid "Pixora is bezig met mappenstructuur opruimen. Als je nu sluit kunnen foto's halverwege verplaatst zijn."
 msgstr "Pixora is bezig met mappenstructuur opruimen. Als je nu sluit kunnen foto's halverwege verplaatst zijn."
 
+msgid "{n} foto"
+msgid_plural "{n} foto's"
+msgstr[0] "{n} foto"
+msgstr[1] "{n} foto's"
+
+msgid "{n} video"
+msgid_plural "{n} video's"
+msgstr[0] "{n} video"
+msgstr[1] "{n} video's"
+
+msgid "{a} en {b}"
+msgstr "{a} en {b}"
+
+msgid "{c} worden verplaatst naar de juiste map."
+msgstr "{c} worden verplaatst naar de juiste map."
+
+msgid "{c} zijn exact dezelfde en worden verwijderd."
+msgstr "{c} zijn exact dezelfde en worden verwijderd."
+
+msgid "{c} verplaatst"
+msgstr "{c} verplaatst"
+
+msgid "{c} verwijderd (duplicaat)"
+msgstr "{c} verwijderd (duplicaat)"
+
+msgid "{done} van {total_label}"
+msgstr "{done} van {total_label}"
+
 msgid "{done} van {total} foto"
 msgid_plural "{done} van {total} foto's"
 msgstr[0] "{done} van {total} foto"

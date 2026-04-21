@@ -1708,6 +1708,34 @@ msgstr "Stille Neuorganisation gestartet: {m} Verschiebungen, {d} Duplikate"
 msgid "Pixora is bezig met mappenstructuur opruimen. Als je nu sluit kunnen foto's halverwege verplaatst zijn."
 msgstr "Pixora räumt gerade die Ordnerstruktur auf. Beim Schließen könnten Fotos halb verschoben sein."
 
+msgid "{n} foto"
+msgid_plural "{n} foto's"
+msgstr[0] "{n} Foto"
+msgstr[1] "{n} Fotos"
+
+msgid "{n} video"
+msgid_plural "{n} video's"
+msgstr[0] "{n} Video"
+msgstr[1] "{n} Videos"
+
+msgid "{a} en {b}"
+msgstr "{a} und {b}"
+
+msgid "{c} worden verplaatst naar de juiste map."
+msgstr "{c} werden in den richtigen Ordner verschoben."
+
+msgid "{c} zijn exact dezelfde en worden verwijderd."
+msgstr "{c} sind exakte Duplikate und werden entfernt."
+
+msgid "{c} verplaatst"
+msgstr "{c} verschoben"
+
+msgid "{c} verwijderd (duplicaat)"
+msgstr "{c} entfernt (Duplikat)"
+
+msgid "{done} van {total_label}"
+msgstr "{done} von {total_label}"
+
 msgid "{done} van {total} foto"
 msgid_plural "{done} van {total} foto's"
 msgstr[0] "{done} von {total} Foto"

@@ -1311,6 +1311,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_done_bytes = 0
         self._reorganize_start_time = 0.0
         self._reorganize_current_name = ""
+        self._reorganize_total_label = ""
         # Silent-mode: bij auto-popup direct reorganize draaien zonder popup
         # én zonder fullscreen-page; bijgehouden per-run zodat een handmatige
         # klik op "Opruimen" altijd de fullscreen toont.
@@ -6100,6 +6101,35 @@ class MainWindow(Adw.ApplicationWindow):
         save_settings(self.settings)
 
     # ── Mapstructuur — re-organizer ─────────────────────────────────
+    def _count_media(self, paths):
+        """Geeft (foto's, video's) terug voor een lijst Path- of tuple-items.
+        Moves zijn (src, dst) tuples, dups zijn losse Paths — beide vormen
+        werken, we kijken naar de src-extensie."""
+        photos = 0
+        videos = 0
+        for item in paths:
+            src = item[0] if isinstance(item, tuple) else item
+            if is_video(str(src)):
+                videos += 1
+            else:
+                photos += 1
+        return photos, videos
+
+    def _format_media_counts(self, photos, videos):
+        """Tekst zoals '3 foto's en 1 video'. Enkelvoud/meervoud via ngettext."""
+        parts = []
+        if photos:
+            parts.append(ngettext(
+                "{n} foto", "{n} foto's", photos).format(n=photos))
+        if videos:
+            parts.append(ngettext(
+                "{n} video", "{n} video's", videos).format(n=videos))
+        if not parts:
+            return ""
+        if len(parts) == 1:
+            return parts[0]
+        return _("{a} en {b}").format(a=parts[0], b=parts[1])
+
     def _photo_date_for_structure(self, src, st, exif_tags, video_exts,
                                   video_date_fn):
         """EXIF (foto) / ffprobe (video) eerst, mtime als fallback. Geeft een
@@ -6239,17 +6269,13 @@ class MainWindow(Adw.ApplicationWindow):
             _("Gekozen structuur: {s}").format(s=structure_label),
         ]
         if moves:
-            body_lines.append(ngettext(
-                "{n} foto wordt verplaatst naar de juiste map.",
-                "{n} foto's worden verplaatst naar de juiste map.",
-                len(moves),
-            ).format(n=len(moves)))
+            ph, vi = self._count_media(moves)
+            body_lines.append(_("{c} worden verplaatst naar de juiste map.").format(
+                c=self._format_media_counts(ph, vi)))
         if dups:
-            body_lines.append(ngettext(
-                "{n} exact dezelfde foto op een andere plek wordt verwijderd.",
-                "{n} exact dezelfde foto's op andere plekken worden verwijderd.",
-                len(dups),
-            ).format(n=len(dups)))
+            ph, vi = self._count_media(dups)
+            body_lines.append(_("{c} zijn exact dezelfde en worden verwijderd.").format(
+                c=self._format_media_counts(ph, vi)))
         dlg = Adw.AlertDialog(
             heading=_("Mappenstructuur aanpassen?"),
             body="\n".join(body_lines),
@@ -6375,17 +6401,32 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_done_bytes = 0
         self._reorganize_start_time = time.time()
         self._reorganize_current_name = ""
+        # Label voor de live-subtitle: onderscheidt foto's en video's.
+        tot_ph = sum(1 for s, _d in moves if not is_video(str(s)))
+        tot_vi = sum(1 for s, _d in moves if is_video(str(s)))
+        tot_ph += sum(1 for d in dups if not is_video(str(d)))
+        tot_vi += sum(1 for d in dups if is_video(str(d)))
+        self._reorganize_total_label = self._format_media_counts(tot_ph, tot_vi)
         # Alleen fullscreen tonen als we niet in silent-mode draaien.
         if not self._reorganize_silent_run:
             GLib.idle_add(self._on_reorganize_progress_start)
         done = 0
+        moved_photos = 0
+        moved_videos = 0
+        removed_photos = 0
+        removed_videos = 0
         first_err_logged = False
         for (src, dst), sz in zip(moves, sizes_moves):
             self._reorganize_current_name = src.name
+            is_vid = is_video(str(src))
             try:
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 _sh.move(str(src), str(dst))
                 moved += 1
+                if is_vid:
+                    moved_videos += 1
+                else:
+                    moved_photos += 1
             except Exception as e:
                 errors.append(f"{src.name}: {e}")
                 if not first_err_logged:
@@ -6399,9 +6440,14 @@ class MainWindow(Adw.ApplicationWindow):
             self._reorganize_fraction = done / total
         for dup, sz in zip(dups, sizes_dups):
             self._reorganize_current_name = dup.name
+            is_vid = is_video(str(dup))
             try:
                 dup.unlink()
                 removed += 1
+                if is_vid:
+                    removed_videos += 1
+                else:
+                    removed_photos += 1
             except OSError as e:
                 errors.append(f"{dup.name}: {e}")
                 if not first_err_logged:
@@ -6423,9 +6469,15 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(_("Reorganize: {m} verplaatst, {r} duplicaten weg, {e} fouten").format(
             m=moved, r=removed, e=len(errors),
         ))
-        GLib.idle_add(self._reorganize_done, moved, removed, errors)
+        GLib.idle_add(
+            self._reorganize_done,
+            moved, removed, errors,
+            moved_photos, moved_videos, removed_photos, removed_videos,
+        )
 
-    def _reorganize_done(self, moved, removed, errors):
+    def _reorganize_done(self, moved, removed, errors,
+                         moved_photos=0, moved_videos=0,
+                         removed_photos=0, removed_videos=0):
         self._reorganize_moving = False
         self._reorganize_fraction = 1.0
         if not self._backup_scanning and not self._backup_running:
@@ -6451,17 +6503,11 @@ class MainWindow(Adw.ApplicationWindow):
         # pas als user op Sluiten klikt — zie _on_reorganize_close_clicked.
         parts = []
         if moved:
-            parts.append(ngettext(
-                "{n} foto verplaatst",
-                "{n} foto's verplaatst",
-                moved,
-            ).format(n=moved))
+            parts.append(_("{c} verplaatst").format(
+                c=self._format_media_counts(moved_photos, moved_videos)))
         if removed:
-            parts.append(ngettext(
-                "{n} duplicaat verwijderd",
-                "{n} duplicaten verwijderd",
-                removed,
-            ).format(n=removed))
+            parts.append(_("{c} verwijderd (duplicaat)").format(
+                c=self._format_media_counts(removed_photos, removed_videos)))
         if not parts:
             parts.append(_("Geen wijzigingen nodig"))
         summary = ", ".join(parts) + "."
@@ -6602,11 +6648,9 @@ class MainWindow(Adw.ApplicationWindow):
         done_gb = self._reorganize_done_bytes / (1024 ** 3)
         total_gb = self._reorganize_total_bytes / (1024 ** 3)
         eta = self._format_reorganize_eta(frac)
-        counts = ngettext(
-            "{done} van {total} foto",
-            "{done} van {total} foto's",
-            total_n,
-        ).format(done=done_n, total=total_n)
+        total_label = self._reorganize_total_label or str(total_n)
+        counts = _("{done} van {total_label}").format(
+            done=done_n, total_label=total_label)
         subtitle = _("{counts} · {dg:.2f} / {tg:.2f} GB · nog ± {eta}").format(
             counts=counts, dg=done_gb, tg=total_gb, eta=eta,
         )
