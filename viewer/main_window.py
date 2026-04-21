@@ -5570,6 +5570,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._scan_btn_stack.add_named(_scan_ok, "uptodate")
         self.settings_manual_scan_btn.set_child(self._scan_btn_stack)
         self._scan_btn_fade_id = None
+        # Als er al een scan/backup/sync loopt op moment dat settings opent,
+        # meteen de spinner tonen zodat de gebruiker niet tevergeefs klikt.
+        if self._backup_scanning or self._backup_running:
+            self._scan_btn_stack.set_visible_child_name("checking")
+            self._scan_check_spinner.start()
+            self.settings_manual_scan_btn.set_sensitive(False)
         manual_scan_row = Adw.ActionRow(
             title=_("Nu controleren"),
             subtitle=_("Scan USB op ontbrekende foto's"),
