@@ -2018,6 +2018,14 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def on_close(self, window):
+        # Een openstaand instellingen-dialog blokkeert de close-request
+        # op het hoofdvenster (rechtermuisknop → "Close N windows"). Sluit
+        # 'm expliciet voordat we verder gaan.
+        if self._settings_dialog is not None:
+            try:
+                self._settings_dialog.close()
+            except Exception:
+                pass
         # Close-guard: als backup of reorganize actief is, vraag bevestiging.
         if not getattr(self, "_close_confirmed", False):
             if self._backup_running:
