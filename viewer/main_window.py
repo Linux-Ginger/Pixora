@@ -6407,8 +6407,10 @@ class MainWindow(Adw.ApplicationWindow):
         tot_ph += sum(1 for d in dups if not is_video(str(d)))
         tot_vi += sum(1 for d in dups if is_video(str(d)))
         self._reorganize_total_label = self._format_media_counts(tot_ph, tot_vi)
-        # Alleen fullscreen tonen als we niet in silent-mode draaien.
-        if not self._reorganize_silent_run:
+        # Silent-mode: geen fullscreen, wel de donut als progress-indicator.
+        if self._reorganize_silent_run:
+            GLib.idle_add(self._on_reorganize_silent_start)
+        else:
             GLib.idle_add(self._on_reorganize_progress_start)
         done = 0
         moved_photos = 0
@@ -6634,11 +6636,30 @@ class MainWindow(Adw.ApplicationWindow):
                 200, self._tick_reorganize_progress)
         return False
 
+    def _on_reorganize_silent_start(self):
+        """Silent-mode: alleen de donut tonen (geen fullscreen-wissel).
+        De tick verzorgt het periodieke redraw zodat de arc vult."""
+        tip = _("Mappenstructuur bijwerken…")
+        self._set_donuts_visible(True)
+        if hasattr(self, "_backup_donut_btn"):
+            self._backup_donut_btn.set_tooltip_text(tip)
+        if hasattr(self, "_viewer_donut_btn"):
+            self._viewer_donut_btn.set_tooltip_text(tip)
+        if self._reorganize_anim_id is None:
+            self._reorganize_anim_id = GLib.timeout_add(
+                200, self._tick_reorganize_progress)
+        self._redraw_donuts()
+        return False
+
     def _tick_reorganize_progress(self):
         if not self._reorganize_moving:
             self._reorganize_anim_id = None
             return False
-        if not hasattr(self, "reorganize_bar"):
+        # Donut vullen (silent-mode) en fullscreen-labels updaten indien
+        # beschikbaar. Beide trajecten delen dezelfde tick.
+        self._redraw_donuts()
+        if not hasattr(self, "reorganize_bar") \
+                or self.main_stack.get_visible_child_name() != "reorganize":
             return True
         frac = max(0.0, min(1.0, self._reorganize_fraction))
         self.reorganize_bar.set_fraction(frac)
