@@ -1359,6 +1359,9 @@ msgstr "Scannen op nieuwe foto's…"
 msgid "Backup-scan gestart"
 msgstr "Backup-scan gestart"
 
+msgid "Backup-scan handmatig gestart"
+msgstr "Backup-scan handmatig gestart"
+
 msgid "Scan fout: {err}"
 msgstr "Scan fout: {err}"
 

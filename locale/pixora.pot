@@ -700,6 +700,9 @@ msgstr ""
 msgid "Backup-scan gestart"
 msgstr ""
 
+msgid "Backup-scan handmatig gestart"
+msgstr ""
+
 msgid "Scan fout: {err}"
 msgstr ""
 

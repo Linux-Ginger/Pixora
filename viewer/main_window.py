@@ -6984,13 +6984,23 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_settings_manual_scan(self, btn):
         if self._backup_running or self._backup_scanning:
+            log_info("Manual scan: afgewezen — backup/scan al bezig")
             return
         if not (self.settings.get("backup_enabled")
                 and self.settings.get("backup_uuid")
                 and self.settings.get("backup_path")):
+            log_info("Manual scan: afgewezen — backup niet geconfigureerd")
             return
         if self._backup_drive_mountpoint() is None:
+            log_info("Manual scan: afgewezen — drive niet gemount")
             return
+        if self._reorganize_active \
+                or time.time() < self._reorganize_block_until:
+            # Reorganize-gate blokkeert de normale _trigger_backup_scan,
+            # ook als gebruiker expliciet klikt. Log 'm zodat 't zichtbaar is.
+            log_info("Manual scan: afgewezen — reorganize-gate actief")
+            return
+        log_info(_("Backup-scan handmatig gestart"))
         self._manual_scan_requested = True
         self._set_manual_scan_state("checking")
         self._trigger_backup_scan()

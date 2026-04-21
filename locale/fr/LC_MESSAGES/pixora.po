@@ -1350,6 +1350,9 @@ msgstr "Recherche de nouvelles photos…"
 msgid "Backup-scan gestart"
 msgstr "Analyse de sauvegarde lancée"
 
+msgid "Backup-scan handmatig gestart"
+msgstr "Analyse de sauvegarde lancée manuellement"
+
 msgid "Scan fout: {err}"
 msgstr "Erreur d'analyse : {err}"
 
