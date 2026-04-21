@@ -503,8 +503,6 @@ class InstallerWindow(Adw.ApplicationWindow):
                 "Type=Application\n"
                 "Categories=Graphics;Photography;\n"
                 "StartupWMClass=com.linuxginger.pixora\n"
-                "StartupNotify=true\n"
-                "StartupWMClass=com.linuxginger.pixora\n"
             )
             return True, ""
         except Exception as e:

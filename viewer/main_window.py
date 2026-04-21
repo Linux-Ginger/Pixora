@@ -1757,7 +1757,11 @@ class MainWindow(Adw.ApplicationWindow):
                         content_existing = _df.read()
                     icon_ok = f"Icon={icon}" in content_existing and os.path.exists(icon)
                     wm_ok = "StartupWMClass=com.linuxginger.pixora" in content_existing
-                    if icon_ok and wm_ok:
+                    # Self-heal: oude installs hebben StartupNotify=true, wat
+                    # op GNOME een "Pixora is ready"-notificatie triggert bij
+                    # elke present() op een achtergrondvenster. Regel eruit.
+                    startup_notify_ok = "StartupNotify=true" not in content_existing
+                    if icon_ok and wm_ok and startup_notify_ok:
                         needs_write = False
                 except Exception:
                     pass
