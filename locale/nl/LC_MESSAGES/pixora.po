@@ -1672,6 +1672,12 @@ msgstr "Sla de pop-up over en start opruimen direct wanneer er iets te doen is."
 msgid "Start direct als er iets te doen is zonder te storen."
 msgstr "Start direct als er iets te doen is zonder te storen."
 
+msgid "Mappenstructuur controleren…"
+msgstr "Mappenstructuur controleren…"
+
+msgid "Backup scannen…"
+msgstr "Backup scannen…"
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Silent-mode: backup start automatisch zonder dialog"
 

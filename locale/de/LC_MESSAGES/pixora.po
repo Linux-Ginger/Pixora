@@ -1663,6 +1663,12 @@ msgstr "Pop-up überspringen und Aufräumen sofort starten, wenn etwas zu tun is
 msgid "Start direct als er iets te doen is zonder te storen."
 msgstr "Startet sofort, wenn etwas zu tun ist, ohne zu stören."
 
+msgid "Mappenstructuur controleren…"
+msgstr "Ordnerstruktur wird geprüft…"
+
+msgid "Backup scannen…"
+msgstr "Backup wird gescannt…"
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Silent-Modus: Backup startet automatisch ohne Dialog"
 

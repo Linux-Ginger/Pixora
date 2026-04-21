@@ -8035,19 +8035,30 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _on_backup_donut_clicked(self, btn):
-        """Klik op donut → popover met backup-detail."""
+        """Klik op donut → popover met actuele status. Scannen én
+        backup-runnen tonen elk hun eigen label; geen "0%" tijdens scan."""
         pop = Gtk.Popover()
         pop.set_parent(btn)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.set_margin_top(8); box.set_margin_bottom(8)
         box.set_margin_start(12); box.set_margin_end(12)
-        title = Gtk.Label(label=_("Backup bezig"))
+        if self._structure_scanning:
+            title_txt = _("Mappenstructuur controleren…")
+        elif self._backup_scanning:
+            title_txt = _("Backup scannen…")
+        elif self._backup_running:
+            title_txt = _("Backup bezig")
+        else:
+            title_txt = _("Backup bezig")
+        title = Gtk.Label(label=title_txt)
         title.add_css_class("heading")
         title.set_halign(Gtk.Align.START)
         box.append(title)
-        pct = Gtk.Label(label=f"{int(self._backup_fraction * 100)}%")
-        pct.set_halign(Gtk.Align.START)
-        box.append(pct)
+        # Alleen % tonen tijdens een actieve backup-run (niet tijdens scan).
+        if self._backup_running and not self._backup_scanning:
+            pct = Gtk.Label(label=f"{int(self._backup_fraction * 100)}%")
+            pct.set_halign(Gtk.Align.START)
+            box.append(pct)
         if self._backup_detail:
             det = Gtk.Label(label=self._backup_detail)
             det.add_css_class("caption")

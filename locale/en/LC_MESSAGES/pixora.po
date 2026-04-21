@@ -1672,6 +1672,12 @@ msgstr "Skip the pop-up and start cleaning up immediately when there is work to 
 msgid "Start direct als er iets te doen is zonder te storen."
 msgstr "Starts right away when there's work to do, without interrupting."
 
+msgid "Mappenstructuur controleren…"
+msgstr "Checking folder structure…"
+
+msgid "Backup scannen…"
+msgstr "Scanning backup…"
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Silent mode: backup starts automatically without dialog"
 

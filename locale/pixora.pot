@@ -1014,6 +1014,12 @@ msgstr ""
 msgid "Start direct als er iets te doen is zonder te storen."
 msgstr ""
 
+msgid "Mappenstructuur controleren…"
+msgstr ""
+
+msgid "Backup scannen…"
+msgstr ""
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr ""
 

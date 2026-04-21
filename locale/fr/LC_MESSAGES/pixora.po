@@ -1663,6 +1663,12 @@ msgstr "Ignorer la pop-up et lancer le nettoyage immédiatement s'il y a quelque
 msgid "Start direct als er iets te doen is zonder te storen."
 msgstr "Démarre tout de suite quand il y a quelque chose à faire, sans déranger."
 
+msgid "Mappenstructuur controleren…"
+msgstr "Vérification de la structure des dossiers…"
+
+msgid "Backup scannen…"
+msgstr "Analyse de la sauvegarde…"
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Mode silencieux : la sauvegarde démarre automatiquement sans dialogue"
 
