@@ -7203,6 +7203,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scanning = True
         self._backup_scan_phase = 0.0
         self._backup_scan_start = time.time()
+        self._backup_scan_last_frac = 0.0
         # Schat totale scan-duur op basis van bronbestanden (~0.09s/file)
         # met een minimum van 10s. Klopt niet exact, maar geeft een
         # redelijke oplopende voortgang i.p.v. een statische "…".
@@ -7233,10 +7234,17 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         self._backup_scan_phase = (self._backup_scan_phase + 0.18) % (2 * math.pi)
         # Tijdsgebaseerde schatting voor de scan-voortgang in de popover.
+        # Monotoon stijgend: als iets het scan-start-moment per ongeluk
+        # later zet (bv. als een andere tick/event zijn werk doet), mag
+        # de weergave nooit visueel terugvallen.
         if self._backup_scanning:
             elapsed = time.time() - self._backup_scan_start
             est = getattr(self, "_backup_scan_est_total", 30.0) or 30.0
             frac = min(0.95, elapsed / est)
+            last = getattr(self, "_backup_scan_last_frac", 0.0)
+            if frac < last:
+                frac = last
+            self._backup_scan_last_frac = frac
             self._backup_detail = _("Scannen {pct}%").format(
                 pct=int(frac * 100))
         if hasattr(self, "_backup_donut"):
