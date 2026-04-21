@@ -229,7 +229,13 @@ class PixoraApp(Adw.Application):
             from main_window import MainWindow
             win = MainWindow(app, settings)
 
-        win.present()
+        # Gebruik set_visible i.p.v. present(): GNOME Shell stuurt anders
+        # een "Pixora is klaar"-notificatie bij elke startup als het venster
+        # op dat moment niet gefocused is. set_visible toont het venster
+        # zonder urgency/attention-hint; de gebruiker kan zelf klikken of
+        # alt-tabben. De taakbalk-highlight (bij `_present_dialog` en
+        # `demands_attention`) blijft bewaard voor latere events.
+        win.set_visible(True)
 
 
 def main():
