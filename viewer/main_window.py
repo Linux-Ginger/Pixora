@@ -5109,6 +5109,9 @@ class MainWindow(Adw.ApplicationWindow):
         # PreferencesWindow defaultet op ~360px hoog — te kort voor onze
         # rijen. Matcht nu ongeveer de Adw.PreferencesDialog-hoogte.
         dialog.set_default_size(640, 720)
+        # Standaard toont PreferencesWindow een zoekicoontje; we hebben
+        # geen 50 rijen dus die verbergen we.
+        dialog.set_search_enabled(False)
         self._settings_dialog = dialog
         dialog.connect(
             "close-request",
