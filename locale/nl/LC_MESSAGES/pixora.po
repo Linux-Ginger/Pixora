@@ -1696,6 +1696,30 @@ msgstr "Mappenstructuur bijgewerkt"
 msgid "Mappenstructuur bijwerken…"
 msgstr "Mappenstructuur bijwerken…"
 
+msgid "Mappenstructuur bijwerken"
+msgstr "Mappenstructuur bijwerken"
+
+msgid "{done} van {total} foto"
+msgid_plural "{done} van {total} foto's"
+msgstr[0] "{done} van {total} foto"
+msgstr[1] "{done} van {total} foto's"
+
+msgid "{counts} · {dg:.2f} / {tg:.2f} GB · nog ± {eta}"
+msgstr "{counts} · {dg:.2f} / {tg:.2f} GB · nog ± {eta}"
+
+msgid "onbekend"
+msgstr "onbekend"
+
+msgid "{n} seconde"
+msgid_plural "{n} seconden"
+msgstr[0] "{n} seconde"
+msgstr[1] "{n} seconden"
+
+msgid "{n} minuut"
+msgid_plural "{n} minuten"
+msgstr[0] "{n} minuut"
+msgstr[1] "{n} minuten"
+
 msgid "Geen wijzigingen nodig"
 msgstr "Geen wijzigingen nodig"
 

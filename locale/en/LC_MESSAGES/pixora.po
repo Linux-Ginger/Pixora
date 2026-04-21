@@ -1696,6 +1696,30 @@ msgstr "Folder structure updated"
 msgid "Mappenstructuur bijwerken…"
 msgstr "Updating folder structure…"
 
+msgid "Mappenstructuur bijwerken"
+msgstr "Updating folder structure"
+
+msgid "{done} van {total} foto"
+msgid_plural "{done} van {total} foto's"
+msgstr[0] "{done} of {total} photo"
+msgstr[1] "{done} of {total} photos"
+
+msgid "{counts} · {dg:.2f} / {tg:.2f} GB · nog ± {eta}"
+msgstr "{counts} · {dg:.2f} / {tg:.2f} GB · about {eta} left"
+
+msgid "onbekend"
+msgstr "unknown"
+
+msgid "{n} seconde"
+msgid_plural "{n} seconden"
+msgstr[0] "{n} second"
+msgstr[1] "{n} seconds"
+
+msgid "{n} minuut"
+msgid_plural "{n} minuten"
+msgstr[0] "{n} minute"
+msgstr[1] "{n} minutes"
+
 msgid "Geen wijzigingen nodig"
 msgstr "No changes needed"
 

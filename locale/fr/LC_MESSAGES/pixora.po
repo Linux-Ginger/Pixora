@@ -1687,6 +1687,30 @@ msgstr "Structure des dossiers mise à jour"
 msgid "Mappenstructuur bijwerken…"
 msgstr "Mise à jour de la structure des dossiers…"
 
+msgid "Mappenstructuur bijwerken"
+msgstr "Mise à jour de la structure des dossiers"
+
+msgid "{done} van {total} foto"
+msgid_plural "{done} van {total} foto's"
+msgstr[0] "{done} sur {total} photo"
+msgstr[1] "{done} sur {total} photos"
+
+msgid "{counts} · {dg:.2f} / {tg:.2f} GB · nog ± {eta}"
+msgstr "{counts} · {dg:.2f} / {tg:.2f} Go · encore ± {eta}"
+
+msgid "onbekend"
+msgstr "inconnu"
+
+msgid "{n} seconde"
+msgid_plural "{n} seconden"
+msgstr[0] "{n} seconde"
+msgstr[1] "{n} secondes"
+
+msgid "{n} minuut"
+msgid_plural "{n} minuten"
+msgstr[0] "{n} minute"
+msgstr[1] "{n} minutes"
+
 msgid "Geen wijzigingen nodig"
 msgstr "Aucune modification nécessaire"
 

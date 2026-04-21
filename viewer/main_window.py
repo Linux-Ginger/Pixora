@@ -160,7 +160,7 @@ if _DEV_MODE:
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk, Pango
 gi.require_foreign("cairo")
 import cairo
 
@@ -1304,6 +1304,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_moving = False
         self._reorganize_fraction = 0.0
         self._reorganize_anim_id = None
+        # Fullscreen reorganize-page state (thread schrijft, timer rendert):
+        self._reorganize_total_count = 0
+        self._reorganize_done_count = 0
+        self._reorganize_total_bytes = 0
+        self._reorganize_done_bytes = 0
+        self._reorganize_start_time = 0.0
+        self._reorganize_current_name = ""
         # Structuur-scan state (detecteert mappen die niet bij de gekozen
         # structuur horen, ook zonder backup-drive). Donut is donkerblauw
         # in plaats van oranje zolang er geen backup-context is.
@@ -1335,6 +1342,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.add_named(self.build_viewer_page(), "viewer")
         self.main_stack.add_named(self.build_map_page(),    "map")
         self.main_stack.add_named(self.importer_page,       "importer")
+        self.main_stack.add_named(self._build_reorganize_page(), "reorganize")
         log_info(_("Startup fase 3: pages klaar"))
 
         self.update_banner = Adw.Banner(title="", button_label=_("Bijwerken"), use_markup=False)
@@ -6183,11 +6191,37 @@ class MainWindow(Adw.ApplicationWindow):
         removed = 0
         errors = []
         total = max(1, len(moves) + len(dups))
+        # Totale bytes vooraf bepalen voor GB-teller. Src-grootte is wat we
+        # daadwerkelijk "verwerken" — verplaatsen of verwijderen.
+        total_bytes = 0
+        sizes_moves = []
+        sizes_dups = []
+        for src, _dst in moves:
+            try:
+                sz = src.stat().st_size
+            except OSError:
+                sz = 0
+            sizes_moves.append(sz)
+            total_bytes += sz
+        for dup in dups:
+            try:
+                sz = dup.stat().st_size
+            except OSError:
+                sz = 0
+            sizes_dups.append(sz)
+            total_bytes += sz
         self._reorganize_moving = True
         self._reorganize_fraction = 0.0
+        self._reorganize_total_count = total
+        self._reorganize_done_count = 0
+        self._reorganize_total_bytes = total_bytes
+        self._reorganize_done_bytes = 0
+        self._reorganize_start_time = time.time()
+        self._reorganize_current_name = ""
         GLib.idle_add(self._on_reorganize_progress_start)
         done = 0
-        for src, dst in moves:
+        for (src, dst), sz in zip(moves, sizes_moves):
+            self._reorganize_current_name = src.name
             try:
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 _sh.move(str(src), str(dst))
@@ -6195,14 +6229,19 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception as e:
                 errors.append(f"{src.name}: {e}")
             done += 1
+            self._reorganize_done_count = done
+            self._reorganize_done_bytes += sz
             self._reorganize_fraction = done / total
-        for dup in dups:
+        for dup, sz in zip(dups, sizes_dups):
+            self._reorganize_current_name = dup.name
             try:
                 dup.unlink()
                 removed += 1
             except OSError as e:
                 errors.append(f"{dup.name}: {e}")
             done += 1
+            self._reorganize_done_count = done
+            self._reorganize_done_bytes += sz
             self._reorganize_fraction = done / total
         # Lege mappen opruimen (bottom-up, behalve de root)
         for root, _dirs, _files in os.walk(str(photo_path), topdown=False):
@@ -6248,39 +6287,134 @@ class MainWindow(Adw.ApplicationWindow):
         dlg.add_response("ok", _("OK"))
         dlg.set_default_response("ok")
         dlg.set_close_response("ok")
-        self._present_dialog(dlg)
-        self.reload_photos()
         self._reorganize_moving = False
         self._reorganize_fraction = 0.0
+        # Fullscreen-page verlaten; donut blijft dicht tenzij backup draait.
+        self.header.set_visible(True)
+        self.bottom_stack.set_visible(True)
+        return_to = getattr(self, "_reorganize_return_page", "grid") or "grid"
+        self.main_stack.set_visible_child_name(return_to)
+        if hasattr(self, "reorganize_spinner"):
+            self.reorganize_spinner.stop()
         if not self._backup_scanning and not self._backup_running:
             self._set_donuts_visible(False)
         self._redraw_donuts()
+        # Dialog + banner nu pas tonen (na terug naar grid).
+        self._present_dialog(dlg)
+        self.reload_photos()
         self._reorganize_active = False
         self._reorganize_block_until = time.time() + 10.0
         GLib.timeout_add_seconds(10, self._maybe_trigger_backup_after_reorganize)
         return False
 
+    def _build_reorganize_page(self):
+        """Fullscreen voortgangs-page, zelfde indeling als ImporterPage."""
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(480)
+        clamp.set_valign(Gtk.Align.CENTER)
+        clamp.set_vexpand(True)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        box.set_margin_top(48)
+        box.set_margin_bottom(48)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+
+        self.reorganize_spinner = Gtk.Spinner()
+        self.reorganize_spinner.set_size_request(48, 48)
+        self.reorganize_spinner.set_halign(Gtk.Align.CENTER)
+        box.append(self.reorganize_spinner)
+
+        self.reorganize_title = Gtk.Label(label=_("Mappenstructuur bijwerken"))
+        self.reorganize_title.add_css_class("title-2")
+        self.reorganize_title.set_halign(Gtk.Align.CENTER)
+        box.append(self.reorganize_title)
+
+        self.reorganize_subtitle = Gtk.Label()
+        self.reorganize_subtitle.add_css_class("dim-label")
+        self.reorganize_subtitle.set_halign(Gtk.Align.CENTER)
+        self.reorganize_subtitle.set_wrap(True)
+        self.reorganize_subtitle.set_max_width_chars(52)
+        box.append(self.reorganize_subtitle)
+
+        self.reorganize_bar = Gtk.ProgressBar()
+        self.reorganize_bar.set_show_text(True)
+        box.append(self.reorganize_bar)
+
+        self.reorganize_detail = Gtk.Label()
+        self.reorganize_detail.add_css_class("dim-label")
+        self.reorganize_detail.add_css_class("caption")
+        self.reorganize_detail.set_halign(Gtk.Align.CENTER)
+        self.reorganize_detail.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+        self.reorganize_detail.set_max_width_chars(52)
+        box.append(self.reorganize_detail)
+
+        clamp.set_child(box)
+        return clamp
+
     def _on_reorganize_progress_start(self):
-        """Main-thread: donut tonen en anim-tick starten zodra
-        _do_reorganize begint met verplaatsen."""
-        tip = _("Mappenstructuur bijwerken…")
-        if hasattr(self, "_backup_donut_btn"):
-            self._set_donuts_visible(True)
-            self._backup_donut_btn.set_tooltip_text(tip)
-        if hasattr(self, "_viewer_donut_btn"):
-            self._viewer_donut_btn.set_tooltip_text(tip)
+        """Main-thread: wissel naar fullscreen reorganize-page en start de
+        voortgangs-tick die de labels periodiek vernieuwt."""
+        self._reorganize_return_page = \
+            self.main_stack.get_visible_child_name() or "grid"
+        self.header.set_visible(False)
+        self.bottom_stack.set_visible(False)
+        self.main_stack.set_visible_child_name("reorganize")
+        if hasattr(self, "reorganize_spinner"):
+            self.reorganize_spinner.start()
+        if hasattr(self, "reorganize_bar"):
+            self.reorganize_bar.set_fraction(0.0)
+            self.reorganize_bar.set_text("0%")
+        if hasattr(self, "reorganize_subtitle"):
+            self.reorganize_subtitle.set_text("")
+        if hasattr(self, "reorganize_detail"):
+            self.reorganize_detail.set_text("")
+        # Donut verbergen zolang de fullscreen-page aan staat.
+        if not self._backup_scanning and not self._backup_running:
+            self._set_donuts_visible(False)
         if self._reorganize_anim_id is None:
             self._reorganize_anim_id = GLib.timeout_add(
-                80, self._tick_reorganize_progress)
-        self._redraw_donuts()
+                200, self._tick_reorganize_progress)
         return False
 
     def _tick_reorganize_progress(self):
         if not self._reorganize_moving:
             self._reorganize_anim_id = None
             return False
-        self._redraw_donuts()
+        if not hasattr(self, "reorganize_bar"):
+            return True
+        frac = max(0.0, min(1.0, self._reorganize_fraction))
+        self.reorganize_bar.set_fraction(frac)
+        self.reorganize_bar.set_text(f"{int(frac * 100)}%")
+        done_n = self._reorganize_done_count
+        total_n = self._reorganize_total_count
+        done_gb = self._reorganize_done_bytes / (1024 ** 3)
+        total_gb = self._reorganize_total_bytes / (1024 ** 3)
+        eta = self._format_reorganize_eta(frac)
+        counts = ngettext(
+            "{done} van {total} foto",
+            "{done} van {total} foto's",
+            total_n,
+        ).format(done=done_n, total=total_n)
+        subtitle = _("{counts} · {dg:.2f} / {tg:.2f} GB · nog ± {eta}").format(
+            counts=counts, dg=done_gb, tg=total_gb, eta=eta,
+        )
+        self.reorganize_subtitle.set_text(subtitle)
+        self.reorganize_detail.set_text(self._reorganize_current_name or "")
         return True
+
+    def _format_reorganize_eta(self, frac):
+        if frac <= 0.001:
+            return _("onbekend")
+        elapsed = time.time() - self._reorganize_start_time
+        if elapsed < 0.5:
+            return _("onbekend")
+        remaining = max(0.0, elapsed * (1.0 - frac) / frac)
+        if remaining < 60:
+            secs = int(remaining)
+            return ngettext("{n} seconde", "{n} seconden", secs).format(n=secs)
+        mins = int(remaining / 60)
+        return ngettext("{n} minuut", "{n} minuten", mins).format(n=mins)
 
     def _maybe_trigger_backup_after_reorganize(self):
         """One-shot: 10s na _reorganize_done. Start backup-scan als alles
