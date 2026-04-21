@@ -6242,13 +6242,22 @@ class MainWindow(Adw.ApplicationWindow):
             # Defensive: voorkom dubbele thread-start als signal 2× binnenkomt.
             return
         # Sluit het instellingen-dialog zodat de fullscreen-page niet achter
-        # een modal verdwijnt.
+        # een modal verdwijnt. Deferred via idle_add: synchroon sluiten
+        # vanuit een andere dialog-response crasht Adw op GObject-cleanup
+        # (SIGSEGV). Force_close slaat de close-attempt-signal over.
         if self._settings_dialog is not None:
-            try:
-                self._settings_dialog.close()
-            except Exception:
-                pass
+            dlg_to_close = self._settings_dialog
             self._settings_dialog = None
+            def _close_later():
+                try:
+                    if hasattr(dlg_to_close, "force_close"):
+                        dlg_to_close.force_close()
+                    else:
+                        dlg_to_close.close()
+                except Exception:
+                    pass
+                return False
+            GLib.idle_add(_close_later)
         threading.Thread(
             target=self._do_reorganize, args=(moves, dups), daemon=True,
         ).start()
