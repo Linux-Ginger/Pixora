@@ -1660,6 +1660,9 @@ msgstr "Pop-up überspringen und Backup/Sync sofort starten, wenn etwas zu tun i
 msgid "Sla de pop-up over en start opruimen direct wanneer er iets te doen is."
 msgstr "Pop-up überspringen und Aufräumen sofort starten, wenn etwas zu tun ist."
 
+msgid "Start direct als er iets te doen is zonder te storen."
+msgstr "Startet sofort, wenn etwas zu tun ist, ohne zu stören."
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Silent-Modus: Backup startet automatisch ohne Dialog"
 

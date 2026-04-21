@@ -1011,6 +1011,9 @@ msgstr ""
 msgid "Sla de pop-up over en start opruimen direct wanneer er iets te doen is."
 msgstr ""
 
+msgid "Start direct als er iets te doen is zonder te storen."
+msgstr ""
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr ""
 

@@ -5299,7 +5299,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         silent_row = Adw.ActionRow(
             title=_("Automatisch bevestigen"),
-            subtitle=_("Sla de pop-up over en start opruimen direct wanneer er iets te doen is."),
+            subtitle=_("Start direct als er iets te doen is zonder te storen."),
         )
         silent_row.add_prefix(
             Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
@@ -5509,7 +5509,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_silent_switch.connect("notify::active", self.on_backup_silent_toggle)
         silent_row = Adw.ActionRow(
             title=_("Automatisch bevestigen"),
-            subtitle=_("Sla de pop-up over en start backup/sync direct wanneer er iets te doen is."),
+            subtitle=_("Start direct als er iets te doen is zonder te storen."),
         )
         silent_row.add_prefix(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
         silent_row.add_suffix(self.settings_silent_switch)
