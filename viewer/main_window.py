@@ -6077,13 +6077,29 @@ class MainWindow(Adw.ApplicationWindow):
                 from PIL import Image
                 with Image.open(str(src)) as img:
                     exif = img.getexif()
+                # DateTimeOriginal (36867) en DateTimeDigitized (36868)
+                # zitten in de ExifIFD-sub (pointer-tag 0x8769), niet in
+                # de main IFD. Zonder deze sub-IFD zouden we alleen tag 306
+                # (ModifyDate) vinden — die wordt bij elke edit bijgewerkt.
+                try:
+                    exif_sub = exif.get_ifd(0x8769)
+                except Exception:
+                    exif_sub = {}
+                # Zoek eerst in ExifIFD (originele + digitized), daarna pas
+                # in de main IFD (voor DateTime = 306).
+                sources = []
                 for tag in exif_tags:
-                    val = exif.get(tag)
+                    if tag in (36867, 36868):
+                        sources.append((exif_sub, tag))
+                    else:
+                        sources.append((exif, tag))
+                for ifd, tag in sources:
+                    val = ifd.get(tag) if ifd else None
                     if val:
                         try:
                             return datetime.datetime.strptime(
                                 val[:19], "%Y:%m:%d %H:%M:%S")
-                        except ValueError:
+                        except (ValueError, TypeError):
                             continue
             except Exception:
                 pass
