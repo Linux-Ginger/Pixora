@@ -5098,12 +5098,19 @@ class MainWindow(Adw.ApplicationWindow):
     # ── Instellingen ──────────────────────────────────────────────────
     def on_settings_clicked(self, btn):
         log_info(_("Instellingen geopend"))
-        dialog = Adw.PreferencesDialog()
+        # Gebruik PreferencesWindow (eigen toplevel) i.p.v.
+        # PreferencesDialog — die laatste blokkeert op Adw 1.5+ de
+        # close-request van het hoofdvenster: GNOME's "Close N windows"
+        # kan Pixora dan niet afsluiten terwijl settings open is.
+        dialog = Adw.PreferencesWindow()
         dialog.set_title(_("Instellingen"))
-        # Bewaar referentie zodat we 'm kunnen sluiten bij reorganize-start
-        # (anders blijft deze modal vóór de fullscreen-page staan).
+        dialog.set_transient_for(self)
+        dialog.set_modal(False)
         self._settings_dialog = dialog
-        dialog.connect("closed", lambda _d: setattr(self, "_settings_dialog", None))
+        dialog.connect(
+            "close-request",
+            lambda _d: (setattr(self, "_settings_dialog", None), False)[1],
+        )
 
         display_page = Adw.PreferencesPage()
         display_page.set_title(_("Weergave"))
@@ -5679,7 +5686,7 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.add(import_page)
         dialog.add(advanced_page)
         dialog.add(about_page)
-        dialog.present(self)
+        dialog.present()
 
     def _on_thumb_size_changed(self, scale, row):
         new_size = int(scale.get_value())
