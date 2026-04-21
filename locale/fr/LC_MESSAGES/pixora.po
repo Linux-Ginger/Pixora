@@ -1675,6 +1675,12 @@ msgstr "Synchro en cours"
 msgid "Sync scannen…"
 msgstr "Analyse de la synchro…"
 
+msgid "Scannen {pct}%"
+msgstr "Analyse {pct}%"
+
+msgid "Scannen 0%"
+msgstr "Analyse 0%"
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Mode silencieux : la sauvegarde démarre automatiquement sans dialogue"
 

@@ -7186,7 +7186,20 @@ class MainWindow(Adw.ApplicationWindow):
             return
         self._backup_scanning = True
         self._backup_scan_phase = 0.0
-        self._backup_detail = _("Scannen…")
+        self._backup_scan_start = time.time()
+        # Schat totale scan-duur op basis van bronbestanden (~0.09s/file)
+        # met een minimum van 10s. Klopt niet exact, maar geeft een
+        # redelijke oplopende voortgang i.p.v. een statische "…".
+        try:
+            from pathlib import Path as _P
+            ppath = _P(self.settings.get("photo_path") or _P.home() / "Photos")
+            count = 0
+            for _root, _d, _files in os.walk(str(ppath)):
+                count += len(_files)
+            self._backup_scan_est_total = max(10.0, count * 0.09)
+        except Exception:
+            self._backup_scan_est_total = 30.0
+        self._backup_detail = _("Scannen 0%")
         if hasattr(self, "_backup_donut_btn"):
             self._set_donuts_visible(True)
             self._backup_donut_btn.set_tooltip_text(_("Scannen op nieuwe foto's…"))
@@ -7200,6 +7213,13 @@ class MainWindow(Adw.ApplicationWindow):
             self._backup_scan_anim_id = None
             return False
         self._backup_scan_phase = (self._backup_scan_phase + 0.18) % (2 * math.pi)
+        # Tijdsgebaseerde schatting voor de scan-voortgang in de popover.
+        if self._backup_scanning:
+            elapsed = time.time() - self._backup_scan_start
+            est = getattr(self, "_backup_scan_est_total", 30.0) or 30.0
+            frac = min(0.95, elapsed / est)
+            self._backup_detail = _("Scannen {pct}%").format(
+                pct=int(frac * 100))
         if hasattr(self, "_backup_donut"):
             self._redraw_donuts()
         return True

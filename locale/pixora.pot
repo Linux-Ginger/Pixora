@@ -1026,6 +1026,12 @@ msgstr ""
 msgid "Sync scannen…"
 msgstr ""
 
+msgid "Scannen {pct}%"
+msgstr ""
+
+msgid "Scannen 0%"
+msgstr ""
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr ""
 

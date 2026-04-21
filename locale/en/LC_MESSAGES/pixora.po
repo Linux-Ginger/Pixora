@@ -1684,6 +1684,12 @@ msgstr "Sync in progress"
 msgid "Sync scannen…"
 msgstr "Scanning sync…"
 
+msgid "Scannen {pct}%"
+msgstr "Scanning {pct}%"
+
+msgid "Scannen 0%"
+msgstr "Scanning 0%"
+
 msgid "Silent-mode: backup start automatisch zonder dialog"
 msgstr "Silent mode: backup starts automatically without dialog"
 
