@@ -6259,6 +6259,18 @@ class MainWindow(Adw.ApplicationWindow):
                 dlg.set_close_response("ok")
                 self._present_dialog(dlg)
             return False
+        # Silent-modus: geen popup, geen fullscreen, direct uitvoeren.
+        # Geldt voor zowel auto-detectie als manueel klikken op "Opruimen".
+        if self.settings.get("reorganize_silent", False):
+            self._reorganize_silent_run = True
+            log_info(_("Reorganize stil gestart: {m} moves, {d} dups").format(
+                m=len(moves), d=len(dups)))
+            threading.Thread(
+                target=self._do_reorganize, args=(moves, dups),
+                daemon=True,
+            ).start()
+            return False
+        self._reorganize_silent_run = False
         structure = self.settings.get("structure", "year_month")
         structure_label = {
             "flat": _("Alles bij elkaar"),
@@ -6338,23 +6350,11 @@ class MainWindow(Adw.ApplicationWindow):
         if self._reorganize_moving:
             # Defensive: voorkom dubbele thread-start als signal 2× binnenkomt.
             return
-        # Sluit het instellingen-dialog zodat de fullscreen-page niet achter
-        # een modal verdwijnt. Deferred via idle_add: synchroon sluiten
-        # vanuit een andere dialog-response crasht Adw op GObject-cleanup
-        # (SIGSEGV). Force_close slaat de close-attempt-signal over.
-        if self._settings_dialog is not None:
-            dlg_to_close = self._settings_dialog
-            self._settings_dialog = None
-            def _close_later():
-                try:
-                    if hasattr(dlg_to_close, "force_close"):
-                        dlg_to_close.force_close()
-                    else:
-                        dlg_to_close.close()
-                except Exception:
-                    pass
-                return False
-            GLib.idle_add(_close_later)
+        # Instellingen-dialog laten we open — Adw.PreferencesDialog
+        # crasht native (SIGSEGV) als we 'm van hieruit proberen te
+        # sluiten (force_close én close). De fullscreen-page wordt wel
+        # gewisseld in main_stack; zodra de gebruiker settings zelf
+        # sluit is die zichtbaar.
         threading.Thread(
             target=self._do_reorganize, args=(moves, dups), daemon=True,
         ).start()
@@ -6745,17 +6745,8 @@ class MainWindow(Adw.ApplicationWindow):
         if had_mismatch and not self._structure_popup_dismissed \
                 and not self._reorganize_active:
             self._reorganize_active = True
-            # Silent-mode: sla popup + fullscreen over, draai direct.
-            if self.settings.get("reorganize_silent", False):
-                self._reorganize_silent_run = True
-                log_info(_("Reorganize stil gestart: {m} moves, {d} dups").format(
-                    m=len(moves), d=len(dups)))
-                threading.Thread(
-                    target=self._do_reorganize, args=(moves, dups),
-                    daemon=True,
-                ).start()
-                return False
-            self._reorganize_silent_run = False
+            # Silent-check gebeurt in _on_reorganize_scan_done zodat zowel
+            # auto als manual pad het respecteert.
             self._on_reorganize_scan_done(moves, dups, True)
             return False
         # Geen mismatch (of popup al afgewezen deze sessie) → backup mag.
