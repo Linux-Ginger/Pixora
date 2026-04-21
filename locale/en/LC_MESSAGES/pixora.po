@@ -1693,6 +1693,9 @@ msgstr "Organize now"
 msgid "Mappenstructuur bijgewerkt"
 msgstr "Folder structure updated"
 
+msgid "Mappenstructuur bijwerken…"
+msgstr "Updating folder structure…"
+
 msgid "Geen wijzigingen nodig"
 msgstr "No changes needed"
 

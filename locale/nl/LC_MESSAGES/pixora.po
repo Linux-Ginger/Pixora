@@ -1693,6 +1693,9 @@ msgstr "Nu ordenen"
 msgid "Mappenstructuur bijgewerkt"
 msgstr "Mappenstructuur bijgewerkt"
 
+msgid "Mappenstructuur bijwerken…"
+msgstr "Mappenstructuur bijwerken…"
+
 msgid "Geen wijzigingen nodig"
 msgstr "Geen wijzigingen nodig"
 

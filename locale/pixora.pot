@@ -1035,6 +1035,9 @@ msgstr ""
 msgid "Mappenstructuur bijgewerkt"
 msgstr ""
 
+msgid "Mappenstructuur bijwerken…"
+msgstr ""
+
 msgid "Geen wijzigingen nodig"
 msgstr ""
 

@@ -1684,6 +1684,9 @@ msgstr "Organiser maintenant"
 msgid "Mappenstructuur bijgewerkt"
 msgstr "Structure des dossiers mise à jour"
 
+msgid "Mappenstructuur bijwerken…"
+msgstr "Mise à jour de la structure des dossiers…"
+
 msgid "Geen wijzigingen nodig"
 msgstr "Aucune modification nécessaire"
 

@@ -1297,9 +1297,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_excluded_paths = []
         self._manual_scan_requested = False
         # Reorganize-flow state: blokkeert backup/sync zolang popup/ordenen
-        # loopt én 10s erna (zie _trigger_backup_scan).
+        # loopt én 10s erna (zie _trigger_backup_scan). _reorganize_moving
+        # stuurt de voortgangs-donut aan tijdens _do_reorganize.
         self._reorganize_active = False
         self._reorganize_block_until = 0.0
+        self._reorganize_moving = False
+        self._reorganize_fraction = 0.0
+        self._reorganize_anim_id = None
         # Structuur-scan state (detecteert mappen die niet bij de gekozen
         # structuur horen, ook zonder backup-drive). Donut is donkerblauw
         # in plaats van oranje zolang er geen backup-context is.
@@ -6178,6 +6182,11 @@ class MainWindow(Adw.ApplicationWindow):
         moved = 0
         removed = 0
         errors = []
+        total = max(1, len(moves) + len(dups))
+        self._reorganize_moving = True
+        self._reorganize_fraction = 0.0
+        GLib.idle_add(self._on_reorganize_progress_start)
+        done = 0
         for src, dst in moves:
             try:
                 dst.parent.mkdir(parents=True, exist_ok=True)
@@ -6185,12 +6194,16 @@ class MainWindow(Adw.ApplicationWindow):
                 moved += 1
             except Exception as e:
                 errors.append(f"{src.name}: {e}")
+            done += 1
+            self._reorganize_fraction = done / total
         for dup in dups:
             try:
                 dup.unlink()
                 removed += 1
             except OSError as e:
                 errors.append(f"{dup.name}: {e}")
+            done += 1
+            self._reorganize_fraction = done / total
         # Lege mappen opruimen (bottom-up, behalve de root)
         for root, _dirs, _files in os.walk(str(photo_path), topdown=False):
             if root == str(photo_path):
@@ -6237,10 +6250,37 @@ class MainWindow(Adw.ApplicationWindow):
         dlg.set_close_response("ok")
         self._present_dialog(dlg)
         self.reload_photos()
+        self._reorganize_moving = False
+        self._reorganize_fraction = 0.0
+        if not self._backup_scanning and not self._backup_running:
+            self._set_donuts_visible(False)
+        self._redraw_donuts()
         self._reorganize_active = False
         self._reorganize_block_until = time.time() + 10.0
         GLib.timeout_add_seconds(10, self._maybe_trigger_backup_after_reorganize)
         return False
+
+    def _on_reorganize_progress_start(self):
+        """Main-thread: donut tonen en anim-tick starten zodra
+        _do_reorganize begint met verplaatsen."""
+        tip = _("Mappenstructuur bijwerken…")
+        if hasattr(self, "_backup_donut_btn"):
+            self._set_donuts_visible(True)
+            self._backup_donut_btn.set_tooltip_text(tip)
+        if hasattr(self, "_viewer_donut_btn"):
+            self._viewer_donut_btn.set_tooltip_text(tip)
+        if self._reorganize_anim_id is None:
+            self._reorganize_anim_id = GLib.timeout_add(
+                80, self._tick_reorganize_progress)
+        self._redraw_donuts()
+        return False
+
+    def _tick_reorganize_progress(self):
+        if not self._reorganize_moving:
+            self._reorganize_anim_id = None
+            return False
+        self._redraw_donuts()
+        return True
 
     def _maybe_trigger_backup_after_reorganize(self):
         """One-shot: 10s na _reorganize_done. Start backup-scan als alles
@@ -7505,14 +7545,13 @@ class MainWindow(Adw.ApplicationWindow):
             cr.arc_negative(cx, cy, r_inner, 2 * math.pi, 0)
             cr.fill()
 
-            # Kleur: oranje voor backup-activiteit, donker-blauw als alleen
-            # de structuur-scan loopt (geen backup-drive of backup uit).
-            if self._structure_scanning \
-                    and not self._backup_scanning \
-                    and not self._backup_running:
-                color = (0.10, 0.20, 0.55)  # dark blue
-            else:
+            # Kleur: oranje als backup actief is, anders donker-blauw.
+            # Zowel de structuur-scan als de reorganize-voortgang vallen
+            # onder "geen backup-context" en krijgen dus de blauwe tint.
+            if self._backup_scanning or self._backup_running:
                 color = (0.914, 0.329, 0.125)  # orange
+            else:
+                color = (0.10, 0.20, 0.55)  # dark blue
 
             if self._backup_scanning or self._structure_scanning:
                 start = self._backup_scan_phase - math.pi / 2
@@ -7528,7 +7567,11 @@ class MainWindow(Adw.ApplicationWindow):
                 cr.set_operator(cairo.OPERATOR_OVER)
                 return
 
-            frac = max(0.0, min(1.0, self._backup_fraction))
+            # Progress-modus: reorganize heeft voorrang, anders backup.
+            if self._reorganize_moving:
+                frac = max(0.0, min(1.0, self._reorganize_fraction))
+            else:
+                frac = max(0.0, min(1.0, self._backup_fraction))
             if frac > 0.001:
                 start = -math.pi / 2  # top
                 end = start + frac * 2 * math.pi
