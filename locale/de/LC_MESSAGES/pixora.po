@@ -1599,6 +1599,12 @@ msgstr "Backup-Scan: {n} neu, {d} Waisen (Modus={m}), {b} Bytes, {u} Duplikate"
 msgid "Structuur-scan gestart"
 msgstr "Strukturprüfung gestartet"
 
+msgid "Structuur-scan klaar: {m} verplaatsingen, {d} duplicaten"
+msgstr "Strukturprüfung fertig: {m} Verschiebungen, {d} Duplikate"
+
+msgid "Structuur-scan klaar: structuur klopt"
+msgstr "Strukturprüfung fertig: Struktur ist korrekt"
+
 msgid "Controleren op mappenstructuur…"
 msgstr "Ordnerstruktur wird überprüft…"
 

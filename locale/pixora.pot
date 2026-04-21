@@ -950,6 +950,12 @@ msgstr ""
 msgid "Structuur-scan gestart"
 msgstr ""
 
+msgid "Structuur-scan klaar: {m} verplaatsingen, {d} duplicaten"
+msgstr ""
+
+msgid "Structuur-scan klaar: structuur klopt"
+msgstr ""
+
 msgid "Controleren op mappenstructuur…"
 msgstr ""
 

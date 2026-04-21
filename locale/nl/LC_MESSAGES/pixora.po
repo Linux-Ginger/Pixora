@@ -1608,6 +1608,12 @@ msgstr "Backup-scan: {n} nieuw, {d} orphans (mode={m}), {b} bytes, {u} duplicate
 msgid "Structuur-scan gestart"
 msgstr "Structuur-scan gestart"
 
+msgid "Structuur-scan klaar: {m} verplaatsingen, {d} duplicaten"
+msgstr "Structuur-scan klaar: {m} verplaatsingen, {d} duplicaten"
+
+msgid "Structuur-scan klaar: structuur klopt"
+msgstr "Structuur-scan klaar: structuur klopt"
+
 msgid "Controleren op mappenstructuur…"
 msgstr "Controleren op mappenstructuur…"
 

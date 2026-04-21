@@ -6520,6 +6520,12 @@ class MainWindow(Adw.ApplicationWindow):
             self._set_donuts_visible(False)
         self._redraw_donuts()
         had_mismatch = bool(moves or dups)
+        if had_mismatch:
+            log_info(_("Structuur-scan klaar: {m} verplaatsingen, {d} duplicaten").format(
+                m=len(moves), d=len(dups),
+            ))
+        else:
+            log_info(_("Structuur-scan klaar: structuur klopt"))
         if had_mismatch and not self._structure_popup_dismissed \
                 and not self._reorganize_active:
             self._reorganize_active = True

@@ -1599,6 +1599,12 @@ msgstr "Analyse : {n} nouveau(x), {d} orphelins (mode={m}), {b} octets, {u} doub
 msgid "Structuur-scan gestart"
 msgstr "Analyse de la structure démarrée"
 
+msgid "Structuur-scan klaar: {m} verplaatsingen, {d} duplicaten"
+msgstr "Analyse terminée : {m} déplacements, {d} doublons"
+
+msgid "Structuur-scan klaar: structuur klopt"
+msgstr "Analyse terminée : la structure est correcte"
+
 msgid "Controleren op mappenstructuur…"
 msgstr "Vérification de la structure des dossiers…"
 
