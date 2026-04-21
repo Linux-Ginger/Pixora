@@ -6064,12 +6064,47 @@ class MainWindow(Adw.ApplicationWindow):
             save_settings(self.settings)
 
     # ── Mapstructuur — re-organizer ─────────────────────────────────
+    def _photo_date_for_structure(self, src, st, exif_tags, video_exts,
+                                  video_date_fn):
+        """EXIF (foto) / ffprobe (video) eerst, mtime als fallback. Geeft een
+        datetime terug die in _dest_path gaat voor de jaar/maand-map. We
+        slaan de iPhone-filename-heuristiek uit get_photo_date bewust over —
+        die geeft een sorteersleutel terug, geen echte timestamp."""
+        ext = src.suffix.lower()
+        if ext in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng",
+                   ".tiff", ".tif"):
+            try:
+                from PIL import Image
+                with Image.open(str(src)) as img:
+                    exif = img.getexif()
+                for tag in exif_tags:
+                    val = exif.get(tag)
+                    if val:
+                        try:
+                            return datetime.datetime.strptime(
+                                val[:19], "%Y:%m:%d %H:%M:%S")
+                        except ValueError:
+                            continue
+            except Exception:
+                pass
+        elif ext in video_exts:
+            try:
+                ts = video_date_fn(src)
+                if ts:
+                    return datetime.datetime.fromtimestamp(ts)
+            except Exception:
+                pass
+        return datetime.datetime.fromtimestamp(st.st_mtime)
+
     def _scan_structure_mismatch(self):
         """Return (moves, dups) waar moves = [(Path src, Path dst), ...]
         en dups = [Path, ...] bit-identieke duplicaten die op een ander pad
         staan dan target."""
         from pathlib import Path as _P
-        from importer_page import dest_path as _dest_path, SUPPORTED_EXT
+        from importer_page import (
+            dest_path as _dest_path, SUPPORTED_EXT,
+            _EXIF_DATE_TAGS, _VIDEO_EXT, _get_video_date,
+        )
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
         if not photo_path.is_dir():
             return [], []
@@ -6086,8 +6121,10 @@ class MainWindow(Adw.ApplicationWindow):
                     st = src.stat()
                 except OSError:
                     continue
-                mtime = datetime.datetime.fromtimestamp(st.st_mtime)
-                dst = _dest_path(photo_path, structure, src.name, mtime)
+                photo_dt = self._photo_date_for_structure(
+                    src, st, _EXIF_DATE_TAGS, _VIDEO_EXT, _get_video_date,
+                )
+                dst = _dest_path(photo_path, structure, src.name, photo_dt)
                 if src.resolve() == dst.resolve():
                     reserved_targets.add(str(dst.resolve()))
                     continue
