@@ -1311,6 +1311,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_done_bytes = 0
         self._reorganize_start_time = 0.0
         self._reorganize_current_name = ""
+        # Zie on_settings_clicked: bewaarde instellingendialog.
+        self._settings_dialog = None
         # Structuur-scan state (detecteert mappen die niet bij de gekozen
         # structuur horen, ook zonder backup-drive). Donut is donkerblauw
         # in plaats van oranje zolang er geen backup-context is.
@@ -5072,6 +5074,10 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(_("Instellingen geopend"))
         dialog = Adw.PreferencesDialog()
         dialog.set_title(_("Instellingen"))
+        # Bewaar referentie zodat we 'm kunnen sluiten bij reorganize-start
+        # (anders blijft deze modal vóór de fullscreen-page staan).
+        self._settings_dialog = dialog
+        dialog.connect("closed", lambda _d: setattr(self, "_settings_dialog", None))
 
         display_page = Adw.PreferencesPage()
         display_page.set_title(_("Weergave"))
@@ -6179,6 +6185,17 @@ class MainWindow(Adw.ApplicationWindow):
             # Manual "Opruimen"-knop werkt wel.
             self._structure_popup_dismissed = True
             return
+        if self._reorganize_moving:
+            # Defensive: voorkom dubbele thread-start als signal 2× binnenkomt.
+            return
+        # Sluit het instellingen-dialog zodat de fullscreen-page niet achter
+        # een modal verdwijnt.
+        if self._settings_dialog is not None:
+            try:
+                self._settings_dialog.close()
+            except Exception:
+                pass
+            self._settings_dialog = None
         threading.Thread(
             target=self._do_reorganize, args=(moves, dups), daemon=True,
         ).start()
@@ -6187,6 +6204,13 @@ class MainWindow(Adw.ApplicationWindow):
         import shutil as _sh
         from pathlib import Path as _P
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
+        # File-watcher uitzetten: elke move triggert anders een reload_photos
+        # die tegelijkertijd met onze verplaatsingen loopt → _load_thread
+        # crasht op FileNotFoundError. Opnieuw starten in _reorganize_done.
+        try:
+            self.stop_watcher()
+        except Exception:
+            pass
         moved = 0
         removed = 0
         errors = []
@@ -6220,6 +6244,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_current_name = ""
         GLib.idle_add(self._on_reorganize_progress_start)
         done = 0
+        first_err_logged = False
         for (src, dst), sz in zip(moves, sizes_moves):
             self._reorganize_current_name = src.name
             try:
@@ -6228,6 +6253,11 @@ class MainWindow(Adw.ApplicationWindow):
                 moved += 1
             except Exception as e:
                 errors.append(f"{src.name}: {e}")
+                if not first_err_logged:
+                    log_info(
+                        f"Reorganize move failed: {src} → {dst}: {e}"
+                    )
+                    first_err_logged = True
             done += 1
             self._reorganize_done_count = done
             self._reorganize_done_bytes += sz
@@ -6239,6 +6269,9 @@ class MainWindow(Adw.ApplicationWindow):
                 removed += 1
             except OSError as e:
                 errors.append(f"{dup.name}: {e}")
+                if not first_err_logged:
+                    log_info(f"Reorganize unlink failed: {dup}: {e}")
+                    first_err_logged = True
             done += 1
             self._reorganize_done_count = done
             self._reorganize_done_bytes += sz
@@ -6299,6 +6332,12 @@ class MainWindow(Adw.ApplicationWindow):
         if not self._backup_scanning and not self._backup_running:
             self._set_donuts_visible(False)
         self._redraw_donuts()
+        # File-watcher weer aan voordat we reload_photos doen — zodat
+        # toekomstige wijzigingen buiten reorganize weer opgemerkt worden.
+        try:
+            self.start_watcher(self.settings.get("photo_path"))
+        except Exception:
+            pass
         # Dialog + banner nu pas tonen (na terug naar grid).
         self._present_dialog(dlg)
         self.reload_photos()
