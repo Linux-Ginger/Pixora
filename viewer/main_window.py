@@ -5106,6 +5106,9 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.set_title(_("Instellingen"))
         dialog.set_transient_for(self)
         dialog.set_modal(False)
+        # PreferencesWindow defaultet op ~360px hoog — te kort voor onze
+        # rijen. Matcht nu ongeveer de Adw.PreferencesDialog-hoogte.
+        dialog.set_default_size(640, 720)
         self._settings_dialog = dialog
         dialog.connect(
             "close-request",
