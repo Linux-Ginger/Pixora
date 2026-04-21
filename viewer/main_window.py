@@ -8059,8 +8059,12 @@ class MainWindow(Adw.ApplicationWindow):
             pct = Gtk.Label(label=f"{int(self._backup_fraction * 100)}%")
             pct.set_halign(Gtk.Align.START)
             box.append(pct)
-        if self._backup_detail:
-            det = Gtk.Label(label=self._backup_detail)
+        # Detail alleen tonen als 't meer info is dan alleen de %. Rsync
+        # vult `_backup_detail` namelijk met de % zelf (bv "24%"), dan zou
+        # hij dubbel op het scherm komen.
+        detail = (self._backup_detail or "").strip()
+        if detail and not detail.rstrip("%").strip().isdigit():
+            det = Gtk.Label(label=detail)
             det.add_css_class("caption")
             det.add_css_class("dim-label")
             det.set_halign(Gtk.Align.START)
