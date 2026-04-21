@@ -6807,7 +6807,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _maybe_trigger_backup_now(self):
         """Start backup-scan als niks draait, backup is ingeschakeld en de
-        drive beschikbaar is. Stil als een voorwaarde niet geldt."""
+        drive beschikbaar is. Skip als we net 'alles gesynct' zagen en
+        er sindsdien niks is geïmporteerd — anders oneindige scan-lus bij
+        grote USB's waar de rsync-dry-run minutenlang duurt."""
         try:
             if self._backup_running or self._backup_scanning:
                 return
@@ -6819,6 +6821,15 @@ class MainWindow(Adw.ApplicationWindow):
                     and self.settings.get("backup_path")):
                 return
             if self._backup_drive_mountpoint() is None:
+                return
+            # Cooldown-check: laatste scan <10min geleden én geen nieuwe
+            # import sindsdien → overslaan. Manual "Nu controleren" en
+            # drive-attach omzeilen dit (die bellen _trigger_backup_scan
+            # direct, niet via hier).
+            last_backup = self.settings.get("last_backup_time", 0) or 0
+            last_import = self.settings.get("last_import_time", 0) or 0
+            if last_backup and (time.time() - last_backup) < 600 \
+                    and last_import <= last_backup:
                 return
             self._trigger_backup_scan()
         except Exception:
