@@ -1696,6 +1696,18 @@ msgstr "Mise à jour de la structure des dossiers…"
 msgid "Mappenstructuur bijwerken"
 msgstr "Mise à jour de la structure des dossiers"
 
+msgid "Stil uitvoeren"
+msgstr "Exécuter en silence"
+
+msgid "Bij automatische detectie direct opruimen zonder popup of fullscreen. Handmatige 'Opruimen' werkt normaal."
+msgstr "Lors de la détection automatique, nettoyer immédiatement sans popup ni plein écran. Le bouton manuel « Nettoyer » fonctionne normalement."
+
+msgid "Reorganize stil gestart: {m} moves, {d} dups"
+msgstr "Réorganisation silencieuse démarrée : {m} déplacements, {d} doublons"
+
+msgid "Pixora is bezig met mappenstructuur opruimen. Als je nu sluit kunnen foto's halverwege verplaatst zijn."
+msgstr "Pixora nettoie la structure des dossiers. Fermer maintenant peut laisser des photos à moitié déplacées."
+
 msgid "{done} van {total} foto"
 msgid_plural "{done} van {total} foto's"
 msgstr[0] "{done} sur {total} photo"

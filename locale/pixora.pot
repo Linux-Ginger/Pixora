@@ -1047,6 +1047,18 @@ msgstr ""
 msgid "Mappenstructuur bijwerken"
 msgstr ""
 
+msgid "Stil uitvoeren"
+msgstr ""
+
+msgid "Bij automatische detectie direct opruimen zonder popup of fullscreen. Handmatige 'Opruimen' werkt normaal."
+msgstr ""
+
+msgid "Reorganize stil gestart: {m} moves, {d} dups"
+msgstr ""
+
+msgid "Pixora is bezig met mappenstructuur opruimen. Als je nu sluit kunnen foto's halverwege verplaatst zijn."
+msgstr ""
+
 msgid "{done} van {total} foto"
 msgid_plural "{done} van {total} foto's"
 msgstr[0] ""

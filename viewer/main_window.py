@@ -1311,6 +1311,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_done_bytes = 0
         self._reorganize_start_time = 0.0
         self._reorganize_current_name = ""
+        # Silent-mode: bij auto-popup direct reorganize draaien zonder popup
+        # én zonder fullscreen-page; bijgehouden per-run zodat een handmatige
+        # klik op "Opruimen" altijd de fullscreen toont.
+        self._reorganize_silent_run = False
+        # Video pauzeren wanneer de structuur-popup komt, resumen bij "Later".
+        self._video_paused_by_popup = False
         # Zie on_settings_clicked: bewaarde instellingendialog.
         self._settings_dialog = None
         # Structuur-scan state (detecteert mappen die niet bij de gekozen
@@ -2007,23 +2013,30 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def on_close(self, window):
-        # Close-guard: als backup actief is, vraag eerst bevestiging
-        if (self._backup_running and
-                not getattr(self, "_close_confirmed", False)):
-            dlg = Adw.AlertDialog(
-                heading=_("Pixora afsluiten?"),
-                body=_("Pixora is bezig met een backup naar je USB-schijf. "
-                       "Als je nu sluit wordt de backup onderbroken."),
-            )
-            dlg.add_response("cancel", _("Annuleren"))
-            dlg.add_response("close", _("Toch sluiten"))
-            dlg.set_response_appearance(
-                "close", Adw.ResponseAppearance.DESTRUCTIVE
-            )
-            dlg.set_default_response("cancel")
-            dlg.connect("response", self._on_close_guard_response)
-            self._present_dialog(dlg)
-            return True  # annuleer close event — we beslissen via de dialog
+        # Close-guard: als backup of reorganize actief is, vraag bevestiging.
+        if not getattr(self, "_close_confirmed", False):
+            if self._backup_running:
+                body = _("Pixora is bezig met een backup naar je USB-schijf. "
+                         "Als je nu sluit wordt de backup onderbroken.")
+            elif self._reorganize_moving:
+                body = _("Pixora is bezig met mappenstructuur opruimen. "
+                         "Als je nu sluit kunnen foto's halverwege verplaatst zijn.")
+            else:
+                body = None
+            if body is not None:
+                dlg = Adw.AlertDialog(
+                    heading=_("Pixora afsluiten?"),
+                    body=body,
+                )
+                dlg.add_response("cancel", _("Annuleren"))
+                dlg.add_response("close", _("Toch sluiten"))
+                dlg.set_response_appearance(
+                    "close", Adw.ResponseAppearance.DESTRUCTIVE
+                )
+                dlg.set_default_response("cancel")
+                dlg.connect("response", self._on_close_guard_response)
+                self._present_dialog(dlg)
+                return True  # annuleer close event — we beslissen via de dialog
         log_info(_("Pixora wordt afgesloten — opruimen…"))
         # Indien backup actief en gebruiker bevestigde → probeer rsync-proc
         # netjes te killen zodat de backup stopt in plaats van te hangen.
@@ -5283,6 +5296,25 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         structure_group.add(reorganize_row)
 
+        silent_row = Adw.ActionRow(
+            title=_("Stil uitvoeren"),
+            subtitle=_("Bij automatische detectie direct opruimen zonder popup of fullscreen. Handmatige 'Opruimen' werkt normaal."),
+        )
+        silent_row.add_prefix(
+            Gtk.Image.new_from_icon_name("emblem-ok-symbolic"))
+        silent_switch = Gtk.Switch()
+        silent_switch.set_valign(Gtk.Align.CENTER)
+        silent_switch.set_active(
+            bool(self.settings.get("reorganize_silent", False)))
+        silent_switch.connect("notify::active", self._on_reorganize_silent_toggle)
+        silent_row.add_suffix(silent_switch)
+        silent_row.set_activatable_widget(silent_switch)
+        try:
+            silent_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        structure_group.add(silent_row)
+
         import_page.add(structure_group)
 
         dup_group = Adw.PreferencesGroup()
@@ -6063,6 +6095,10 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings["structure"] = value
             save_settings(self.settings)
 
+    def _on_reorganize_silent_toggle(self, switch, _pspec):
+        self.settings["reorganize_silent"] = bool(switch.get_active())
+        save_settings(self.settings)
+
     # ── Mapstructuur — re-organizer ─────────────────────────────────
     def _photo_date_for_structure(self, src, st, exif_tags, video_exts,
                                   video_date_fn):
@@ -6228,8 +6264,41 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         dlg.connect("response", self._on_reorganize_response, moves, dups)
+        # Pauzeer een lopende video-afspelende viewer zolang de popup staat —
+        # de user zit midden in iets. Resumen gebeurt bij "Later" of "cancel".
+        self._pause_video_for_popup()
         self._present_dialog(dlg)
         return False
+
+    def _pause_video_for_popup(self):
+        try:
+            media = getattr(self, "_video_media", None)
+            if media is None or not media.get_playing():
+                return
+            if self.main_stack.get_visible_child_name() != "viewer":
+                return
+            media.pause()
+            self._video_paused_by_popup = True
+            if hasattr(self, "video_play_btn"):
+                self.video_play_btn.set_icon_name(
+                    "media-playback-start-symbolic")
+        except Exception:
+            pass
+
+    def _resume_video_after_popup(self):
+        if not self._video_paused_by_popup:
+            return
+        self._video_paused_by_popup = False
+        try:
+            media = getattr(self, "_video_media", None)
+            if media is None:
+                return
+            media.play()
+            if hasattr(self, "video_play_btn"):
+                self.video_play_btn.set_icon_name(
+                    "media-playback-pause-symbolic")
+        except Exception:
+            pass
 
     def _on_reorganize_response(self, dlg, response, moves, dups):
         if response != "go":
@@ -6237,6 +6306,8 @@ class MainWindow(Adw.ApplicationWindow):
             # User koos "Later" → geen auto-popup meer deze sessie.
             # Manual "Opruimen"-knop werkt wel.
             self._structure_popup_dismissed = True
+            # Video mag weer verder.
+            self._resume_video_after_popup()
             return
         if self._reorganize_moving:
             # Defensive: voorkom dubbele thread-start als signal 2× binnenkomt.
@@ -6304,7 +6375,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_done_bytes = 0
         self._reorganize_start_time = time.time()
         self._reorganize_current_name = ""
-        GLib.idle_add(self._on_reorganize_progress_start)
+        # Alleen fullscreen tonen als we niet in silent-mode draaien.
+        if not self._reorganize_silent_run:
+            GLib.idle_add(self._on_reorganize_progress_start)
         done = 0
         first_err_logged = False
         for (src, dst), sz in zip(moves, sizes_moves):
@@ -6353,6 +6426,29 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._reorganize_done, moved, removed, errors)
 
     def _reorganize_done(self, moved, removed, errors):
+        self._reorganize_moving = False
+        self._reorganize_fraction = 1.0
+        if not self._backup_scanning and not self._backup_running:
+            self._set_donuts_visible(False)
+        self._redraw_donuts()
+        # File-watcher weer aan voordat we reload_photos doen — zodat
+        # toekomstige wijzigingen buiten reorganize weer opgemerkt worden.
+        try:
+            self.start_watcher(self.settings.get("photo_path"))
+        except Exception:
+            pass
+        # Silent-mode: geen UI, alleen reload + cooldown.
+        if self._reorganize_silent_run:
+            self._reorganize_silent_run = False
+            self.reload_photos()
+            self._reorganize_active = False
+            self._reorganize_block_until = time.time() + 10.0
+            GLib.timeout_add_seconds(
+                10, self._maybe_trigger_backup_after_reorganize)
+            return False
+        # Niet-silent: de fullscreen blijft staan met stats + Sluiten-knop.
+        # De cleanup (terug naar grid, cooldown, backup-trigger) gebeurt
+        # pas als user op Sluiten klikt — zie _on_reorganize_close_clicked.
         parts = []
         if moved:
             parts.append(ngettext(
@@ -6368,45 +6464,45 @@ class MainWindow(Adw.ApplicationWindow):
             ).format(n=removed))
         if not parts:
             parts.append(_("Geen wijzigingen nodig"))
-        body = ", ".join(parts) + "."
+        summary = ", ".join(parts) + "."
         if errors:
-            body += "\n" + ngettext(
+            summary += "\n" + ngettext(
                 "{n} fout — zie dev-log.",
                 "{n} fouten — zie dev-log.",
                 len(errors),
             ).format(n=len(errors))
-        dlg = Adw.AlertDialog(
-            heading=_("Mappenstructuur bijgewerkt"),
-            body=body,
-        )
-        dlg.add_response("ok", _("OK"))
-        dlg.set_default_response("ok")
-        dlg.set_close_response("ok")
-        self._reorganize_moving = False
-        self._reorganize_fraction = 0.0
-        # Fullscreen-page verlaten; donut blijft dicht tenzij backup draait.
+        if hasattr(self, "reorganize_subtitle"):
+            self.reorganize_subtitle.set_text(summary)
+        if hasattr(self, "reorganize_title"):
+            self.reorganize_title.set_text(_("Mappenstructuur bijgewerkt"))
+        if hasattr(self, "reorganize_bar"):
+            self.reorganize_bar.set_fraction(1.0)
+            self.reorganize_bar.set_text("100%")
+        if hasattr(self, "reorganize_detail"):
+            self.reorganize_detail.set_text("")
+        if hasattr(self, "reorganize_spinner"):
+            self.reorganize_spinner.stop()
+            self.reorganize_spinner.set_visible(False)
+        if hasattr(self, "reorganize_close_btn"):
+            self.reorganize_close_btn.set_visible(True)
+        return False
+
+    def _on_reorganize_close_clicked(self, _btn):
+        """Sluit-knop op de fullscreen reorganize-page: terug naar de grid
+        (of waar user vandaan kwam) + cooldown-timer, backup-trigger, etc."""
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
         return_to = getattr(self, "_reorganize_return_page", "grid") or "grid"
         self.main_stack.set_visible_child_name(return_to)
+        if hasattr(self, "reorganize_close_btn"):
+            self.reorganize_close_btn.set_visible(False)
         if hasattr(self, "reorganize_spinner"):
-            self.reorganize_spinner.stop()
-        if not self._backup_scanning and not self._backup_running:
-            self._set_donuts_visible(False)
-        self._redraw_donuts()
-        # File-watcher weer aan voordat we reload_photos doen — zodat
-        # toekomstige wijzigingen buiten reorganize weer opgemerkt worden.
-        try:
-            self.start_watcher(self.settings.get("photo_path"))
-        except Exception:
-            pass
-        # Dialog + banner nu pas tonen (na terug naar grid).
-        self._present_dialog(dlg)
+            self.reorganize_spinner.set_visible(True)
         self.reload_photos()
         self._reorganize_active = False
         self._reorganize_block_until = time.time() + 10.0
-        GLib.timeout_add_seconds(10, self._maybe_trigger_backup_after_reorganize)
-        return False
+        GLib.timeout_add_seconds(
+            10, self._maybe_trigger_backup_after_reorganize)
 
     def _build_reorganize_page(self):
         """Fullscreen voortgangs-page, zelfde indeling als ImporterPage."""
@@ -6450,6 +6546,15 @@ class MainWindow(Adw.ApplicationWindow):
         self.reorganize_detail.set_max_width_chars(52)
         box.append(self.reorganize_detail)
 
+        self.reorganize_close_btn = Gtk.Button(label=_("Sluiten"))
+        self.reorganize_close_btn.add_css_class("pill")
+        self.reorganize_close_btn.add_css_class("suggested-action")
+        self.reorganize_close_btn.set_halign(Gtk.Align.CENTER)
+        self.reorganize_close_btn.set_visible(False)
+        self.reorganize_close_btn.connect(
+            "clicked", self._on_reorganize_close_clicked)
+        box.append(self.reorganize_close_btn)
+
         clamp.set_child(box)
         return clamp
 
@@ -6461,8 +6566,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
         self.main_stack.set_visible_child_name("reorganize")
+        if hasattr(self, "reorganize_title"):
+            self.reorganize_title.set_text(_("Mappenstructuur bijwerken"))
         if hasattr(self, "reorganize_spinner"):
+            self.reorganize_spinner.set_visible(True)
             self.reorganize_spinner.start()
+        if hasattr(self, "reorganize_close_btn"):
+            self.reorganize_close_btn.set_visible(False)
         if hasattr(self, "reorganize_bar"):
             self.reorganize_bar.set_fraction(0.0)
             self.reorganize_bar.set_text("0%")
@@ -6591,6 +6701,17 @@ class MainWindow(Adw.ApplicationWindow):
         if had_mismatch and not self._structure_popup_dismissed \
                 and not self._reorganize_active:
             self._reorganize_active = True
+            # Silent-mode: sla popup + fullscreen over, draai direct.
+            if self.settings.get("reorganize_silent", False):
+                self._reorganize_silent_run = True
+                log_info(_("Reorganize stil gestart: {m} moves, {d} dups").format(
+                    m=len(moves), d=len(dups)))
+                threading.Thread(
+                    target=self._do_reorganize, args=(moves, dups),
+                    daemon=True,
+                ).start()
+                return False
+            self._reorganize_silent_run = False
             self._on_reorganize_scan_done(moves, dups, True)
             return False
         # Geen mismatch (of popup al afgewezen deze sessie) → backup mag.

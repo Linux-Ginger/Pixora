@@ -1696,6 +1696,18 @@ msgstr "Ordnerstruktur wird aktualisiert…"
 msgid "Mappenstructuur bijwerken"
 msgstr "Ordnerstruktur wird aktualisiert"
 
+msgid "Stil uitvoeren"
+msgstr "Still ausführen"
+
+msgid "Bij automatische detectie direct opruimen zonder popup of fullscreen. Handmatige 'Opruimen' werkt normaal."
+msgstr "Bei automatischer Erkennung ohne Popup oder Vollbild direkt aufräumen. Die manuelle Taste 'Aufräumen' funktioniert normal."
+
+msgid "Reorganize stil gestart: {m} moves, {d} dups"
+msgstr "Stille Neuorganisation gestartet: {m} Verschiebungen, {d} Duplikate"
+
+msgid "Pixora is bezig met mappenstructuur opruimen. Als je nu sluit kunnen foto's halverwege verplaatst zijn."
+msgstr "Pixora räumt gerade die Ordnerstruktur auf. Beim Schließen könnten Fotos halb verschoben sein."
+
 msgid "{done} van {total} foto"
 msgid_plural "{done} van {total} foto's"
 msgstr[0] "{done} von {total} Foto"
