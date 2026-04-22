@@ -7224,21 +7224,10 @@ class MainWindow(Adw.ApplicationWindow):
             return
         self._backup_scanning = True
         self._backup_scan_phase = 0.0
-        self._backup_scan_start = time.time()
-        self._backup_scan_last_frac = 0.0
-        # Schat totale scan-duur op basis van bronbestanden (~0.09s/file)
-        # met een minimum van 10s. Klopt niet exact, maar geeft een
-        # redelijke oplopende voortgang i.p.v. een statische "…".
-        try:
-            from pathlib import Path as _P
-            ppath = _P(self.settings.get("photo_path") or _P.home() / "Photos")
-            count = 0
-            for _root, _d, _files in os.walk(str(ppath)):
-                count += len(_files)
-            self._backup_scan_est_total = max(10.0, count * 0.09)
-        except Exception:
-            self._backup_scan_est_total = 30.0
-        self._backup_detail = _("Scannen 0%")
+        # Geen percentage meer tijdens scannen: rsync --dry-run streamt geen
+        # voortgang, en een tijdsgok was misleidend. Donut draait als spinner
+        # en de popover-titel "Backup scannen…" zegt al genoeg.
+        self._backup_detail = ""
         tip = _("Scannen op nieuwe foto's…")
         if hasattr(self, "_backup_donut_btn"):
             self._set_donuts_visible(True)
@@ -7255,20 +7244,6 @@ class MainWindow(Adw.ApplicationWindow):
             self._backup_scan_anim_id = None
             return False
         self._backup_scan_phase = (self._backup_scan_phase + 0.18) % (2 * math.pi)
-        # Tijdsgebaseerde schatting voor de scan-voortgang in de popover.
-        # Monotoon stijgend: als iets het scan-start-moment per ongeluk
-        # later zet (bv. als een andere tick/event zijn werk doet), mag
-        # de weergave nooit visueel terugvallen.
-        if self._backup_scanning:
-            elapsed = time.time() - self._backup_scan_start
-            est = getattr(self, "_backup_scan_est_total", 30.0) or 30.0
-            frac = min(0.95, elapsed / est)
-            last = getattr(self, "_backup_scan_last_frac", 0.0)
-            if frac < last:
-                frac = last
-            self._backup_scan_last_frac = frac
-            self._backup_detail = _("Scannen {pct}%").format(
-                pct=int(frac * 100))
         if hasattr(self, "_backup_donut"):
             self._redraw_donuts()
         return True
@@ -7288,6 +7263,48 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         mode = self.settings.get("backup_mode", "backup")
         dedup_enabled = bool(self.settings.get("backup_dedup"))
+
+        # Short-circuit: lege USB-map → alle bronbestanden zijn per definitie
+        # nieuw en er zijn geen orphans. Scheelt op USB-schijven 30-60s
+        # stat-latency van de rsync-vergelijking. Alleen een os.walk over
+        # de bron (lokale schijf, snel) is nodig om totaal + bytes te weten.
+        try:
+            dest_empty = not any(backup_dest.iterdir())
+        except OSError:
+            dest_empty = False
+        if dest_empty:
+            new_count = 0
+            bytes_to_transfer = 0
+            to_transfer_rels = []
+            try:
+                for root, _dirs, files in os.walk(str(photo_path)):
+                    for fn in files:
+                        sf = os.path.join(root, fn)
+                        rel = os.path.relpath(sf, str(photo_path))
+                        to_transfer_rels.append(rel)
+                        new_count += 1
+                        try:
+                            bytes_to_transfer += os.path.getsize(sf)
+                        except OSError:
+                            pass
+            except Exception as e:
+                log_error(_("Scan fout: {err}").format(err=e))
+                GLib.idle_add(self._handle_scan_result, None)
+                return
+            log_info(_("Backup-scan: USB-map leeg, {n} bestanden in bron").format(n=new_count))
+            GLib.idle_add(
+                self._handle_scan_result,
+                {
+                    "new": new_count,
+                    "bytes": bytes_to_transfer,
+                    "delete": 0,
+                    "dup_count": 0,
+                    "excluded": [],
+                    "mode": mode,
+                },
+            )
+            return
+
         to_transfer_rels = []
         if _cmd_available_bk("rsync"):
             # Altijd --delete in dry-run: we willen weten of er orphans op
