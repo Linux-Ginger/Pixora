@@ -751,6 +751,51 @@ msgstr ""
 msgid "Analyseren: {c} / {t}"
 msgstr ""
 
+msgid "Pre-sync review: {d} dubbele kopieën, {u} uniek — wacht op keuze"
+msgstr ""
+
+msgid "Pre-sync review: user koos '{c}'"
+msgstr ""
+
+msgid "Sync wil foto's wissen van de USB"
+msgstr ""
+
+msgid "Sync wil {n} foto van de USB verwijderen die niet in Pixora staat:"
+msgid_plural ""
+"Sync wil {n} foto's van de USB verwijderen die niet in Pixora staan:"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "• {n} dubbele kopie (zelfde beeld als een foto in Pixora)"
+msgid_plural "• {n} dubbele kopieën (zelfde beeld als foto's in Pixora)"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"• {n} unieke foto (geen match in Pixora — mogelijk eerder verwijderd)"
+msgid_plural ""
+"• {n} unieke foto's (geen match in Pixora — mogelijk eerder verwijderd)"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Alles verwijderen"
+msgstr ""
+
+msgid "Alleen dubbele verwijderen"
+msgstr ""
+
+msgid "Sync annuleren"
+msgstr ""
+
+msgid "Verwijderen en doorgaan"
+msgstr ""
+
+msgid "Sync geannuleerd"
+msgstr ""
+
+msgid "De USB is niet veranderd."
+msgstr ""
+
 msgid "Orphan-analyse overgeslagen: {err}"
 msgstr ""
 

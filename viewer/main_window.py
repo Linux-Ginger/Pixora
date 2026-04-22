@@ -1293,6 +1293,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scanning  = False
         self._backup_deduping  = False  # dedup-fase vóór rsync
         self._orphan_reviewing = False  # pHash-analyse ná backup
+        self._backup_cancelled = False  # user koos 'Sync annuleren' in pre-review
         self._backup_scan_phase = 0.0
         # Orphan-count uit de laatste scan — foto's op USB die niet meer
         # in Pixora zijn. Gebruikt voor waarschuwing na silent-backup
@@ -7910,6 +7911,20 @@ class MainWindow(Adw.ApplicationWindow):
         # blijft het scan-dialog altijd meteen klaar; de pHash-berekening
         # gebeurt tijdens de backup-fase met zichtbare voortgang in de donut.
         excluded = self._dedup_for_backup(photo_path, backup_dest)
+
+        # Sync-mode + dedup + orphans: vraag vooraf welke orphans door
+        # rsync --delete gewist mogen worden. Wat de user wil behouden
+        # komt in de --exclude-from lijst zodat --delete 'm spaart.
+        if (mode == "sync" and self.settings.get("backup_dedup")
+                and self._last_scan_orphan_rels):
+            keep_rels = self._presync_review(photo_path, backup_dest)
+            if keep_rels is None:
+                self._backup_cancelled = True
+                GLib.idle_add(self._backup_finished, False, None)
+                return
+            if keep_rels:
+                excluded = list(excluded) + list(keep_rels)
+
         exclude_file = None
         success = False
         if _cmd_available_bk("rsync"):
@@ -8234,6 +8249,18 @@ class MainWindow(Adw.ApplicationWindow):
             self.backup_done_banner.set_revealed(False)
         except Exception:
             pass
+        # Annuleren via pre-sync review → rustige popup, niet "mislukt".
+        if self._backup_cancelled:
+            self._backup_cancelled = False
+            dlg = Adw.AlertDialog(
+                heading=_("Sync geannuleerd"),
+                body=_("De USB is niet veranderd."),
+            )
+            dlg.add_response("ok", _("OK"))
+            dlg.set_default_response("ok")
+            dlg.set_close_response("ok")
+            self._present_dialog(dlg)
+            return
         orphan_count = self._last_scan_orphan_count
         mode = self.settings.get("backup_mode", "backup")
         dedup_on = bool(self.settings.get("backup_dedup"))
@@ -8311,16 +8338,13 @@ class MainWindow(Adw.ApplicationWindow):
         dlg.set_close_response("ok")
         self._present_dialog(dlg)
 
-    def _review_orphans_thread(self):
-        """Categoriseer de orphans op USB via pHash tegen de Pixora-library:
-        'dubbele kopie' (visueel = een foto in Pixora) vs 'uniek op USB'.
-        Toont daarna een keuze-dialog op de main-thread."""
-        from pathlib import Path as _P
-        photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
-        backup_dest = self._last_scan_backup_dest
-        orphan_rels = list(self._last_scan_orphan_rels)
-        if not backup_dest or not orphan_rels:
-            return
+    def _categorize_orphans(self, photo_path, backup_dest, orphan_rels,
+                            progress_cb=None):
+        """Pure helper: pHash-match elke orphan tegen Pixora-library.
+        Returnt (dup_rels, unique_rels). progress_cb(i, total) wordt elke
+        25 files aangeroepen — gebruik het om UI te updaten.
+        Bij import- of hash-fout: alles belandt in unique_rels (veilige
+        default: niet als 'dubbel' markeren als we het niet zeker weten)."""
         try:
             from importer_page import (
                 perceptual_hash, build_library_hashes, find_duplicate,
@@ -8328,55 +8352,76 @@ class MainWindow(Adw.ApplicationWindow):
             )
         except Exception as e:
             log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
+            return [], list(orphan_rels)
+        try:
+            src_hashes = build_library_hashes(photo_path)
+        except Exception as e:
+            log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
+            return [], list(orphan_rels)
+
+        dup_rels, unique_rels = [], []
+        MAX_DIST = 2
+        total = len(orphan_rels)
+        for i, rel in enumerate(orphan_rels):
+            if progress_cb and i % 25 == 0:
+                try:
+                    progress_cb(i, total)
+                except Exception:
+                    pass
+            orph_file = backup_dest / rel
+            if not orph_file.is_file():
+                continue
+            if orph_file.suffix.lower() not in SUPPORTED_EXT:
+                unique_rels.append(rel)
+                continue
+            ph = perceptual_hash(orph_file)
+            if ph and find_duplicate(ph, src_hashes, MAX_DIST):
+                dup_rels.append(rel)
+            else:
+                unique_rels.append(rel)
+        return dup_rels, unique_rels
+
+    def _start_orphan_review_ui(self):
+        """Donut-spinner + tooltip aanzetten voor pHash-fase."""
+        tip = _("Analyseren op dubbele kopieën…")
+        if hasattr(self, "_backup_donut_btn"):
+            try:
+                self._set_donuts_visible(True)
+                self._backup_donut_btn.set_tooltip_text(tip)
+            except Exception:
+                pass
+        if hasattr(self, "_viewer_donut_btn"):
+            try:
+                self._viewer_donut_btn.set_tooltip_text(tip)
+            except Exception:
+                pass
+        if self._backup_scan_anim_id is None:
+            self._backup_scan_anim_id = GLib.timeout_add(
+                80, self._tick_backup_scan)
+        return False
+
+    def _review_orphans_thread(self):
+        """Categoriseer de orphans op USB via pHash tegen de Pixora-library
+        (na een backup), toont daarna het keuze-dialog."""
+        from pathlib import Path as _P
+        photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
+        backup_dest = self._last_scan_backup_dest
+        orphan_rels = list(self._last_scan_orphan_rels)
+        if not backup_dest or not orphan_rels:
             return
 
         # Donut-spinner aan tijdens de analyse zodat er geen 'dood gat'
         # zit tussen backup-klaar en het keuze-dialog.
         self._orphan_reviewing = True
+        GLib.idle_add(self._start_orphan_review_ui)
 
-        def _start_review_ui():
-            tip = _("Analyseren op dubbele kopieën…")
-            if hasattr(self, "_backup_donut_btn"):
-                try:
-                    self._set_donuts_visible(True)
-                    self._backup_donut_btn.set_tooltip_text(tip)
-                except Exception:
-                    pass
-            if hasattr(self, "_viewer_donut_btn"):
-                try:
-                    self._viewer_donut_btn.set_tooltip_text(tip)
-                except Exception:
-                    pass
-            if self._backup_scan_anim_id is None:
-                self._backup_scan_anim_id = GLib.timeout_add(
-                    80, self._tick_backup_scan)
-            return False
-        GLib.idle_add(_start_review_ui)
+        def _progress(cur, total):
+            msg = _("Analyseren: {c} / {t}").format(c=cur, t=total)
+            GLib.idle_add(self._set_dedup_detail, msg)
 
-        dup_rels = []
-        unique_rels = []
         try:
-            src_hashes = build_library_hashes(photo_path)
-            MAX_DIST = 2
-            total = len(orphan_rels)
-            for i, rel in enumerate(orphan_rels):
-                if i % 25 == 0:
-                    msg = _("Analyseren: {c} / {t}").format(c=i, t=total)
-                    GLib.idle_add(self._set_dedup_detail, msg)
-                orph_file = backup_dest / rel
-                if not orph_file.is_file():
-                    continue
-                if orph_file.suffix.lower() not in SUPPORTED_EXT:
-                    unique_rels.append(rel)
-                    continue
-                ph = perceptual_hash(orph_file)
-                if ph and find_duplicate(ph, src_hashes, MAX_DIST):
-                    dup_rels.append(rel)
-                else:
-                    unique_rels.append(rel)
-        except Exception as e:
-            log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
-            dup_rels, unique_rels = [], list(orphan_rels)
+            dup_rels, unique_rels = self._categorize_orphans(
+                photo_path, backup_dest, orphan_rels, _progress)
         finally:
             self._orphan_reviewing = False
             GLib.idle_add(self._set_dedup_detail, "")
@@ -8386,6 +8431,60 @@ class MainWindow(Adw.ApplicationWindow):
                    "{u} uniek op USB").format(
             d=len(dup_rels), u=len(unique_rels)))
         GLib.idle_add(self._show_orphan_review_dialog, dup_rels, unique_rels)
+
+    def _presync_review(self, photo_path, backup_dest):
+        """In sync-mode: analyseer welke orphans verwijderd gaan worden door
+        rsync --delete en laat de gebruiker kiezen.
+
+        Returnt een lijst van relatieve paden die rsync moet *behouden*
+        (via --exclude-from), of None als de gebruiker sync annuleert."""
+        orphan_rels = list(self._last_scan_orphan_rels)
+        if not orphan_rels:
+            return []
+
+        self._orphan_reviewing = True
+        GLib.idle_add(self._start_orphan_review_ui)
+
+        def _progress(cur, total):
+            msg = _("Analyseren: {c} / {t}").format(c=cur, t=total)
+            GLib.idle_add(self._set_dedup_detail, msg)
+
+        try:
+            dup_rels, unique_rels = self._categorize_orphans(
+                photo_path, backup_dest, orphan_rels, _progress)
+        finally:
+            self._orphan_reviewing = False
+            GLib.idle_add(self._set_dedup_detail, "")
+
+        log_info(_("Pre-sync review: {d} dubbele kopieën, "
+                   "{u} uniek — wacht op keuze").format(
+            d=len(dup_rels), u=len(unique_rels)))
+
+        # Blokkeer backup-thread tot user reageert op dialog.
+        event = threading.Event()
+        result = {"choice": None}
+
+        def _on_choice(choice):
+            result["choice"] = choice
+            event.set()
+
+        GLib.idle_add(
+            self._show_presync_review_dialog,
+            dup_rels, unique_rels, _on_choice
+        )
+        event.wait()
+
+        choice = result["choice"]
+        log_info(_("Pre-sync review: user koos '{c}'").format(c=choice))
+        if choice == "cancel":
+            return None
+        if choice == "delete_all":
+            return []  # rsync --delete doet z'n werk
+        if choice == "keep_unique":
+            # Alleen dubbele kopieën worden gewist; uniek wordt behouden.
+            return list(unique_rels)
+        # Fallback (dialog gesloten zonder keuze): behandel als cancel.
+        return None
 
     def _finish_review_ui(self):
         """Donut verbergen nadat de orphan-analyse klaar is."""
@@ -8438,6 +8537,69 @@ class MainWindow(Adw.ApplicationWindow):
                     args=(list(dup_rels),),
                     daemon=True,
                 ).start()
+        dlg.connect("response", _on_resp)
+        self._present_dialog(dlg)
+        return False
+
+    def _show_presync_review_dialog(self, dup_rels, unique_rels, on_choice):
+        """Pre-sync dialog: user kiest wat rsync --delete mag wissen.
+        Roept on_choice(str) aan met 'cancel' / 'delete_all' / 'keep_unique'."""
+        total = len(dup_rels) + len(unique_rels)
+        if total == 0:
+            on_choice("delete_all")
+            return False
+
+        lines = [ngettext(
+            "Sync wil {n} foto van de USB verwijderen die niet in "
+            "Pixora staat:",
+            "Sync wil {n} foto's van de USB verwijderen die niet in "
+            "Pixora staan:",
+            total,
+        ).format(n=total)]
+        if dup_rels:
+            lines.append("")
+            lines.append(ngettext(
+                "• {n} dubbele kopie (zelfde beeld als een foto in Pixora)",
+                "• {n} dubbele kopieën (zelfde beeld als foto's in Pixora)",
+                len(dup_rels),
+            ).format(n=len(dup_rels)))
+        if unique_rels:
+            lines.append(ngettext(
+                "• {n} unieke foto (geen match in Pixora — mogelijk "
+                "eerder verwijderd)",
+                "• {n} unieke foto's (geen match in Pixora — mogelijk "
+                "eerder verwijderd)",
+                len(unique_rels),
+            ).format(n=len(unique_rels)))
+        body = "\n".join(lines)
+
+        dlg = Adw.AlertDialog(
+            heading=_("Sync wil foto's wissen van de USB"),
+            body=body,
+        )
+        # Response-opties hangen af van wat er gecategoriseerd is. Voor
+        # gemengde case (dubbele + uniek) bieden we 3 knoppen zodat de
+        # gebruiker uniek kan behouden.
+        if dup_rels and unique_rels:
+            dlg.add_response("delete_all", _("Alles verwijderen"))
+            dlg.set_response_appearance(
+                "delete_all", Adw.ResponseAppearance.DESTRUCTIVE)
+            dlg.add_response("keep_unique", _("Alleen dubbele verwijderen"))
+            dlg.set_response_appearance(
+                "keep_unique", Adw.ResponseAppearance.SUGGESTED)
+            dlg.add_response("cancel", _("Sync annuleren"))
+            dlg.set_default_response("keep_unique")
+        else:
+            # Alleen één categorie: binair keuze.
+            dlg.add_response("delete_all", _("Verwijderen en doorgaan"))
+            dlg.set_response_appearance(
+                "delete_all", Adw.ResponseAppearance.DESTRUCTIVE)
+            dlg.add_response("cancel", _("Sync annuleren"))
+            dlg.set_default_response("cancel")
+        dlg.set_close_response("cancel")
+
+        def _on_resp(_d, resp):
+            on_choice(resp)
         dlg.connect("response", _on_resp)
         self._present_dialog(dlg)
         return False

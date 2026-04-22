@@ -1307,6 +1307,54 @@ msgstr "Analyseren op dubbele kopieën…"
 msgid "Analyseren: {c} / {t}"
 msgstr "Analyseren: {c} / {t}"
 
+msgid "Pre-sync review: {d} dubbele kopieën, {u} uniek — wacht op keuze"
+msgstr "Pre-sync review: {d} dubbele kopieën, {u} uniek — wacht op keuze"
+
+msgid "Pre-sync review: user koos '{c}'"
+msgstr "Pre-sync review: user koos '{c}'"
+
+msgid "Sync wil foto's wissen van de USB"
+msgstr "Sync wil foto's wissen van de USB"
+
+msgid "Sync wil {n} foto van de USB verwijderen die niet in Pixora staat:"
+msgid_plural ""
+"Sync wil {n} foto's van de USB verwijderen die niet in Pixora staan:"
+msgstr[0] "Sync wil {n} foto van de USB verwijderen die niet in Pixora staat:"
+msgstr[1] ""
+"Sync wil {n} foto's van de USB verwijderen die niet in Pixora staan:"
+
+msgid "• {n} dubbele kopie (zelfde beeld als een foto in Pixora)"
+msgid_plural "• {n} dubbele kopieën (zelfde beeld als foto's in Pixora)"
+msgstr[0] "• {n} dubbele kopie (zelfde beeld als een foto in Pixora)"
+msgstr[1] "• {n} dubbele kopieën (zelfde beeld als foto's in Pixora)"
+
+msgid ""
+"• {n} unieke foto (geen match in Pixora — mogelijk eerder verwijderd)"
+msgid_plural ""
+"• {n} unieke foto's (geen match in Pixora — mogelijk eerder verwijderd)"
+msgstr[0] ""
+"• {n} unieke foto (geen match in Pixora — mogelijk eerder verwijderd)"
+msgstr[1] ""
+"• {n} unieke foto's (geen match in Pixora — mogelijk eerder verwijderd)"
+
+msgid "Alles verwijderen"
+msgstr "Alles verwijderen"
+
+msgid "Alleen dubbele verwijderen"
+msgstr "Alleen dubbele verwijderen"
+
+msgid "Sync annuleren"
+msgstr "Sync annuleren"
+
+msgid "Verwijderen en doorgaan"
+msgstr "Verwijderen en doorgaan"
+
+msgid "Sync geannuleerd"
+msgstr "Sync geannuleerd"
+
+msgid "De USB is niet veranderd."
+msgstr "De USB is niet veranderd."
+
 msgid "Orphan-analyse overgeslagen: {err}"
 msgstr "Orphan-analyse overgeslagen: {err}"
 
