@@ -269,6 +269,9 @@ msgstr "Fotoordner"
 msgid "Foto verwijderd: {p}"
 msgstr "Foto gelöscht: {p}"
 
+msgid "Lege map opgeruimd: {p}"
+msgstr "Leerer Ordner entfernt: {p}"
+
 msgid "Foto verwijderen?"
 msgstr "Foto löschen?"
 

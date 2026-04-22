@@ -269,6 +269,9 @@ msgstr "Dossier photo"
 msgid "Foto verwijderd: {p}"
 msgstr "Photo supprimée : {p}"
 
+msgid "Lege map opgeruimd: {p}"
+msgstr "Dossier vide supprimé : {p}"
+
 msgid "Foto verwijderen?"
 msgstr "Supprimer la photo ?"
 

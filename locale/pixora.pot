@@ -498,6 +498,9 @@ msgstr ""
 msgid "Verwijderen"
 msgstr ""
 
+msgid "Lege map opgeruimd: {p}"
+msgstr ""
+
 msgid "Viewer gesloten → terug naar grid"
 msgstr ""
 

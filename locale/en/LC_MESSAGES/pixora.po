@@ -1012,6 +1012,9 @@ msgstr "Favorites save error: {err}"
 msgid "Foto verwijderd: {p}"
 msgstr "Photo deleted: {p}"
 
+msgid "Lege map opgeruimd: {p}"
+msgstr "Empty folder removed: {p}"
+
 msgid "Foto's laden… {loaded} / {total}"
 msgstr "Loading photos… {loaded} / {total}"
 

@@ -4877,9 +4877,16 @@ class MainWindow(Adw.ApplicationWindow):
     def _play_shred_animation(self, path, on_done):
         """Papier-versnipperaar-effect: verdeel de huidige foto in verticale
         strips, laat ze met vertraging naar beneden vallen + fade out, en
-        roep on_done(path) aan na afloop. Bij video/geen pixbuf: skip visuele
-        animatie en voer de callback direct uit."""
+        roep on_done(path) aan na afloop. Voor video's halen we de gecachte
+        thumbnail op als pixbuf — anders zou delete zonder animatie gebeuren."""
         pixbuf = getattr(self, "_viewer_pixbuf", None)
+        if pixbuf is None and is_video(path):
+            try:
+                thumb_path = get_cache_path(path, THUMB_SIZE)
+                if os.path.exists(thumb_path):
+                    pixbuf = GdkPixbuf.Pixbuf.new_from_file(thumb_path)
+            except Exception:
+                pixbuf = None
         if pixbuf is None:
             on_done(path)
             return
@@ -4997,6 +5004,25 @@ class MainWindow(Adw.ApplicationWindow):
 
         draw_area.add_tick_callback(_tick)
 
+    def _cleanup_empty_parent_dirs(self, path):
+        """Verwijder lege bovenliggende mappen tot aan de photo_path root.
+        Stopt bij photo_path zelf (mag nooit weg) of bij de eerste niet-lege
+        map. Zo blijft een '2026/' map niet achter als z'n laatste foto is
+        verwijderd."""
+        photo_root = self.settings.get("photo_path")
+        if not photo_root:
+            return
+        photo_root = os.path.abspath(photo_root)
+        parent = os.path.dirname(os.path.abspath(path))
+        while (parent != photo_root
+               and parent.startswith(photo_root + os.sep)):
+            try:
+                os.rmdir(parent)  # slaagt alleen als leeg
+                log_info(_("Lege map opgeruimd: {p}").format(p=parent))
+            except OSError:
+                break  # niet leeg of geen rechten → stop
+            parent = os.path.dirname(parent)
+
     def _finish_delete_after_shred(self, path):
         """Na-animatie: daadwerkelijk verwijderen + navigeren."""
         n_before = len(self.photos)
@@ -5018,6 +5044,7 @@ class MainWindow(Adw.ApplicationWindow):
                 os.remove(cache_path)
         except Exception:
             pass
+        self._cleanup_empty_parent_dirs(path)
         if path in self._favorites:
             self._favorites.discard(path)
             self._schedule_save_favorites()
@@ -5097,6 +5124,10 @@ class MainWindow(Adw.ApplicationWindow):
             if path in self._favorites:
                 self._favorites.discard(path)
                 fav_changed = True
+        # Lege mappen opruimen ná alle files — zodat bv. 2026/foto1.jpg en
+        # 2026/foto2.jpg samen gewist de map 2026/ opruimen, niet tussendoor.
+        for path in paths_to_delete:
+            self._cleanup_empty_parent_dirs(path)
         if fav_changed:
             self._schedule_save_favorites()
         self.toggle_select_mode()
