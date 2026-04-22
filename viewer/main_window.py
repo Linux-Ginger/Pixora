@@ -1293,7 +1293,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scanning  = False
         self._backup_deduping  = False  # dedup-fase vóór rsync
         self._orphan_reviewing = False  # pHash-analyse ná backup
-        self._backup_cancelled = False  # user koos 'Sync annuleren' in pre-review
         self._backup_scan_phase = 0.0
         # Orphan-count uit de laatste scan — foto's op USB die niet meer
         # in Pixora zijn. Gebruikt voor waarschuwing na silent-backup
@@ -7913,20 +7912,6 @@ class MainWindow(Adw.ApplicationWindow):
         # blijft het scan-dialog altijd meteen klaar; de pHash-berekening
         # gebeurt tijdens de backup-fase met zichtbare voortgang in de donut.
         excluded = self._dedup_for_backup(photo_path, backup_dest)
-
-        # Sync-mode + dedup + orphans: vraag vooraf welke orphans door
-        # rsync --delete gewist mogen worden. Wat de user wil behouden
-        # komt in de --exclude-from lijst zodat --delete 'm spaart.
-        if (mode == "sync" and self.settings.get("backup_dedup")
-                and self._last_scan_orphan_rels):
-            keep_rels = self._presync_review(photo_path, backup_dest)
-            if keep_rels is None:
-                self._backup_cancelled = True
-                GLib.idle_add(self._backup_finished, False, None)
-                return
-            if keep_rels:
-                excluded = list(excluded) + list(keep_rels)
-
         exclude_file = None
         success = False
         if _cmd_available_bk("rsync"):
@@ -8251,18 +8236,6 @@ class MainWindow(Adw.ApplicationWindow):
             self.backup_done_banner.set_revealed(False)
         except Exception:
             pass
-        # Annuleren via pre-sync review → rustige popup, niet "mislukt".
-        if self._backup_cancelled:
-            self._backup_cancelled = False
-            dlg = Adw.AlertDialog(
-                heading=_("Sync geannuleerd"),
-                body=_("De USB is niet veranderd."),
-            )
-            dlg.add_response("ok", _("OK"))
-            dlg.set_default_response("ok")
-            dlg.set_close_response("ok")
-            self._present_dialog(dlg)
-            return
         orphan_count = self._last_scan_orphan_count
         mode = self.settings.get("backup_mode", "backup")
         dedup_on = bool(self.settings.get("backup_dedup"))
@@ -8448,63 +8421,6 @@ class MainWindow(Adw.ApplicationWindow):
             d=len(dup_rels), u=len(unique_rels)))
         GLib.idle_add(self._show_orphan_review_dialog, dup_rels, unique_rels)
 
-    def _presync_review(self, photo_path, backup_dest):
-        """In sync-mode: analyseer welke orphans verwijderd gaan worden door
-        rsync --delete en laat de gebruiker kiezen.
-
-        Returnt een lijst van relatieve paden die rsync moet *behouden*
-        (via --exclude-from), of None als de gebruiker sync annuleert."""
-        orphan_rels = list(self._last_scan_orphan_rels)
-        if not orphan_rels:
-            return []
-
-        self._orphan_reviewing = True
-        GLib.idle_add(self._start_orphan_review_ui)
-
-        def _progress(cur, total, phase):
-            if phase == "build":
-                msg = _("Hash-cache bouwen: {c} / {t}").format(c=cur, t=total)
-            else:
-                msg = _("Analyseren: {c} / {t}").format(c=cur, t=total)
-            GLib.idle_add(self._set_dedup_detail, msg)
-
-        try:
-            dup_rels, unique_rels = self._categorize_orphans(
-                photo_path, backup_dest, orphan_rels, _progress)
-        finally:
-            self._orphan_reviewing = False
-            GLib.idle_add(self._set_dedup_detail, "")
-
-        log_info(_("Pre-sync review: {d} dubbele kopieën, "
-                   "{u} uniek — wacht op keuze").format(
-            d=len(dup_rels), u=len(unique_rels)))
-
-        # Blokkeer backup-thread tot user reageert op dialog.
-        event = threading.Event()
-        result = {"choice": None}
-
-        def _on_choice(choice):
-            result["choice"] = choice
-            event.set()
-
-        GLib.idle_add(
-            self._show_presync_review_dialog,
-            dup_rels, unique_rels, _on_choice
-        )
-        event.wait()
-
-        choice = result["choice"]
-        log_info(_("Pre-sync review: user koos '{c}'").format(c=choice))
-        if choice == "cancel":
-            return None
-        if choice == "delete_all":
-            return []  # rsync --delete doet z'n werk
-        if choice == "keep_unique":
-            # Alleen dubbele kopieën worden gewist; uniek wordt behouden.
-            return list(unique_rels)
-        # Fallback (dialog gesloten zonder keuze): behandel als cancel.
-        return None
-
     def _finish_review_ui(self):
         """Donut verbergen nadat de orphan-analyse klaar is."""
         if hasattr(self, "_backup_donut_btn"):
@@ -8556,69 +8472,6 @@ class MainWindow(Adw.ApplicationWindow):
                     args=(list(dup_rels),),
                     daemon=True,
                 ).start()
-        dlg.connect("response", _on_resp)
-        self._present_dialog(dlg)
-        return False
-
-    def _show_presync_review_dialog(self, dup_rels, unique_rels, on_choice):
-        """Pre-sync dialog: user kiest wat rsync --delete mag wissen.
-        Roept on_choice(str) aan met 'cancel' / 'delete_all' / 'keep_unique'."""
-        total = len(dup_rels) + len(unique_rels)
-        if total == 0:
-            on_choice("delete_all")
-            return False
-
-        lines = [ngettext(
-            "Sync wil {n} foto van de USB verwijderen die niet in "
-            "Pixora staat:",
-            "Sync wil {n} foto's van de USB verwijderen die niet in "
-            "Pixora staan:",
-            total,
-        ).format(n=total)]
-        if dup_rels:
-            lines.append("")
-            lines.append(ngettext(
-                "• {n} dubbele kopie (zelfde beeld als een foto in Pixora)",
-                "• {n} dubbele kopieën (zelfde beeld als foto's in Pixora)",
-                len(dup_rels),
-            ).format(n=len(dup_rels)))
-        if unique_rels:
-            lines.append(ngettext(
-                "• {n} unieke foto (geen match in Pixora — mogelijk "
-                "eerder verwijderd)",
-                "• {n} unieke foto's (geen match in Pixora — mogelijk "
-                "eerder verwijderd)",
-                len(unique_rels),
-            ).format(n=len(unique_rels)))
-        body = "\n".join(lines)
-
-        dlg = Adw.AlertDialog(
-            heading=_("Sync wil foto's wissen van de USB"),
-            body=body,
-        )
-        # Response-opties hangen af van wat er gecategoriseerd is. Voor
-        # gemengde case (dubbele + uniek) bieden we 3 knoppen zodat de
-        # gebruiker uniek kan behouden.
-        if dup_rels and unique_rels:
-            dlg.add_response("delete_all", _("Alles verwijderen"))
-            dlg.set_response_appearance(
-                "delete_all", Adw.ResponseAppearance.DESTRUCTIVE)
-            dlg.add_response("keep_unique", _("Alleen dubbele verwijderen"))
-            dlg.set_response_appearance(
-                "keep_unique", Adw.ResponseAppearance.SUGGESTED)
-            dlg.add_response("cancel", _("Sync annuleren"))
-            dlg.set_default_response("keep_unique")
-        else:
-            # Alleen één categorie: binair keuze.
-            dlg.add_response("delete_all", _("Verwijderen en doorgaan"))
-            dlg.set_response_appearance(
-                "delete_all", Adw.ResponseAppearance.DESTRUCTIVE)
-            dlg.add_response("cancel", _("Sync annuleren"))
-            dlg.set_default_response("cancel")
-        dlg.set_close_response("cancel")
-
-        def _on_resp(_d, resp):
-            on_choice(resp)
         dlg.connect("response", _on_resp)
         self._present_dialog(dlg)
         return False
