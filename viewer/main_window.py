@@ -34,17 +34,15 @@ _translation = _gettext_mod.translation(
 )
 _ = _translation.gettext
 ngettext = _translation.ngettext
-_translation.install()  # maakt _() ook als builtin beschikbaar
+_translation.install()  # makes _() available as a builtin
 
-# Debug: welke .mo is geladen? (zichtbaar in dev-terminal zodat je weet
-# of vertalingen überhaupt werken)
 _MO_PATH = os.path.join(_LOCALE_DIR, _lang, "LC_MESSAGES", "pixora.mo")
 _I18N_STATUS = (
     f"lang={_lang} mo={'found' if os.path.exists(_MO_PATH) else 'MISSING'} "
     f"path={_MO_PATH}"
 )
 
-# LC_TIME sync — zodat strftime("%B") ook de gekozen taal volgt i.p.v. systeem-locale
+# LC_TIME sync so strftime("%B") follows the chosen language, not system locale.
 import locale as _locale_mod
 _LC_TIME_CANDIDATES = {
     "nl": ["nl_NL.UTF-8", "nl_NL.utf8", "nl_NL", "nl"],
@@ -59,10 +57,8 @@ for _cand in _LC_TIME_CANDIDATES.get(_lang, []):
     except _locale_mod.Error:
         continue
 
-# ── Dev-mode logging ─────────────────────────────────────────────────
-# Lees dev_mode direct uit settings.json — we importeren NIET uit main.py
-# omdat dat main's module-level code opnieuw zou uitvoeren (en een tweede
-# tail-terminal zou openen).
+# Read dev_mode directly from settings.json — importing from main.py would
+# re-run its module-level code and spawn a second terminal.
 _CFG = os.path.expanduser("~/.config/pixora/settings.json")
 try:
     with open(_CFG, "r") as _f:
@@ -110,9 +106,8 @@ def log_info(msg):  _log("INFO",  "36", msg)
 def log_warn(msg):  _log("WARN",  "33", msg)
 def log_error(msg): _log("ERROR", "1;31", msg)
 
-# In dev mode: enable faulthandler zodat hangs/crashes altijd een thread-
-# stackdump produceren. Gebruiker kan 'kill -USR1 <pid>' uitvoeren als
-# Pixora vastzit om te zien waar.
+# Dev-mode: enable faulthandler so hangs/crashes produce thread stackdumps.
+# `kill -USR1 <pid>` dumps thread stacks on demand.
 if _DEV_MODE:
     import faulthandler
     try:
@@ -128,13 +123,11 @@ if _DEV_MODE:
     except Exception:
         faulthandler.enable(all_threads=True)
 
-# Vang ongevangen uitzonderingen zodat ze in de terminal/log opvallen met
-# bestand:regel + traceback.
+# Catch uncaught exceptions so they surface with file:line + traceback.
 if _DEV_MODE:
     import traceback
     def _excepthook(exc_type, exc_val, exc_tb):
         tb_lines = traceback.format_exception(exc_type, exc_val, exc_tb)
-        # Zoek de laatste frame uit ons eigen project voor file:line
         frames = traceback.extract_tb(exc_tb)
         loc = "?"
         if frames:
@@ -188,24 +181,20 @@ WEBKIT_AVAILABLE = False
 WebKit2 = None
 _webkit_load_error = None
 
-# Ubuntu 24.04's AppArmor blokkeert unprivileged user-namespaces, waardoor
-# WebKit's bwrap-sandbox faalt met "Permission denied" en WebKit crasht.
-# Zet sandbox-disable VOOR de WebKit-import zodat de env-var effect heeft.
+# Ubuntu 24.04 AppArmor blocks unprivileged user namespaces → WebKit's
+# bwrap sandbox fails with "Permission denied". Disable before import.
 os.environ.setdefault("WEBKIT_DISABLE_SANDBOX", "1")
 os.environ.setdefault("WEBKIT_FORCE_SANDBOX", "0")
-# Forceer GPU-compositing voor Leaflet (anders valt WebKit terug op
-# software rendering in sommige VMs, wat pan/zoom traag maakt).
+# Force GPU compositing — in some VMs WebKit otherwise falls back to software.
 os.environ.setdefault("WEBKIT_FORCE_COMPOSITING_MODE", "1")
-# EGL/DMA-BUF renderer werkt vaak beter in VMs (VMware SVGA3D) dan GLX.
+# EGL/DMA-BUF beats GLX in VMs (VMware SVGA3D).
 os.environ.setdefault("WEBKIT_USE_EGL", "1")
 os.environ.setdefault("GDK_GL", "gles")
-# JavaScriptCore gebruikt standaard SIGUSR1 (=10) voor garbage collection
-# en overschrijft dan de faulthandler die we in dev-mode zetten voor
-# 'kill -USR1 <pid>'-threadstacks. Wijs JSC naar SIGUSR2 (=12) zodat beide
-# features naast elkaar werken.
+# JavaScriptCore uses SIGUSR1 (=10) for GC by default, which clobbers our
+# dev-mode faulthandler for `kill -USR1 <pid>`. Route JSC to SIGUSR2.
 os.environ.setdefault("JSC_SIGNAL_FOR_GC", "12")
 
-# Probeer eerst WebKit 6.0 (GTK4-native, nieuwste). Daarna WebKit2 4.1 / 4.0.
+# Prefer WebKit 6.0 (GTK4-native), then WebKit2 4.1 / 4.0.
 try:
     gi.require_version("WebKit", "6.0")
     from gi.repository import WebKit as _WK
@@ -274,10 +263,8 @@ def get_logo_path(dark_mode):
     return os.path.join(ASSETS_DIR, f"pixora-logo-{'dark' if dark_mode else 'light'}.png")
 
 def save_settings(settings):
-    # Atomic write: eerst naar .tmp, dan rename. Voorkomt corrupt JSON
-    # als Pixora midden in een write crasht (bv. power-off).
-    # Mode 0600: alleen eigenaar kan lezen — bevat foto-pad en kan op
-    # multi-user-machines privacy-gevoelig zijn.
+    # Atomic write + 0600: survives crash mid-write and is privacy-sensitive
+    # on multi-user machines (contains photo_path).
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     tmp = CONFIG_PATH + ".tmp"
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -296,8 +283,8 @@ def load_favorites():
     except FileNotFoundError:
         return set()
     except Exception:
-        # Corrupt bestand: backup en start schoon i.p.v. elke start weer
-        # dezelfde parse-error raken.
+        # Corrupt file: back it up and start fresh instead of re-hitting the
+        # parse error on every launch.
         try:
             os.rename(FAVORITES_PATH, FAVORITES_PATH + ".corrupt")
         except Exception:
@@ -306,8 +293,7 @@ def load_favorites():
 
 
 def save_favorites(favorites):
-    # Atomic write via .tmp + rename + mode 0600. Favorieten-lijst bevat
-    # paden → privé voor de eigenaar op multi-user machines.
+    # Same atomic-0600 pattern as save_settings.
     try:
         os.makedirs(os.path.dirname(FAVORITES_PATH), exist_ok=True)
         tmp = FAVORITES_PATH + ".tmp"
@@ -319,13 +305,9 @@ def save_favorites(favorites):
         pass
 
 def get_available_drives():
-    """Zoek aangesloten drives die geschikt zijn als backup-target.
-    Een drive komt in aanmerking als:
-      - fstype in BACKUP_FSTYPES (ext4, ntfs, exfat, …)
-      - hotplug=True OF gemount onder /media/*, /run/media/*, /mnt/* (veel
-        USB-sticks/HDDs worden zo gemount ook al is HOTPLUG=0)
-      - NIET gemount op /, /boot, /home, /boot/efi (systeem-drives nooit
-        als backup-target)."""
+    """Return drives suitable as backup target: supported fstype, external
+    (hotplug/removable/USB/mounted under /media/, /run/media/, /mnt/), and
+    never a system partition (/, /boot, /home, /boot/efi, …)."""
     drives = []
     SYS_MOUNTS = {"/", "/boot", "/boot/efi", "/home", "/var", "/usr", "/etc"}
     EXTERNAL_PREFIXES = ("/media/", "/run/media/", "/mnt/")
@@ -338,8 +320,6 @@ def get_available_drives():
         data = json.loads(result.stdout)
 
         def _is_external(mountpoint, hotplug, rm, tran):
-            """Extern = hotplug, of removable-flag, of USB-transport, of
-            gemount onder /media/, /run/media/, /mnt/."""
             if hotplug or rm:
                 return True
             if tran in ("usb", "ieee1394"):
@@ -358,7 +338,7 @@ def get_available_drives():
             size       = device.get("size") or ""
             mountpoint = (device.get("mountpoint") or "").strip()
             if mountpoint in SYS_MOUNTS:
-                pass  # skip system partition (maar wel children bekijken)
+                pass  # skip system partition but still recurse into children
             elif uuid and fstype in BACKUP_FSTYPES:
                 if _is_external(mountpoint, hotplug, rm, tran) and uuid not in seen_uuids:
                     seen_uuids.add(uuid)
@@ -377,7 +357,6 @@ def get_available_drives():
     return drives
 
 def _cmd_available_bk(cmd):
-    """Wrapper rond shutil.which voor de backup-flow."""
     import shutil as _sh
     return _sh.which(cmd) is not None
 
@@ -402,9 +381,8 @@ def format_date_header(dt):
     return f"{dt.day} {_(_MONTH_KEYS[dt.month])} {dt.year}"
 
 def format_viewer_date(dt):
-    # Taalonafhankelijke datum-formatting via gettext (niet via strftime-locale,
-    # omdat en_US.UTF-8 niet overal geïnstalleerd is).
-    # Epoch/bogus dates (< jan 2000) → "Onbekende datum" i.p.v. "1 januari 1970"
+    # Use gettext for date formatting — strftime-locale requires en_US.UTF-8
+    # etc. to be installed system-wide. Bogus dates (<2000) → "unknown date".
     if dt is None or dt.year < 2000:
         return _("Onbekende datum")
     return _("{day} {month} {year}  {time}").format(
@@ -415,8 +393,7 @@ def format_viewer_date(dt):
     )
 
 
-# ── Metadata-cache (video-duur, foto-datum, GPS, geocode) ─────────────
-# Spaart zware EXIF- en ffprobe-calls bij iedere grid-reload/map-open.
+# Metadata cache — avoids repeat EXIF/ffprobe calls on grid reload / map open.
 _METADATA_CACHE_PATH = os.path.expanduser("~/.cache/pixora/metadata.json")
 _metadata_cache = {
     "video_duration": {},
@@ -440,15 +417,14 @@ def _load_metadata_cache():
             v = data.get(k)
             if isinstance(v, dict):
                 _metadata_cache[k] = v
-        # Oude geocode-entries met lege waarde of pre-lang key-format weg.
+        # Drop legacy geocode entries (empty values or pre-language key format).
         geo = _metadata_cache.get("geocode", {})
         pruned = {k: v for k, v in geo.items() if v and ":" in k}
         if len(pruned) != len(geo):
             _metadata_cache["geocode"] = pruned
             _metadata_dirty = True
-        # Stale file-based entries (pad bestaat niet meer) verwijderen zodat
-        # de cache niet oneindig groeit na deletes. Alleen bij startup —
-        # O(N) stat-calls maar eenmalig.
+        # Prune stale file-based entries so the cache doesn't grow forever
+        # after deletes. Startup-only: O(N) stat calls, but once.
         for bucket in ("photo_date", "video_duration", "gps_coords"):
             entries = _metadata_cache.get(bucket, {})
             stale = [p for p in entries if not os.path.exists(p)]
@@ -456,9 +432,8 @@ def _load_metadata_cache():
                 entries.pop(p, None)
             if stale:
                 _metadata_dirty = True
-        # Geocode-bucket trimmen als hij te groot is. Zonder access-timing
-        # kunnen we niet echt LRU — behoud de meest recent toegevoegde
-        # (dict preserveert insertion-order in Py3.7+).
+        # Geocode bucket: trim if too large. No access-timing available, so
+        # pseudo-LRU via dict insertion order (Py3.7+).
         geo = _metadata_cache.get("geocode", {})
         if len(geo) > _METADATA_MAX_GEOCODE:
             keep = dict(list(geo.items())[-_METADATA_MAX_GEOCODE:])
@@ -492,9 +467,8 @@ def _cache_fresh(bucket, path):
         mtime = os.path.getmtime(path)
     except Exception:
         return None
-    # Exact mtime-match: zodra de foto is bewerkt/aangepast krijgt het bestand
-    # een nieuwe mtime en wordt de cache ongeldig. Een tolerantie van 0.5s
-    # kon stale data geven direct na een edit — bij exact-match is dat weg.
+    # Exact mtime match — a 0.5s tolerance once gave stale data right after
+    # an edit, so we compare exactly.
     if entry.get("m") == mtime:
         return entry.get("v")
     return None
@@ -556,15 +530,15 @@ _geocode_failed_at = {}
 
 
 def reverse_geocode(lat, lon):
-    # Cache-sleutel inclusief taal: zelfde coördinaten krijgen andere labels
-    # per taal (bv. "Paris, France" vs "Parijs, Frankrijk" vs "Paris, Frankreich").
+    # Cache key includes language — same coords get different labels per lang
+    # ("Paris, France" / "Parijs, Frankrijk" / "Paris, Frankreich").
     global _metadata_dirty
     key = f"{_lang}:{lat:.4f},{lon:.4f}"
     cached = _metadata_cache["geocode"].get(key)
     if cached:
         return cached
-    # Retry-rate-limit: als een eerdere lookup faalde (offline / server-down),
-    # niet elke keer opnieuw 5s timeout'en. Na 30 min mag een retry.
+    # Rate-limit retries after a failed lookup (30 min) so we don't burn
+    # 5s timeouts on every viewer open when offline.
     last_fail = _geocode_failed_at.get(key, 0)
     if time.time() - last_fail < 1800:
         return ""
@@ -581,9 +555,7 @@ def reverse_geocode(lat, lon):
 def _reverse_geocode_raw(lat, lon):
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-        # Accept-Language stuurt Nominatim de gekozen Pixora-taal zodat
-        # city/country labels in die taal terugkomen (bv. "Parijs, Frankrijk"
-        # in NL-modus i.p.v. de standaard Engelse "Paris, France").
+        # Accept-Language returns city/country labels in the chosen Pixora lang.
         req = urllib.request.Request(url, headers={
             "User-Agent": "Pixora/1.0 (+https://github.com/Linux-Ginger/Pixora)",
             "Accept-Language": _lang,
@@ -620,7 +592,7 @@ def get_photo_date(path: str) -> float:
 
 
 def _get_photo_date_raw(path: str) -> float:
-    """Geeft de fotodatum als timestamp. Probeert EXIF eerst, valt terug op mtime."""
+    """Timestamp from EXIF, falling back to mtime."""
     ext = os.path.splitext(path)[1].lower()
     if ext in (".jpg", ".jpeg", ".heic", ".png", ".dng"):
         try:
@@ -705,7 +677,7 @@ def load_thumbnail(photo_path, thumb_size=None):
     os.makedirs(CACHE_DIR, exist_ok=True)
     if is_video(photo_path):
         try:
-            # Vaste hoogte, breedte volgt aspect (-2 = deelbaar door 2)
+            # Fixed height, width keeps aspect (-2 = divisible by 2).
             subprocess.run(
                 ["ffmpeg", "-i", photo_path, "-ss", "00:00:01", "-vframes", "1",
                  "-vf", f"scale=-2:{thumb_size}",
@@ -718,10 +690,9 @@ def load_thumbnail(photo_path, thumb_size=None):
     try:
         from PIL import Image, ImageOps
         with Image.open(photo_path) as img:
-            img = ImageOps.exif_transpose(img)  # Respecteer EXIF-rotatie
+            img = ImageOps.exif_transpose(img)  # honor EXIF orientation
             if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGB")
-            # Schaal naar vaste hoogte, breedte volgt aspect
             w, h = img.size
             if h > 0:
                 new_w = max(1, int(w * thumb_size / h))
@@ -737,7 +708,6 @@ def load_thumbnail(photo_path, thumb_size=None):
             return None
 
 
-# ── File watcher ─────────────────────────────────────────────────────
 class PhotoFolderHandler(FileSystemEventHandler):
     def __init__(self, callback):
         super().__init__()
@@ -762,16 +732,10 @@ class PhotoFolderHandler(FileSystemEventHandler):
         self._schedule_reload()
 
 
-# ── Tijdlijn scrollbar ───────────────────────────────────────────────
 class TimelineBar(Gtk.DrawingArea):
-    """Right-side timeline bar.
-
-    Entries are stored as (label, y_px, is_year) where y_px is the actual
-    Y pixel position of that date header inside the grid_box.  The bar maps
-    those pixel values to proportional positions using max_scroll
-    (= adj.upper - adj.page_size), so everything stays consistent with the
-    scroll adjustment — no fractions, no conversion errors.
-    """
+    """Right-side timeline bar. Entries are (label, y_px, is_year); y_px is
+    the header's actual Y pixel in grid_box, mapped to the bar via max_scroll
+    (= adj.upper - adj.page_size) so positions stay in sync with scrolling."""
     _ORANGE = (0.914, 0.329, 0.125)
 
     def __init__(self, scroll_cb, style_manager=None):
@@ -791,25 +755,18 @@ class TimelineBar(Gtk.DrawingArea):
         click.connect("pressed", self._on_click)
         self.add_controller(click)
 
-    # ── Public API ────────────────────────────────────────────────────
-
     def set_data(self, entries, max_scroll):
-        """Replace all entries and redraw.  Called after loading finishes."""
         self._entries    = entries
         self._max_scroll = max(max_scroll, 1.0)
         self._recalc()
         self.queue_draw()
 
     def update_scroll(self, value, max_scroll):
-        """Called on every scroll-position change."""
         self._scroll_val = value
         self._max_scroll = max(max_scroll, 1.0)
         self._recalc()
 
-    # ── Internal ──────────────────────────────────────────────────────
-
     def _recalc(self):
-        """Find the active entry: last one whose y_px <= current scroll."""
         if not self._entries:
             return
         new_active = 0
@@ -871,7 +828,6 @@ class TimelineBar(Gtk.DrawingArea):
             self._scroll_cb((y / height) * self._max_scroll)
 
 
-# ── Kaart widget (Leaflet in WebView) ────────────────────────────────
 class MapWidget(Gtk.Box):
     def __init__(self, markers, open_photo_cb, status_cb=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
@@ -914,14 +870,12 @@ class MapWidget(Gtk.Box):
         self.append(lbl)
 
     def _init_webview(self):
-        # Sandbox uit VOOR WebView-creation. Ubuntu 24.04 blokkeert
-        # unprivileged user-namespaces systeem-wijd; WebKit's bwrap-sandbox
-        # faalt dan met "Permission denied" en crasht het proces. Door
-        # WebKit's eigen sandbox uit te zetten wordt bwrap niet aangeroepen;
-        # de kernel-AppArmor-restrictie blijft intact voor andere apps.
+        # Disable WebKit's bwrap sandbox before WebView creation — Ubuntu 24.04
+        # blocks unprivileged user namespaces, so bwrap crashes the process.
+        # AppArmor still protects the rest of the system.
         network_session = None
         try:
-            # WebKit 6.0: NetworkSession heeft set_sandbox_enabled
+            # WebKit 6.0 API
             if hasattr(WebKit2, "NetworkSession"):
                 try:
                     network_session = WebKit2.NetworkSession.get_default()
@@ -936,7 +890,7 @@ class MapWidget(Gtk.Box):
             log_warn(_("NetworkSession sandbox-disable faalde: {err}").format(err=e))
 
         try:
-            # WebKit2 4.x: WebContext heeft set_sandbox_enabled
+            # WebKit2 4.x API
             if hasattr(WebKit2, "WebContext"):
                 wc = WebKit2.WebContext.get_default()
                 if wc and hasattr(wc, "set_sandbox_enabled"):
@@ -944,7 +898,6 @@ class MapWidget(Gtk.Box):
         except Exception as e:
             log_warn(_("WebContext sandbox-disable faalde: {err}").format(err=e))
 
-        # Probeer WebView te maken mét een custom NetworkSession (WebKit 6.0)
         self.web = None
         if network_session is not None and hasattr(WebKit2, "WebView"):
             try:
@@ -1070,10 +1023,8 @@ class MapWidget(Gtk.Box):
                 GLib.idle_add(self.status_cb, "offline")
 
 
-# ── Backup-map picker ────────────────────────────────────────────────
 class BackupFolderPicker(Adw.Dialog):
-    """Een simpele picker die je niet buiten de USB-schijf laat navigeren en
-    een knop heeft om ter plekke een nieuwe submap aan te maken."""
+    """Folder picker confined to the USB root, with inline create-subfolder."""
 
     def __init__(self, mountpoint, current_path, on_selected):
         super().__init__()
@@ -1243,22 +1194,17 @@ class BackupFolderPicker(Adw.Dialog):
         self.close()
 
 
-# ── Hoofdvenster ─────────────────────────────────────────────────────
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
         self.settings        = settings
-        # Migratie: pre-v1.16 installs hadden geen backup_enabled-flag, maar
-        # wel een backup_uuid. Neem de oude impliciete semantiek over (uuid
-        # aanwezig = backup aan) zodat bestaande configs blijven werken.
+        # Migration: pre-v1.16 installs had no backup_enabled flag; presence
+        # of backup_uuid implied backup-on.
         if "backup_enabled" not in self.settings and self.settings.get("backup_uuid"):
             self.settings["backup_enabled"] = True
-        # Zorg dat pixora.desktop een kloppend Icon=-pad heeft. Gebruikers die
-        # alleen 'git pull' doen in .local/share/pixora draaien updater.sh
-        # nooit, dus de .desktop van een oudere install houdt het kapotte
-        # docs/pixora-icon.svg-pad vast. Repareer zelf op startup.
+        # Users who only `git pull` in .local/share/pixora never run updater.sh,
+        # so their .desktop still points at an old broken icon. Repair on startup.
         self._repair_desktop_entry()
-        # Thumbnail-grootte uit instellingen (globale constante wordt hier overschreven)
         global THUMB_SIZE
         try:
             THUMB_SIZE = max(200, min(500, int(settings.get("thumbnail_size", 200))))
@@ -1317,35 +1263,33 @@ class MainWindow(Adw.ApplicationWindow):
         self._current_flow          = None
         self._current_row_hbox      = None
         self._current_row_width     = 0
-        # ── Backup-manager state ───────────────────────────────────────
+        # Backup-manager state
         self._backup_running   = False
-        self._backup_fraction  = 0.0   # 0.0–1.0
+        self._backup_fraction  = 0.0
         self._backup_detail    = ""
-        self._backup_proc      = None  # actieve rsync Popen (of None)
-        self._backup_total     = 0     # totaal te backuppen (voor manual-fallback)
+        self._backup_proc      = None
+        self._backup_total     = 0
         self._backup_done      = 0
         self._backup_scanning  = False
-        self._backup_deduping  = False  # dedup-fase vóór rsync
-        self._orphan_reviewing = False  # pHash-analyse ná backup
+        self._backup_deduping  = False
+        self._orphan_reviewing = False
         self._backup_scan_phase = 0.0
-        # Orphan-count uit de laatste scan — foto's op USB die niet meer
-        # in Pixora zijn. Gebruikt voor waarschuwing na silent-backup
-        # (bv. als user handmatig een dubbele map op USB heeft gekopieerd).
+        # Orphan state from the last scan: files on USB that aren't in Pixora.
+        # Used to warn after silent backup (e.g. user copied a dup folder).
         self._last_scan_orphan_count = 0
-        self._last_scan_orphan_rels = []  # relatieve paden t.o.v. backup_dest
-        self._last_scan_backup_dest = None  # Path van dest, voor deletion
+        self._last_scan_orphan_rels = []
+        self._last_scan_backup_dest = None
         self._backup_scan_anim_id = None
         self._backup_scan_dialog_open = False
         self._manual_scan_requested = False
-        # Reorganize-flow state: blokkeert backup/sync zolang popup/ordenen
-        # loopt én 10s erna (zie _trigger_backup_scan). _reorganize_moving
-        # stuurt de voortgangs-donut aan tijdens _do_reorganize.
+        # Reorganize gate: blocks backup/sync while the popup/reorg runs and
+        # for 10s after. _reorganize_moving drives the progress donut.
         self._reorganize_active = False
         self._reorganize_block_until = 0.0
         self._reorganize_moving = False
         self._reorganize_fraction = 0.0
         self._reorganize_anim_id = None
-        # Fullscreen reorganize-page state (thread schrijft, timer rendert):
+        # Fullscreen reorganize page: thread writes, timer renders.
         self._reorganize_total_count = 0
         self._reorganize_done_count = 0
         self._reorganize_total_bytes = 0
@@ -1353,24 +1297,19 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_start_time = 0.0
         self._reorganize_current_name = ""
         self._reorganize_total_label = ""
-        # Silent-mode: bij auto-popup direct reorganize draaien zonder popup
-        # én zonder fullscreen-page; bijgehouden per-run zodat een handmatige
-        # klik op "Opruimen" altijd de fullscreen toont.
+        # Silent-mode: auto-popup runs reorganize with no dialog and no
+        # fullscreen. Reset per-run so manual "Opruimen" always shows it.
         self._reorganize_silent_run = False
-        # Video pauzeren wanneer de structuur-popup komt, resumen bij "Later".
         self._video_paused_by_popup = False
-        # Zie on_settings_clicked: bewaarde instellingendialog.
         self._settings_dialog = None
-        # Structuur-scan state (detecteert mappen die niet bij de gekozen
-        # structuur horen, ook zonder backup-drive). Donut is donkerblauw
-        # in plaats van oranje zolang er geen backup-context is.
+        # Structure-scan state: detects folders outside the chosen structure,
+        # works without a backup drive. Donut turns dark-blue (no backup ctx).
         self._structure_scanning = False
         self._structure_startup_scanned = False
         self._structure_popup_dismissed = False
-        # Update-notify state
-        self._home_ready_at = None         # set zodra homepage eerst zichtbaar is
-        self._pending_update_version = None  # versie van niet-getoonde popup
-        self._update_dialog_shown = False    # tijdens deze sessie al getoond?
+        self._home_ready_at = None
+        self._pending_update_version = None
+        self._update_dialog_shown = False
 
         self.set_title("Pixora (Dev Mode)" if self.settings.get("dev_mode") else "Pixora")
         self.set_default_size(9999, 9999)
@@ -1402,11 +1341,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.iphone_banner = Adw.Banner(title="", use_markup=False)
         self.iphone_banner.set_revealed(False)
 
-        # "Sluit je USB-backup-schijf aan"-banner
         self.backup_pending_banner = Adw.Banner(title="", use_markup=False)
         self.backup_pending_banner.set_revealed(False)
 
-        # "Backup voltooid"-banner (button = ✕ om weg te klikken)
         self.backup_done_banner = Adw.Banner(
             title="", button_label=_("OK"), use_markup=False
         )
@@ -1426,7 +1363,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.toolbar_view.add_bottom_bar(self.build_bottombar())
         toolbar_view = self.toolbar_view
 
-        # ── Startup splash overlay ────────────────────────────────────
         root_overlay = Gtk.Overlay()
         root_overlay.set_child(toolbar_view)
 
@@ -1492,8 +1428,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add_seconds(8, self._poll_backup_drive)
         GLib.idle_add(self._check_pending_backup)
         GLib.timeout_add_seconds(300, self._periodic_scan)
-        # Periodic save voorkomt dat we bij een crash alle cache-work
-        # sinds laatste start kwijtraken.
+        # Periodic save — otherwise a crash loses all cache work since startup.
         GLib.timeout_add_seconds(
             300, lambda: (save_metadata_cache(), True)[1]
         )
@@ -1509,7 +1444,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _setup_usb_monitor(self):
-        """Luister naar udev USB-events voor automatische iPhone-detectie."""
+        """Listen to udev USB events for automatic iPhone detection."""
         self._udev_client = None
         if not GUDEV_AVAILABLE:
             return
@@ -1530,11 +1465,11 @@ class MainWindow(Adw.ApplicationWindow):
         if vendor != "05ac":  # Apple
             return
         log_info(_("Apple USB-device aangesloten (vendor=05ac) — check na 2.5s"))
-        # Wacht kort zodat usbmuxd het device kan zien, daarna controleren
+        # Wait briefly so usbmuxd sees the device before we check.
         GLib.timeout_add(2500, self._post_apple_plugin_check)
 
     def _post_apple_plugin_check(self):
-        # Niet storen als importer open staat
+        # Don't interrupt an open importer.
         try:
             if self.main_stack.get_visible_child_name() == "importer":
                 return False
@@ -1548,14 +1483,12 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _iphone_recovery_flow(self):
-        """Volledig automatische recovery: eerst check, dan reset bij falen."""
-        # Eerste check
+        """Fully automatic recovery: first check, then reset usbmuxd on fail."""
         has_device = self._idevice_check()
         if has_device:
             log_info(_("iPhone direct herkend door usbmuxd"))
             GLib.idle_add(self._iphone_flow_success, False)
             return
-        # Niet herkend — automatisch reset
         log_warn(_("iPhone niet herkend door usbmuxd — start auto-recovery"))
         GLib.idle_add(self._set_iphone_banner,
                       _("🔧 Verbinding herstellen, even geduld…"))
@@ -1574,7 +1507,6 @@ class MainWindow(Adw.ApplicationWindow):
         if not reset_ok:
             GLib.idle_add(self._iphone_flow_fail)
             return
-        # Wacht opnieuw tot usbmuxd + device klaar zijn
         time.sleep(2.5)
         has_device = self._idevice_check()
         if has_device:
@@ -1622,8 +1554,8 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _poll_import_device(self):
-        # Niet pollen terwijl de importer open is — voorkomt interferentie
-        # met pair/mount van libimobiledevice
+        # Don't poll while importer is open — interferes with libimobiledevice
+        # pair/mount.
         try:
             if self.main_stack.get_visible_child_name() == "importer":
                 return True
@@ -1631,7 +1563,6 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
         def check():
-            # Zorg dat usbmuxd loopt — als die is gecrasht werkt de iPhone niet
             try:
                 r = subprocess.run(["pgrep", "-x", "usbmuxd"],
                                    capture_output=True, timeout=2)
@@ -1668,9 +1599,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.import_btn.set_tooltip_text(_("Importeer van iPhone of iPad"))
         return False
 
-    # ── Startup splash ───────────────────────────────────────────────
     def _prewarm_gstreamer(self):
-        """Initialize GStreamer pipeline in background so first video opens fast."""
+        """Initialize GStreamer in background so first video opens fast."""
         try:
             import gi
             gi.require_version("Gst", "1.0")
@@ -1710,7 +1640,6 @@ class MainWindow(Adw.ApplicationWindow):
                 return False
         return True
 
-    # ── Update systeem ───────────────────────────────────────────────
     def _check_for_update(self):
         threading.Thread(target=self._do_update_check, daemon=True).start()
         return False
@@ -1724,9 +1653,8 @@ class MainWindow(Adw.ApplicationWindow):
                 return
             with open(local_version_file) as f:
                 local_version = f.read().strip()
-            # Cache-bust: Fastly cached raw.githubusercontent.com ~5 min,
-            # waardoor een verse push niet meteen zichtbaar is. Een unieke
-            # query-string forceert een fresh fetch.
+            # Cache-bust: raw.githubusercontent.com is Fastly-cached ~5 min
+            # → unique query-string forces a fresh fetch.
             req = urllib.request.Request(
                 f"https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt?t={int(time.time())}",
                 headers={
@@ -1744,8 +1672,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _maybe_show_update_popup(self):
-        """Toon de update-popup pas wanneer de homepage minstens 2s zichtbaar
-        is. Anders: retry elke 500ms tot die voorwaarde klopt."""
+        """Defer update popup until home page has been visible ≥2s, else retry."""
         if self._update_dialog_shown or not self._pending_update_version:
             return False
         ready_at = getattr(self, "_home_ready_at", None)
@@ -1779,9 +1706,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._open_installer()
 
     def _repair_desktop_entry(self):
-        """Check ~/.local/share/applications/pixora.desktop: als het Icon=
-        pad niet (meer) bestaat, regenereer het bestand. Draait silent —
-        een falen hier mag Pixora nooit blokkeren."""
+        """Rewrite ~/.local/share/applications/pixora.desktop if its Icon=
+        path is stale. Silent — a failure here must never block startup."""
         try:
             install_dir = os.path.expanduser("~/.local/share/pixora")
             icon = os.path.join(install_dir, "assets", "logos", "pixora-icon.svg")
@@ -1789,7 +1715,7 @@ class MainWindow(Adw.ApplicationWindow):
             desktop_dir = os.path.expanduser("~/.local/share/applications")
             desktop = os.path.join(desktop_dir, "pixora.desktop")
             if not os.path.exists(icon) or not os.path.exists(launcher):
-                return  # Draait vanuit dev-tree of niet-geïnstalleerd
+                return  # running from dev-tree or not installed
             needs_write = True
             if os.path.exists(desktop):
                 try:
@@ -1797,9 +1723,8 @@ class MainWindow(Adw.ApplicationWindow):
                         content_existing = _df.read()
                     icon_ok = f"Icon={icon}" in content_existing and os.path.exists(icon)
                     wm_ok = "StartupWMClass=com.linuxginger.pixora" in content_existing
-                    # Self-heal: oude installs hebben StartupNotify=true, wat
-                    # op GNOME een "Pixora is ready"-notificatie triggert bij
-                    # elke present() op een achtergrondvenster. Regel eruit.
+                    # StartupNotify=true triggers GNOME "Pixora is ready"
+                    # notifications on every present(); must be absent.
                     startup_notify_ok = "StartupNotify=true" not in content_existing
                     if icon_ok and wm_ok and startup_notify_ok:
                         needs_write = False
@@ -1850,18 +1775,15 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_error(_("GUI-updater kon niet starten: {err}").format(err=e))
             return
-        # Trigger on_close (met z'n 2s force-exit fallback) i.p.v.
-        # app.quit() dat de GTK-loop wel stopt maar non-daemon threads +
-        # WebKit-subprocess kan laten hangen. Als dat gebeurt blijft
-        # Pixora als zombie in process-lijst en blokkeert nieuwe launches.
+        # Use on_close (with its 2s force-exit fallback) instead of app.quit()
+        # — the latter leaves non-daemon threads + WebKit subprocess hanging,
+        # keeping Pixora as a zombie that blocks future launches.
         GLib.idle_add(self.close)
 
     def _on_open_github(self, btn):
-        # subprocess.Popen i.p.v. Gio.AppInfo.launch_default_for_uri omdat
-        # browsers bij opstarten GTK-warnings naar stderr sturen ("atk-bridge"
-        # e.d.) die anders in Pixora's terminal belanden. Met DEVNULL zien we
-        # die niet meer — tevens de start-new-session zodat de browser niet
-        # aan Pixora's lifetime hangt.
+        # subprocess.Popen + DEVNULL + start_new_session — browsers spam
+        # GTK warnings to stderr otherwise, and we don't want the browser
+        # tied to Pixora's lifetime.
         try:
             subprocess.Popen(
                 ["xdg-open", "https://github.com/Linux-Ginger/Pixora"],
@@ -1874,7 +1796,7 @@ class MainWindow(Adw.ApplicationWindow):
             log_warn(_("GitHub openen mislukt: {err}").format(err=e))
 
     def _on_view_license(self, btn):
-        """Popup met GPL-3.0 samenvatting (✓ / ! / ✗) + volledige tekst."""
+        """GPL-3.0 summary popup (✓ / ! / ✗) with full license text."""
         win = Adw.Window()
         win.set_title(_("Licentie"))
         win.set_transient_for(self)
@@ -1906,7 +1828,6 @@ class MainWindow(Adw.ApplicationWindow):
         intro.set_xalign(0)
         body.append(intro)
 
-        # Drie kolommen: mag / moet / mag niet.
         summary = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL, spacing=12,
             homogeneous=True,
@@ -1972,9 +1893,8 @@ class MainWindow(Adw.ApplicationWindow):
         win.present()
 
     def _license_summary_col(self, title, icon_char, css_class, items):
-        """Kolom voor de licentie-samenvatting. icon_char is een Unicode
-        teken (✓ / ! / ✗) omdat dat onafhankelijk is van icon-themes en
-        ook mooi rendert in monospace-fallback."""
+        """icon_char is Unicode (✓ / ! / ✗) so it doesn't depend on icon-themes
+        and still renders in monospace fallback."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         badge = Gtk.Label(label=icon_char)
@@ -1996,18 +1916,15 @@ class MainWindow(Adw.ApplicationWindow):
         return box
 
     def _on_settings_check_update(self, btn):
-        # Als er een update klaarstaat → knop-klik start de updater.
         if self._update_check_state == "available":
             self._open_installer()
             return
-        # Anders: start een nieuwe check.
         self._set_update_state("checking")
         threading.Thread(target=self._do_settings_update_check, daemon=True).start()
 
     def _set_update_state(self, state):
         """state ∈ {'idle', 'checking', 'uptodate', 'available'}."""
         self._update_check_state = state
-        # Stop eventuele lopende animaties.
         if self._update_check_pulse_id is not None:
             try:
                 GLib.source_remove(self._update_check_pulse_id)
@@ -2034,7 +1951,6 @@ class MainWindow(Adw.ApplicationWindow):
             elif state == "uptodate":
                 self._update_btn_stack.set_visible_child_name("uptodate")
                 self._update_check_spinner.stop()
-                # Na 5s terug naar idle; knop is direct klikbaar.
                 self._update_check_btn.set_sensitive(True)
                 self._update_check_btn.set_opacity(1.0)
                 self._update_check_fade_id = GLib.timeout_add_seconds(
@@ -2048,7 +1964,7 @@ class MainWindow(Adw.ApplicationWindow):
                     _("Nieuwe versie beschikbaar — klik om bij te werken")
                 )
                 self._update_btn_stack.set_visible_child_name("available")
-                # Pulse: 1.5s update-icon, 1.5s "Bijwerken"-label, repeat.
+                # Pulse: alternate icon/label every 1.5s.
                 self._update_pulse_on = True
                 self._update_check_pulse_id = GLib.timeout_add(
                     1500, self._update_pulse_tick
@@ -2066,9 +1982,8 @@ class MainWindow(Adw.ApplicationWindow):
         if self._update_check_state != "available":
             self._update_check_pulse_id = None
             return False
-        # Stop als settings-dialog is gesloten — het stack-widget hangt dan
-        # niet meer in een root en set_visible_child_name zou een
-        # Gtk-CRITICAL geven.
+        # Stop once settings dialog closed — calling set_visible_child_name on
+        # a widget without a root raises Gtk-CRITICAL.
         try:
             if self._update_check_btn.get_root() is None:
                 self._update_check_pulse_id = None
@@ -2095,9 +2010,7 @@ class MainWindow(Adw.ApplicationWindow):
             if os.path.exists(local_version_file):
                 with open(local_version_file) as _lvf:
                     local_version = _lvf.read().strip()
-            # Cache-bust: Fastly cached raw.githubusercontent.com ~5 min,
-            # waardoor een verse push niet meteen zichtbaar is. Een unieke
-            # query-string forceert een fresh fetch.
+            # Cache-bust: see _do_update_check.
             req = urllib.request.Request(
                 f"https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt?t={int(time.time())}",
                 headers={
@@ -2114,7 +2027,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._settings_update_result, local_version, remote_version)
 
     def _settings_update_result(self, local_version, remote_version):
-        # Dialog kan ondertussen gesloten zijn → widgets gedisposed.
+        # Dialog may have closed meanwhile → widgets disposed.
         try:
             if remote_version is None:
                 self._update_check_row.set_subtitle(_("Controleren mislukt"))
@@ -2133,7 +2046,6 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         return False
 
-    # ── Dark mode ────────────────────────────────────────────────────
     def is_dark(self):
         return self.style_manager.get_dark()
 
@@ -2142,7 +2054,6 @@ class MainWindow(Adw.ApplicationWindow):
         if os.path.exists(logo_path):
             self.logo_picture.set_filename(logo_path)
 
-    # ── File watcher ─────────────────────────────────────────────────
     def start_watcher(self, path):
         if not WATCHDOG_AVAILABLE or not os.path.exists(path):
             return
@@ -2180,15 +2091,14 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def on_close(self, window):
-        # Een openstaand instellingen-dialog blokkeert de close-request
-        # op het hoofdvenster (rechtermuisknop → "Close N windows"). Sluit
-        # 'm expliciet voordat we verder gaan.
+        # An open settings dialog blocks the main window's close-request
+        # ("Close N windows" from GNOME Shell) — close it first.
         if self._settings_dialog is not None:
             try:
                 self._settings_dialog.close()
             except Exception:
                 pass
-        # Close-guard: als backup of reorganize actief is, vraag bevestiging.
+        # Guard against closing during backup/reorganize — ask to confirm.
         if not getattr(self, "_close_confirmed", False):
             if self._backup_running:
                 body = _("Pixora is bezig met een backup naar je USB-schijf. "
@@ -2211,10 +2121,9 @@ class MainWindow(Adw.ApplicationWindow):
                 dlg.set_default_response("cancel")
                 dlg.connect("response", self._on_close_guard_response)
                 self._present_dialog(dlg)
-                return True  # annuleer close event — we beslissen via de dialog
+                return True  # cancel close; dialog decides
         log_info(_("Pixora wordt afgesloten — opruimen…"))
-        # Indien backup actief en gebruiker bevestigde → probeer rsync-proc
-        # netjes te killen zodat de backup stopt in plaats van te hangen.
+        # Kill rsync cleanly so the backup actually stops instead of hanging.
         if self._backup_running and self._backup_proc is not None:
             try:
                 self._backup_proc.kill()
@@ -2226,8 +2135,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._filmstrip_load_id += 1
         except Exception:
             pass
-        # Cancel ALLE GLib timers EERST, voordat we state vernietigen.
-        # Anders kan een timer firing na cleanup crashen op None/missende state.
+        # Cancel ALL GLib timers BEFORE tearing down state — otherwise a timer
+        # firing mid-cleanup crashes on a None / missing attribute.
         for attr in ("_favorites_save_id", "_sort_timer", "_fade_timer_id",
                      "_fade_anim_id", "_preview_debounce_id",
                      "_video_seek_pending_id", "_video_poll_id",
@@ -2240,7 +2149,6 @@ class MainWindow(Adw.ApplicationWindow):
                 except Exception:
                     pass
                 setattr(self, attr, None)
-        # Persist alle pending caches/writes
         try:
             save_favorites(self._favorites)
         except Exception:
@@ -2250,12 +2158,11 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         self.stop_watcher()
-        # Stop USB-monitor
         try:
             self._udev_client = None
         except Exception:
             pass
-        # Stop video playback + MediaFile explicitly (GStreamer-threads loslaten)
+        # Stop video + MediaFile explicitly so GStreamer threads release.
         try:
             self._stop_video()
             if getattr(self, "_video_media", None):
@@ -2266,7 +2173,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self._video_media = None
         except Exception:
             pass
-        # Laat grote structuren los zodat RAM vrijkomt
+        # Release big structures so RAM frees promptly.
         try:
             self.photos = []
             self.thumb_widgets = {}
@@ -2283,19 +2190,17 @@ class MainWindow(Adw.ApplicationWindow):
                 self._map_widget = None
         except Exception as e:
             log_error(_("Cleanup-fout: {err}").format(err=e))
-        # Trigger garbage collect
         try:
             import gc
             gc.collect()
         except Exception:
             pass
-        # Sluit dev-terminal als die open staat
         try:
             import main as _main_mod
             _main_mod.kill_dev_terminal()
         except Exception:
             pass
-        # Wis de dev-log file zodat volgende sessie fris begint
+        # Truncate dev log so the next session starts fresh.
         global _LOG_FILE
         try:
             if _LOG_FILE:
@@ -2308,9 +2213,8 @@ class MainWindow(Adw.ApplicationWindow):
                 open(_LOG_PATH, "w").close()
         except Exception:
             pass
-        # Forceer exit als Python niet binnen 2s stopt — voorkomt dat
-        # lingering non-daemon-threads (GStreamer, PIL, gvfs-workers) het
-        # proces in geheugen houden.
+        # Force exit after 2s — lingering non-daemon threads (GStreamer, PIL,
+        # gvfs-workers) otherwise keep the process in memory.
         def _force_exit():
             try:
                 print(_("Pixora proces forceert exit (lingering threads)"), flush=True)
@@ -2320,7 +2224,6 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Timer(2.0, _force_exit).start()
         return False
 
-    # ── Header ───────────────────────────────────────────────────────
     def build_header(self):
         self.header = Adw.HeaderBar()
         self.header.add_css_class("flat")
@@ -2386,9 +2289,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_btn.connect("clicked", self.on_settings_clicked)
         self.header.pack_end(self.settings_btn)
 
-        # Backup-progress donut (verborgen tot backup actief is).
-        # Gtk.Button met custom DrawingArea-child zodat de cirkel meedraait
-        # met de button-hover en klik → popover met details.
+        # Backup-progress donut — hidden until backup is active. Wrapped in
+        # a Gtk.Button so hover/click works and opens the details popover.
         self._backup_donut = Gtk.DrawingArea()
         self._backup_donut.set_size_request(24, 24)
         self._backup_donut.set_valign(Gtk.Align.CENTER)
@@ -2404,13 +2306,12 @@ class MainWindow(Adw.ApplicationWindow):
 
         return self.header
 
-    # ── Grid pagina ───────────────────────────────────────────────────
     def build_grid_page(self):
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         outer.set_vexpand(True)
         outer.set_hexpand(True)
 
-        # ── Filter-info-banner (zichtbaar bij cluster-filter vanaf kaart) ──
+        # Filter-info banner (visible when a cluster filter is active)
         self.filter_info_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         self.filter_info_bar.add_css_class("toolbar")
         self.filter_info_bar.set_margin_top(8)
@@ -2419,7 +2320,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.filter_info_bar.set_margin_bottom(4)
         self.filter_info_bar.set_visible(False)
 
-        # Emoji-pin links
         _filter_icon = Gtk.Label(label="📍")
         _filter_icon.set_valign(Gtk.Align.CENTER)
         _filter_icon_css = Gtk.CssProvider()
@@ -2428,7 +2328,6 @@ class MainWindow(Adw.ApplicationWindow):
             _filter_icon_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.filter_info_bar.append(_filter_icon)
 
-        # Tekst-stack: titel + subtitel
         _text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         _text_box.set_hexpand(True)
         _text_box.set_valign(Gtk.Align.CENTER)
@@ -2444,7 +2343,6 @@ class MainWindow(Adw.ApplicationWindow):
         _text_box.append(self.filter_subtitle_lbl)
         self.filter_info_bar.append(_text_box)
 
-        # ✕ knop rechts
         _clear_btn = Gtk.Button(icon_name="window-close-symbolic")
         _clear_btn.add_css_class("circular")
         _clear_btn.add_css_class("flat")
@@ -2506,7 +2404,6 @@ class MainWindow(Adw.ApplicationWindow):
         outer.append(self.content_stack)
         return outer
 
-    # ── Kaart pagina (in-app) ─────────────────────────────────────────
     def build_map_page(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         box.set_vexpand(True)
@@ -2592,11 +2489,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         markers = []
         seen_paths = set()
-        # Live Photos zijn paren (IMG_xxxx.HEIC + IMG_xxxx.MOV) met identieke
-        # GPS — zonder dedup telt de cluster ze beide → user ziet 14 terwijl
-        # het gevoel is van 12 unieke "foto-momenten".
-        # Groepeer paden op basis van (lat, lon, filename-zonder-extensie):
-        # als HEIC en MOV dezelfde stem + GPS hebben, is het hetzelfde moment.
+        # Live Photos are HEIC+MOV pairs with identical GPS — dedup on
+        # (lat, lon, stem) so one "photo moment" doesn't count twice.
         grouped = {}  # key → (lat, lon, filename, datum, [paths])
         with ThreadPoolExecutor(max_workers=8) as pool:
             for result in pool.map(scan_one, self.photos):
@@ -2607,8 +2501,7 @@ class MainWindow(Adw.ApplicationWindow):
                     continue
                 seen_paths.add(path)
                 stem = os.path.splitext(filename)[0].lower()
-                # Afronden op 6 decimalen (~10cm precisie) — absolute matching
-                # op Live Photo pairs die EXIF/ffprobe identiek invullen.
+                # 6-decimal round (~10cm) matches Live Photo pairs exactly.
                 key = (round(lat, 6), round(lon, 6), stem)
                 if key in grouped:
                     grouped[key][4].append(path)
@@ -2629,7 +2522,6 @@ class MainWindow(Adw.ApplicationWindow):
             self.map_content.remove(self._map_widget)
             self._map_widget = None
 
-        # Spinner blijft, label naar "Verbinden..." tot eerste tiles binnen zijn.
         try:
             self.map_spinner_label.set_text(_("Verbinden met kaart-server…"))
         except Exception:
@@ -2640,8 +2532,7 @@ class MainWindow(Adw.ApplicationWindow):
             status_cb=self._on_map_status
         )
         self.map_content.append(self._map_widget)
-        # NIET switchen naar "map" view; wacht op map-ready status-callback.
-        # Als er na 12s nog niks is → fallback zodat Pixora niet oneindig hangt.
+        # Wait for map-ready status callback; 12s fallback prevents hang.
         self._map_ready_fallback_id = GLib.timeout_add_seconds(
             12, self._on_map_ready_timeout
         )
@@ -2664,8 +2555,8 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 pass
         elif status == "offline":
-            # Toon alsnog de kaart — de JS-banner in map.html vertelt de user
-            # dat tiles niet geladen kunnen. Markers blijven zichtbaar.
+            # Show the map anyway — map.html's JS banner explains the tile
+            # failure, and markers remain visible.
             if getattr(self, "_map_ready_fallback_id", None):
                 try:
                     GLib.source_remove(self._map_ready_fallback_id)
@@ -2680,7 +2571,6 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_map_ready_timeout(self):
-        # Fallback: na 12s tonen we de kaart sowieso, ook zonder tile-load.
         log_warn(_("Kaart-ready timeout — toon kaart alsnog"))
         self._map_ready_fallback_id = None
         try:
@@ -2702,18 +2592,17 @@ class MainWindow(Adw.ApplicationWindow):
             index = self.photos.index(valid[0])
             GLib.idle_add(self.open_photo, index)
         else:
-            # Cluster: toon gefilterde grid met alleen die foto's
+            # Cluster click: filter grid to those photos.
             self._photos_before_cluster = self.photos
             self.photos = valid
-            # Bereken datumbereik (oudste → nieuwste) voor de info-banner
+            # Compute date range for the info banner.
             date_range = ""
             try:
                 dates = []
                 for p in valid:
                     try:
                         mt = os.path.getmtime(p)
-                        # Filter epoch-0 / bogus mtime (voor Jan 1 2000)
-                        # zodat de banner geen "1 januari 1970" toont.
+                        # Filter epoch-0 / pre-2000 mtimes to avoid "1 Jan 1970".
                         if mt > 0 and mt >= 946684800:
                             dates.append(mt)
                     except Exception:
@@ -2731,11 +2620,10 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 pass
 
-            # Locatienaam voor de titel (reverse-geocoded via EXIF GPS)
             loc = self._photo_location.get(valid[0], "")
             if not loc:
-                # Nog niet gecached → trigger een lookup zodat de info-banner
-                # zo mogelijk alsnog de locatienaam krijgt.
+                # Not yet cached → trigger async lookup so the banner may
+                # get the resolved location later.
                 threading.Thread(
                     target=self._fetch_cluster_location,
                     args=(valid[0],),
@@ -2749,15 +2637,12 @@ class MainWindow(Adw.ApplicationWindow):
             self.filter_subtitle_lbl.set_text(subtitle)
             self.filter_info_bar.set_visible(True)
 
-            # Behoud het korte label in de bottom-bar voor consistentie
             self._cluster_location_label = title
             self.photo_count_label.set_text(count_str)
             GLib.idle_add(self.start_load)
 
     def _fetch_cluster_location(self, sample_path):
-        """Reverse-geocode een sample-foto zodat het filter-label alsnog een
-        locatienaam krijgt (op moment van cluster-open was de lookup nog niet
-        afgerond)."""
+        """Async reverse-geocode for the cluster filter label."""
         try:
             if is_video(sample_path):
                 coords = get_video_gps_coords(sample_path)
@@ -2773,8 +2658,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _apply_cluster_location(self, loc):
-        # Alleen toepassen als de filter-bar nog zichtbaar is (gebruiker kan
-        # inmiddels ✕ hebben geklikt).
+        # Only apply while the filter bar is still visible (user may have ✕'d).
         try:
             if self.filter_info_bar.get_visible():
                 self.filter_title_lbl.set_text(loc)
@@ -2815,7 +2699,6 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         self.main_stack.set_visible_child_name("grid")
 
-    # ── Viewer pagina ─────────────────────────────────────────────────
     def build_viewer_page(self):
         viewer_area = Gtk.Overlay()
         viewer_area.set_vexpand(True)
@@ -2878,10 +2761,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.edit_btn.connect("clicked", self.on_edit_current)
         viewer_area.add_overlay(self.edit_btn)
 
-        # Donut in de viewer-overlay — spiegelt de header-donut zodat de
-        # gebruiker backup-voortgang ook ziet tijdens foto-viewing (header
-        # is dan verborgen). Deelt dezelfde _draw_backup_donut en state,
-        # dus altijd in sync.
+        # Viewer-overlay donut mirrors the header donut so backup progress is
+        # visible while viewing photos (header is hidden then). Shares
+        # _draw_backup_donut and state so both stay in sync.
         self._viewer_donut = Gtk.DrawingArea()
         self._viewer_donut.set_size_request(24, 24)
         self._viewer_donut.set_draw_func(self._draw_backup_donut)
@@ -2891,7 +2773,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_donut_btn.set_child(self._viewer_donut)
         self._viewer_donut_btn.set_halign(Gtk.Align.END)
         self._viewer_donut_btn.set_valign(Gtk.Align.START)
-        # Onder de verwijder-knop (margin_end=68, margin_top=16 + 40 + 8).
+        # Positioned below the delete button (margin_end=68, top=16+40+8).
         self._viewer_donut_btn.set_margin_top(64)
         self._viewer_donut_btn.set_margin_end(68)
         self._viewer_donut_btn.set_size_request(40, 40)
@@ -2918,7 +2800,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         viewer_area.add_overlay(self.favorite_btn)
 
-        # ── Editor toolbar (verborgen tot editor modus) ────────────────
+        # Editor toolbar (hidden until editor mode).
         self.editor_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.editor_bar.set_halign(Gtk.Align.CENTER)
         self.editor_bar.set_valign(Gtk.Align.END)
@@ -2968,7 +2850,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         viewer_area.add_overlay(self.editor_bar)
 
-        # ── Crop overlay DrawingArea ───────────────────────────────────
         self.crop_overlay_area = Gtk.DrawingArea()
         self.crop_overlay_area.set_draw_func(self.on_crop_draw)
         self.crop_overlay_area.set_vexpand(True)
@@ -3064,7 +2945,6 @@ class MainWindow(Adw.ApplicationWindow):
         viewer_area.add_controller(viewer_motion)
         self.viewer_area = viewer_area
 
-        # ── Video controls ───────────────────────────────────────────
         self.video_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.video_controls.add_css_class("osd")
         self.video_controls.set_halign(Gtk.Align.FILL)
@@ -3096,7 +2976,6 @@ class MainWindow(Adw.ApplicationWindow):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.video_scrubber.connect("value-changed", self._on_video_scrub)
 
-        # Scrubber preview popover
         self._preview_popover = Gtk.Popover()
         self._preview_popover.set_parent(self.video_scrubber)
         self._preview_popover.set_autohide(False)
@@ -3152,7 +3031,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         viewer_area.add_overlay(self.video_controls)
 
-        # ── Filmstrip ────────────────────────────────────────────────
         self.filmstrip_scroll = Gtk.ScrolledWindow()
         self.filmstrip_scroll.set_policy(Gtk.PolicyType.EXTERNAL, Gtk.PolicyType.NEVER)
         self.filmstrip_scroll.set_halign(Gtk.Align.FILL)
@@ -3173,10 +3051,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.filmstrip_area = Gtk.DrawingArea()
         self.filmstrip_area.set_draw_func(self._draw_filmstrip)
         self.filmstrip_area.set_size_request(FILM_THUMB + 4, FILM_THUMB + 8)
-        # halign START: als het totaal aan thumbs smaller zou zijn dan het
-        # scroll-viewport (kleine bibliotheek), wordt de DrawingArea niet
-        # ge-centered in de overschot-ruimte — dus thumb 1 blijft altijd
-        # tegen de linker rand staan.
+        # halign=START so a narrow filmstrip (small library) doesn't center
+        # inside the viewport — thumb 1 stays pinned to the left edge.
         self.filmstrip_area.set_halign(Gtk.Align.START)
 
         film_click = Gtk.GestureClick()
@@ -3186,7 +3062,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.filmstrip_scroll.set_child(self.filmstrip_area)
         viewer_area.add_overlay(self.filmstrip_scroll)
 
-        # ── Video loading spinner ─────────────────────────────────────
         self.video_spinner = Gtk.Spinner()
         self.video_spinner.set_size_request(64, 64)
         self.video_spinner.set_halign(Gtk.Align.CENTER)
@@ -3196,7 +3071,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         return viewer_area
 
-    # ── Onderste balk ─────────────────────────────────────────────────
     def build_bottombar(self):
         self.bottom_stack = Gtk.Stack()
         self.bottom_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
@@ -3206,9 +3080,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label = Gtk.Label(label=ngettext("%d foto", "%d foto's", 0) % 0)
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
-
-        # Cluster-filter ✕ staat nu in de filter-info-bar bovenaan de grid;
-        # de oude onderkant-knop is vervangen.
 
         self.bottom_stack.add_named(normal_bar, "normal")
 
@@ -3228,21 +3099,17 @@ class MainWindow(Adw.ApplicationWindow):
 
         return self.bottom_stack
 
-    # ── Tijdlijn ──────────────────────────────────────────────────────
-
     def _on_timeline_click(self, scroll_px):
-        """Scroll the grid to the requested pixel position."""
         adj     = self.scroll.get_vadjustment()
         max_val = adj.get_upper() - adj.get_page_size()
         adj.set_value(max(0.0, min(scroll_px, max(0.0, max_val))))
 
     def _on_scroll_changed(self, adj):
-        pass  # tijdlijn tijdelijk uitgeschakeld voor beta
+        pass  # timeline disabled in beta
 
     def _update_timeline_from_positions(self):
-        return False  # tijdlijn tijdelijk uitgeschakeld voor beta
+        return False  # timeline disabled in beta
 
-    # ── Selectie modus ────────────────────────────────────────────────
     def toggle_select_mode(self, btn=None):
         self._select_mode = not self._select_mode
         log_info(_("Selectie-modus: {state}").format(
@@ -3268,13 +3135,12 @@ class MainWindow(Adw.ApplicationWindow):
         btn, check_box = widget
         selected = index in self._selected
         if check_box is None and selected:
-            # Lazy: maak check_box pas aan wanneer nodig
             if not hasattr(self, '_thumb_css'):
                 return
             tc = self._thumb_css
             overlay = btn.get_child()
             if not isinstance(overlay, Gtk.Overlay):
-                # Wrap picture in overlay voor check_box
+                # Wrap the picture in an overlay so we can add check_box.
                 picture = btn.get_child()
                 btn.set_child(None)
                 overlay = Gtk.Overlay()
@@ -3301,7 +3167,6 @@ class MainWindow(Adw.ApplicationWindow):
         if check_box is not None:
             check_box.set_visible(selected)
 
-    # ── Foto's laden ──────────────────────────────────────────────────
     def load_photos(self):
         photo_path = self.settings.get("photo_path", "")
         log_info(_("load_photos: scanning in {p}").format(p=photo_path))
@@ -3331,9 +3196,8 @@ class MainWindow(Adw.ApplicationWindow):
             count_text = _("{count} (favorieten)").format(count=count_text)
         self.photo_count_label.set_text(count_text)
         self.start_watcher(photo_path)
-        # Sort + render async — bij eerste keer duurt date-fetch (EXIF)
-        # seconden voor 2000 foto's. Thread-pool doet 'm parallel en
-        # blokkeert de UI niet.
+        # Sort + render async — first-time EXIF date-fetch takes seconds
+        # for 2000 photos, so parallelize and keep the UI responsive.
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
         self.spinner_label.set_text(_("Foto's sorteren…"))
@@ -3392,15 +3256,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _group_by_date(self, photos):
         groups = defaultdict(list)
-        # Sentinel voor onleesbare / epoch-0 datum: sorteer ze apart als
-        # "Onbekende datum" i.p.v. te tonen als 1 januari 1970.
-        UNKNOWN = datetime.date.min
-        # Belangrijk: zelfde datum-bron als apply_sort / filmstrip view_order
-        # (get_photo_date: EXIF eerst, anders mtime). Als we hier mtime zouden
-        # gebruiken en de sort gebruikt EXIF, dan matcht de grid-indeling niet
-        # met de self.photos-volgorde — foto 1 in de grid zou dan op een hoog
-        # self.photos-index kunnen liggen en de viewer-counter geeft het
-        # "verkeerde" nummer.
+        UNKNOWN = datetime.date.min  # sentinel for bogus dates
+        # Must use the same date source as apply_sort / filmstrip (EXIF then
+        # mtime). Mismatch would desync grid position with self.photos index,
+        # breaking the viewer counter.
         for i, path in enumerate(photos):
             try:
                 ts = get_photo_date(path)
@@ -3411,9 +3270,6 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 dt = UNKNOWN
             groups[dt].append(i)
-        # Groepsvolgorde volgt de sort-keuze: "Datum oudste" → oudste
-        # groep bovenaan, anders nieuwste boven (default). De filmstrip
-        # heeft z'n eigen altijd-nieuwste-links volgorde ongeacht grid-sort.
         sort_idx = (self.sort_combo.get_selected()
                     if hasattr(self, "sort_combo") else 0)
         oldest_first = (sort_idx == 1)
@@ -3540,9 +3396,8 @@ class MainWindow(Adw.ApplicationWindow):
         if not hasattr(self, "_hydrated_indices"):
             self._hydrated_indices = set()
         want = set()
-        # thumb_widgets is een dict met insertion-order = photo-index order =
-        # grofweg top-to-bottom in de grid. Na de visible range kunnen we
-        # stoppen i.p.v. alle 2000 thumbs coördinaten te laten berekenen.
+        # thumb_widgets insertion-order matches grid top-to-bottom, so we can
+        # bail out after the visible range instead of checking all 2000 thumbs.
         seen_visible = False
         for index, (btn, _check) in self.thumb_widgets.items():
             if not hasattr(btn, "_pixora_cache_path"):
@@ -3643,7 +3498,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.spinner_label.set_text(
             _("Foto's laden… {loaded} / {total}").format(loaded=loaded, total=total)
         )
-        # Shared CSS providers — created once, reused for every thumbnail
+        # Shared CSS providers — created once, reused per thumbnail.
         if not hasattr(self, '_thumb_css'):
             tc = {}
             p = Gtk.CssProvider()
@@ -3749,7 +3604,7 @@ class MainWindow(Adw.ApplicationWindow):
             btn._pixora_index = index
             btn._fav_badge = fav_badge
             self._append_thumb_to_row(btn, width_at_thumb)
-            # check_box wordt lazy aangemaakt bij selectie-modus
+            # check_box lazily created when selection mode enters.
             self.thumb_widgets[index] = (btn, None)
         self._schedule_viewport_hydrate()
         return False
@@ -3779,7 +3634,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label.set_text(ngettext("%d foto", "%d foto's", 0) % 0)
         self._loading = False
 
-    # ── Thumbnail klik ────────────────────────────────────────────────
     def on_thumb_clicked(self, index):
         path = self.photos[index] if 0 <= index < len(self.photos) else "?"
         if self._select_mode:
@@ -3796,12 +3650,11 @@ class MainWindow(Adw.ApplicationWindow):
             log_info(_("Thumbnail geklikt → open foto: idx={i} path={p}").format(i=index, p=path))
             self.open_photo(index)
 
-    # ── Sorteren ──────────────────────────────────────────────────────
     def apply_sort(self):
         index = self.sort_combo.get_selected()
         if index in (0, 1):
-            # Pre-compute alle datums eenmaal zodat sort() niet O(n log n)
-            # EXIF-reads triggert maar O(n) + O(n log n) compares.
+            # Precompute dates so sort() does O(n) fetch + O(n log n) compare,
+            # not O(n log n) EXIF reads.
             date_map = {p: get_photo_date(p) for p in self.photos}
             self.photos.sort(key=date_map.get, reverse=(index == 0))
         elif index == 2:
@@ -3844,9 +3697,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.photos = photos
         GLib.idle_add(self.start_load)
 
-    # ── Foto viewer ───────────────────────────────────────────────────
     def open_photo(self, index):
-        # Guard: lege lijst of out-of-range index → niet openen
         if not self.photos or not (0 <= index < len(self.photos)):
             return
         path = self.photos[index]
@@ -3869,21 +3720,18 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add(80, self._scroll_filmstrip_to_current)
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
-        # Pad is hierboven al veilig uit self.photos gehaald (niet self.photos[index])
         threading.Thread(
             target=self._load_full_photo,
             args=(path, load_id),
             daemon=True
         ).start()
 
-# ── Locatie-helpers ─────────────────────────────────────────────
     def _determine_initial_location(self, path):
-        """Geeft (label, coords_for_geocode) terug:
-        - cached city → (city, None)     → toon direct, geen spinner
-        - EXIF coords → ("", coords)     → toon spinner, async lookup
-        - niets        → ("", None)     → niets tonen
-        Cache "" voor foto's zonder GPS ouder dan 30s zodat we niet elke
-        open opnieuw EXIF parsen."""
+        """Returns (label, coords_for_geocode):
+          cached → (city, None): show immediately, no spinner.
+          EXIF   → ("", coords): show spinner, async lookup.
+          none   → ("", None): nothing to show.
+        Caches "" for GPS-less photos older than 30s to skip re-parsing EXIF."""
         cached = self._photo_location.get(path)
         if cached:
             return cached, None
@@ -3893,7 +3741,6 @@ class MainWindow(Adw.ApplicationWindow):
             coords = get_gps_coords(path)
         if coords:
             return "", coords
-        # Geen GPS
         try:
             if cached is None and time.time() - os.path.getmtime(path) > 30:
                 self._photo_location[path] = ""
@@ -3923,9 +3770,8 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _start_geocode_upgrade(self, path, coords, load_id):
-        """Async reverse-geocode. Bij succes: viewer_location toont 'Stad,
-        Land'. Bij falen (geen internet / timeout): fallback naar de rauwe
-        coördinaten zodat de gebruiker nooit de spinner blijft zien."""
+        """Async reverse-geocode; falls back to raw coords so the spinner
+        never gets stuck on failure (offline/timeout)."""
         def _bg():
             city = reverse_geocode(coords[0], coords[1])
             if city:
@@ -3933,7 +3779,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self._photo_location[path] = city
             else:
                 resolved = f"📍 {coords[0]:.4f}, {coords[1]:.4f}"
-                # Niet cachen — bij internet-terug proberen we opnieuw
+                # Don't cache — retry once internet comes back.
             if load_id == self._viewer_load_id:
                 GLib.idle_add(self._update_viewer_location, resolved, load_id)
         threading.Thread(target=_bg, daemon=True).start()
@@ -3969,8 +3815,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._start_geocode_upgrade(path, coords, load_id)
 
     def _update_viewer_location(self, text, load_id):
-        # Guard tegen stale callbacks (user kan inmiddels naar andere foto
-        # genavigeerd zijn).
+        # Guard against stale callbacks when user has already navigated.
         if load_id != self._viewer_load_id:
             return False
         self._set_viewer_location("done", text)
@@ -3978,7 +3823,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_full_photo(self, pixbuf, path, location="", searching=False):
         self._stop_video()
-        self._show_viewer_ui()   # reset opacity/visibility from any previous fade
+        self._show_viewer_ui()   # reset opacity/visibility from any prior fade
         self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
         self.photo_picture.set_visible(True)
@@ -4028,12 +3873,11 @@ class MainWindow(Adw.ApplicationWindow):
             self._schedule_photo_load()
 
     def _schedule_photo_load(self):
-        """Direct tonen bij cache-hit, anders thumbnail-placeholder + async load."""
+        """Cache hit → show immediately; miss → thumbnail placeholder + async."""
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
-        # Counter en prev/next-knoppen meteen updaten zodat bij
-        # pijltjes-ingedrukt-houden de "X / N" realtime meeloopt,
-        # ook als de echte photo-load achterop raakt.
+        # Update counter / prev-next immediately so arrow-key-held navigation
+        # shows "X / N" in real time even when photo loads lag behind.
         try:
             self.viewer_counter.set_text(
                 f"{self.current_index + 1} / {len(self.photos)}"
@@ -4056,14 +3900,13 @@ class MainWindow(Adw.ApplicationWindow):
             return
         path = self.photos[self.current_index]
 
-        # 1. Cache-hit (foto al gepreloaded) → direct tonen, geen debounce
+        # Cache hit (preloaded) → show instantly, no debounce.
         if not is_video(path):
             cached = self._viewer_pixbuf_cache.get(path)
             if cached is not None:
                 self._viewer_pixbuf_cache.move_to_end(path)
-                # Direct zichtbare locatie bepalen + async geocode-upgrade.
-                # Zonder deze call verdween het locatie-label bij prev/next-
-                # navigatie tussen gepreloade foto's (de bug).
+                # Still resolve location here — without it, the location
+                # label disappeared when prev/next'ing through preloaded photos.
                 initial, coords = self._determine_initial_location(path)
                 self._show_full_photo(cached, path, initial, searching=bool(coords))
                 if coords:
@@ -4071,7 +3914,7 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._preload_adjacent_photos)
                 return
 
-        # 2. Cache-miss: toon thumbnail als placeholder (instant feedback)
+        # Cache miss: show the thumbnail as instant placeholder.
         try:
             thumb_path = get_cache_path(path, THUMB_SIZE)
             if os.path.exists(thumb_path):
@@ -4081,7 +3924,6 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
-        # 3. Full-res async; debounce 0ms (geen extra wachttijd)
         self._nav_debounce_id = GLib.timeout_add(0, self._do_scheduled_load)
 
     def _preload_adjacent_photos(self):
@@ -4128,9 +3970,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.toolbar_view.set_reveal_bottom_bars(True)
         except Exception:
             pass
-        # Cluster-filter NIET resetten bij viewer-sluiten — de gebruiker zit nog
-        # in een gefilterde grid en wil daar blijven. Filter gaat pas weg via
-        # on_clear_cluster_filter (✕ knop / info-banner).
+        # Don't clear the cluster filter here — user is still in a filtered
+        # grid; the ✕ on the info-banner is how they exit it.
         self.main_stack.set_visible_child_name("grid")
         GLib.idle_add(self._close_viewer_cleanup)
 
@@ -4143,12 +3984,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._show_viewer_ui()
         return False
 
-    # ── Filmstrip ─────────────────────────────────────────────────────
     def _update_filmstrip(self):
-        """Resize the DrawingArea en laad thumbnails. De filmstrip gebruikt een
-        eigen volgorde (altijd nieuwste-links → oudste-rechts), onafhankelijk
-        van de grid-sortering. Dat is intuïtiever voor viewer-navigatie:
-        links gaat naar een nieuwere foto, rechts naar een oudere."""
+        """Filmstrip always shows newest-left → oldest-right, independent of
+        grid sort — left = newer / right = older is more intuitive in viewer."""
         n = len(self.photos)
         w = n * (FILM_THUMB + 4)
         self.filmstrip_area.set_size_request(max(w, FILM_THUMB + 4), FILM_THUMB + 8)
@@ -4170,8 +4008,7 @@ class MainWindow(Adw.ApplicationWindow):
         n = len(view_order)
         if n == 0:
             return
-        # Zoek de huidige visuele positie (= visual_pos van current_index
-        # in view_order). Start laden vanuit dat centrum naar buiten toe.
+        # Load outward from the visible position (current_index in view_order).
         try:
             center = view_order.index(self.current_index)
         except ValueError:
@@ -4229,17 +4066,15 @@ class MainWindow(Adw.ApplicationWindow):
         if n == 0:
             return
         cell = FILM_THUMB + 4
-        # dark background
         cr.set_source_rgba(0, 0, 0, 0.65)
         cr.rectangle(0, 0, width, height)
         cr.fill()
-        # Alleen zichtbare items tekenen
+        # Only draw visible items.
         adj = self.filmstrip_scroll.get_hadjustment()
         scroll_x = adj.get_value() if adj else 0
         visible_w = adj.get_page_size() if adj else width
         first_visible = max(0, int(scroll_x / cell) - 1)
         last_visible = min(n, int((scroll_x + visible_w) / cell) + 2)
-        # Huidige visuele positie voor de oranje highlight.
         try:
             current_visual = view.index(self.current_index)
         except ValueError:
@@ -4303,9 +4138,8 @@ class MainWindow(Adw.ApplicationWindow):
                 ).start()
 
     def _scroll_filmstrip_to_current(self):
-        """Scroll the filmstrip so the current photo is centered. Voor de
-        eerste/laatste visuele positie valt de clamp naar 0 / (upper-page),
-        dus die komen netjes aan de rand te staan i.p.v. gecentreerd."""
+        """Center current photo in filmstrip; the clamp keeps first/last at
+        the edges instead of forcing them to center."""
         cell = FILM_THUMB + 4
         adj  = self.filmstrip_scroll.get_hadjustment()
         page = adj.get_page_size()
@@ -4322,14 +4156,12 @@ class MainWindow(Adw.ApplicationWindow):
         adj.set_value(max(0, min(target, adj.get_upper() - page)))
         return False
 
-    # ── Video speler ──────────────────────────────────────────────────
-
     def _show_video(self, path, location="", searching=False):
         self._stop_video()
         self._preview_cache = OrderedDict()
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
-        self._show_viewer_ui()   # reset opacity/visibility from any previous fade
+        self._show_viewer_ui()   # reset opacity/visibility from any prior fade
         self.photo_picture.set_visible(False)
         self.edit_btn.set_visible(False)
         self._update_favorite_btn()
@@ -4474,8 +4306,6 @@ class MainWindow(Adw.ApplicationWindow):
             return
         self._video_media.set_volume(scale.get_value())
 
-    # ── Auto-fade viewer UI ───────────────────────────────────────────
-
     def _on_viewer_motion(self, ctrl, x, y):
         if self.main_stack.get_visible_child_name() != "viewer":
             return
@@ -4548,12 +4378,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _fade_tick(self):
         self._fade_step += 1
-        opacity = max(0.0, 1.0 - self._fade_step / 8)  # ~400ms, minder stappen
+        opacity = max(0.0, 1.0 - self._fade_step / 8)  # ~400ms
         widgets = self._video_fade_widgets()
         for w in widgets:
             w.set_opacity(opacity)
-        # De backup-donut mag nooit wegfaden — hij is actieve status-
-        # feedback, geen decoratieve OSD.
+        # Backup donut never fades — it's active status, not decorative OSD.
         if hasattr(self, "_viewer_donut_btn"):
             self._viewer_donut_btn.set_opacity(1.0)
         if opacity <= 0.0:
@@ -4563,8 +4392,6 @@ class MainWindow(Adw.ApplicationWindow):
             self._fade_anim_id = None
             return False
         return True
-
-    # ── Scrubber preview ──────────────────────────────────────────────
 
     def _trigger_scrub_preview(self, fraction):
         if not self._video_media:
@@ -4617,9 +4444,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._preview_cache[ts_s] = None  # mark loading
         self._preview_extracting = True
         path = self.photos[self.current_index]
-        # Koppel extractie aan de huidige viewer-load-id: als user verspringt
-        # naar een andere video voordat ffmpeg klaar is, vallen de late
-        # callbacks weg en zetten we geen frame van een oude video op de UI.
+        # Bind extraction to the current viewer-load-id: if user navigates
+        # away before ffmpeg finishes, the late callback discards its frame.
         load_id = self._viewer_load_id
         threading.Thread(
             target=self._extract_preview_frame,
@@ -4639,7 +4465,7 @@ class MainWindow(Adw.ApplicationWindow):
                 capture_output=True, timeout=8
             )
             if load_id != self._viewer_load_id:
-                # User is al doorgeklikt — verwerp resultaat.
+                # User already navigated away; discard.
                 os.unlink(tmp)
                 return
             pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(tmp, 160, 90, True)
@@ -4655,7 +4481,6 @@ class MainWindow(Adw.ApplicationWindow):
             self._preview_extracting = False
 
     def _apply_preview_frame(self, ts_s, load_id=None):
-        # Skip als we inmiddels op een andere foto/video zitten.
         if load_id is not None and load_id != self._viewer_load_id:
             return False
         pb = self._preview_cache.get(ts_s)
@@ -4744,7 +4569,6 @@ class MainWindow(Adw.ApplicationWindow):
             return True
         return False
 
-    # ── Favorieten ────────────────────────────────────────────────────
     def _current_photo_path(self):
         if 0 <= self.current_index < len(self.photos):
             return self.photos[self.current_index]
@@ -4805,7 +4629,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.load_photos()
 
 
-    # ── Foto editor ───────────────────────────────────────────────────
     def on_edit_current(self, btn):
         path = self._current_photo_path() or "?"
         log_info(_("Editor geopend voor: {name}").format(name=os.path.basename(path)))
@@ -4890,7 +4713,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.crop_overlay_area.queue_draw()
 
     def _get_image_display_rect(self, widget_w, widget_h):
-        """Geeft (x, y, w, h) van de foto binnen de widget (letterbox)."""
+        """Return (x, y, w, h) of the letterboxed image inside the widget."""
         pixbuf = self._editor_display_pixbuf or self._viewer_pixbuf
         if not pixbuf:
             return (0, 0, widget_w, widget_h)
@@ -4902,7 +4725,6 @@ class MainWindow(Adw.ApplicationWindow):
         return ((widget_w - disp_w) / 2, (widget_h - disp_h) / 2, disp_w, disp_h)
 
     def on_crop_draw(self, area, cr, w, h):
-        # Initialiseer crop rect op de foto-grenzen
         if self._crop_rect is None:
             ix, iy, iw, ih = self._get_image_display_rect(w, h)
             self._crop_rect = [ix, iy, ix + iw, iy + ih]
@@ -4910,23 +4732,20 @@ class MainWindow(Adw.ApplicationWindow):
         x1, y1, x2, y2 = self._crop_rect
         rw, rh = x2 - x1, y2 - y1
 
-        # Donkere overlay
         cr.set_source_rgba(0, 0, 0, 0.55)
         cr.paint()
 
-        # Snijgebied uitsparen
         cr.set_operator(cairo.OPERATOR_CLEAR)
         cr.rectangle(x1, y1, rw, rh)
         cr.fill()
         cr.set_operator(cairo.OPERATOR_OVER)
 
-        # Rand
         cr.set_source_rgba(1, 1, 1, 1.0)
         cr.set_line_width(2)
         cr.rectangle(x1, y1, rw, rh)
         cr.stroke()
 
-        # Derde-lijn rasters
+        # Rule-of-thirds gridlines
         cr.set_source_rgba(1, 1, 1, 0.35)
         cr.set_line_width(1)
         for i in (1, 2):
@@ -4936,7 +4755,6 @@ class MainWindow(Adw.ApplicationWindow):
             cr.line_to(x2, y1 + rh * i / 3)
         cr.stroke()
 
-        # Hoekpunten (witte gevulde cirkels)
         HANDLE_R = 7
         for hx, hy in [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]:
             cr.set_source_rgba(0, 0, 0, 0.5)
@@ -4950,7 +4768,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self._crop_rect is None:
             return
         self._crop_rect_origin = list(self._crop_rect)
-        HANDLE_R = 20  # detectie-straal
+        HANDLE_R = 20  # detection radius
         x1, y1, x2, y2 = self._crop_rect
         for name, (hx, hy) in [('tl', (x1, y1)), ('tr', (x2, y1)),
                                 ('bl', (x1, y2)), ('br', (x2, y2))]:
@@ -5045,10 +4863,9 @@ class MainWindow(Adw.ApplicationWindow):
                 ext = os.path.splitext(path)[1].lower()
                 is_jpeg = ext in (".jpg", ".jpeg")
 
-                # Bewaar alle EXIF-metadata (GPS, cameragegevens, etc.)
                 exif = img.getexif() if is_jpeg else None
 
-                # Normaliseer EXIF-oriëntatie zodat PIL en GdkPixbuf overeenkomen
+                # Normalize EXIF orientation so PIL and GdkPixbuf agree.
                 img = ImageOps.exif_transpose(img)
 
                 if rotation != 0:
@@ -5057,14 +4874,13 @@ class MainWindow(Adw.ApplicationWindow):
                     img = img.crop(crop_box)
 
                 if is_jpeg:
-                    # Zet oriëntatie op normaal (1) — pixels zijn nu fysiek correct
+                    # Reset orientation tag to normal (1) — pixels are now physically correct.
                     if exif is not None:
                         exif[0x0112] = 1
                     img.save(path, "JPEG", quality=95,
                              exif=exif.tobytes() if exif is not None else b"")
                 else:
                     img.save(path, "PNG")
-                # Verwijder oude thumbnail-cache en herstel originele datum
                 if os.path.exists(old_cache):
                     os.remove(old_cache)
                 os.utime(path, (original_mtime, original_mtime))
@@ -5094,9 +4910,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         threading.Thread(target=_do_save, daemon=True).start()
 
-    # ── Verwijderen ───────────────────────────────────────────────────
     def on_delete_current(self, btn):
-        # Guard: lege lijst, ongeldige index, of al bezig met een shred
         if not self.photos or not (0 <= self.current_index < len(self.photos)):
             return
         if getattr(self, "_shredding", False):
@@ -5120,19 +4934,16 @@ class MainWindow(Adw.ApplicationWindow):
         if response != "delete":
             log_info(_("Verwijderen geannuleerd: {p}").format(p=path))
             return
-        # Guard: niet twee keer tegelijk shredden
         if getattr(self, "_shredding", False):
             return
         self._shredding = True
-        # Start shred-animatie; na animatie-klaar wordt de file daadwerkelijk
-        # verwijderd en navigeren we naar vorige/volgende foto.
         self._play_shred_animation(path, on_done=self._finish_delete_after_shred)
 
     def _play_shred_animation(self, path, on_done):
-        """Papier-versnipperaar-effect: verdeel de huidige foto in verticale
-        strips, laat ze met vertraging naar beneden vallen + fade out, en
-        roep on_done(path) aan na afloop. Voor video's halen we de gecachte
-        thumbnail op als pixbuf — anders zou delete zonder animatie gebeuren."""
+        """Paper-shredder effect: split the photo into vertical strips that
+        fall + fade with staggered delay, then call on_done(path). For videos
+        we fall back to the cached thumbnail — otherwise delete would happen
+        without animation."""
         pixbuf = getattr(self, "_viewer_pixbuf", None)
         if pixbuf is None and is_video(path):
             try:
@@ -5145,15 +4956,14 @@ class MainWindow(Adw.ApplicationWindow):
             on_done(path)
             return
 
-        # Render de pixbuf EENMAAL naar een cairo ImageSurface. Anders zou
-        # Gdk.cairo_set_source_pixbuf per strip per frame de hele pixbuf naar
-        # GPU moeten uploaden (~14 × 60 = 840 keer per seconde) = lage fps.
-        # Met een ImageSurface doen we de upload één keer.
+        # Render the pixbuf ONCE into a cairo ImageSurface. Otherwise each
+        # strip × frame would re-upload the full pixbuf to the GPU (~14×60 =
+        # 840 uploads/sec, killing fps).
         try:
             anim_pb = pixbuf
             orig_w = anim_pb.get_width()
             orig_h = anim_pb.get_height()
-            # Schaal naar max 1280px voor snellere rendering
+            # Scale to 1280px max for faster rendering.
             MAX_DIM = 1280
             if max(orig_w, orig_h) > MAX_DIM:
                 scale = MAX_DIM / max(orig_w, orig_h)
@@ -5178,10 +4988,8 @@ class MainWindow(Adw.ApplicationWindow):
         draw_area.set_hexpand(True)
         draw_area.set_can_target(False)
         self.viewer_area.add_overlay(draw_area)
-        # Onderliggende picture/video verbergen zodat de thumbnail niet
-        # naast/over de live video staat te flikkeren. Voor video's eerst
-        # media pauzeren en display loskoppelen — anders blijft 'ie spelen
-        # onder de animatie en ziet de user het zwart/foto-gewissel.
+        # Hide picture/video under the overlay. For videos, pause and detach
+        # first — otherwise it keeps playing and flickers under the animation.
         is_vid = is_video(path)
         if is_vid:
             try:
@@ -5211,25 +5019,20 @@ class MainWindow(Adw.ApplicationWindow):
                     delay = (i / N_STRIPS) * 0.35
                     denom = max(0.001, 1.0 - delay)
                     sp = max(0.0, min(1.0, (progress - delay) / denom))
-                    # Ease-in cubic voor meer “zwaartekracht”-gevoel
-                    ease = sp * sp * sp
+                    ease = sp * sp * sp  # cubic ease-in for gravity feel
                     y_off = ease * h * 1.4
                     opacity = max(0.0, 1.0 - sp * 1.05)
                     rot = (sp * 0.4) * (1 if i % 2 else -1)
                     strip_x = x0 + i * strip_w
 
                     cr.save()
-                    # Clip naar de kolom van deze strip
                     cr.rectangle(strip_x, 0, strip_w + 1, h)
                     cr.clip()
-                    # Rotatie rondom het middelpunt van de (verplaatste) strip
                     cx = strip_x + strip_w / 2
                     cy = y0 + disp_h / 2 + y_off
                     cr.translate(cx, cy)
                     cr.rotate(rot)
                     cr.translate(-cx, -cy)
-                    # Teken de cached cairo-surface (originele pixel-grootte)
-                    # geschaald naar display-grootte.
                     cr.translate(x0, y0 + y_off)
                     cr.scale(scale, scale)
                     cr.set_source_surface(surface, 0, 0)
@@ -5255,19 +5058,18 @@ class MainWindow(Adw.ApplicationWindow):
                     self.viewer_area.remove_overlay(draw_area)
                 except Exception:
                     pass
-                # Wis de oude pixbuf vóór set_visible — anders zou photo_picture
-                # even de verwijderde foto tonen voordat on_done de nieuwe laadt.
+                # Clear the old pixbuf before setting visible — otherwise
+                # photo_picture would briefly show the deleted photo before
+                # on_done loads the next one.
                 try:
                     self.photo_picture.set_pixbuf(None)
                     self.viewer_title.set_text("")
                     self._set_viewer_location("empty")
                 except Exception:
                     pass
-                # photo_picture én video_display beide weer zichtbaar zetten;
-                # on_done navigeert naar volgende file en die toont óf een
-                # foto óf een video, dus beide widgets moeten klaar staan.
-                # show_full_photo/show_full_video regelen daarna wie zichtbaar
-                # blijft op basis van de nieuwe file.
+                # Re-show both photo_picture and video_display — on_done
+                # navigates to the next file (photo or video) and
+                # show_full_photo/_show_video picks which stays visible.
                 self.photo_picture.set_visible(True)
                 if is_vid:
                     try:
@@ -5281,10 +5083,8 @@ class MainWindow(Adw.ApplicationWindow):
         draw_area.add_tick_callback(_tick)
 
     def _cleanup_empty_parent_dirs(self, path):
-        """Verwijder lege bovenliggende mappen tot aan de photo_path root.
-        Stopt bij photo_path zelf (mag nooit weg) of bij de eerste niet-lege
-        map. Zo blijft een '2026/' map niet achter als z'n laatste foto is
-        verwijderd."""
+        """Remove empty parent dirs up to photo_path root (which is never
+        removed). Stops at the first non-empty dir."""
         photo_root = self.settings.get("photo_path")
         if not photo_root:
             return
@@ -5293,27 +5093,25 @@ class MainWindow(Adw.ApplicationWindow):
         while (parent != photo_root
                and parent.startswith(photo_root + os.sep)):
             try:
-                os.rmdir(parent)  # slaagt alleen als leeg
+                os.rmdir(parent)  # only succeeds when empty
                 log_info(_("Lege map opgeruimd: {p}").format(p=parent))
             except OSError:
-                break  # niet leeg of geen rechten → stop
+                break
             parent = os.path.dirname(parent)
 
     def _finish_delete_after_shred(self, path):
-        """Na-animatie: daadwerkelijk verwijderen + navigeren."""
+        """Post-animation: actually delete + navigate."""
         n_before = len(self.photos)
         try:
             os.remove(path)
             log_info(_("Foto verwijderd: {p}").format(p=path))
         except FileNotFoundError:
-            # File was al weg (vorige delete, externe tool, watcher-race).
-            # Niet fataal — gewoon doorgaan met photos-list update + navigatie.
+            # Already gone (prior delete / external tool / watcher race).
             log_warn(_("Bestand al weg van disk: {p}").format(p=path))
         except Exception as e:
             log_error(_("Verwijderen mislukt: {err}").format(err=e))
             self._shredding = False
             return
-        # Cache-thumbnail ook weghalen (best-effort, faalt niet de flow)
         try:
             cache_path = get_cache_path(path)
             if os.path.exists(cache_path):
@@ -5324,10 +5122,8 @@ class MainWindow(Adw.ApplicationWindow):
         if path in self._favorites:
             self._favorites.discard(path)
             self._schedule_save_favorites()
-        # Gebruik list-comprehension i.p.v. self.photos.remove(path) zodat het
-        # altijd slaagt, ook als path om welke reden ook niet exact in de list
-        # zit (watcher-reload race e.d.). Log de count om bugs zichtbaar te
-        # maken in de dev-terminal.
+        # List-comprehension (not .remove()) so watcher-reload races never
+        # raise when path isn't in the list. Log count to surface bugs.
         self.photos = [p for p in self.photos if p != path]
         n_after = len(self.photos)
         log_info(_("photos-list: {before} → {after}").format(before=n_before, after=n_after))
@@ -5339,8 +5135,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self.current_index >= len(self.photos):
             self.current_index = len(self.photos) - 1
         next_path = self.photos[self.current_index]
-        # Filmstrip-thumbs opnieuw laten bouwen + queue_draw meteen zodat de
-        # tape niet meer de verwijderde foto toont.
+        # Rebuild filmstrip thumbs + redraw so the deleted photo vanishes.
         self._filmstrip_thumbs = {}
         try:
             self.filmstrip_area.queue_draw()
@@ -5348,7 +5143,6 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         GLib.idle_add(self._update_filmstrip)
         GLib.timeout_add(80, self._scroll_filmstrip_to_current)
-        # Viewer-counter alvast bijwerken (_show_full_photo zou dat later doen)
         try:
             self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         except Exception:
@@ -5400,8 +5194,7 @@ class MainWindow(Adw.ApplicationWindow):
             if path in self._favorites:
                 self._favorites.discard(path)
                 fav_changed = True
-        # Lege mappen opruimen ná alle files — zodat bv. 2026/foto1.jpg en
-        # 2026/foto2.jpg samen gewist de map 2026/ opruimen, niet tussendoor.
+        # Clean up empty dirs AFTER all files are gone so we don't stop early.
         for path in paths_to_delete:
             self._cleanup_empty_parent_dirs(path)
         if fav_changed:
@@ -5409,27 +5202,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.toggle_select_mode()
         self.load_photos()
 
-    # ── Instellingen ──────────────────────────────────────────────────
     def on_settings_clicked(self, btn):
-        # Settings-knop uitgrijzen zolang dialog open is, zodat je niet
-        # meerdere instances naast elkaar kan openen.
         if self._settings_dialog is not None:
             self._settings_dialog.present()
             return
         log_info(_("Instellingen geopend"))
-        # Gebruik PreferencesWindow (eigen toplevel) i.p.v.
-        # PreferencesDialog — die laatste blokkeert op Adw 1.5+ de
-        # close-request van het hoofdvenster: GNOME's "Close N windows"
-        # kan Pixora dan niet afsluiten terwijl settings open is.
+        # PreferencesWindow (own toplevel) instead of PreferencesDialog —
+        # on Adw 1.5+ the latter blocks the main window's close-request, so
+        # GNOME "Close N windows" can't kill Pixora while settings is open.
         dialog = Adw.PreferencesWindow()
         dialog.set_title(_("Instellingen"))
         dialog.set_transient_for(self)
         dialog.set_modal(False)
-        # PreferencesWindow defaultet op ~360px hoog — te kort voor onze
-        # rijen. Matcht nu ongeveer de Adw.PreferencesDialog-hoogte.
         dialog.set_default_size(640, 720)
-        # Standaard toont PreferencesWindow een zoekicoontje; we hebben
-        # geen 50 rijen dus die verbergen we.
         dialog.set_search_enabled(False)
         self._settings_dialog = dialog
         if hasattr(self, "settings_btn"):
@@ -5511,9 +5296,8 @@ class MainWindow(Adw.ApplicationWindow):
         )
         thumb_row.add_suffix(thumb_reset_btn)
 
-        # Vinkje-knop die pas scherpstelt en opslaat als de gebruiker klikt.
-        # Tot die tijd verandert er niets aan de grid → geen vastloper bij
-        # sliden.
+        # Apply button — grid is only regenerated on click, so sliding
+        # doesn't freeze the UI.
         self._thumb_apply_btn = Gtk.Button(icon_name="emblem-ok-symbolic")
         self._thumb_apply_btn.add_css_class("flat")
         self._thumb_apply_btn.add_css_class("circular")
@@ -5525,8 +5309,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         display_group.add(thumb_row)
 
-        # Voorbeeld onder de slider — schaalt mee tijdens sliden zonder de
-        # echte thumbnails aan te raken (anders vastloper op home).
+        # Preview updates live while sliding without touching real thumbnails.
         self._thumb_preview = Gtk.DrawingArea()
         self._thumb_preview.set_content_width(140)
         self._thumb_preview.set_content_height(140)
@@ -5540,7 +5323,6 @@ class MainWindow(Adw.ApplicationWindow):
         preview_row.set_activatable(False)
         display_group.add(preview_row)
 
-        # Taal-keuze
         lang_row = Adw.ActionRow(
             title=_("Taal"),
             subtitle=_("Herstart van Pixora is nodig om een nieuwe taal te laden")
@@ -5671,8 +5453,7 @@ class MainWindow(Adw.ApplicationWindow):
         dup_group = Adw.PreferencesGroup()
         dup_group.set_title(_("Duplicaat-detectie"))
         dup_group.set_description(_("Controleer bij import of foto's al bestaan"))
-        # Threshold=0 betekent uit, >=1 betekent aan. Aan gebruikt altijd
-        # strict (=1) voor de hoogste accuratie.
+        # Threshold 0 = off, ≥1 = on. "On" always uses strict (=1) for accuracy.
         dup_on = self.settings.get("duplicate_threshold", 2) != 0
 
         dup_info_row = Adw.ActionRow(
@@ -5824,8 +5605,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.settings_dedup_switch = Gtk.Switch()
         self.settings_dedup_switch.set_valign(Gtk.Align.CENTER)
-        # Automatisch uit als hoofd-dup-detectie uit staat — de USB-check hergebruikt
-        # dezelfde pHash-engine en is zinloos zonder.
+        # USB-dedup reuses the pHash engine; force off when main detection is off.
         if not dup_on:
             self.settings_dedup_switch.set_active(False)
             if self.settings.get("backup_dedup"):
@@ -5851,8 +5631,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dedup_row = dedup_row
         backup_group.add(dedup_row)
 
-        # Silent-mode switch: scan-dialog wordt overgeslagen, backup start
-        # automatisch. Error-popups blijven staan.
+        # Silent-mode: skip scan-dialog and auto-start backup. Errors still popup.
         self.settings_silent_switch = Gtk.Switch()
         self.settings_silent_switch.set_valign(Gtk.Align.CENTER)
         self.settings_silent_switch.set_active(bool(self.settings.get("backup_silent")))
@@ -5877,7 +5656,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_manual_scan_btn.set_valign(Gtk.Align.CENTER)
         self.settings_manual_scan_btn.set_size_request(120, 32)
         self.settings_manual_scan_btn.connect("clicked", self.on_settings_manual_scan)
-        # Drie states: idle (label), checking (spinner), uptodate (✓ 5s fade)
+        # States: idle (label), checking (spinner), uptodate (✓ 5s fade).
         self._scan_btn_stack = Gtk.Stack()
         self._scan_btn_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self._scan_btn_stack.set_transition_duration(250)
@@ -5895,8 +5674,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._scan_btn_stack.add_named(_scan_ok, "uptodate")
         self.settings_manual_scan_btn.set_child(self._scan_btn_stack)
         self._scan_btn_fade_id = None
-        # Als er al een scan/backup/sync loopt op moment dat settings opent,
-        # meteen de spinner tonen zodat de gebruiker niet tevergeefs klikt.
+        # If a scan/backup is already running when settings opens, show the
+        # spinner immediately so the user doesn't click in vain.
         if self._backup_scanning or self._backup_running:
             self._scan_btn_stack.set_visible_child_name("checking")
             self._scan_check_spinner.start()
@@ -5918,7 +5697,6 @@ class MainWindow(Adw.ApplicationWindow):
         about_group = Adw.PreferencesGroup()
         about_group.set_title(_("Over"))
 
-        # App info row
         app_row = Adw.ActionRow(
             title=_("Pixora"),
             subtitle=_("Met ❤ gemaakt door LinuxGinger"))
@@ -5943,7 +5721,6 @@ class MainWindow(Adw.ApplicationWindow):
         app_row.add_suffix(github_btn)
         about_group.add(app_row)
 
-        # Versie row
         installed_version_path = os.path.join(os.path.expanduser("~"), ".config", "pixora", "installed_version")
         try:
             with open(installed_version_path) as _ivf:
@@ -5953,12 +5730,10 @@ class MainWindow(Adw.ApplicationWindow):
         version_row = Adw.ActionRow(title=_("Versie"), subtitle=installed_ver)
         about_group.add(version_row)
 
-        # Controleer op updates row
         self._update_check_row = Adw.ActionRow(title=_("Controleer op updates"))
 
-        # De Controleer-knop heeft vier states die we via een Gtk.Stack
-        # schakelen — idle (label), checking (spinner), uptodate (vinkje),
-        # available (uitroepteken dat pulseert).
+        # Button has 4 states in a Gtk.Stack: idle / checking / uptodate /
+        # available (the pulsing variant).
         self._update_check_state = "idle"
         self._update_check_pulse_id = None
         self._update_check_fade_id = None
@@ -6002,7 +5777,7 @@ class MainWindow(Adw.ApplicationWindow):
         about_group.add(self._update_check_row)
         about_page.add(about_group)
 
-        # Als de auto-startup-check al een update vond: knop direct pulseren.
+        # Auto-startup-check already found an update → button pulses now.
         if self._pending_update_version:
             self._update_remote_version = self._pending_update_version
             self._update_check_row.set_subtitle(
@@ -6010,9 +5785,8 @@ class MainWindow(Adw.ApplicationWindow):
             )
             self._set_update_state("available")
 
-        # Credit-regel ONDER de Over-box, in de open ruimte van de About-page.
-        # Adw.PreferencesGroup met alleen set_description en geen rijen rendert
-        # als freestanding dim-label tekst zonder eigen boxed-list.
+        # Credit line below the About box. An Adw.PreferencesGroup with only
+        # a description (no rows) renders as a free-standing dim-label.
         credit_group = Adw.PreferencesGroup()
         credit_group.set_description(
             _("GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc.")
@@ -6022,7 +5796,6 @@ class MainWindow(Adw.ApplicationWindow):
         )
         about_page.add(credit_group)
 
-        # Licentie-row met "Bekijken"-knop die de GPL-3 popup opent.
         license_group = Adw.PreferencesGroup()
         license_row = Adw.ActionRow(
             title=_("Licentie"),
@@ -6047,7 +5820,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_thumb_size_changed(self, scale, row):
         new_size = int(scale.get_value())
-        # Snap naar stappen van 20
+        # Snap to steps of 20.
         new_size = (new_size // 20) * 20
         row.set_subtitle(f"{new_size} px")
         self._pending_thumb_size = new_size
@@ -6060,12 +5833,10 @@ class MainWindow(Adw.ApplicationWindow):
             self._thumb_apply_btn.set_sensitive(new_size != THUMB_SIZE)
 
     def _draw_thumb_preview(self, area, cr, w, h):
-        """Mockup van Pixora's home-grid met portret+landscape mix,
-        gecentreerd. Klein Pixora-icoon in de header-zone."""
+        """Mock home-grid (portrait+landscape mix) with mini Pixora icon."""
         try:
             size = getattr(self, "_pending_thumb_size", THUMB_SIZE)
-            # Clip het hele canvas naar een rounded rect zodat achtergrond,
-            # header-balk en tegels automatisch binnen de ronde vorm blijven.
+            # Clip whole canvas to a rounded rect so bg/header/tiles stay inside.
             outer_r = 10.0
             cr.new_sub_path()
             cr.arc(w - outer_r, outer_r, outer_r, -math.pi / 2, 0)
@@ -6074,17 +5845,14 @@ class MainWindow(Adw.ApplicationWindow):
             cr.arc(outer_r, outer_r, outer_r, math.pi, 3 * math.pi / 2)
             cr.close_path()
             cr.clip()
-            # Canvas-achtergrond (licht-grijs kader).
             cr.set_source_rgba(0.5, 0.5, 0.5, 0.08)
             cr.rectangle(0, 0, w, h)
             cr.fill()
 
-            # Header-balk met mini-logo (als er plek voor is).
             header_h = 14.0
             cr.set_source_rgba(0.5, 0.5, 0.5, 0.14)
             cr.rectangle(0, 0, w, header_h)
             cr.fill()
-            # Mini Pixora-icoon linksboven — rendered via Gdk.Pixbuf naar Cairo
             if not hasattr(self, "_thumb_preview_logo"):
                 try:
                     icon_path = os.path.join(ASSETS_DIR, "pixora-icon.svg")
@@ -6106,12 +5874,12 @@ class MainWindow(Adw.ApplicationWindow):
                     cr.paint()
                 except Exception:
                     pass
-            # Een paar "titel"-lijntjes naast logo voor app-feel.
+            # Title-stripes next to the logo for app-feel.
             cr.set_source_rgba(0.5, 0.5, 0.5, 0.35)
             cr.rectangle(18, header_h / 2 - 1, 28, 2)
             cr.fill()
 
-            # Schaling: 200→500 px echt. 12% lijkt prettig in 140-wide canvas.
+            # 12% scale reads well in the 140-wide canvas (true range 200→500 px).
             scale = 0.12
             base = size * scale
             gap = max(3.0, base * 0.08)
@@ -6119,26 +5887,19 @@ class MainWindow(Adw.ApplicationWindow):
             pad_top = header_h + 6.0
             radius = max(3.0, base * 0.06)
 
-            # Mockup-patroon: mix van landscape (breed) + portret (smal) +
-            # vierkant. Herhaalbare serie die over meerdere rijen doorloopt.
-            # Elke tuple = (w-factor, h-factor).
+            # Mix of landscape / portrait / square, repeating across rows.
             pattern = [
-                (1.3, 1.0),   # landscape
-                (0.75, 1.0),  # portret
-                (1.0, 1.0),   # square
-                (0.75, 1.0),  # portret
-                (1.3, 1.0),   # landscape
-                (1.0, 1.0),   # square
+                (1.3, 1.0), (0.75, 1.0), (1.0, 1.0),
+                (0.75, 1.0), (1.3, 1.0), (1.0, 1.0),
             ]
 
-            # Centreer de grid horizontaal door eerst de layout te plannen.
             inner_w = w - 2 * pad_x
             inner_h = h - pad_top - pad_x
             rows_layout = []
             current_row = []
             current_w = 0.0
             idx = 0
-            row_h = base  # alle tegels delen dezelfde rij-hoogte voor netheid
+            row_h = base
             while True:
                 fw, _fh = pattern[idx % len(pattern)]
                 tile_w = base * fw
@@ -6147,14 +5908,13 @@ class MainWindow(Adw.ApplicationWindow):
                     if current_row:
                         rows_layout.append((current_row, current_w))
                     current_row, current_w = [], 0.0
-                    # Begrens aantal rijen op wat past.
                     if (len(rows_layout)) * (row_h + gap) >= inner_h:
                         break
                     continue
                 current_row.append((tile_w, row_h))
                 current_w += (gap if len(current_row) > 1 else 0) + tile_w
                 idx += 1
-                if idx > 60:  # sanity
+                if idx > 60:
                     break
             if current_row and \
                (len(rows_layout) + 1) * (row_h + gap) - gap <= inner_h:
@@ -6170,7 +5930,6 @@ class MainWindow(Adw.ApplicationWindow):
 
             y = pad_top
             for tiles, total_w in rows_layout:
-                # Horizontaal centreren per rij.
                 x = pad_x + (inner_w - total_w) / 2
                 for tw, th in tiles:
                     cr.set_source_rgba(0.5, 0.5, 0.5, 0.35)
@@ -6329,7 +6088,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         log_info(_("Taal gewijzigd naar: {lang} — Pixora wordt herstart").format(lang=new_lang))
 
-        # Laad translation in NIEUWE taal voor de overlay-tekst
+        # Load translation in the NEW language for the overlay text.
         try:
             new_trans = _gettext_mod.translation(
                 "pixora", localedir=_LOCALE_DIR,
@@ -6339,8 +6098,7 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             msg = _("Taal wordt gewijzigd…")
 
-        # Modale overlay met spinner + tekst — niet sluitbaar, user
-        # moet wachten tot relaunch.
+        # Non-closable modal overlay until relaunch.
         overlay = Gtk.Window()
         overlay.set_modal(True)
         overlay.set_transient_for(self)
@@ -6433,9 +6191,8 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _restart_app(self):
         try:
-            # Strip zowel IN_DEV_TERM als DEV_LOG_OPENED zodat de nieuwe
-            # main.py weer opnieuw een dev-terminal kan spawnen i.p.v. te
-            # denken dat hij al in één draait.
+            # Strip IN_DEV_TERM + DEV_LOG_OPENED so the new main.py spawns a
+            # fresh dev-terminal instead of assuming it already runs in one.
             env = {
                 k: v for k, v in os.environ.items()
                 if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")
@@ -6448,9 +6205,8 @@ class MainWindow(Adw.ApplicationWindow):
                     os.path.dirname(__file__), "main.py"
                 ))
                 relaunch = f'{sys.executable!s} {script!s}'
-            # 1.5s sleep voor D-Bus unique-name release; extra marge voor
-            # trage systemen. Log naar een bestand zodat we eventuele
-            # relaunch-fouten zien ook als de dev-terminal weg is.
+            # 1.5s sleep gives D-Bus time to release the unique name; log to
+            # file so relaunch errors are visible after the dev-terminal closes.
             log_file = os.path.expanduser("~/.cache/pixora/relaunch.log")
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
             subprocess.Popen(
@@ -6476,11 +6232,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings["reorganize_silent"] = bool(switch.get_active())
         save_settings(self.settings)
 
-    # ── Mapstructuur — re-organizer ─────────────────────────────────
     def _count_media(self, paths):
-        """Geeft (foto's, video's) terug voor een lijst Path- of tuple-items.
-        Moves zijn (src, dst) tuples, dups zijn losse Paths — beide vormen
-        werken, we kijken naar de src-extensie."""
+        """Return (photos, videos). Accepts bare Paths or (src, dst) tuples."""
         photos = 0
         videos = 0
         for item in paths:
@@ -6492,7 +6245,7 @@ class MainWindow(Adw.ApplicationWindow):
         return photos, videos
 
     def _format_media_counts(self, photos, videos):
-        """Tekst zoals '3 foto's en 1 video'. Enkelvoud/meervoud via ngettext."""
+        """Localized "3 photos and 1 video" (ngettext)."""
         parts = []
         if photos:
             parts.append(ngettext(
@@ -6508,10 +6261,8 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _photo_date_for_structure(self, src, st, exif_tags, video_exts,
                                   video_date_fn):
-        """EXIF (foto) / ffprobe (video) eerst, mtime als fallback. Geeft een
-        datetime terug die in _dest_path gaat voor de jaar/maand-map. We
-        slaan de iPhone-filename-heuristiek uit get_photo_date bewust over —
-        die geeft een sorteersleutel terug, geen echte timestamp."""
+        """EXIF/ffprobe first, mtime fallback. Skips get_photo_date's iPhone-
+        filename heuristic deliberately — that returns a sort key, not a date."""
         ext = src.suffix.lower()
         if ext in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng",
                    ".tiff", ".tif"):
@@ -6519,16 +6270,14 @@ class MainWindow(Adw.ApplicationWindow):
                 from PIL import Image
                 with Image.open(str(src)) as img:
                     exif = img.getexif()
-                # DateTimeOriginal (36867) en DateTimeDigitized (36868)
-                # zitten in de ExifIFD-sub (pointer-tag 0x8769), niet in
-                # de main IFD. Zonder deze sub-IFD zouden we alleen tag 306
-                # (ModifyDate) vinden — die wordt bij elke edit bijgewerkt.
+                # DateTimeOriginal (36867) + DateTimeDigitized (36868) live in
+                # the ExifIFD sub (pointer tag 0x8769), not the main IFD.
+                # Without the sub-IFD we'd only find tag 306 (ModifyDate),
+                # which updates on every edit.
                 try:
                     exif_sub = exif.get_ifd(0x8769)
                 except Exception:
                     exif_sub = {}
-                # Zoek eerst in ExifIFD (originele + digitized), daarna pas
-                # in de main IFD (voor DateTime = 306).
                 sources = []
                 for tag in exif_tags:
                     if tag in (36867, 36868):
@@ -6555,9 +6304,8 @@ class MainWindow(Adw.ApplicationWindow):
         return datetime.datetime.fromtimestamp(st.st_mtime)
 
     def _scan_structure_mismatch(self):
-        """Return (moves, dups) waar moves = [(Path src, Path dst), ...]
-        en dups = [Path, ...] bit-identieke duplicaten die op een ander pad
-        staan dan target."""
+        """Return (moves, dups). moves = [(src, dst), ...] for files at a
+        wrong path; dups = bit-identical duplicates at non-target paths."""
         from pathlib import Path as _P
         from importer_page import (
             dest_path as _dest_path, SUPPORTED_EXT,
@@ -6586,7 +6334,7 @@ class MainWindow(Adw.ApplicationWindow):
                 if src.resolve() == dst.resolve():
                     reserved_targets.add(str(dst.resolve()))
                     continue
-                # Target bestaat al of is al gereserveerd door een andere src
+                # Target exists or already reserved by another src.
                 dst_str = str(dst.resolve() if dst.exists() else dst)
                 if dst.exists() or dst_str in reserved_targets:
                     try:
@@ -6598,7 +6346,7 @@ class MainWindow(Adw.ApplicationWindow):
                                 continue
                     except OSError:
                         pass
-                    # Niet identiek → unieke suffix bedenken
+                    # Not identical → find a unique suffix.
                     stem = dst.stem
                     ext = dst.suffix
                     counter = 1
@@ -6614,8 +6362,8 @@ class MainWindow(Adw.ApplicationWindow):
         return moves, dups
 
     def _prompt_reorganize(self, from_startup=False):
-        """Toon dialog met aantallen + confirm. Als from_startup=True en er
-        niks te doen is → geen dialog. Anders altijd feedback."""
+        """Show confirm dialog with counts. Silent when from_startup and
+        nothing to do; always shows feedback otherwise."""
         self._reorganize_active = True
         def _scan():
             moves, dups = self._scan_structure_mismatch()
@@ -6635,8 +6383,8 @@ class MainWindow(Adw.ApplicationWindow):
                 dlg.set_close_response("ok")
                 self._present_dialog(dlg)
             return False
-        # Silent-modus: geen popup, geen fullscreen, direct uitvoeren.
-        # Geldt voor zowel auto-detectie als manueel klikken op "Opruimen".
+        # Silent mode: no popup, no fullscreen, run immediately. Applies to
+        # both auto-detection and a manual "Opruimen" click.
         if self.settings.get("reorganize_silent", False):
             self._reorganize_silent_run = True
             log_info(_("Reorganize stil gestart: {m} moves, {d} dups").format(
@@ -6678,8 +6426,7 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         dlg.connect("response", self._on_reorganize_response, moves, dups)
-        # Pauzeer een lopende video-afspelende viewer zolang de popup staat —
-        # de user zit midden in iets. Resumen gebeurt bij "Later" of "cancel".
+        # Pause any playing viewer video while the popup is up.
         self._pause_video_for_popup()
         self._present_dialog(dlg)
         return False
@@ -6717,20 +6464,16 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_reorganize_response(self, dlg, response, moves, dups):
         if response != "go":
             self._reorganize_active = False
-            # User koos "Later" → geen auto-popup meer deze sessie.
-            # Manual "Opruimen"-knop werkt wel.
+            # "Later" → no more auto-popup this session; manual still works.
             self._structure_popup_dismissed = True
-            # Video mag weer verder.
             self._resume_video_after_popup()
             return
         if self._reorganize_moving:
-            # Defensive: voorkom dubbele thread-start als signal 2× binnenkomt.
+            # Defensive: prevent double thread-start on repeated signal.
             return
-        # Instellingen-dialog laten we open — Adw.PreferencesDialog
-        # crasht native (SIGSEGV) als we 'm van hieruit proberen te
-        # sluiten (force_close én close). De fullscreen-page wordt wel
-        # gewisseld in main_stack; zodra de gebruiker settings zelf
-        # sluit is die zichtbaar.
+        # Leave the settings dialog open — force_close/close on Adw
+        # PreferencesDialog from a signal handler crashes with SIGSEGV.
+        # The fullscreen page still swaps in main_stack underneath.
         threading.Thread(
             target=self._do_reorganize, args=(moves, dups), daemon=True,
         ).start()
@@ -6739,9 +6482,9 @@ class MainWindow(Adw.ApplicationWindow):
         import shutil as _sh
         from pathlib import Path as _P
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
-        # File-watcher uitzetten: elke move triggert anders een reload_photos
-        # die tegelijkertijd met onze verplaatsingen loopt → _load_thread
-        # crasht op FileNotFoundError. Opnieuw starten in _reorganize_done.
+        # Disable the file-watcher — every move would trigger reload_photos
+        # and _load_thread would crash on FileNotFoundError mid-move.
+        # Re-enabled in _reorganize_done.
         try:
             self.stop_watcher()
         except Exception:
@@ -6750,8 +6493,8 @@ class MainWindow(Adw.ApplicationWindow):
         removed = 0
         errors = []
         total = max(1, len(moves) + len(dups))
-        # Totale bytes vooraf bepalen voor GB-teller. Src-grootte is wat we
-        # daadwerkelijk "verwerken" — verplaatsen of verwijderen.
+        # Precompute total bytes for the GB counter. Src size is what we
+        # actually "process" (move or delete).
         total_bytes = 0
         sizes_moves = []
         sizes_dups = []
@@ -6777,13 +6520,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_done_bytes = 0
         self._reorganize_start_time = time.time()
         self._reorganize_current_name = ""
-        # Label voor de live-subtitle: onderscheidt foto's en video's.
         tot_ph = sum(1 for s, _d in moves if not is_video(str(s)))
         tot_vi = sum(1 for s, _d in moves if is_video(str(s)))
         tot_ph += sum(1 for d in dups if not is_video(str(d)))
         tot_vi += sum(1 for d in dups if is_video(str(d)))
         self._reorganize_total_label = self._format_media_counts(tot_ph, tot_vi)
-        # Silent-mode: geen fullscreen, wel de donut als progress-indicator.
+        # Silent mode: donut-only progress (no fullscreen).
         if self._reorganize_silent_run:
             GLib.idle_add(self._on_reorganize_silent_start)
         else:
@@ -6835,7 +6577,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._reorganize_done_count = done
             self._reorganize_done_bytes += sz
             self._reorganize_fraction = done / total
-        # Lege mappen opruimen (bottom-up, behalve de root)
+        # Prune empty dirs bottom-up (never the root itself).
         for root, _dirs, _files in os.walk(str(photo_path), topdown=False):
             if root == str(photo_path):
                 continue
@@ -6861,13 +6603,13 @@ class MainWindow(Adw.ApplicationWindow):
         if not self._backup_scanning and not self._backup_running:
             self._set_donuts_visible(False)
         self._redraw_donuts()
-        # File-watcher weer aan voordat we reload_photos doen — zodat
-        # toekomstige wijzigingen buiten reorganize weer opgemerkt worden.
+        # Re-enable file-watcher before reload_photos so future external
+        # changes are picked up again.
         try:
             self.start_watcher(self.settings.get("photo_path"))
         except Exception:
             pass
-        # Silent-mode: geen UI, alleen reload + cooldown.
+        # Silent mode: reload + cooldown, no UI.
         if self._reorganize_silent_run:
             self._reorganize_silent_run = False
             self.reload_photos()
@@ -6876,9 +6618,8 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.timeout_add_seconds(
                 10, self._maybe_trigger_backup_after_reorganize)
             return False
-        # Niet-silent: de fullscreen blijft staan met stats + Sluiten-knop.
-        # De cleanup (terug naar grid, cooldown, backup-trigger) gebeurt
-        # pas als user op Sluiten klikt — zie _on_reorganize_close_clicked.
+        # Non-silent: fullscreen stays up with stats + Close button; cleanup
+        # (back-to-grid + cooldown + backup trigger) runs on close click.
         parts = []
         if moved:
             parts.append(_("{c} verplaatst").format(
@@ -6912,8 +6653,8 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_reorganize_close_clicked(self, _btn):
-        """Sluit-knop op de fullscreen reorganize-page: terug naar de grid
-        (of waar user vandaan kwam) + cooldown-timer, backup-trigger, etc."""
+        """Close the fullscreen reorganize page: back to grid + cooldown +
+        backup trigger."""
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
         return_to = getattr(self, "_reorganize_return_page", "grid") or "grid"
@@ -6929,7 +6670,7 @@ class MainWindow(Adw.ApplicationWindow):
             10, self._maybe_trigger_backup_after_reorganize)
 
     def _build_reorganize_page(self):
-        """Fullscreen voortgangs-page, zelfde indeling als ImporterPage."""
+        """Fullscreen progress page, same layout as ImporterPage."""
         clamp = Adw.Clamp()
         clamp.set_maximum_size(480)
         clamp.set_valign(Gtk.Align.CENTER)
@@ -6983,8 +6724,8 @@ class MainWindow(Adw.ApplicationWindow):
         return clamp
 
     def _on_reorganize_progress_start(self):
-        """Main-thread: wissel naar fullscreen reorganize-page en start de
-        voortgangs-tick die de labels periodiek vernieuwt."""
+        """Main-thread: swap to fullscreen reorganize page and start the
+        progress tick that periodically refreshes the labels."""
         self._reorganize_return_page = \
             self.main_stack.get_visible_child_name() or "grid"
         self.header.set_visible(False)
@@ -7004,7 +6745,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.reorganize_subtitle.set_text("")
         if hasattr(self, "reorganize_detail"):
             self.reorganize_detail.set_text("")
-        # Donut verbergen zolang de fullscreen-page aan staat.
+        # Hide donut while fullscreen page is visible.
         if not self._backup_scanning and not self._backup_running:
             self._set_donuts_visible(False)
         if self._reorganize_anim_id is None:
@@ -7013,8 +6754,8 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_reorganize_silent_start(self):
-        """Silent-mode: alleen de donut tonen (geen fullscreen-wissel).
-        De tick verzorgt het periodieke redraw zodat de arc vult."""
+        """Silent mode: show only the donut (no fullscreen swap); the tick
+        periodically redraws it so the arc fills."""
         tip = _("Mappenstructuur bijwerken…")
         self._set_donuts_visible(True)
         if hasattr(self, "_backup_donut_btn"):
@@ -7031,8 +6772,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not self._reorganize_moving:
             self._reorganize_anim_id = None
             return False
-        # Donut vullen (silent-mode) en fullscreen-labels updaten indien
-        # beschikbaar. Beide trajecten delen dezelfde tick.
+        # Fill donut (silent) and update fullscreen labels when present.
         self._redraw_donuts()
         if not hasattr(self, "reorganize_bar") \
                 or self.main_stack.get_visible_child_name() != "reorganize":
@@ -7069,8 +6809,7 @@ class MainWindow(Adw.ApplicationWindow):
         return ngettext("{n} minuut", "{n} minuten", mins).format(n=mins)
 
     def _maybe_trigger_backup_after_reorganize(self):
-        """One-shot: 10s na _reorganize_done. Start backup-scan als alles
-        geconfigureerd is en er niks anders loopt."""
+        """One-shot 10s after _reorganize_done: start backup-scan if idle."""
         try:
             if self._backup_running or self._backup_scanning:
                 return False
@@ -7087,8 +6826,8 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _maybe_check_structure_on_startup(self):
-        """Na home-grid+2s: kick off de eerste structuur+backup-scan via
-        _periodic_scan. Daarna blijft de 60s-tick het werk doen."""
+        """Home-grid +2s: kick off the first structure+backup scan via
+        _periodic_scan; the 60s tick handles the rest."""
         if self._structure_startup_scanned:
             return False
         ready_at = getattr(self, "_home_ready_at", None)
@@ -7100,9 +6839,8 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _trigger_structure_scan(self):
-        """Start een stille structuur-scan op een thread; de callback
-        laat de reorganize-popup zien (bij mismatch én niet-dismissed) of
-        triggert een backup-scan als er niks te doen is."""
+        """Silent threaded structure-scan. Callback shows the reorganize popup
+        on mismatch (unless dismissed), else triggers a backup-scan."""
         if self._structure_scanning:
             return
         self._structure_scanning = True
@@ -7128,7 +6866,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_periodic_structure_done(self, moves, dups):
         self._structure_scanning = False
-        # Donut alleen verbergen als er ook geen backup-scan/run draait.
+        # Only hide donut when nothing else is running.
         if not self._backup_scanning and not self._backup_running:
             self._set_donuts_visible(False)
         self._redraw_donuts()
@@ -7142,19 +6880,17 @@ class MainWindow(Adw.ApplicationWindow):
         if had_mismatch and not self._structure_popup_dismissed \
                 and not self._reorganize_active:
             self._reorganize_active = True
-            # Silent-check gebeurt in _on_reorganize_scan_done zodat zowel
-            # auto als manual pad het respecteert.
+            # Silent-check is inside _on_reorganize_scan_done so both auto
+            # and manual paths respect it.
             self._on_reorganize_scan_done(moves, dups, True)
             return False
-        # Geen mismatch (of popup al afgewezen deze sessie) → backup mag.
         self._maybe_trigger_backup_now()
         return False
 
     def _maybe_trigger_backup_now(self):
-        """Start backup-scan als niks draait, backup is ingeschakeld en de
-        drive beschikbaar is. Skip als we net 'alles gesynct' zagen en
-        er sindsdien niks is geïmporteerd — anders oneindige scan-lus bij
-        grote USB's waar de rsync-dry-run minutenlang duurt."""
+        """Start backup-scan if idle, configured, drive present. Skip when
+        "all synced" was just seen and nothing has imported since — otherwise
+        large USBs with multi-minute rsync dry-runs would loop."""
         try:
             if self._backup_running or self._backup_scanning:
                 return
@@ -7167,10 +6903,9 @@ class MainWindow(Adw.ApplicationWindow):
                 return
             if self._backup_drive_mountpoint() is None:
                 return
-            # Cooldown-check: laatste scan <10min geleden én geen nieuwe
-            # import sindsdien → overslaan. Manual "Nu controleren" en
-            # drive-attach omzeilen dit (die bellen _trigger_backup_scan
-            # direct, niet via hier).
+            # Cooldown: last scan <10min ago and no new import since → skip.
+            # Manual scan and drive-attach bypass this (they call
+            # _trigger_backup_scan directly).
             last_backup = self.settings.get("last_backup_time", 0) or 0
             last_import = self.settings.get("last_import_time", 0) or 0
             if last_backup and (time.time() - last_backup) < 600 \
@@ -7186,16 +6921,15 @@ class MainWindow(Adw.ApplicationWindow):
             save_settings(self.settings)
 
     def on_dup_switch_toggled(self, switch, _pspec):
-        # Aan = strict (1), Uit = 0 (detectie uit)
+        # On = strict (1), Off = 0 (disabled)
         active = switch.get_active()
         self.settings["duplicate_threshold"] = 1 if active else 0
         if not active and self.settings.get("backup_dedup"):
-            # Hoofd-detectie uit → USB-dedup kan niet aan zijn.
+            # Main detection off → USB-dedup can't be on.
             self.settings["backup_dedup"] = False
             if hasattr(self, "settings_dedup_switch"):
                 self.settings_dedup_switch.set_active(False)
         save_settings(self.settings)
-        # Live sensitivity-update op de USB-dedup rij
         if hasattr(self, "settings_dedup_row"):
             backup_on = bool(self.settings.get("backup_enabled"))
             drive_present = self._backup_drive_mountpoint() is not None
@@ -7205,9 +6939,8 @@ class MainWindow(Adw.ApplicationWindow):
         active = switch.get_active()
         if not active and self.settings.get("backup_enabled") \
                 and self.settings.get("backup_uuid"):
-            # User probeert backup uit te zetten terwijl er een config staat
-            # → confirm dialog. We mogen de switch niet tijdens de signal-
-            # emit terugdraaien, dus schedulen we het op idle.
+            # User disables backup while config is present → confirm.
+            # Can't undo the switch during signal emit; schedule on idle.
             def _confirm():
                 dlg = Adw.AlertDialog(
                     heading=_("Automatische backup uitzetten?"),
@@ -7254,7 +6987,7 @@ class MainWindow(Adw.ApplicationWindow):
         if response == "disable":
             self._apply_backup_toggle(False)
         else:
-            # Switch terugdraaien zonder de toggle-handler opnieuw te vuren
+            # Revert the switch without re-firing the toggle handler.
             self.settings_backup_switch.handler_block_by_func(
                 self.on_settings_backup_toggle
             )
@@ -7284,7 +7017,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings["backup_path"] = None
         self.settings["backup_enabled"] = False
         save_settings(self.settings)
-        # UI resyncen
         if hasattr(self, "settings_backup_switch"):
             self.settings_backup_switch.set_active(False)
         if hasattr(self, "settings_drive_reset_btn"):
@@ -7293,7 +7025,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings_backup_folder_row.set_subtitle(_("Niet ingesteld"))
         if hasattr(self, "settings_backup_folder_btn"):
             self.settings_backup_folder_btn.set_label(_("Instellen"))
-        # Drive-lijst opnieuw opbouwen (verwijdert de vergeten drive)
+        # Rebuild drive list to remove the forgotten drive.
         if hasattr(self, "settings_drive_model"):
             while self.settings_drive_model.get_n_items() > 0:
                 self.settings_drive_model.remove(0)
@@ -7311,7 +7043,7 @@ class MainWindow(Adw.ApplicationWindow):
     def on_backup_silent_toggle(self, switch, _pspec):
         active = switch.get_active()
         if active and not self.settings.get("backup_silent"):
-            # User zet 'm AAN → confirm dialog. Bij cancel: switch terug.
+            # User enables → confirm first; revert on cancel.
             def _confirm():
                 dlg = Adw.AlertDialog(
                     heading=_("Automatisch bevestigen aanzetten?"),
@@ -7358,8 +7090,7 @@ class MainWindow(Adw.ApplicationWindow):
             return
         if self._reorganize_active \
                 or time.time() < self._reorganize_block_until:
-            # Reorganize-gate blokkeert de normale _trigger_backup_scan,
-            # ook als gebruiker expliciet klikt. Log 'm zodat 't zichtbaar is.
+            # Reorganize gate blocks even an explicit user click. Log it.
             log_info("Manual scan: afgewezen — reorganize-gate actief")
             return
         log_info(_("Backup-scan handmatig gestart"))
@@ -7411,16 +7142,14 @@ class MainWindow(Adw.ApplicationWindow):
             save_settings(self.settings)
 
     def _build_settings_drive_list(self):
-        """Geef lijst van (uuid, label) terug. Als de geconfigureerde drive
-        niet fysiek aanwezig is, voeg hem toe met het opgeslagen label —
-        zo blijft de combo de naam tonen ook zonder verbinding."""
+        """List of (uuid, label). Includes the configured drive with its
+        saved label even if not connected, so the combo keeps showing the name."""
         drives = list(get_available_drives())
         saved_uuid = self.settings.get("backup_uuid")
         if saved_uuid and not any(u == saved_uuid for u, _l in drives):
             label = self.settings.get("backup_label") or _("Bekende backup-schijf")
             drives.insert(0, (saved_uuid, label))
-        # Zet label opslag bij als we 'm nu nog niet hadden maar de drive
-        # wel aanwezig is.
+        # Persist label when we see the drive for the first time.
         if saved_uuid and not self.settings.get("backup_label"):
             for u, lab in drives:
                 if u == saved_uuid:
@@ -7437,7 +7166,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self.settings_drives and selected < len(self.settings_drives):
             new_uuid, new_label = self.settings_drives[selected]
             if new_uuid != self.settings.get("backup_uuid"):
-                # Andere schijf gekozen → oud pad is niet meer geldig
+                # Different drive picked → old path no longer valid.
                 self.settings["backup_path"] = None
                 self.settings_backup_folder_row.set_subtitle(_("Niet ingesteld"))
                 self.settings_backup_folder_btn.set_label(_("Instellen"))
@@ -7457,7 +7186,6 @@ class MainWindow(Adw.ApplicationWindow):
                 self.settings_drive_model.append(label)
         else:
             self.settings_drive_model.append(_("Geen externe schijven gevonden"))
-        # Re-select saved uuid
         saved_uuid = self.settings.get("backup_uuid")
         if saved_uuid:
             for i, (uuid, _l) in enumerate(self.settings_drives):
@@ -7493,9 +7221,8 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._sync_now_if_ready)
 
     def _refresh_settings_drive_state(self):
-        """Live-update van de backup-sectie wanneer de drive wordt aan- of
-        afgekoppeld terwijl het settings-venster open is. No-op als de UI
-        niet is opgebouwd."""
+        """Live-update backup section on drive attach/detach while settings
+        is open. No-op if UI not built."""
         if not hasattr(self, "settings_backup_folder_row"):
             return False
         backup_on = bool(self.settings.get("backup_enabled"))
@@ -7532,9 +7259,8 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _sync_now_if_ready(self):
-        """Triggert een scan op de backup-diff zodra alle instellingen
-        compleet zijn en de schijf aanwezig is. Wordt aangeroepen na
-        configuratie-wijzigingen en na drive-attach."""
+        """Trigger a backup-diff scan once settings are complete and the
+        drive is present. Called after config changes + drive-attach."""
         if self._backup_running or self._backup_scanning:
             return False
         if not (self.settings.get("backup_enabled")
@@ -7547,21 +7273,17 @@ class MainWindow(Adw.ApplicationWindow):
         self._trigger_backup_scan()
         return False
 
-    # ── Backup-scan ──────────────────────────────────────────────────
     def _trigger_backup_scan(self):
         if self._backup_running or self._backup_scanning:
             return
-        # Reorganize-flow heeft voorrang: popup open, scan/moves bezig, of
-        # binnen 10s na afloop → niet starten. Periodieke tick/post-cooldown
-        # timer pikt het later vanzelf op.
+        # Reorganize takes priority: popup open, scan/moves running, or within
+        # 10s cooldown → skip. Periodic tick / post-cooldown timer retries.
         if self._reorganize_active or time.time() < self._reorganize_block_until:
             return
         self._backup_scanning = True
         self._backup_scan_phase = 0.0
-        # Geen percentage meer tijdens scannen — dat was een misleidende
-        # tijdsgok. Subtitel onder de donut-popover laat wél zien dat een
-        # USB-schijf traag kan zijn, zodat de gebruiker niet denkt dat 'ie
-        # vastloopt als het even duurt.
+        # No percentage during scan — a previous time-guess was misleading.
+        # Popover subtitle explains USB slowness so users don't think it hung.
         self._backup_detail = _("Dit kan even duren op een USB-schijf")
         tip = _("Scannen op nieuwe foto's…")
         if hasattr(self, "_backup_donut_btn"):
@@ -7601,13 +7323,11 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         mode = self.settings.get("backup_mode", "backup")
 
-        # Pure Python set-diff op relatieve paden. Eerder gebruikten we hier
-        # rsync --dry-run, maar dat blokkeerde soms minutenlang op trage of
-        # flaky USB-schijven (rsync stat't elke dest-file voor attribute-
-        # preservation — op FAT/exFAT is dat veel langzamer dan strikt nodig).
-        # rsync wordt alsnog gebruikt voor de *echte* backup hieronder.
-        # Dedup gebeurt niet meer hier — die is verplaatst naar de backup-
-        # thread zodat de scan altijd snel klaar is.
+        # Pure-Python set-diff on relative paths. Previously rsync --dry-run
+        # was used, but that blocks minutes on flaky USB (rsync stat's every
+        # dest file for attribute preservation — much slower than needed on
+        # FAT/exFAT). rsync is still used for the real backup below.
+        # Dedup happens in the backup thread so the scan always finishes fast.
         src_files = {}
         try:
             for root, _dirs, files in os.walk(str(photo_path)):
@@ -7631,7 +7351,7 @@ class MainWindow(Adw.ApplicationWindow):
                         df = os.path.join(root, fn)
                         dest_rels.add(os.path.relpath(df, str(backup_dest)))
             except Exception:
-                pass  # onvolledige enumeratie → missende files worden als 'nieuw' behandeld
+                pass  # partial enumeration → missing files treated as "new"
 
         src_rels = set(src_files.keys())
         to_transfer_rels = sorted(src_rels - dest_rels)
@@ -7657,9 +7377,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scanning = False
         if hasattr(self, "_backup_donut"):
             self._redraw_donuts()
-        # Donut-visibility beslissen we verderop, nadat we weten of silent-
-        # mode een backup gaat starten. Anders zou hij kort uitgaan tussen
-        # scan-end en backup-start.
+        # Defer donut visibility until we know if silent-mode starts a
+        # backup — otherwise it'd flicker off between scan-end and backup-start.
         manual_requested = self._manual_scan_requested
         self._manual_scan_requested = False
         silent = bool(self.settings.get("backup_silent"))
@@ -7674,15 +7393,13 @@ class MainWindow(Adw.ApplicationWindow):
         bytes_to_transfer = result["bytes"]
         dup_count = result.get("dup_count", 0)
         mode = result.get("mode", self.settings.get("backup_mode", "backup"))
-        # Orphan-state onthouden voor beide modes. In backup-mode gebruikt
-        # _show_backup_done_banner de count voor de post-backup review; in
-        # sync-mode heeft _backup_thread de rel-lijst nodig voor de
-        # pre-delete review vóór rsync --delete.
+        # Remember orphan state for both modes: backup-mode uses the count
+        # for the post-backup review, sync-mode uses the rel list for the
+        # pre-delete review before rsync --delete.
         orphans = result.get("orphans", [])
         self._last_scan_orphan_count = delete_count if mode == "backup" else 0
         self._last_scan_orphan_rels = list(orphans)
-        # backup_dest onthouden zodat orphan-review na de backup weet waar
-        # de files te vinden/verwijderen zijn.
+        # Also remember backup_dest so orphan review can locate/delete files.
         drive_root = self._backup_drive_mountpoint()
         if drive_root:
             from pathlib import Path as _P
@@ -7692,13 +7409,11 @@ class MainWindow(Adw.ApplicationWindow):
                 else drive_root / "Pixora"
             )
 
-        # In backup-modus zijn orphans (delete_count) informatief — ze worden
-        # bewaard. Voor de "is alles al gesynct?"-check behandelen we ze dan
-        # alsof er niks te doen is.
+        # In backup mode, orphans are informational (kept). For the
+        # "already synced" check we ignore them.
         actionable_delete = delete_count if mode == "sync" else 0
 
         if new_count == 0 and actionable_delete == 0 and dup_count == 0:
-            # Alles al gesynct — last_backup_time bijwerken.
             self.settings["last_backup_time"] = time.time()
             try:
                 save_settings(self.settings)
@@ -7708,9 +7423,8 @@ class MainWindow(Adw.ApplicationWindow):
             log_info(_("Backup-scan: alles gesynct"))
             if hasattr(self, "_backup_donut_btn"):
                 self._set_donuts_visible(self._backup_running)
-            # Orphans op USB in backup-mode: óók als er geen backup meer
-            # hoeft te draaien, heeft de gebruiker recht op info. Bij
-            # manuele klik negeren we silent-mode — user klikte expliciet.
+            # Orphans in backup-mode are still worth surfacing on a manual
+            # click — user explicitly asked to check.
             if delete_count > 0 and mode == "backup" and manual_requested:
                 if (self.settings.get("backup_dedup")
                         and self._last_scan_orphan_rels):
@@ -7736,18 +7450,16 @@ class MainWindow(Adw.ApplicationWindow):
             n=new_count, d=delete_count, m=mode,
             b=bytes_to_transfer, u=dup_count,
         ))
-        # Silent-mode: scan-dialog overslaan en backup direct starten, óók
-        # als dit een handmatige Controleer-klik was. User heeft immers
-        # gekozen voor "alles automatisch bevestigen".
+        # Silent-mode: skip the dialog and start backup, even on a manual
+        # check — user opted into auto-confirm.
         if silent:
             log_info(_("Silent-mode: backup start automatisch zonder dialog"))
-            # Donut mag niet uitflikkeren tussen scan-end en backup-start.
             if hasattr(self, "_backup_donut_btn"):
                 self._set_donuts_visible(True)
             self.start_backup()
             self._set_manual_scan_state("idle")
             return False
-        # Niet-silent: donut verbergen (scan is klaar, backup draait niet).
+        # Non-silent: hide donut (scan done, no backup running).
         if hasattr(self, "_backup_donut_btn"):
             self._set_donuts_visible(self._backup_running)
         self._show_backup_scan_dialog(
@@ -7800,9 +7512,8 @@ class MainWindow(Adw.ApplicationWindow):
                                  dup_count=0, mode="backup"):
         if self._backup_scan_dialog_open:
             return
-        # Tijdens startup (home-grid nog niet ≥2s zichtbaar): uitstellen —
-        # anders landt de popup bovenop een halfgeladen UI. Alleen voor
-        # niet-manuele scans, want een manuele klik = expliciete intentie.
+        # Defer during startup (home-grid <2s visible) so the popup doesn't
+        # land on a half-loaded UI.
         ready_at = getattr(self, "_home_ready_at", None)
         if ready_at is None or (time.time() - ready_at) < 2.0:
             GLib.timeout_add(500, self._show_backup_scan_dialog,
@@ -7825,7 +7536,7 @@ class MainWindow(Adw.ApplicationWindow):
                     delete_count,
                 ).format(n=delete_count))
             else:
-                # backup-modus: orphans blijven bewaard — alleen info.
+                # backup-mode: orphans are kept — purely informational.
                 lines.append(ngettext(
                     "{n} foto op USB niet meer in Pixora (blijft bewaard)",
                     "{n} foto's op USB niet meer in Pixora (blijven bewaard)",
@@ -7902,18 +7613,16 @@ class MainWindow(Adw.ApplicationWindow):
         self.close_importer()
         if count and count > 0:
             self.reload_photos()
-            # Pending-backup markeren door last_import_time bij te werken
+            # Mark pending-backup by bumping last_import_time.
             self.settings["last_import_time"] = time.time()
             try:
                 save_settings(self.settings)
             except Exception:
                 pass
-            # Meteen backup-check: als drive er is → start; anders banner
             GLib.idle_add(self._check_pending_backup)
 
-    # ── Backup-manager ───────────────────────────────────────────────
     def _is_backup_pending(self):
-        """True als er nieuwe import is geweest sinds de laatste backup."""
+        """True if there's been an import since the last backup."""
         if not self.settings.get("backup_enabled"):
             return False
         if not self.settings.get("backup_uuid"):
@@ -7923,7 +7632,7 @@ class MainWindow(Adw.ApplicationWindow):
         return last_import > last_backup
 
     def _backup_drive_mountpoint(self):
-        """Geeft Path van de backup-drive als die aangesloten is, anders None."""
+        """Return Path of the backup drive when attached, else None."""
         uuid = self.settings.get("backup_uuid")
         if not uuid:
             return None
@@ -7937,8 +7646,8 @@ class MainWindow(Adw.ApplicationWindow):
             return None
 
     def _check_pending_backup(self):
-        """Na import of drive-attach: scan op nieuwe foto's; de scan toont
-        zelf een dialog bij een non-empty diff, anders stilletjes niks."""
+        """After import or drive-attach: scan; the scan itself shows a dialog
+        on a non-empty diff, silent otherwise."""
         if self._backup_running or self._backup_scanning:
             return False
         if not (self.settings.get("backup_enabled")
@@ -7953,12 +7662,10 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _present_dialog(self, dlg):
-        """Toon een AlertDialog/Adw.Dialog. Als het instellingen-dialog
-        open staat, parenten we de popup dáárop — anders landt 'ie achter
-        de settings-modal en blokkeert alles (je kan settings dan niet
-        meer sluiten, ook niet via de taakbalk). NIET self.present()
-        aanroepen: dat triggert op GNOME Shell een "Pixora is klaar"-
-        notificatie plus een tweede bolletje in de taakbalk."""
+        """Parent the popup on the settings dialog if open, else on self.
+        Without this, the popup lands behind a modal settings and blocks
+        the taskbar. Never call self.present() — GNOME Shell then fires a
+        "Pixora is ready" notification and adds a taskbar badge."""
         parent = self._settings_dialog if self._settings_dialog is not None else self
         try:
             dlg.present(parent)
@@ -7969,7 +7676,7 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
 
     def _show_backup_pending_banner(self):
-        # Banner uitgeschakeld — feedback gebeurt in de settings-UI.
+        # Banner disabled — feedback now lives in the settings UI.
         try:
             self.backup_pending_banner.set_revealed(False)
         except Exception:
@@ -7982,10 +7689,8 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _periodic_scan(self):
-        """60s tick: eerst structuur-scan (detecteert mappen buiten de
-        gekozen structuur, ook zonder backup-drive), daarna backup-scan
-        als er een drive is. De backup-trigger loopt via de
-        _on_periodic_structure_done-keten zodra structuur klaar is."""
+        """60s tick: structure-scan first (works without a backup drive);
+        backup-scan runs via _on_periodic_structure_done once structure's done."""
         try:
             ready_at = getattr(self, "_home_ready_at", None)
             if ready_at is None or (time.time() - ready_at) < 2.0:
@@ -7999,12 +7704,11 @@ class MainWindow(Adw.ApplicationWindow):
             self._trigger_structure_scan()
         except Exception:
             pass
-        return True  # blijf herhalen
+        return True
 
     def _poll_backup_drive(self):
-        """Detecteer drive-insert/remove en update de UI daarop:
-        - attach: scan op diff (scan toont dialog als er iets is)
-        - detach: grey-out settings-backup-sectie + banner tonen"""
+        """Drive attach/detach → UI update. Attach: scan for diff; detach:
+        grey out settings-backup + show banner."""
         drive_now = self._backup_drive_mountpoint() is not None
         just_attached = drive_now and not self._backup_drive_last_seen
         just_detached = (not drive_now) and self._backup_drive_last_seen
@@ -8023,7 +7727,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._show_backup_pending_banner()
         if just_attached or just_detached:
             GLib.idle_add(self._refresh_settings_drive_state)
-        return True  # repeat
+        return True
 
     def _prompt_backup_on_insert(self):
         if self._backup_running:
@@ -8060,14 +7764,12 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._backup_thread, daemon=True).start()
 
     def _check_backup_dest_writable(self, drive_root, backup_dest):
-        """Retourneert None als we kunnen schrijven, anders een nette
-        foutboodschap met fix-hint. Probeer eerst bestaande dest, val
-        dan terug op drive-root zodat we ook bij 'map bestaat niet nog'
-        de read-only-state detecteren."""
+        """Return None if writable, else a clear error with a fix hint.
+        Tries dest first, then drive root — detects read-only even when
+        the dest folder doesn't exist yet."""
         candidates = [p for p in (backup_dest, drive_root)
                       if p is not None and os.path.isdir(str(p))]
         if not candidates:
-            # Kan mappen niet vinden; normale mkdir-flow later zal melden.
             return None
         test_dir = str(candidates[0])
         test_path = os.path.join(test_dir, f".pixora-write-test-{os.getpid()}")
@@ -8095,17 +7797,13 @@ class MainWindow(Adw.ApplicationWindow):
             )
 
     def _dedup_for_backup(self, photo_path, backup_dest):
-        """Bereken welke bron-foto's visueel al op de USB staan en dus niet
-        gekopieerd hoeven. Draait in de backup-thread vóór rsync zodat de
-        scan snel blijft; popover toont "Duplicaat-check: X / Y".
-
-        Returnt een lijst van relatieve paden (vanaf photo_path) om via
-        rsync --exclude-from uit te sluiten.
-        """
+        """Return relative paths (from photo_path) to exclude from the backup
+        because they already exist on USB visually. Runs in the backup thread
+        before rsync so scans stay fast; popover shows "Duplicaat-check: X/Y"."""
         if not self.settings.get("backup_dedup"):
             return []
 
-        # Set-diff op filename-basis; dedup checkt alleen de "nieuwe" files.
+        # Filename-based set-diff; dedup only checks files not already on USB.
         src_rels = set()
         try:
             for root, _dirs, files in os.walk(str(photo_path)):
@@ -8127,8 +7825,8 @@ class MainWindow(Adw.ApplicationWindow):
         if not to_check or not dest_rels:
             return []
 
-        # Zelfde 10%-drempel als eerder: USB moet substantiële library hebben
-        # voordat pHash-werk statistisch rendabel is.
+        # 10% threshold: USB must hold a substantial library before pHash
+        # work is statistically worth it.
         if len(dest_rels) * 10 < len(src_rels):
             log_info(_("Duplicaat-check overgeslagen: USB te leeg "
                        "({d} foto's vs {s} in Pixora)").format(
@@ -8161,7 +7859,7 @@ class MainWindow(Adw.ApplicationWindow):
                     self._viewer_donut_btn.set_tooltip_text(tip)
                 except Exception:
                     pass
-            # Hergebruik de scan-animatie voor de donut-spinner.
+            # Reuse the scan animation for the donut spinner.
             if self._backup_scan_anim_id is None:
                 self._backup_scan_anim_id = GLib.timeout_add(
                     80, self._tick_backup_scan)
@@ -8196,7 +7894,7 @@ class MainWindow(Adw.ApplicationWindow):
         return excluded
 
     def _set_dedup_detail(self, text):
-        """Thread-safe setter voor popover-subtitel tijdens dedup-fase."""
+        """Thread-safe setter for popover subtitle during dedup."""
         self._backup_detail = text or ""
         if hasattr(self, "_backup_donut"):
             self._redraw_donuts()
@@ -8212,9 +7910,8 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._backup_finished, False, _("Back-upschijf niet gevonden."))
             return
         backup_dest = _P(backup_path_str) if backup_path_str else drive_root / "Pixora"
-        # Veel gangbare oorzaak: NTFS/exFAT-drive mounted read-only na unsafe
-        # eject op Windows → laat de user meteen zien wat er speelt i.p.v.
-        # te crashen op de eerste rsync write.
+        # Common case: NTFS/exFAT drive mounted read-only after unsafe eject
+        # on Windows. Tell the user early instead of crashing in rsync.
         ro_msg = self._check_backup_dest_writable(drive_root, backup_dest)
         if ro_msg is not None:
             GLib.idle_add(self._backup_finished, False, ro_msg)
@@ -8235,9 +7932,8 @@ class MainWindow(Adw.ApplicationWindow):
                         pass
 
         mode = self.settings.get("backup_mode", "backup")
-        # Dedup draait nu hier (vóór rsync) i.p.v. in de scan-thread. Zo
-        # blijft het scan-dialog altijd meteen klaar; de pHash-berekening
-        # gebeurt tijdens de backup-fase met zichtbare voortgang in de donut.
+        # Dedup runs here (before rsync) so the scan dialog is always instant;
+        # pHash runs in the backup phase with visible progress in the donut.
         excluded = self._dedup_for_backup(photo_path, backup_dest)
         exclude_file = None
         success = False
@@ -8304,7 +8000,7 @@ class MainWindow(Adw.ApplicationWindow):
                     "/dev/sdXN` uit."
                 )
             elif rsync_err:
-                # Eerste regel van rsync's stderr = meestal de echte reden.
+                # First line of rsync stderr usually holds the real reason.
                 first = rsync_err.splitlines()[0] if rsync_err else ""
                 note = _("Backup mislukt: {err}").format(err=first[:200])
             else:
@@ -8312,10 +8008,9 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._backup_finished, success, note)
 
     def _manual_backup(self, src, dst, delete_extraneous=False, excluded=None):
-        """Fallback zonder rsync: handmatig kopiëren met progress.
-        delete_extraneous=True → sync-gedrag: files in dst die niet in src
-        staan worden verwijderd. excluded = set van relatieve paden (vanaf
-        src) die overgeslagen moeten worden (dedup-matches)."""
+        """Fallback without rsync: copy manually with progress.
+        delete_extraneous=True → sync: remove dst files not in src.
+        excluded = set of src-relative paths to skip (dedup matches)."""
         excluded = excluded or set()
         try:
             all_src = []
@@ -8373,7 +8068,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _set_donuts_visible(self, visible):
-        """Hou de header-donut en de viewer-overlay-donut in sync."""
+        """Keep header and viewer-overlay donut visibility in sync."""
         for name in ("_backup_donut_btn", "_viewer_donut_btn"):
             btn = getattr(self, name, None)
             if btn is not None:
@@ -8392,24 +8087,21 @@ class MainWindow(Adw.ApplicationWindow):
                     pass
 
     def _draw_backup_donut(self, area, cr, w, h):
-        """Donut/pie-chart die vult van 0° tot progress × 360°. Tijdens
-        scannen rouleert er een kwart-boog rond de ring als indeterminate-
-        indicator."""
+        """Pie chart filling 0°→progress×360°. While scanning, a rotating
+        quarter-arc serves as indeterminate indicator."""
         try:
             cx = w / 2
             cy = h / 2
             r_outer = min(w, h) / 2 - 1
             r_inner = r_outer * 0.55
 
-            # Background ring (grijs)
             cr.set_source_rgba(0.5, 0.5, 0.5, 0.3)
             cr.arc(cx, cy, r_outer, 0, 2 * math.pi)
             cr.arc_negative(cx, cy, r_inner, 2 * math.pi, 0)
             cr.fill()
 
-            # Kleur: oranje als backup actief is, anders donker-blauw.
-            # Zowel de structuur-scan als de reorganize-voortgang vallen
-            # onder "geen backup-context" en krijgen dus de blauwe tint.
+            # Orange when backup-related; dark blue for structure/reorganize
+            # (no-backup context).
             if (self._backup_scanning or self._backup_running
                     or self._orphan_reviewing):
                 color = (0.914, 0.329, 0.125)  # orange
@@ -8419,7 +8111,7 @@ class MainWindow(Adw.ApplicationWindow):
             if (self._backup_scanning or self._structure_scanning
                     or self._backup_deduping or self._orphan_reviewing):
                 start = self._backup_scan_phase - math.pi / 2
-                end = start + math.pi / 2  # kwart cirkel
+                end = start + math.pi / 2  # quarter arc
                 cr.set_source_rgb(*color)
                 cr.move_to(cx, cy)
                 cr.arc(cx, cy, r_outer, start, end)
@@ -8431,20 +8123,19 @@ class MainWindow(Adw.ApplicationWindow):
                 cr.set_operator(cairo.OPERATOR_OVER)
                 return
 
-            # Progress-modus: reorganize heeft voorrang, anders backup.
+            # Progress mode: reorganize has priority, else backup.
             if self._reorganize_moving:
                 frac = max(0.0, min(1.0, self._reorganize_fraction))
             else:
                 frac = max(0.0, min(1.0, self._backup_fraction))
             if frac > 0.001:
-                start = -math.pi / 2  # top
+                start = -math.pi / 2  # 12 o'clock
                 end = start + frac * 2 * math.pi
                 cr.set_source_rgb(*color)
                 cr.move_to(cx, cy)
                 cr.arc(cx, cy, r_outer, start, end)
                 cr.close_path()
                 cr.fill()
-                # Inner gat terug weg-cutten
                 cr.set_operator(cairo.OPERATOR_CLEAR)
                 cr.arc(cx, cy, r_inner, 0, 2 * math.pi)
                 cr.fill()
@@ -8453,9 +8144,8 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _on_backup_donut_clicked(self, btn):
-        """Klik op donut → live-updatende popover. Labels worden als attrs
-        bewaard zodat _refresh_donut_popover ze kan herschrijven zonder
-        dat de user 'm hoeft te sluiten + heropenen."""
+        """Donut click → live-updating popover. Labels are stored as attrs
+        so _refresh_donut_popover can rewrite them in place."""
         pop = Gtk.Popover()
         pop.set_parent(btn)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -8476,7 +8166,7 @@ class MainWindow(Adw.ApplicationWindow):
         pop.set_child(box)
         self._donut_popover = pop
         self._refresh_donut_popover()
-        # Refresh elke 250ms zolang popover zichtbaar is.
+        # Refresh every 250ms while visible.
         self._donut_pop_tick_id = GLib.timeout_add(
             250, self._refresh_donut_popover)
         def _on_closed(_p):
@@ -8496,7 +8186,7 @@ class MainWindow(Adw.ApplicationWindow):
         if pop is None or not hasattr(self, "_donut_pop_title"):
             return False
         is_sync = self.settings.get("backup_mode", "backup") == "sync"
-        # Kies titel + welke velden we laten zien op basis van wat loopt.
+        # Pick title + visible fields based on what's running.
         if self._reorganize_moving:
             title = _("Mappenstructuur bijwerken")
             pct_val = int(max(0.0, min(1.0, self._reorganize_fraction)) * 100)
@@ -8556,9 +8246,8 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _show_backup_done_banner(self, success, note):
-        # Banner uitgeschakeld — voltooid-feedback gebeurt via popup (zelfde
-        # stijl als de start-dialog). Heading kiest op backup_mode zodat
-        # sync-users "Sync voltooid" zien i.p.v. "Backup voltooid".
+        # Banner disabled — done feedback is a popup (same style as start
+        # dialog); heading toggles by backup_mode ("Sync voltooid" etc.).
         try:
             self.backup_done_banner.set_revealed(False)
         except Exception:
@@ -8569,9 +8258,8 @@ class MainWindow(Adw.ApplicationWindow):
         has_orphans = (success and mode == "backup" and orphan_count > 0
                        and self._last_scan_orphan_rels)
 
-        # Orphans + dedup aan → pHash-analyse met keuze-dialog (vervangt de
-        # voltooid-popup). Zonder dedup-toggle doen we geen pHash-werk;
-        # alleen een simpele "let op"-melding.
+        # Orphans + dedup on → run pHash analysis + choice dialog (replaces
+        # the done popup). Without dedup, just a simple "heads up" message.
         if has_orphans and dedup_on:
             log_info(_("Backup voltooid, orphan-analyse gestart "
                        "({n} orphans)").format(n=orphan_count))
@@ -8580,9 +8268,9 @@ class MainWindow(Adw.ApplicationWindow):
             ).start()
             return
 
-        # Silent-mode: success-popup overslaan. Fouten blijven wél zichtbaar.
-        # Uitzondering: orphans in backup-mode zonder dedup → tóch een info-
-        # popup zodat de gebruiker weet dat er iets vreemds op de USB staat.
+        # Silent-mode: skip success popup, keep error popups. Exception:
+        # orphans in backup-mode without dedup → still an info popup so the
+        # user knows something unexpected sits on the USB.
         if success and self.settings.get("backup_silent"):
             if has_orphans:
                 log_info(_("Silent-mode: backup voltooid, {n} orphans "
@@ -8642,12 +8330,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _categorize_orphans(self, photo_path, backup_dest, orphan_rels,
                             progress_cb=None):
-        """Pure helper: pHash-match elke orphan tegen Pixora-library.
-        Returnt (dup_rels, unique_rels). progress_cb(cur, total, phase) wordt
-        periodiek aangeroepen met phase='build' (pHash-cache opbouwen — kan
-        minuten duren eerste keer) of phase='check' (orphans vergelijken).
-        Bij import- of hash-fout: alles belandt in unique_rels (veilige
-        default: niet als 'dubbel' markeren als we het niet zeker weten)."""
+        """pHash-match every orphan against the Pixora library. Returns
+        (dup_rels, unique_rels). progress_cb(cur, total, phase) where
+        phase='build' (hash-cache build) or phase='check' (comparing).
+        On import/hash error, everything falls into unique_rels — safer
+        default is not to flag as duplicate when unsure."""
         try:
             from importer_page import (
                 perceptual_hash, build_library_hashes, find_duplicate,
@@ -8657,8 +8344,7 @@ class MainWindow(Adw.ApplicationWindow):
             log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
             return [], list(orphan_rels)
 
-        # Progress voor build_library_hashes — wordt per file aangeroepen,
-        # maar we throttlen naar elke 25 voor rustige UI-updates.
+        # Throttle build_library_hashes progress to every 25 for calm UI.
         def _build_progress(i, total, _name):
             if progress_cb and i % 25 == 0:
                 try:
@@ -8695,7 +8381,7 @@ class MainWindow(Adw.ApplicationWindow):
         return dup_rels, unique_rels
 
     def _start_orphan_review_ui(self):
-        """Donut-spinner + tooltip aanzetten voor pHash-fase."""
+        """Enable donut spinner + tooltip for the pHash phase."""
         tip = _("Analyseren op dubbele kopieën…")
         if hasattr(self, "_backup_donut_btn"):
             try:
@@ -8714,8 +8400,8 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _review_orphans_thread(self):
-        """Categoriseer de orphans op USB via pHash tegen de Pixora-library
-        (na een backup), toont daarna het keuze-dialog."""
+        """After a backup: pHash-categorize orphans on USB, then show the
+        choice dialog."""
         from pathlib import Path as _P
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
         backup_dest = self._last_scan_backup_dest
@@ -8723,8 +8409,8 @@ class MainWindow(Adw.ApplicationWindow):
         if not backup_dest or not orphan_rels:
             return
 
-        # Donut-spinner aan tijdens de analyse zodat er geen 'dood gat'
-        # zit tussen backup-klaar en het keuze-dialog.
+        # Donut spinner on during analysis so there's no "dead gap" between
+        # backup-done and the choice dialog.
         self._orphan_reviewing = True
         GLib.idle_add(self._start_orphan_review_ui)
 
@@ -8749,7 +8435,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._show_orphan_review_dialog, dup_rels, unique_rels)
 
     def _finish_review_ui(self):
-        """Donut verbergen nadat de orphan-analyse klaar is."""
+        """Hide donut after orphan analysis completes."""
         if hasattr(self, "_backup_donut_btn"):
             try:
                 self._set_donuts_visible(self._backup_running)
@@ -8816,7 +8502,7 @@ class MainWindow(Adw.ApplicationWindow):
             except OSError as e:
                 log_warn(_("Kon orphan niet verwijderen: {p} "
                            "({err})").format(p=str(path), err=e))
-        # Lege mappen op USB achter elkaar opruimen (van diep naar ondiep)
+        # Prune empty dirs on USB bottom-up.
         try:
             for root, _dirs, _files in os.walk(
                     str(backup_dest), topdown=False):
@@ -8831,6 +8517,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         log_info(_("Orphans verwijderd: {n}").format(n=deleted))
         GLib.idle_add(self._show_orphans_deleted_dialog, deleted)
+
 
     def _show_orphans_deleted_dialog(self, count):
         dlg = Adw.AlertDialog(

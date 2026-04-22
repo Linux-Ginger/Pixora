@@ -17,19 +17,13 @@ import subprocess
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
 LOG_PATH = os.path.expanduser("~/.cache/pixora/pixora.log")
 
-# Global zodat MainWindow weet of dev-mode actief is (logs conditioneren)
 PIXORA_DEV_MODE = False
 _PIXORA_APP = None
 
 
 def _compile_stale_mo_files():
-    """Regenereer .mo-bestanden per taal als de .po nieuwer is dan de .mo
-    (of de .mo mist). Belangrijk bij 'git pull' flows waarbij alleen de
-    .po's worden geüpdatet en de oude .mo blijft staan — main_window.py
-    laadt z'n gettext-translation ineens met stale vertalingen → nieuwe
-    strings vallen terug op het Nederlandse msgid.
-
-    Silent als msgfmt er niet is of een locale-dir niet bestaat."""
+    """Rebuild .mo files per language when the .po is newer (git pull flows
+    leave stale .mo's, causing new msgids to fall back to Dutch)."""
     try:
         if not shutil.which("msgfmt"):
             return
@@ -75,7 +69,6 @@ def load_settings():
         if isinstance(data, dict):
             return data
     except Exception:
-        # Corrupt settings: backup en terug naar setup-wizard flow
         try:
             os.rename(CONFIG_PATH, CONFIG_PATH + ".corrupt")
         except Exception:
@@ -84,20 +77,14 @@ def load_settings():
 
 
 def _launch_dev_terminal():
-    """Dev-mode: spawn een terminal die Pixora zelf aanroept via
-    ~/.local/bin/pixora. Originele process exit — de terminal "neemt
-    het over". Pixora's stdout/stderr gaat direct naar die terminal.
-
-    Pixora sluiten → python exits → bash exits → terminal sluit.
-    Terminal sluiten → bash krijgt SIGHUP → propageert naar python →
-    GTK-app eindigt netjes.
-    """
+    """Dev-mode: spawn terminal that runs Pixora; original process exits so
+    Pixora's stdout/stderr goes to that terminal. Terminal close → SIGHUP
+    propagates to Python → clean GTK exit."""
     global PIXORA_DEV_MODE
     settings = load_settings()
     if not settings or not settings.get("dev_mode"):
         return
     PIXORA_DEV_MODE = True
-    # Al in de dev-terminal? Niet nogmaals spawnen.
     if os.environ.get("PIXORA_IN_DEV_TERM"):
         return
 
@@ -107,7 +94,6 @@ def _launch_dev_terminal():
     else:
         run_cmd = f'python3 "{os.path.abspath(__file__)}"'
 
-    # Dev-terminal tekst lokaliseren o.b.v. gekozen taal in settings
     import gettext as _gt
     _locale_dir = os.path.abspath(os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "..", "locale"
@@ -122,8 +108,8 @@ def _launch_dev_terminal():
         header = "─── Pixora (dev mode) ───"
         hint = "Sluit dit venster om Pixora te sluiten."
 
-    # Zet PIXORA_IN_DEV_TERM ín het bash-commando i.p.v. via Popen env —
-    # gnome-terminal-server neemt env niet altijd mee naar z'n child-shell.
+    # Set PIXORA_IN_DEV_TERM inside the bash command — gnome-terminal-server
+    # drops Popen env when handing off to its child shell.
     bash_cmd = (
         "export PIXORA_IN_DEV_TERM=1; "
         f"echo '{header}'; "
@@ -148,7 +134,6 @@ def _launch_dev_terminal():
                     [term] + args,
                     start_new_session=True,
                 )
-                # Origineel proces sluit af; de terminal neemt het over.
                 sys.exit(0)
             except Exception as e:
                 try:
@@ -156,7 +141,6 @@ def _launch_dev_terminal():
                 except Exception:
                     print(f"Could not start {term}: {e}")
                 continue
-    # Geen terminal gevonden: val terug op directe start met waarschuwing
     try:
         print(_t.gettext("Geen terminal gevonden voor dev-mode; Pixora start zonder."))
     except Exception:
@@ -170,14 +154,12 @@ def _quit_pixora_app():
 
 
 def kill_dev_terminal():
-    """Compat-stub — oude flow had een aparte tail-terminal die we nu
-    niet meer gebruiken. Behouden omdat main_window.on_close nog
-    main.kill_dev_terminal() aanroept."""
+    """Compat-stub kept because main_window.on_close still calls it."""
     return
 
 
-# Install SIGHUP handler in de child-process (dev-terminal) zodat het
-# sluiten van de terminal Pixora netjes afsluit ipv een hard crash.
+# SIGHUP handler in the dev-terminal child so closing the terminal exits
+# Pixora cleanly instead of a hard crash.
 def _install_dev_term_signal_handler():
     if not os.environ.get("PIXORA_IN_DEV_TERM"):
         return
@@ -196,9 +178,8 @@ def _install_dev_term_signal_handler():
 _install_dev_term_signal_handler()
 
 
-# Alleen de échte opstart (command-line) mag de terminal openen.
-# Bij `from main import ...` (geïmporteerd vanuit main_window) wordt deze
-# module opnieuw uitgevoerd onder de naam "main"; dan skippen we dit.
+# Only spawn the dev-terminal on real CLI startup; `from main import ...`
+# re-executes this module as "main" and must skip the spawn.
 if __name__ == "__main__":
     _launch_dev_terminal()
 
@@ -221,20 +202,15 @@ class PixoraApp(Adw.Application):
         settings = load_settings()
 
         if settings is None:
-            # Eerste keer opstarten → setup wizard
             from setup_wizard import SetupWizard
             win = SetupWizard(app)
         else:
-            # Instellingen gevonden → hoofdscherm
             from main_window import MainWindow
             win = MainWindow(app, settings)
 
-        # Gebruik set_visible i.p.v. present(): GNOME Shell stuurt anders
-        # een "Pixora is klaar"-notificatie bij elke startup als het venster
-        # op dat moment niet gefocused is. set_visible toont het venster
-        # zonder urgency/attention-hint; de gebruiker kan zelf klikken of
-        # alt-tabben. De taakbalk-highlight (bij `_present_dialog` en
-        # `demands_attention`) blijft bewaard voor latere events.
+        # set_visible instead of present(): GNOME Shell fires a "Pixora is
+        # ready" notification on every startup when the window isn't focused
+        # if we use present().
         win.set_visible(True)
 
 
@@ -242,8 +218,6 @@ def main():
     global _PIXORA_APP
     _PIXORA_APP = PixoraApp()
     rc = _PIXORA_APP.run(sys.argv)
-    # Als we hier komen zonder _force_exit, is dat goed. Log het zodat je
-    # in dev-mode ziet dat Pixora cleanly afgesloten is.
     try:
         if PIXORA_DEV_MODE:
             print("Pixora clean exit (rc=" + str(rc) + ")", flush=True)

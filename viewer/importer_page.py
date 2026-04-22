@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # ─────────────────────────────────────────────
 #  Pixora — importer_page.py
-#  Importer als ingebedde pagina (niet los venster)
 #  by LinuxGinger
 # ─────────────────────────────────────────────
 
@@ -51,13 +50,10 @@ try:
 except ImportError:
     HAS_IMAGEHASH = False
 
-# ─── Paden ───────────────────────────────────────────────────────────────────
-
 CONFIG_PATH  = Path.home() / ".config" / "pixora" / "settings.json"
 CACHE_DIR    = Path.home() / ".cache"  / "pixora"
 HASH_CACHE   = CACHE_DIR / "hashes.json"
-# Mount-point uniek per user (voorkomt conflict tussen twee gelijktijdige
-# Pixora-instances op dezelfde machine, of stale mounts van andere users).
+# Per-user mount-point so concurrent Pixora instances / stale mounts don't clash.
 MOUNT_POINT  = Path(tempfile.gettempdir()) / f"pixora_iphone_{os.getuid()}"
 
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
@@ -65,14 +61,12 @@ SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".dng", ".mp4", ".m
 EXCLUDED_EXT   = {".aae"}
 SKIP_DIRS      = {".Trash", "Recently Deleted", "Onlangs verwijderd", ".recently-deleted"}
 
-# Duplicate threshold → maximale hash-afstand. 0 betekent: check overslaan.
+# Duplicate threshold → max hash distance. 0 disables the check.
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
 
-# Eigen vierkante thumbnail-cache voor de importer
 IMPORT_THUMB_DIR = Path.home() / ".cache" / "pixora" / "import_thumbs"
-SELECT_THUMB     = 160  # vierkant, pixels
+SELECT_THUMB     = 160  # square pixels
 
-# ─── States ──────────────────────────────────────────────────────────────────
 
 STATE_WAITING   = "waiting"
 STATE_DETECTED  = "detected"
@@ -86,7 +80,6 @@ STATE_BACKUP    = "backup"
 STATE_DONE      = "done"
 STATE_ERROR     = "error"
 
-# ─── Hulpfuncties ────────────────────────────────────────────────────────────
 
 def load_settings() -> dict:
     if CONFIG_PATH.exists():
@@ -119,12 +112,11 @@ def dest_path(base: Path, structure: str, filename: str, mtime: datetime) -> Pat
 
 
 def ensure_services():
-    """Start usbmuxd als het niet draait. Wacht kort tot het klaar is."""
+    """Start usbmuxd if not running."""
     try:
         r = subprocess.run(["pgrep", "-x", "usbmuxd"],
                            capture_output=True, timeout=3)
         if r.returncode != 0:
-            # Probeer eerst zonder sudo, dan met sudo
             try:
                 subprocess.run(["usbmuxd"], capture_output=True, timeout=5)
             except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -134,13 +126,12 @@ def ensure_services():
                 except Exception:
                     pass
             import time as _time
-            _time.sleep(1)  # Geef usbmuxd even om op te starten
+            _time.sleep(1)
     except Exception:
         pass
 
 
 def detect_iphone() -> str | None:
-    """Geeft UDID terug als een iPhone verbonden is, anders None."""
     try:
         result = subprocess.run(
             ["idevice_id", "-l"],
@@ -165,16 +156,14 @@ def get_device_name(udid: str) -> str:
 
 
 def mount_iphone(udid: str, mountpoint: Path) -> bool:
-    # Unmount eerst (ook als de vorige mount kapot is). We checken het resultaat
-    # om niet stil verder te gaan als unmount faalde — dan zou ifuse hierna
-    # alsnog falen met "mountpoint is not empty".
+    # Lazy unmount first — handles broken previous mounts so ifuse doesn't
+    # fail later with "mountpoint is not empty".
     try:
         subprocess.run(["fusermount", "-uz", str(mountpoint)],
                        capture_output=True, timeout=5)
     except Exception:
         pass
-    # Alleen dir verwijderen als hij NIET gemount is — anders rmtree-op-mount
-    # kan hangen of fouten geven op FUSE.
+    # Only rmtree when NOT mounted — rmtree-on-mount can hang on FUSE.
     try:
         still_mounted = False
         try:
@@ -211,7 +200,7 @@ _EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, DateTimeDigitized, Da
 _VIDEO_EXT = {".mp4", ".mov", ".m4v", ".3gp"}
 
 def _get_video_date(path: Path) -> float | None:
-    """Haal creation_time uit video metadata via ffprobe."""
+    """Return creation_time from video metadata via ffprobe."""
     try:
         result = subprocess.run(
             ["ffprobe", "-v", "quiet", "-print_format", "json",
@@ -223,7 +212,6 @@ def _get_video_date(path: Path) -> float | None:
             info = _json.loads(result.stdout)
             ct = info.get("format", {}).get("tags", {}).get("creation_time", "")
             if ct:
-                # Formaat: "2024-03-15T14:30:00.000000Z"
                 dt = datetime.strptime(ct[:19], "%Y-%m-%dT%H:%M:%S")
                 return dt.timestamp()
     except Exception:
@@ -231,7 +219,7 @@ def _get_video_date(path: Path) -> float | None:
     return None
 
 def _get_video_duration(path: Path) -> str | None:
-    """Haal videoduur op via ffprobe. Geeft string terug zoals '1:23' of '0:05'."""
+    """Return video duration as 'm:ss' string via ffprobe."""
     try:
         result = subprocess.run(
             ["ffprobe", "-v", "quiet", "-print_format", "json",
@@ -252,9 +240,8 @@ def _get_video_duration(path: Path) -> str | None:
 
 
 def get_photo_date(path: Path) -> float:
-    """Geeft de fotodatum als timestamp. Probeert EXIF/ffprobe eerst, valt terug op bestandsnaam."""
+    """Return a sort key: EXIF/ffprobe timestamp, else filename counter, else mtime."""
     ext = path.suffix.lower()
-    # Foto's: EXIF
     if ext in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng", ".tiff", ".tif"):
         try:
             from PIL import Image
@@ -267,13 +254,12 @@ def get_photo_date(path: Path) -> float:
                     return dt.timestamp()
         except Exception:
             pass
-    # Video's: ffprobe
     elif ext in _VIDEO_EXT:
         ts = _get_video_date(path)
         if ts:
             return ts
-    # Fallback: iPhone-bestandsnamen (IMG_1234, IMG_E1234) zijn chronologisch.
-    # Gebruik het nummer als sorteersleutel zodat we niet afhankelijk zijn van mtime.
+    # Fallback: iPhone filenames (IMG_1234) are chronological — use the counter
+    # as sort key so we don't depend on (often wrong) mtime.
     import re
     m = re.search(r'(\d{4,})', path.stem)
     if m:
@@ -282,10 +268,7 @@ def get_photo_date(path: Path) -> float:
 
 
 def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
-    """
-    Past crop en rotatie uit een AAE-bestand toe op de geïmporteerde foto.
-    Geeft True terug als er bewerkingen zijn toegepast.
-    """
+    """Apply crop/rotation from an AAE file to the imported photo."""
     try:
         import plistlib
         import zlib
@@ -297,11 +280,11 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
         if not raw:
             return False
 
-        # adjustmentData is base64-decoded door plistlib, maar zlib-gecomprimeerd
+        # adjustmentData: plistlib base64-decodes but content is zlib-compressed.
         try:
             json_str = zlib.decompress(raw)
         except zlib.error:
-            json_str = raw  # Sommige zijn niet gecomprimeerd
+            json_str = raw  # some AAE files are uncompressed
 
         import json as _json
         data = _json.loads(json_str)
@@ -320,7 +303,7 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
             settings = adj.get("settings", {})
 
             if identifier == "Crop":
-                # cropOrigin = [x, y] en cropSize = [w, h] als fractie van het origineel
+                # cropOrigin/cropSize are fractions of the original image.
                 origin = settings.get("cropOrigin")
                 size = settings.get("cropSize")
                 angle = settings.get("straightenAngle", 0)
@@ -345,12 +328,11 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
                     modified = True
 
         if modified:
-            # Bewaar met originele kwaliteit
             ext = image_path.suffix.lower()
             if ext in (".jpg", ".jpeg"):
                 img.save(image_path, "JPEG", quality=95, exif=img.info.get("exif", b""))
             elif ext in (".heic", ".heif"):
-                # HEIC opslaan als JPEG (Pillow kan niet naar HEIC schrijven)
+                # Pillow can't write HEIC → save as JPEG next to the original.
                 jpeg_path = image_path.with_suffix(".jpg")
                 img.save(jpeg_path, "JPEG", quality=95)
                 image_path.unlink()
@@ -369,11 +351,7 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
 
 
 def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
-    """
-    Scan de DCIM-map van de iPhone recursief.
-    Slaat mappen over waarvan de naam in SKIP_DIRS staat (.Trash, Recently Deleted, …).
-    AAE-bestanden worden volledig uitgesloten en niet meegeteld.
-    """
+    """Recursively scan DCIM. Skips SKIP_DIRS (Recently Deleted etc.) and AAE."""
     dcim = mountpoint / "DCIM"
     if not dcim.exists():
         return []
@@ -401,7 +379,7 @@ def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
             elif entry.is_file():
                 ext = entry.suffix.lower()
                 if ext in EXCLUDED_EXT:
-                    pass  # AAE overslaan
+                    pass
                 elif ext in SUPPORTED_EXT:
                     files.append(entry)
                     if progress_cb:
@@ -431,9 +409,8 @@ def save_hash_cache(cache: dict):
 
 
 def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
-    """Bouw een hash-index van alle foto's in het archief. Niet-cached
-    foto's worden parallel gehasht (pool=4) — pHash-compute is CPU-bound
-    maar PIL release de GIL tijdens decode, dus threads versnellen dit."""
+    """Build pHash index of the archive. Uncached photos are hashed in parallel
+    (pool=4) — PIL releases the GIL during decode so threads help here."""
     cache = load_hash_cache()
     hashes = {}
 
@@ -495,7 +472,6 @@ def find_duplicate(ph_str: str, library_hashes: dict, max_dist: int) -> str | No
 
 
 def get_backup_mountpoint(uuid: str) -> Path | None:
-    """Zoek het mountpoint van een schijf op UUID."""
     try:
         result = subprocess.run(
             ["lsblk", "-o", "UUID,MOUNTPOINT", "-J"],
@@ -521,7 +497,6 @@ def get_backup_mountpoint(uuid: str) -> Path | None:
 
 
 def _import_cache_path(photo_path: Path) -> Path:
-    """Cache-sleutel op basis van pad + mtime + grootte."""
     try:
         stat = photo_path.stat()
         key = hashlib.md5(f"{photo_path}:{int(stat.st_mtime)}:{stat.st_size}".encode()).hexdigest()
@@ -531,7 +506,6 @@ def _import_cache_path(photo_path: Path) -> Path:
 
 
 def _crop_to_square(pixbuf) -> "GdkPixbuf.Pixbuf":
-    """Snijd het midden van een pixbuf bij tot een vierkant."""
     w = pixbuf.get_width()
     h = pixbuf.get_height()
     size = min(w, h)
@@ -541,14 +515,10 @@ def _crop_to_square(pixbuf) -> "GdkPixbuf.Pixbuf":
 
 
 def load_select_thumb(photo_path: Path):
-    """
-    Laad een vierkante thumbnail (SELECT_THUMB × SELECT_THUMB) voor de selectiepagina.
-    Sla het resultaat op in een eigen cache zodat de volgende keer direct geladen kan worden.
-    """
+    """Square SELECT_THUMB thumbnail for the selection page, disk-cached."""
     IMPORT_THUMB_DIR.mkdir(parents=True, exist_ok=True)
     cache = _import_cache_path(photo_path)
 
-    # Cache-hit: direct laden (al vierkant en goede kwaliteit)
     if cache.exists():
         try:
             return GdkPixbuf.Pixbuf.new_from_file(str(cache))
@@ -560,7 +530,7 @@ def load_select_thumb(photo_path: Path):
         if ext in {".mp4", ".mov", ".m4v"}:
             if not _cmd_available("ffmpeg"):
                 return None
-            # Eerste frame pakken zonder seek — betrouwbaarder op FUSE/USB
+            # No seek — first-frame-only is more reliable on FUSE/USB.
             tmp = cache.with_suffix(".tmp.jpg")
             result = subprocess.run(
                 ["ffmpeg", "-i", str(photo_path),
@@ -574,7 +544,7 @@ def load_select_thumb(photo_path: Path):
             )
             tmp.unlink(missing_ok=True)
         else:
-            # Laad op dubbele grootte voor betere kwaliteit na downscale
+            # Load at 2× for better quality after downscale.
             raw = GdkPixbuf.Pixbuf.new_from_file_at_scale(
                 str(photo_path), SELECT_THUMB * 2, SELECT_THUMB * 2, True
             )
@@ -591,8 +561,6 @@ def _cmd_available(cmd: str) -> bool:
     return shutil.which(cmd) is not None
 
 
-# ─── ImporterPage ─────────────────────────────────────────────────────────────
-
 class ImporterPage(Gtk.Box):
     def __init__(self, on_back_cb, on_done_cb):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
@@ -601,7 +569,6 @@ class ImporterPage(Gtk.Box):
         self.settings = load_settings()
         self.state = STATE_WAITING
 
-        # Import-staat
         self.udid: str | None = None
         self.device_name = "iPhone"
         self.iphone_files: list[Path] = []
@@ -614,14 +581,11 @@ class ImporterPage(Gtk.Box):
 
         self._poll_timer_id: int | None = None
         self._disconnect_dialog_open = False
-        self._thumb_load_gen = 0  # bump bij state-wissel om stale callbacks te detecten
+        self._thumb_load_gen = 0  # bumped on state-switch to invalidate stale callbacks
 
         self._build_ui()
 
-    # ─── UI opbouw ───────────────────────────────────────────────────────────
-
     def _build_ui(self):
-        # Eigen header bar (flat) met terugknop
         header = Adw.HeaderBar()
         header.add_css_class("flat")
 
@@ -653,33 +617,27 @@ class ImporterPage(Gtk.Box):
 
         self._show_state(STATE_WAITING)
 
-    # ─── Activeren / deactiveren ──────────────────────────────────────────────
-
     def activate(self):
-        """Wordt aangeroepen als de pagina zichtbaar wordt."""
         self.settings = load_settings()
         self._show_state(STATE_WAITING)
         threading.Thread(target=ensure_services, daemon=True).start()
         self._start_detection_poll()
 
     def deactivate(self):
-        """Wordt aangeroepen als de pagina verborgen wordt."""
         if self._poll_timer_id is not None:
             try:
                 GLib.source_remove(self._poll_timer_id)
             except Exception:
                 pass
             self._poll_timer_id = None
-        # Bump generation zodat lopende background-loaders hun idle-callbacks
-        # niet meer proberen toe te passen op verwijderde widgets.
+        # Invalidate in-flight thumb loaders so their idle callbacks don't
+        # target now-destroyed widgets.
         self._thumb_load_gen += 1
         unmount_iphone(MOUNT_POINT)
 
     def _on_back_clicked(self, _btn):
         self.deactivate()
         self.on_back_cb()
-
-    # ─── Pagina's bouwen ─────────────────────────────────────────────────────
 
     def _build_waiting_page(self):
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -862,7 +820,6 @@ class ImporterPage(Gtk.Box):
         self.stack.add_named(clamp, "progress")
 
     def _build_selecting_page(self):
-        # CSS voor ronde hoeken op thumbnails
         thumb_css = Gtk.CssProvider()
         thumb_css.load_from_string(".thumb-item { border-radius: 8px; }")
         Gtk.StyleContext.add_provider_for_display(
@@ -872,7 +829,6 @@ class ImporterPage(Gtk.Box):
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
-        # Koptekst
         header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         header_box.set_margin_top(20)
         header_box.set_margin_bottom(10)
@@ -891,14 +847,13 @@ class ImporterPage(Gtk.Box):
 
         outer.append(header_box)
 
-        # Foto-grid
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
         self.select_flow = Gtk.FlowBox()
         self.select_flow.set_homogeneous(True)
-        self.select_flow.set_sort_func(lambda a, b, *_: 0)  # Behoud insertion-order
+        self.select_flow.set_sort_func(lambda a, b, *_: 0)  # preserve insertion-order
         self.select_flow.set_max_children_per_line(6)
         self.select_flow.set_min_children_per_line(2)
         self.select_flow.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -911,7 +866,6 @@ class ImporterPage(Gtk.Box):
         scroll.set_child(self.select_flow)
         outer.append(scroll)
 
-        # Onderbalk
         action_bar = Gtk.ActionBar()
 
         sel_all_btn = Gtk.Button(label=_("Selecteer alles"))
@@ -1059,11 +1013,8 @@ class ImporterPage(Gtk.Box):
         vbox.append(clamp)
         self.stack.add_named(vbox, "error")
 
-    # ─── Scherm wisselen ─────────────────────────────────────────────────────
-
     def _show_state(self, state: str):
         self.state = state
-        # Stop eventuele pulse-animatie als we geen scan-state zijn
         if state != STATE_SCANNING:
             try:
                 self._stop_progress_pulse()
@@ -1083,8 +1034,6 @@ class ImporterPage(Gtk.Box):
             STATE_ERROR:     "error",
         }
         self.stack.set_visible_child_name(page_map.get(state, "waiting"))
-
-    # ─── iPhone detectie ─────────────────────────────────────────────────────
 
     def _start_detection_poll(self):
         if self._poll_timer_id is not None:
@@ -1133,7 +1082,6 @@ class ImporterPage(Gtk.Box):
         self._disconnect_dialog_open = True
         unmount_iphone(MOUNT_POINT)
 
-        # Zoek het bovenliggende venster op voor de dialog
         window = self.get_root()
 
         dialog = Adw.MessageDialog.new(
@@ -1153,8 +1101,6 @@ class ImporterPage(Gtk.Box):
         self._disconnect_dialog_open = False
         self._show_state(STATE_WAITING)
         self._start_detection_poll()
-
-    # ─── Import flow ─────────────────────────────────────────────────────────
 
     def _on_import_clicked(self, _btn):
         self._set_progress(_("Apparaat koppelen…"), _("Even geduld, dit duurt maar even."))
@@ -1182,7 +1128,7 @@ class ImporterPage(Gtk.Box):
         threading.Thread(target=self._do_scan, daemon=True).start()
 
     def _start_progress_pulse(self):
-        """Toon een indeterminate 'bezig' animatie als we geen totaal weten."""
+        """Indeterminate progress bar while total is unknown."""
         self._stop_progress_pulse()
         self.progress_bar.set_show_text(False)
         self.progress_bar.set_pulse_step(0.08)
@@ -1220,13 +1166,12 @@ class ImporterPage(Gtk.Box):
                 total,
             ) % total,
         )
-        # Sorteren met tussentijdse voortgang (laat 'm chunk-gewijs lopen zodat UI reageert)
+        # Chunked progress during sort so the UI stays responsive.
         GLib.idle_add(self._begin_sort_progress, total)
         if total <= 500:
             files.sort(key=get_photo_date, reverse=True)
             GLib.idle_add(self._update_progress, 1.0, _("Sorteren klaar ({n})").format(n=total), "")
         else:
-            # Bereken datums met voortgang per foto, dan eenmalig sorteren op voorgecachte waardes
             date_cache = {}
             for i, f in enumerate(files):
                 date_cache[f] = get_photo_date(f)
@@ -1263,7 +1208,7 @@ class ImporterPage(Gtk.Box):
     def _do_hashing(self, iphone_files: list[Path]):
         photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
         threshold_key = self.settings.get("duplicate_threshold", 2)
-        # threshold 0 = detectie uit → alles als nieuw behandelen.
+        # threshold 0 = detection off → treat everything as new.
         if threshold_key == 0:
             GLib.idle_add(self._on_hashing_done, [], list(iphone_files))
             return
@@ -1306,8 +1251,6 @@ class ImporterPage(Gtk.Box):
         else:
             self._start_import()
 
-    # ─── Selectiepagina ──────────────────────────────────────────────────────
-
     def _show_selecting(self, files: list[Path]):
         n = len(files)
         self.select_title.set_text(ngettext("%d bestand gevonden", "%d bestanden gevonden", n) % n)
@@ -1316,19 +1259,15 @@ class ImporterPage(Gtk.Box):
               "💡 Tip: leeg eerst de prullenbak op je iPhone om verwijderde foto's uit te sluiten.")
         )
 
-        # Alles standaard geselecteerd
         self.selected_files = {str(f) for f in files}
         self._update_select_count()
 
-        # Bump generation zodat eerdere thumb-loaders (van een vorige import-run)
-        # hun idle_add callbacks niet op de nieuwe widgets droppen.
+        # Bump gen so prior thumb-loaders don't drop callbacks on new widgets.
         self._thumb_load_gen += 1
 
-        # Verwijder oude kaarten
         while child := self.select_flow.get_first_child():
             self.select_flow.remove(child)
 
-        # Voeg kaarten toe en laad thumbnails in achtergrond
         self._select_cards: dict[str, Gtk.CheckButton] = {}
         self._select_overlays: dict[str, Gtk.Overlay] = {}
         self._video_duration_labels: dict[str, Gtk.Label] = {}
@@ -1340,28 +1279,24 @@ class ImporterPage(Gtk.Box):
 
         self._show_state(STATE_SELECTING)
 
-        # Thumbnails asynchroon laden
         threading.Thread(target=self._load_select_thumbs, args=(list(files),), daemon=True).start()
 
     def _make_select_card(self, fp: Path) -> tuple[Gtk.Widget, Gtk.CheckButton, Gtk.Overlay]:
-        """Maakt een vierkante thumbnail-kaart met vinkje. Geeft (widget, checkbutton, overlay) terug."""
         overlay = Gtk.Overlay()
         overlay.set_size_request(SELECT_THUMB, SELECT_THUMB)
         overlay.set_overflow(Gtk.Overflow.HIDDEN)
         overlay.add_css_class("thumb-item")
 
-        # Placeholder terwijl thumbnail laadt
         placeholder = Gtk.Image.new_from_icon_name("image-loading-symbolic")
         placeholder.set_pixel_size(32)
         placeholder.set_size_request(SELECT_THUMB, SELECT_THUMB)
         overlay.set_child(placeholder)
 
-        # Klik op de kaart zelf togglet het vinkje
         click = Gtk.GestureClick.new()
         click.connect("pressed", lambda g, n, x, y, ip=str(fp): self._on_card_click(ip))
         overlay.add_controller(click)
 
-        # Vinkje linksboven — alleen visueel, klik wordt afgehandeld door GestureClick
+        # Check icon is visual-only; clicks are handled by GestureClick above.
         check = Gtk.CheckButton()
         check.set_active(True)
         check.set_halign(Gtk.Align.START)
@@ -1372,7 +1307,6 @@ class ImporterPage(Gtk.Box):
         check.set_focusable(False)
         overlay.add_overlay(check)
 
-        # Video-indicator rechtsonder met duur
         ext = fp.suffix.lower()
         if ext in {".mp4", ".mov", ".m4v", ".3gp"}:
             video_lbl = Gtk.Label(label="▶")
@@ -1387,27 +1321,22 @@ class ImporterPage(Gtk.Box):
         return overlay, check, overlay
 
     def _load_select_thumbs(self, files: list[Path]):
-        """Laad thumbnails één voor één — sneller op USB/FUSE dan parallel."""
-        # Capture de generation van dit load voor stale-check (user kan terug
-        # klikken terwijl we nog laden → we willen geen callbacks doen op
-        # widgets die al verdwenen zijn).
+        """Load thumbnails sequentially — faster than parallel on USB/FUSE."""
         my_gen = self._thumb_load_gen
         for fp in files:
             if my_gen != self._thumb_load_gen:
-                return  # user is naar een andere state gegaan
+                return
             pixbuf = load_select_thumb(fp)
             if pixbuf is not None:
                 GLib.idle_add(self._set_select_thumb, str(fp), pixbuf, my_gen)
-            # Videoduur ophalen
             if fp.suffix.lower() in _VIDEO_EXT:
                 dur = _get_video_duration(fp)
                 if dur:
                     GLib.idle_add(self._set_video_duration, str(fp), dur, my_gen)
 
     def _set_select_thumb(self, path_str: str, pixbuf, gen: int = 0):
-        """Vervang placeholder door echte thumbnail in de selectiekaart."""
         if gen and gen != self._thumb_load_gen:
-            return  # stale callback
+            return
         overlay = self._select_overlays.get(path_str)
         if overlay is None:
             return
@@ -1421,7 +1350,6 @@ class ImporterPage(Gtk.Box):
             pass
 
     def _set_video_duration(self, path_str: str, duration: str, gen: int = 0):
-        """Update de video-indicator met de duur (bijv. '▶ 1:23')."""
         if gen and gen != self._thumb_load_gen:
             return
         lbl = self._video_duration_labels.get(path_str)
@@ -1432,7 +1360,6 @@ class ImporterPage(Gtk.Box):
                 pass
 
     def _on_card_click(self, path_str: str):
-        """Klik ergens op de kaart togglet het vinkje (enige toggle-handler)."""
         check = self._select_cards.get(path_str)
         if check is None:
             return
@@ -1473,8 +1400,6 @@ class ImporterPage(Gtk.Box):
             return
         self._start_hashing(selected)
 
-    # ─── Duplicate review ────────────────────────────────────────────────────
-
     def _show_review(self, duplicates: list[tuple[Path, Path]]):
         n = len(duplicates)
         self.review_subtitle.set_text(
@@ -1502,7 +1427,6 @@ class ImporterPage(Gtk.Box):
         card.add_css_class("card")
         card.set_margin_bottom(4)
 
-        # Bestandsnaam kop
         name_lbl = Gtk.Label(label=iphone_path.name)
         name_lbl.add_css_class("heading")
         name_lbl.set_halign(Gtk.Align.START)
@@ -1511,7 +1435,6 @@ class ImporterPage(Gtk.Box):
         name_lbl.set_margin_bottom(8)
         card.append(name_lbl)
 
-        # Twee thumbnails naast elkaar
         img_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         img_row.set_margin_start(12)
         img_row.set_margin_end(12)
@@ -1538,7 +1461,6 @@ class ImporterPage(Gtk.Box):
 
         card.append(img_row)
 
-        # Knoppen
         btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_row.set_margin_start(12)
         btn_row.set_margin_end(12)
@@ -1616,8 +1538,6 @@ class ImporterPage(Gtk.Box):
                 self.to_import.append(iphone_path)
         self._start_import()
 
-    # ─── Kopiëren ────────────────────────────────────────────────────────────
-
     def _start_import(self):
         total = len(self.to_import)
         self._set_progress(
@@ -1642,7 +1562,7 @@ class ImporterPage(Gtk.Box):
                 mtime = datetime.fromtimestamp(src.stat().st_mtime)
                 dst = dest_path(photo_path, structure, src.name, mtime)
 
-                # Bij "beide bewaren": unieke naam
+                # "keep both" case: find a unique filename.
                 if dst.exists():
                     stem, suffix = dst.stem, dst.suffix
                     counter = 1
@@ -1653,7 +1573,6 @@ class ImporterPage(Gtk.Box):
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
 
-                # Pas AAE-bewerkingen toe (crop/rotatie) als die bestaan
                 aae = src.with_suffix(".AAE")
                 if not aae.exists():
                     aae = src.with_suffix(".aae")
@@ -1672,12 +1591,9 @@ class ImporterPage(Gtk.Box):
 
     def _on_import_done(self):
         unmount_iphone(MOUNT_POINT)
-        # Backup-flow zit nu in main_window (BackupManager) — via on_done_cb
-        # (in main_window.on_import_done) wordt last_import_time geset en
-        # de eventuele backup gestart. De importer toont alleen de done-page.
+        # Backup flow is in main_window now; on_done_cb sets last_import_time
+        # and triggers the backup. Importer only shows the done page.
         self._finish()
-
-    # ─── Back-up ─────────────────────────────────────────────────────────────
 
     def _start_backup(self):
         self._set_progress(_("Back-up maken…"),
@@ -1724,7 +1640,7 @@ class ImporterPage(Gtk.Box):
             except Exception:
                 success = False
             finally:
-                # Ongeacht uitkomst: zorg dat proc niet als zombie blijft hangen.
+                # Make sure rsync doesn't linger as a zombie.
                 if proc is not None and proc.poll() is None:
                     try:
                         proc.kill()
@@ -1755,8 +1671,6 @@ class ImporterPage(Gtk.Box):
             return True
         except Exception:
             return False
-
-    # ─── Afgerond / fout ─────────────────────────────────────────────────────
 
     def _finish(self, note: str | None = None):
         n = self.import_count
@@ -1790,8 +1704,6 @@ class ImporterPage(Gtk.Box):
     def _on_retry(self, _btn):
         self._show_state(STATE_WAITING)
         self._start_detection_poll()
-
-    # ─── Voortgang helpers ───────────────────────────────────────────────────
 
     def _set_progress(self, title: str, subtitle: str = ""):
         self.progress_title.set_text(title)

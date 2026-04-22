@@ -102,19 +102,15 @@ class SetupWizard(Adw.Window):
 
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
-        # Header — alleen titel en sluiten
         header = Adw.HeaderBar()
         header.add_css_class("flat")
         main_box.append(header)
 
-        # Inhoud
         main_box.append(self.stack)
 
-        # Scheidingslijn
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         main_box.append(sep)
 
-        # Knoppen onderaan
         btn_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_bar.set_margin_top(12)
         btn_bar.set_margin_bottom(12)
@@ -141,8 +137,6 @@ class SetupWizard(Adw.Window):
         self.pages = ["welcome", "folder", "backup", "duplicate"]
         self.current = 0
 
-    # ── Helper ───────────────────────────────────────────────────────
-
     def _scrolled(self, child):
         sw = Gtk.ScrolledWindow()
         sw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -150,12 +144,8 @@ class SetupWizard(Adw.Window):
         sw.set_child(child)
         return sw
 
-    # ── Dark mode ────────────────────────────────────────────────────
-
     def _on_dark_mode_changed(self, manager, _pspec):
-        pass  # SVG icon werkt in beide thema's
-
-    # ── Pagina: Welkom ───────────────────────────────────────────────
+        pass  # SVG icon works in both themes
 
     def _build_welcome(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -167,7 +157,6 @@ class SetupWizard(Adw.Window):
         page.set_valign(Gtk.Align.CENTER)
         page.set_valign(Gtk.Align.START)
 
-        # Logo
         self.welcome_logo = Gtk.Picture()
         logo_path = self._logo_path()
         if logo_path:
@@ -257,7 +246,6 @@ class SetupWizard(Adw.Window):
 
         group = Adw.PreferencesGroup()
 
-        # Aan/uit schakelaar
         self.backup_switch = Gtk.Switch()
         self.backup_switch.set_valign(Gtk.Align.CENTER)
         self.backup_switch.connect("notify::active", self._on_backup_toggle)
@@ -269,7 +257,6 @@ class SetupWizard(Adw.Window):
         backup_row.set_activatable_widget(self.backup_switch)
         group.add(backup_row)
 
-        # Schijf dropdown
         self.drive_model = Gtk.StringList()
         self.drive_model.append(_("Geen externe schijven gevonden"))
 
@@ -292,7 +279,6 @@ class SetupWizard(Adw.Window):
         self.drive_row.set_sensitive(False)
         group.add(self.drive_row)
 
-        # Map op backup schijf
         self.backup_folder_row = Adw.ActionRow(
             title=_("Map op backup schijf"),
             subtitle=_("Nog geen schijf geselecteerd"))
@@ -312,8 +298,6 @@ class SetupWizard(Adw.Window):
         page.append(group)
         page.append(self.backup_error)
         return page
-
-    # ── Pagina: Duplicaten ───────────────────────────────────────────
 
     def _build_duplicate(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -366,8 +350,6 @@ class SetupWizard(Adw.Window):
         page.append(group)
         return page
 
-    # ── Navigatie ────────────────────────────────────────────────────
-
     def go_next(self, btn):
         page = self.pages[self.current]
 
@@ -412,8 +394,6 @@ class SetupWizard(Adw.Window):
             self.next_btn.set_label(_("Volgende"))
             if hasattr(self, "backup_error"):
                 self.backup_error.set_visible(False)
-
-    # ── Acties ───────────────────────────────────────────────────────
 
     def _on_browse_folder(self, btn):
         dialog = Gtk.FileDialog()
@@ -511,8 +491,8 @@ class SetupWizard(Adw.Window):
             self.drive_model.remove(0)
 
         self.drives = drives
-        # Combo blijft bruikbaar zolang backup aan staat, ook als er (nog)
-        # geen schijven zijn. Dan kan user de refresh-knop opnieuw gebruiken.
+        # Keep combo usable when backup is on but no drives yet, so user can
+        # re-click refresh.
         backup_on = self.backup_switch.get_active() if hasattr(self, "backup_switch") else True
         if drives:
             for uuid, label in drives:
@@ -522,8 +502,6 @@ class SetupWizard(Adw.Window):
         self.drive_combo.set_sensitive(backup_on)
 
         return False
-
-    # ── Helpers ──────────────────────────────────────────────────────
 
     def _logo_path(self):
         base = os.path.dirname(os.path.abspath(__file__))

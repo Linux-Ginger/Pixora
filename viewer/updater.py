@@ -2,8 +2,7 @@
 
 # ─────────────────────────────────────────────
 #  Pixora — updater.py
-#  Grafische updater (GTK4/Adwaita)
-#  Stijl: identiek aan installer.py
+#  by LinuxGinger
 # ─────────────────────────────────────────────
 
 import os
@@ -38,7 +37,7 @@ INSTALL_DIR = Path.home() / ".local" / "share" / "pixora"
 ICON_PATH = INSTALL_DIR / "assets" / "logos" / "pixora-icon.svg"
 UPDATE_URL = "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/updater.sh"
 
-# Stappen die updater.sh emit via "STEP:<key>:<label>" regels
+# Phases emitted by updater.sh as "STEP:<key>:<label>" lines.
 PHASES = [
     ("Bijwerken", [
         ("Dependencies installeren", "deps"),
@@ -132,7 +131,6 @@ class UpdaterWindow(Adw.ApplicationWindow):
         self.progress.set_margin_bottom(8)
         page.append(self.progress)
 
-        # Knoppen (sluiten + Pixora starten) — hidden tot klaar
         self._btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._btn_box.set_halign(Gtk.Align.CENTER)
         self._btn_box.set_margin_bottom(16)
@@ -205,9 +203,8 @@ class UpdaterWindow(Adw.ApplicationWindow):
             self._pulse_timer = GLib.timeout_add(120, self._pulse_tick)
 
     def _run_update(self):
-        # Script eerst lokaal downloaden zodat de pkexec-prompt een kort,
-        # leesbaar commando toont ("pkexec bash /tmp/pixora-updater.sh")
-        # i.p.v. een bash -c met curl-pipe — minder eng voor de gebruiker.
+        # Download script locally first so the pkexec prompt shows a short
+        # command ("pkexec bash /tmp/pixora-updater.sh") instead of a curl-pipe.
         import tempfile
         script_path = None
         try:
@@ -274,7 +271,6 @@ class UpdaterWindow(Adw.ApplicationWindow):
             self._pulse_timer = None
         if ok:
             self.progress.set_fraction(1.0)
-            # Mark alle steps als done
             for key in self.step_rows.keys():
                 self._set_step_done(key)
         else:
@@ -292,9 +288,8 @@ class UpdaterWindow(Adw.ApplicationWindow):
             cmd = [pixora_bin]
         else:
             cmd = [sys.executable, str(INSTALL_DIR / "viewer" / "main.py")]
-        # PIXORA_IN_DEV_TERM strippen — Pixora zette die toen hij de updater
-        # spawnde. Als de flag blijft staan denkt de nieuwe main.py dat hij
-        # al binnen een dev-terminal draait en spawnt er geen.
+        # Strip PIXORA_IN_DEV_TERM — otherwise the new main.py thinks it's
+        # already inside a dev-terminal and won't spawn one.
         child_env = {k: v for k, v in os.environ.items()
                      if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")}
         try:
@@ -308,8 +303,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
             )
         except Exception:
             pass
-        # Wacht 400ms voordat de updater sluit zodat de child process
-        # echt losgekoppeld is en niet door onze close-signalen wordt geraakt.
+        # Delay quit so the child is fully detached before we send close signals.
         def _delayed_quit():
             self.get_application().quit()
             return False
