@@ -7377,19 +7377,28 @@ class MainWindow(Adw.ApplicationWindow):
             log_info(_("Backup-scan: alles gesynct"))
             if hasattr(self, "_backup_donut_btn"):
                 self._set_donuts_visible(self._backup_running)
-            # Silent-mode: geen popup, ook niet bij manuele klik.
-            if not silent and manual_requested:
-                if delete_count > 0 and mode == "backup":
-                    self._show_orphans_only_dialog(delete_count)
+            # Orphans op USB in backup-mode: óók als er geen backup meer
+            # hoeft te draaien, heeft de gebruiker recht op info. Bij
+            # manuele klik negeren we silent-mode — user klikte expliciet.
+            if delete_count > 0 and mode == "backup" and manual_requested:
+                if (self.settings.get("backup_dedup")
+                        and self._last_scan_orphan_rels):
+                    log_info(_("Manual scan: orphan-analyse gestart "
+                               "({n} orphans)").format(n=delete_count))
+                    threading.Thread(
+                        target=self._review_orphans_thread, daemon=True
+                    ).start()
                 else:
-                    dlg = Adw.AlertDialog(
-                        heading=_("Alles al gesynct"),
-                        body=_("Je USB-schijf heeft al dezelfde foto's als Pixora."),
-                    )
-                    dlg.add_response("ok", _("OK"))
-                    dlg.set_default_response("ok")
-                    dlg.set_close_response("ok")
-                    self._present_dialog(dlg)
+                    self._show_orphans_only_dialog(delete_count)
+            elif not silent and manual_requested:
+                dlg = Adw.AlertDialog(
+                    heading=_("Alles al gesynct"),
+                    body=_("Je USB-schijf heeft al dezelfde foto's als Pixora."),
+                )
+                dlg.add_response("ok", _("OK"))
+                dlg.set_default_response("ok")
+                dlg.set_close_response("ok")
+                self._present_dialog(dlg)
             self._set_manual_scan_state("uptodate")
             return False
         log_info(_("Backup-scan: {n} nieuw, {d} orphans (mode={m}), {b} bytes, {u} duplicaten").format(

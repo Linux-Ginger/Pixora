@@ -1289,6 +1289,9 @@ msgstr[1] ""
 msgid "Backup voltooid, orphan-analyse gestart ({n} orphans)"
 msgstr "Backup abgeschlossen, Waisen-Analyse gestartet ({n} Waisen)"
 
+msgid "Manual scan: orphan-analyse gestart ({n} orphans)"
+msgstr "Manueller Scan: Waisen-Analyse gestartet ({n} Waisen)"
+
 msgid "Orphan-analyse overgeslagen: {err}"
 msgstr "Waisen-Analyse übersprungen: {err}"
 
