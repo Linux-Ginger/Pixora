@@ -8343,8 +8343,9 @@ class MainWindow(Adw.ApplicationWindow):
     def _categorize_orphans(self, photo_path, backup_dest, orphan_rels,
                             progress_cb=None):
         """Pure helper: pHash-match elke orphan tegen Pixora-library.
-        Returnt (dup_rels, unique_rels). progress_cb(i, total) wordt elke
-        25 files aangeroepen — gebruik het om UI te updaten.
+        Returnt (dup_rels, unique_rels). progress_cb(cur, total, phase) wordt
+        periodiek aangeroepen met phase='build' (pHash-cache opbouwen — kan
+        minuten duren eerste keer) of phase='check' (orphans vergelijken).
         Bij import- of hash-fout: alles belandt in unique_rels (veilige
         default: niet als 'dubbel' markeren als we het niet zeker weten)."""
         try:
@@ -8355,8 +8356,18 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
             return [], list(orphan_rels)
+
+        # Progress voor build_library_hashes — wordt per file aangeroepen,
+        # maar we throttlen naar elke 25 voor rustige UI-updates.
+        def _build_progress(i, total, _name):
+            if progress_cb and i % 25 == 0:
+                try:
+                    progress_cb(i, total, "build")
+                except Exception:
+                    pass
         try:
-            src_hashes = build_library_hashes(photo_path)
+            src_hashes = build_library_hashes(
+                photo_path, progress_cb=_build_progress)
         except Exception as e:
             log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
             return [], list(orphan_rels)
@@ -8367,7 +8378,7 @@ class MainWindow(Adw.ApplicationWindow):
         for i, rel in enumerate(orphan_rels):
             if progress_cb and i % 25 == 0:
                 try:
-                    progress_cb(i, total)
+                    progress_cb(i, total, "check")
                 except Exception:
                     pass
             orph_file = backup_dest / rel
@@ -8417,8 +8428,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._orphan_reviewing = True
         GLib.idle_add(self._start_orphan_review_ui)
 
-        def _progress(cur, total):
-            msg = _("Analyseren: {c} / {t}").format(c=cur, t=total)
+        def _progress(cur, total, phase):
+            if phase == "build":
+                msg = _("Hash-cache bouwen: {c} / {t}").format(c=cur, t=total)
+            else:
+                msg = _("Analyseren: {c} / {t}").format(c=cur, t=total)
             GLib.idle_add(self._set_dedup_detail, msg)
 
         try:
@@ -8447,8 +8461,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._orphan_reviewing = True
         GLib.idle_add(self._start_orphan_review_ui)
 
-        def _progress(cur, total):
-            msg = _("Analyseren: {c} / {t}").format(c=cur, t=total)
+        def _progress(cur, total, phase):
+            if phase == "build":
+                msg = _("Hash-cache bouwen: {c} / {t}").format(c=cur, t=total)
+            else:
+                msg = _("Analyseren: {c} / {t}").format(c=cur, t=total)
             GLib.idle_add(self._set_dedup_detail, msg)
 
         try:

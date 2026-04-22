@@ -751,6 +751,9 @@ msgstr ""
 msgid "Analyseren: {c} / {t}"
 msgstr ""
 
+msgid "Hash-cache bouwen: {c} / {t}"
+msgstr ""
+
 msgid "Pre-sync review: {d} dubbele kopieën, {u} uniek — wacht op keuze"
 msgstr ""
 

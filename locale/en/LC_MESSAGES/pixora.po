@@ -1307,6 +1307,9 @@ msgstr "Analyzing for duplicate copies…"
 msgid "Analyseren: {c} / {t}"
 msgstr "Analyzing: {c} / {t}"
 
+msgid "Hash-cache bouwen: {c} / {t}"
+msgstr "Building hash cache: {c} / {t}"
+
 msgid "Pre-sync review: {d} dubbele kopieën, {u} uniek — wacht op keuze"
 msgstr "Pre-sync review: {d} duplicate copies, {u} unique — waiting for choice"
 

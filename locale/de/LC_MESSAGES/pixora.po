@@ -1298,6 +1298,9 @@ msgstr "Analysiere auf doppelte Kopien…"
 msgid "Analyseren: {c} / {t}"
 msgstr "Analyse: {c} / {t}"
 
+msgid "Hash-cache bouwen: {c} / {t}"
+msgstr "Hash-Cache aufbauen: {c} / {t}"
+
 msgid "Pre-sync review: {d} dubbele kopieën, {u} uniek — wacht op keuze"
 msgstr "Pre-Sync-Prüfung: {d} doppelte Kopien, {u} einzigartig — warte auf Auswahl"
 
