@@ -7249,6 +7249,13 @@ class MainWindow(Adw.ApplicationWindow):
             self._redraw_donuts()
         return True
 
+    def _set_scan_detail(self, text):
+        """Zet popover-subtitel tijdens scan. Aangeroepen vanuit scan-thread
+        via GLib.idle_add voor progress-updates van de dedup-loop."""
+        if self._backup_scanning:
+            self._backup_detail = text or ""
+        return False
+
     def _backup_scan_thread(self):
         from pathlib import Path as _P
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
@@ -7302,38 +7309,60 @@ class MainWindow(Adw.ApplicationWindow):
         bytes_to_transfer = sum(src_files[rel] for rel in to_transfer_rels)
 
         # Optionele dedup: vergelijk pHash van bestanden-die-zouden-overdragen
-        # tegen pHash van bestaande bestanden op USB.
+        # tegen pHash van bestaande bestanden op USB. Alleen zinvol als USB
+        # een betekenisvolle library bevat — bij (bijna) lege USB kost pHash
+        # 50-200ms per bronbestand (minuten totaal) terwijl de kans op een
+        # visuele match minimaal is.
         excluded_rels = []
         dup_count = 0
-        if dedup_enabled and to_transfer_rels:
-            try:
-                from importer_page import (
-                    perceptual_hash, build_library_hashes, find_duplicate,
-                    SUPPORTED_EXT,
-                )
-                usb_hashes = build_library_hashes(backup_dest)
-                MAX_DIST = 2  # strict (zelfde als "Aan" in dup-detectie)
-                for rel in to_transfer_rels:
-                    src_file = photo_path / rel
-                    if not src_file.is_file():
-                        continue
-                    if src_file.suffix.lower() not in SUPPORTED_EXT:
-                        continue
-                    ph = perceptual_hash(src_file)
-                    if ph and find_duplicate(ph, usb_hashes, MAX_DIST):
-                        excluded_rels.append(rel)
-                        dup_count += 1
-            except Exception as e:
-                log_warn(_("Dedup-check overgeslagen: {err}").format(err=e))
-            # Adjust counts/bytes voor de getoonde schatting
-            for rel in excluded_rels:
+        if dedup_enabled and to_transfer_rels and dest_rels:
+            # Drempel: USB moet minstens 10% van de bron bevatten voordat
+            # dedup statistisch de moeite waard is. Onder die drempel
+            # vergeleken we 2000+ bronbestanden tegen een handjevol USB-
+            # foto's — bijna nooit een match, veel te duur.
+            if len(dest_rels) * 10 < len(src_rels):
+                log_info(_("Duplicaat-check overgeslagen: USB te leeg "
+                           "({d} foto's vs {s} in Pixora)").format(
+                    d=len(dest_rels), s=len(src_rels)))
+            else:
+                log_info(_("Duplicaat-check: {n} nieuwe foto's tegen "
+                           "{u} op USB").format(
+                    n=len(to_transfer_rels), u=len(dest_rels)))
                 try:
-                    sz = (photo_path / rel).stat().st_size
-                    bytes_to_transfer -= sz
-                except OSError:
-                    pass
-            new_count = max(0, new_count - dup_count)
-            bytes_to_transfer = max(0, bytes_to_transfer)
+                    from importer_page import (
+                        perceptual_hash, build_library_hashes, find_duplicate,
+                        SUPPORTED_EXT,
+                    )
+                    usb_hashes = build_library_hashes(backup_dest)
+                    MAX_DIST = 2  # strict (zelfde als "Aan" in dup-detectie)
+                    total = len(to_transfer_rels)
+                    for i, rel in enumerate(to_transfer_rels):
+                        # Elke 25 files: subtitel in popover updaten zodat
+                        # duidelijk is dat hij nog aan het werk is.
+                        if i % 25 == 0:
+                            msg = _("Duplicaat-check: {c} / {t}").format(
+                                c=i, t=total)
+                            GLib.idle_add(self._set_scan_detail, msg)
+                        src_file = photo_path / rel
+                        if not src_file.is_file():
+                            continue
+                        if src_file.suffix.lower() not in SUPPORTED_EXT:
+                            continue
+                        ph = perceptual_hash(src_file)
+                        if ph and find_duplicate(ph, usb_hashes, MAX_DIST):
+                            excluded_rels.append(rel)
+                            dup_count += 1
+                except Exception as e:
+                    log_warn(_("Dedup-check overgeslagen: {err}").format(err=e))
+                # Adjust counts/bytes voor de getoonde schatting
+                for rel in excluded_rels:
+                    try:
+                        sz = (photo_path / rel).stat().st_size
+                        bytes_to_transfer -= sz
+                    except OSError:
+                        pass
+                new_count = max(0, new_count - dup_count)
+                bytes_to_transfer = max(0, bytes_to_transfer)
         GLib.idle_add(
             self._handle_scan_result,
             {

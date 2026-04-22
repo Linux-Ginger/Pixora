@@ -700,6 +700,15 @@ msgstr ""
 msgid "Dit kan even duren op een USB-schijf"
 msgstr ""
 
+msgid "Duplicaat-check overgeslagen: USB te leeg ({d} foto's vs {s} in Pixora)"
+msgstr ""
+
+msgid "Duplicaat-check: {n} nieuwe foto's tegen {u} op USB"
+msgstr ""
+
+msgid "Duplicaat-check: {c} / {t}"
+msgstr ""
+
 msgid "Backup-scan gestart"
 msgstr ""
 

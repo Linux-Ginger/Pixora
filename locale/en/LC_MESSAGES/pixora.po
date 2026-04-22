@@ -1359,6 +1359,15 @@ msgstr "Scanning for new photos…"
 msgid "Dit kan even duren op een USB-schijf"
 msgstr "This may take a while on a USB drive"
 
+msgid "Duplicaat-check overgeslagen: USB te leeg ({d} foto's vs {s} in Pixora)"
+msgstr "Duplicate check skipped: USB is too empty ({d} photos vs {s} in Pixora)"
+
+msgid "Duplicaat-check: {n} nieuwe foto's tegen {u} op USB"
+msgstr "Duplicate check: {n} new photos against {u} on USB"
+
+msgid "Duplicaat-check: {c} / {t}"
+msgstr "Duplicate check: {c} / {t}"
+
 msgid "Backup-scan gestart"
 msgstr "Backup scan started"
 
