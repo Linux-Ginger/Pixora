@@ -7348,11 +7348,13 @@ class MainWindow(Adw.ApplicationWindow):
         bytes_to_transfer = result["bytes"]
         dup_count = result.get("dup_count", 0)
         mode = result.get("mode", self.settings.get("backup_mode", "backup"))
-        # Onthouden voor de post-backup melding in silent-mode. In sync-mode
-        # worden orphans verwijderd → dan is de melding achteraf niet relevant.
+        # Orphan-state onthouden voor beide modes. In backup-mode gebruikt
+        # _show_backup_done_banner de count voor de post-backup review; in
+        # sync-mode heeft _backup_thread de rel-lijst nodig voor de
+        # pre-delete review vóór rsync --delete.
         orphans = result.get("orphans", [])
         self._last_scan_orphan_count = delete_count if mode == "backup" else 0
-        self._last_scan_orphan_rels = orphans if mode == "backup" else []
+        self._last_scan_orphan_rels = list(orphans)
         # backup_dest onthouden zodat orphan-review na de backup weet waar
         # de files te vinden/verwijderen zijn.
         drive_root = self._backup_drive_mountpoint()
