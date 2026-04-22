@@ -1291,10 +1291,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_total     = 0     # totaal te backuppen (voor manual-fallback)
         self._backup_done      = 0
         self._backup_scanning  = False
+        self._backup_deduping  = False  # dedup-fase vóór rsync
         self._backup_scan_phase = 0.0
         self._backup_scan_anim_id = None
         self._backup_scan_dialog_open = False
-        self._backup_excluded_paths = []
         self._manual_scan_requested = False
         # Reorganize-flow state: blokkeert backup/sync zolang popup/ordenen
         # loopt én 10s erna (zie _trigger_backup_scan). _reorganize_moving
@@ -7241,20 +7241,15 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._backup_scan_thread, daemon=True).start()
 
     def _tick_backup_scan(self):
-        if not self._backup_scanning and not self._structure_scanning:
+        if (not self._backup_scanning
+                and not self._structure_scanning
+                and not self._backup_deduping):
             self._backup_scan_anim_id = None
             return False
         self._backup_scan_phase = (self._backup_scan_phase + 0.18) % (2 * math.pi)
         if hasattr(self, "_backup_donut"):
             self._redraw_donuts()
         return True
-
-    def _set_scan_detail(self, text):
-        """Zet popover-subtitel tijdens scan. Aangeroepen vanuit scan-thread
-        via GLib.idle_add voor progress-updates van de dedup-loop."""
-        if self._backup_scanning:
-            self._backup_detail = text or ""
-        return False
 
     def _backup_scan_thread(self):
         from pathlib import Path as _P
@@ -7270,13 +7265,14 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         mode = self.settings.get("backup_mode", "backup")
-        dedup_enabled = bool(self.settings.get("backup_dedup"))
 
         # Pure Python set-diff op relatieve paden. Eerder gebruikten we hier
         # rsync --dry-run, maar dat blokkeerde soms minutenlang op trage of
         # flaky USB-schijven (rsync stat't elke dest-file voor attribute-
         # preservation — op FAT/exFAT is dat veel langzamer dan strikt nodig).
         # rsync wordt alsnog gebruikt voor de *echte* backup hieronder.
+        # Dedup gebeurt niet meer hier — die is verplaatst naar de backup-
+        # thread zodat de scan altijd snel klaar is.
         src_files = {}
         try:
             for root, _dirs, files in os.walk(str(photo_path)):
@@ -7308,69 +7304,14 @@ class MainWindow(Adw.ApplicationWindow):
         delete_count = len(dest_rels - src_rels)
         bytes_to_transfer = sum(src_files[rel] for rel in to_transfer_rels)
 
-        # Optionele dedup: vergelijk pHash van bestanden-die-zouden-overdragen
-        # tegen pHash van bestaande bestanden op USB. Alleen zinvol als USB
-        # een betekenisvolle library bevat — bij (bijna) lege USB kost pHash
-        # 50-200ms per bronbestand (minuten totaal) terwijl de kans op een
-        # visuele match minimaal is.
-        excluded_rels = []
-        dup_count = 0
-        if dedup_enabled and to_transfer_rels and dest_rels:
-            # Drempel: USB moet minstens 10% van de bron bevatten voordat
-            # dedup statistisch de moeite waard is. Onder die drempel
-            # vergeleken we 2000+ bronbestanden tegen een handjevol USB-
-            # foto's — bijna nooit een match, veel te duur.
-            if len(dest_rels) * 10 < len(src_rels):
-                log_info(_("Duplicaat-check overgeslagen: USB te leeg "
-                           "({d} foto's vs {s} in Pixora)").format(
-                    d=len(dest_rels), s=len(src_rels)))
-            else:
-                log_info(_("Duplicaat-check: {n} nieuwe foto's tegen "
-                           "{u} op USB").format(
-                    n=len(to_transfer_rels), u=len(dest_rels)))
-                try:
-                    from importer_page import (
-                        perceptual_hash, build_library_hashes, find_duplicate,
-                        SUPPORTED_EXT,
-                    )
-                    usb_hashes = build_library_hashes(backup_dest)
-                    MAX_DIST = 2  # strict (zelfde als "Aan" in dup-detectie)
-                    total = len(to_transfer_rels)
-                    for i, rel in enumerate(to_transfer_rels):
-                        # Elke 25 files: subtitel in popover updaten zodat
-                        # duidelijk is dat hij nog aan het werk is.
-                        if i % 25 == 0:
-                            msg = _("Duplicaat-check: {c} / {t}").format(
-                                c=i, t=total)
-                            GLib.idle_add(self._set_scan_detail, msg)
-                        src_file = photo_path / rel
-                        if not src_file.is_file():
-                            continue
-                        if src_file.suffix.lower() not in SUPPORTED_EXT:
-                            continue
-                        ph = perceptual_hash(src_file)
-                        if ph and find_duplicate(ph, usb_hashes, MAX_DIST):
-                            excluded_rels.append(rel)
-                            dup_count += 1
-                except Exception as e:
-                    log_warn(_("Dedup-check overgeslagen: {err}").format(err=e))
-                # Adjust counts/bytes voor de getoonde schatting
-                for rel in excluded_rels:
-                    try:
-                        sz = (photo_path / rel).stat().st_size
-                        bytes_to_transfer -= sz
-                    except OSError:
-                        pass
-                new_count = max(0, new_count - dup_count)
-                bytes_to_transfer = max(0, bytes_to_transfer)
         GLib.idle_add(
             self._handle_scan_result,
             {
                 "new": new_count,
                 "bytes": bytes_to_transfer,
                 "delete": delete_count,
-                "dup_count": dup_count,
-                "excluded": excluded_rels,
+                "dup_count": 0,
+                "excluded": [],
                 "mode": mode,
             },
         )
@@ -7396,7 +7337,6 @@ class MainWindow(Adw.ApplicationWindow):
         bytes_to_transfer = result["bytes"]
         dup_count = result.get("dup_count", 0)
         mode = result.get("mode", self.settings.get("backup_mode", "backup"))
-        self._backup_excluded_paths = result.get("excluded", [])
 
         # In backup-modus zijn orphans (delete_count) informatief — ze worden
         # bewaard. Voor de "is alles al gesynct?"-check behandelen we ze dan
@@ -7791,6 +7731,114 @@ class MainWindow(Adw.ApplicationWindow):
                 p=test_dir, err=exc
             )
 
+    def _dedup_for_backup(self, photo_path, backup_dest):
+        """Bereken welke bron-foto's visueel al op de USB staan en dus niet
+        gekopieerd hoeven. Draait in de backup-thread vóór rsync zodat de
+        scan snel blijft; popover toont "Duplicaat-check: X / Y".
+
+        Returnt een lijst van relatieve paden (vanaf photo_path) om via
+        rsync --exclude-from uit te sluiten.
+        """
+        if not self.settings.get("backup_dedup"):
+            return []
+
+        # Set-diff op filename-basis; dedup checkt alleen de "nieuwe" files.
+        src_rels = set()
+        try:
+            for root, _dirs, files in os.walk(str(photo_path)):
+                for fn in files:
+                    src_rels.add(os.path.relpath(
+                        os.path.join(root, fn), str(photo_path)))
+        except Exception:
+            return []
+        dest_rels = set()
+        if backup_dest.is_dir():
+            try:
+                for root, _dirs, files in os.walk(str(backup_dest)):
+                    for fn in files:
+                        dest_rels.add(os.path.relpath(
+                            os.path.join(root, fn), str(backup_dest)))
+            except Exception:
+                pass
+        to_check = sorted(src_rels - dest_rels)
+        if not to_check or not dest_rels:
+            return []
+
+        # Zelfde 10%-drempel als eerder: USB moet substantiële library hebben
+        # voordat pHash-werk statistisch rendabel is.
+        if len(dest_rels) * 10 < len(src_rels):
+            log_info(_("Duplicaat-check overgeslagen: USB te leeg "
+                       "({d} foto's vs {s} in Pixora)").format(
+                d=len(dest_rels), s=len(src_rels)))
+            return []
+
+        log_info(_("Duplicaat-check: {n} nieuwe foto's tegen "
+                   "{u} op USB").format(n=len(to_check), u=len(dest_rels)))
+        try:
+            from importer_page import (
+                perceptual_hash, build_library_hashes, find_duplicate,
+                SUPPORTED_EXT,
+            )
+        except Exception as e:
+            log_warn(_("Dedup-check overgeslagen: {err}").format(err=e))
+            return []
+
+        self._backup_deduping = True
+
+        def _start_dedup_ui():
+            tip = _("Duplicaat-check…")
+            if hasattr(self, "_backup_donut_btn"):
+                try:
+                    self._set_donuts_visible(True)
+                    self._backup_donut_btn.set_tooltip_text(tip)
+                except Exception:
+                    pass
+            if hasattr(self, "_viewer_donut_btn"):
+                try:
+                    self._viewer_donut_btn.set_tooltip_text(tip)
+                except Exception:
+                    pass
+            # Hergebruik de scan-animatie voor de donut-spinner.
+            if self._backup_scan_anim_id is None:
+                self._backup_scan_anim_id = GLib.timeout_add(
+                    80, self._tick_backup_scan)
+            return False
+        GLib.idle_add(_start_dedup_ui)
+
+        excluded = []
+        try:
+            usb_hashes = build_library_hashes(backup_dest)
+            MAX_DIST = 2
+            total = len(to_check)
+            for i, rel in enumerate(to_check):
+                if i % 25 == 0:
+                    msg = _("Duplicaat-check: {c} / {t}").format(c=i, t=total)
+                    GLib.idle_add(self._set_dedup_detail, msg)
+                src_file = photo_path / rel
+                if not src_file.is_file():
+                    continue
+                if src_file.suffix.lower() not in SUPPORTED_EXT:
+                    continue
+                ph = perceptual_hash(src_file)
+                if ph and find_duplicate(ph, usb_hashes, MAX_DIST):
+                    excluded.append(rel)
+        except Exception as e:
+            log_warn(_("Dedup-check overgeslagen: {err}").format(err=e))
+        finally:
+            self._backup_deduping = False
+            GLib.idle_add(self._set_dedup_detail, "")
+        if excluded:
+            log_info(_("Duplicaat-check klaar: {n} dubbel, worden "
+                       "overgeslagen").format(n=len(excluded)))
+        return excluded
+
+    def _set_dedup_detail(self, text):
+        """Thread-safe setter voor popover-subtitel tijdens dedup-fase."""
+        self._backup_detail = text or ""
+        if hasattr(self, "_backup_donut"):
+            self._redraw_donuts()
+        return False
+
     def _backup_thread(self):
         from pathlib import Path as _P
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
@@ -7824,7 +7872,10 @@ class MainWindow(Adw.ApplicationWindow):
                         pass
 
         mode = self.settings.get("backup_mode", "backup")
-        excluded = list(getattr(self, "_backup_excluded_paths", []) or [])
+        # Dedup draait nu hier (vóór rsync) i.p.v. in de scan-thread. Zo
+        # blijft het scan-dialog altijd meteen klaar; de pHash-berekening
+        # gebeurt tijdens de backup-fase met zichtbare voortgang in de donut.
+        excluded = self._dedup_for_backup(photo_path, backup_dest)
         exclude_file = None
         success = False
         if _cmd_available_bk("rsync"):
@@ -7879,8 +7930,6 @@ class MainWindow(Adw.ApplicationWindow):
             )
             rsync_err = ""
 
-        # Excluded-lijst leeg na deze run zodat volgende backup opnieuw scant
-        self._backup_excluded_paths = []
         note = None
         if not success:
             err_low = (rsync_err or "").lower()
@@ -8003,7 +8052,8 @@ class MainWindow(Adw.ApplicationWindow):
             else:
                 color = (0.10, 0.20, 0.55)  # dark blue
 
-            if self._backup_scanning or self._structure_scanning:
+            if (self._backup_scanning or self._structure_scanning
+                    or self._backup_deduping):
                 start = self._backup_scan_phase - math.pi / 2
                 end = start + math.pi / 2  # kwart cirkel
                 cr.set_source_rgb(*color)
@@ -8092,6 +8142,10 @@ class MainWindow(Adw.ApplicationWindow):
             title = _("Mappenstructuur controleren…")
             pct = ""
             detail = ""
+        elif self._backup_deduping:
+            title = _("Duplicaat-check…")
+            pct = ""
+            detail = (self._backup_detail or "").strip()
         elif self._backup_running and not self._backup_scanning:
             title = _("Sync bezig") if is_sync else _("Backup bezig")
             pct = f"{int(self._backup_fraction * 100)}%"

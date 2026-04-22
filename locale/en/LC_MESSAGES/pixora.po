@@ -1368,6 +1368,12 @@ msgstr "Duplicate check: {n} new photos against {u} on USB"
 msgid "Duplicaat-check: {c} / {t}"
 msgstr "Duplicate check: {c} / {t}"
 
+msgid "Duplicaat-check…"
+msgstr "Duplicate check…"
+
+msgid "Duplicaat-check klaar: {n} dubbel, worden overgeslagen"
+msgstr "Duplicate check done: {n} duplicates will be skipped"
+
 msgid "Backup-scan gestart"
 msgstr "Backup scan started"
 

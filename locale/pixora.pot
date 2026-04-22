@@ -709,6 +709,12 @@ msgstr ""
 msgid "Duplicaat-check: {c} / {t}"
 msgstr ""
 
+msgid "Duplicaat-check…"
+msgstr ""
+
+msgid "Duplicaat-check klaar: {n} dubbel, worden overgeslagen"
+msgstr ""
+
 msgid "Backup-scan gestart"
 msgstr ""
 

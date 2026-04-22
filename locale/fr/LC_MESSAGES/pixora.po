@@ -1359,6 +1359,12 @@ msgstr "Vérification de doublons : {n} nouvelles photos contre {u} sur l'USB"
 msgid "Duplicaat-check: {c} / {t}"
 msgstr "Vérification de doublons : {c} / {t}"
 
+msgid "Duplicaat-check…"
+msgstr "Vérification de doublons…"
+
+msgid "Duplicaat-check klaar: {n} dubbel, worden overgeslagen"
+msgstr "Vérification de doublons terminée : {n} doublons ignorés"
+
 msgid "Backup-scan gestart"
 msgstr "Analyse de sauvegarde lancée"
 
