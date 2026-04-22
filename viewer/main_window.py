@@ -344,7 +344,7 @@ def get_available_drives():
                     seen_uuids.add(uuid)
                     display = (f"💾  {label}  ({size})" if label else
                                f"💾  {mountpoint}  ({size})" if mountpoint else
-                               f"💾  {_('Externe schijf')}  ({size})")
+                               f"💾  {_('External drive')}  ({size})")
                     drives.append((uuid, display))
             for child in device.get("children", []):
                 process_device(child, hotplug, rm, tran)
@@ -352,8 +352,8 @@ def get_available_drives():
         for device in data.get("blockdevices", []):
             process_device(device)
     except Exception as e:
-        log_error(_("Drive detectie fout: {err}").format(err=e))
-    log_info(_("Drive-scan: {n} externe schijven gevonden").format(n=len(drives)))
+        log_error(_("Drive detection error: {err}").format(err=e))
+    log_info(_("Drive scan: {n} external drives found").format(n=len(drives)))
     return drives
 
 def _cmd_available_bk(cmd):
@@ -373,8 +373,8 @@ def get_mountpoint_for_uuid(uuid):
     return None
 
 _MONTH_KEYS = [
-    "", "januari", "februari", "maart", "april", "mei", "juni",
-    "juli", "augustus", "september", "oktober", "november", "december"
+    "", "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
 ]
 
 def format_date_header(dt):
@@ -384,8 +384,8 @@ def format_viewer_date(dt):
     # Use gettext for date formatting — strftime-locale requires en_US.UTF-8
     # etc. to be installed system-wide. Bogus dates (<2000) → "unknown date".
     if dt is None or dt.year < 2000:
-        return _("Onbekende datum")
-    return _("{day} {month} {year}  {time}").format(
+        return _("Unknown date")
+    return _("{month} {day}, {year}  {time}").format(
         day=dt.day,
         month=_(_MONTH_KEYS[dt.month]),
         year=dt.year,
@@ -840,13 +840,13 @@ class MapWidget(Gtk.Box):
 
         if not WEBKIT_AVAILABLE:
             self._show_fallback(
-                _("WebKitGTK kon niet geladen worden.") + "\n\n"
-                + _("Installeer een van:") + "\n"
+                _("WebKitGTK failed to load.") + "\n\n"
+                + _("Install one of:") + "\n"
                 "  sudo apt install gir1.2-webkit-6.0\n"
                 "  sudo apt install gir1.2-webkit2-4.1\n"
-                + (f"\n{_('Technische fout')}: {_webkit_load_error}" if _webkit_load_error else "")
+                + (f"\n{_('Technical error')}: {_webkit_load_error}" if _webkit_load_error else "")
             )
-            log_error(_("WebKit niet beschikbaar: {err}").format(err=_webkit_load_error))
+            log_error(_("WebKit unavailable: {err}").format(err=_webkit_load_error))
             return
 
         try:
@@ -854,11 +854,11 @@ class MapWidget(Gtk.Box):
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
-            log_error(_("WebView init crashte:\n{tb}").format(tb=tb))
+            log_error(_("WebView init crashed:\n{tb}").format(tb=tb))
             self._show_fallback(
-                _("Kaart-weergave kon niet starten.") + "\n\n"
-                + _("Fout: {err}").format(err=e) + "\n\n"
-                + _("Check /home/beau/.cache/pixora/pixora.log voor meer.")
+                _("Map view failed to start.") + "\n\n"
+                + _("Error: {err}").format(err=e) + "\n\n"
+                + _("Check /home/beau/.cache/pixora/pixora.log for more.")
             )
 
     def _show_fallback(self, msg):
@@ -887,7 +887,7 @@ class MapWidget(Gtk.Box):
                 if network_session and hasattr(network_session, "set_sandbox_enabled"):
                     network_session.set_sandbox_enabled(False)
         except Exception as e:
-            log_warn(_("NetworkSession sandbox-disable faalde: {err}").format(err=e))
+            log_warn(_("NetworkSession sandbox-disable failed: {err}").format(err=e))
 
         try:
             # WebKit2 4.x API
@@ -896,7 +896,7 @@ class MapWidget(Gtk.Box):
                 if wc and hasattr(wc, "set_sandbox_enabled"):
                     wc.set_sandbox_enabled(False)
         except Exception as e:
-            log_warn(_("WebContext sandbox-disable faalde: {err}").format(err=e))
+            log_warn(_("WebContext sandbox-disable failed: {err}").format(err=e))
 
         self.web = None
         if network_session is not None and hasattr(WebKit2, "WebView"):
@@ -916,7 +916,7 @@ class MapWidget(Gtk.Box):
             wk_settings.set_javascript_can_access_clipboard(False)
             wk_settings.set_enable_developer_extras(False)
         except Exception as e:
-            log_warn(_("WebView settings niet volledig gezet: {err}").format(err=e))
+            log_warn(_("WebView settings not fully applied: {err}").format(err=e))
 
         try:
             ucm = self.web.get_user_content_manager()
@@ -929,10 +929,10 @@ class MapWidget(Gtk.Box):
                 except Exception:
                     continue
             if not registered:
-                log_error(_("register_script_message_handler mislukt met alle varianten"))
+                log_error(_("register_script_message_handler failed with all variants"))
             ucm.connect("script-message-received::pixora", self._on_js_message)
         except Exception as e:
-            log_error(_("WebView bridge setup fout: {err}").format(err=e))
+            log_error(_("WebView bridge setup error: {err}").format(err=e))
 
         self.web.connect("load-changed", self._on_load_changed)
 
@@ -941,7 +941,7 @@ class MapWidget(Gtk.Box):
         )
         map_html_path = os.path.abspath(os.path.join(assets_dir, "map.html"))
         if not os.path.exists(map_html_path):
-            self._show_fallback(_("Leaflet-assets niet gevonden:\n{p}").format(p=map_html_path))
+            self._show_fallback(_("Leaflet assets not found:\n{p}").format(p=map_html_path))
             return
 
         self.web.load_uri("file://" + map_html_path)
@@ -971,10 +971,10 @@ class MapWidget(Gtk.Box):
                 "path": path, "thumb": thumb,
             })
         labels = {
-            "otherInCluster": _("andere foto's in deze cluster"),
-            "clickCluster": _("Klik cluster om gefilterd te bekijken"),
-            "clickOpen": _("Klik om te openen"),
-            "offline": _("⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"),
+            "otherInCluster": _("other photos in this cluster"),
+            "clickCluster": _("Click cluster to view filtered"),
+            "clickOpen": _("Click to open"),
+            "offline": _("⚠ No internet connection — map tiles cannot be loaded"),
         }
         js = (
             f"if(window.pixoraSetLabels){{window.pixoraSetLabels({json.dumps(labels)});}}"
@@ -990,7 +990,7 @@ class MapWidget(Gtk.Box):
             try:
                 self.web.run_javascript(js, None, None, None)
             except Exception as e:
-                log_error(_("JS push fout: {err}").format(err=e))
+                log_error(_("JS push error: {err}").format(err=e))
         return False
 
     def _on_js_message(self, ucm, message):
@@ -1005,20 +1005,20 @@ class MapWidget(Gtk.Box):
         msg_type = payload.get("type")
         if msg_type == "open_photos":
             paths = payload.get("paths") or []
-            log_info(_("Kaart → open_photos: {n} foto's").format(n=len(paths)))
+            log_info(_("Map → open_photos: {n} photos").format(n=len(paths)))
             if paths:
                 GLib.idle_add(self.open_photo_cb, paths)
         elif msg_type == "open_photo":
             path = payload.get("path")
-            log_info(_("Kaart → open_photo: {p}").format(p=path))
+            log_info(_("Map → open_photo: {p}").format(p=path))
             if path:
                 GLib.idle_add(self.open_photo_cb, [path])
         elif msg_type == "map-ready":
-            log_info(_("Kaart → eerste tiles geladen"))
+            log_info(_("Map → first tiles loaded"))
             if self.status_cb:
                 GLib.idle_add(self.status_cb, "ready")
         elif msg_type == "map-offline":
-            log_warn(_("Kaart → offline / tile-errors"))
+            log_warn(_("Map → offline / tile errors"))
             if self.status_cb:
                 GLib.idle_add(self.status_cb, "offline")
 
@@ -1040,7 +1040,7 @@ class BackupFolderPicker(Adw.Dialog):
             start = self._root
         self._cursor = start
 
-        self.set_title(_("Kies backup-map"))
+        self.set_title(_("Choose backup folder"))
         self.set_content_width(480)
         self.set_content_height(520)
 
@@ -1066,7 +1066,7 @@ class BackupFolderPicker(Adw.Dialog):
         scroll.set_child(self._listbox)
         box.append(scroll)
 
-        new_btn = Gtk.Button(label=_("Nieuwe map maken"))
+        new_btn = Gtk.Button(label=_("New folder"))
         new_btn.set_icon_name("folder-new-symbolic")
         new_btn.connect("clicked", self._on_new_folder_clicked)
         box.append(new_btn)
@@ -1075,9 +1075,9 @@ class BackupFolderPicker(Adw.Dialog):
             orientation=Gtk.Orientation.HORIZONTAL, spacing=8,
             halign=Gtk.Align.END,
         )
-        cancel = Gtk.Button(label=_("Annuleren"))
+        cancel = Gtk.Button(label=_("Cancel"))
         cancel.connect("clicked", lambda *_a: self.close())
-        use = Gtk.Button(label=_("Gebruik deze map"))
+        use = Gtk.Button(label=_("Use this folder"))
         use.add_css_class("suggested-action")
         use.connect("clicked", self._on_use_clicked)
         actions.append(cancel)
@@ -1096,7 +1096,7 @@ class BackupFolderPicker(Adw.Dialog):
             self._cursor = self._root
             rel = _P(".")
         if str(rel) == ".":
-            self._path_label.set_label(_("Hoofdmap van USB-schijf"))
+            self._path_label.set_label(_("Root of USB drive"))
         else:
             self._path_label.set_label(f"/{rel}")
 
@@ -1107,7 +1107,7 @@ class BackupFolderPicker(Adw.Dialog):
             self._listbox.remove(row)
 
         if self._cursor != self._root:
-            up = Adw.ActionRow(title=_("Terug"))
+            up = Adw.ActionRow(title=_("Back"))
             up.add_prefix(Gtk.Image.new_from_icon_name("go-up-symbolic"))
             up.set_activatable(True)
             up.connect("activated", lambda *_a: self._navigate(self._cursor.parent))
@@ -1124,8 +1124,8 @@ class BackupFolderPicker(Adw.Dialog):
 
         if not entries and self._cursor == self._root:
             empty = Adw.ActionRow(
-                title=_("Geen submappen"),
-                subtitle=_("Maak er eentje aan met de knop hieronder"),
+                title=_("No subfolders"),
+                subtitle=_("Create one with the button below"),
             )
             empty.set_sensitive(False)
             self._listbox.append(empty)
@@ -1150,14 +1150,14 @@ class BackupFolderPicker(Adw.Dialog):
 
     def _on_new_folder_clicked(self, btn):
         dlg = Adw.AlertDialog(
-            heading=_("Nieuwe map"),
-            body=_("Geef een naam voor de nieuwe map:"),
+            heading=_("New folder"),
+            body=_("Enter a name for the new folder:"),
         )
         entry = Gtk.Entry()
-        entry.set_placeholder_text(_("Map-naam"))
+        entry.set_placeholder_text(_("Folder name"))
         dlg.set_extra_child(entry)
-        dlg.add_response("cancel", _("Annuleren"))
-        dlg.add_response("create", _("Aanmaken"))
+        dlg.add_response("cancel", _("Cancel"))
+        dlg.add_response("create", _("Create"))
         dlg.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("create")
         dlg.set_close_response("cancel")
@@ -1176,7 +1176,7 @@ class BackupFolderPicker(Adw.Dialog):
             new_path.mkdir(parents=False, exist_ok=True)
         except Exception as exc:
             err = Adw.AlertDialog(
-                heading=_("Kon map niet aanmaken"),
+                heading=_("Could not create folder"),
                 body=str(exc),
             )
             err.add_response("ok", _("OK"))
@@ -1211,13 +1211,13 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             THUMB_SIZE = 200
         if settings.get("dev_mode"):
-            log_info(_("═══ Pixora gestart in Developer Mode ═══"))
+            log_info(_("═══ Pixora started in Developer Mode ═══"))
             log_info(f"i18n: {_I18N_STATUS}")
             log_info(_("Config: {p}").format(p=CONFIG_PATH))
             log_info(_("Cache: {p}").format(p=CACHE_DIR))
             log_info(_("Thumbs: {px}px — favorites: {n}").format(px=THUMB_SIZE, n=len(load_favorites())))
             log_info(_("PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks").format(p=os.getpid()))
-        log_info(_("Startup fase 1: MainWindow __init__ begonnen"))
+        log_info(_("Startup phase 1: MainWindow __init__ started"))
         self.photos          = []
         self.thumb_widgets   = {}
         self.date_widgets    = {}
@@ -1323,7 +1323,7 @@ class MainWindow(Adw.ApplicationWindow):
             on_done_cb=self.on_import_done,
         )
 
-        log_info(_("Startup fase 2: pages opbouwen…"))
+        log_info(_("Startup phase 2: building pages…"))
         self.main_stack = Gtk.Stack()
         self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.main_stack.set_transition_duration(200)
@@ -1332,9 +1332,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.add_named(self.build_map_page(),    "map")
         self.main_stack.add_named(self.importer_page,       "importer")
         self.main_stack.add_named(self._build_reorganize_page(), "reorganize")
-        log_info(_("Startup fase 3: pages klaar"))
+        log_info(_("Startup phase 3: pages ready"))
 
-        self.update_banner = Adw.Banner(title="", button_label=_("Bijwerken"), use_markup=False)
+        self.update_banner = Adw.Banner(title="", button_label=_("Update"), use_markup=False)
         self.update_banner.set_revealed(False)
         self.update_banner.connect("button-clicked", self._on_update_banner_clicked)
 
@@ -1384,7 +1384,7 @@ class MainWindow(Adw.ApplicationWindow):
         splash_spinner.set_halign(Gtk.Align.CENTER)
         splash_spinner.start()
 
-        splash_lbl = Gtk.Label(label=_("Pixora wordt gestart…"))
+        splash_lbl = Gtk.Label(label=_("Pixora is starting…"))
         splash_lbl.add_css_class("title-2")
 
         self._splash_bar = Gtk.ProgressBar()
@@ -1413,7 +1413,7 @@ class MainWindow(Adw.ApplicationWindow):
         Gtk.Settings.get_default().set_property("gtk-decoration-layout", "icon:minimize,close")
 
         self.set_resizable(False)
-        log_info(_("Startup fase 4: foto's laden gepland via idle_add"))
+        log_info(_("Startup phase 4: loading photos scheduled via idle_add"))
         GLib.idle_add(self.load_photos)
         self.connect("close-request", self.on_close)
         GLib.idle_add(self._check_for_update)
@@ -1452,7 +1452,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._udev_client = GUdev.Client(subsystems=["usb"])
             self._udev_client.connect("uevent", self._on_usb_event)
         except Exception as e:
-            log_error(_("GUdev monitor kon niet starten: {err}").format(err=e))
+            log_error(_("GUdev monitor failed to start: {err}").format(err=e))
             self._udev_client = None
 
     def _on_usb_event(self, client, action, device):
@@ -1464,7 +1464,7 @@ class MainWindow(Adw.ApplicationWindow):
             vendor = None
         if vendor != "05ac":  # Apple
             return
-        log_info(_("Apple USB-device aangesloten (vendor=05ac) — check na 2.5s"))
+        log_info(_("Apple USB device connected (vendor=05ac) — check after 2.5s"))
         # Wait briefly so usbmuxd sees the device before we check.
         GLib.timeout_add(2500, self._post_apple_plugin_check)
 
@@ -1478,7 +1478,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self._recovery_prompt_active:
             return False
         self._recovery_prompt_active = True
-        self._set_iphone_banner(_("📱 iPhone gedetecteerd, even geduld…"))
+        self._set_iphone_banner(_("📱 iPhone detected, please wait…"))
         threading.Thread(target=self._iphone_recovery_flow, daemon=True).start()
         return False
 
@@ -1486,12 +1486,12 @@ class MainWindow(Adw.ApplicationWindow):
         """Fully automatic recovery: first check, then reset usbmuxd on fail."""
         has_device = self._idevice_check()
         if has_device:
-            log_info(_("iPhone direct herkend door usbmuxd"))
+            log_info(_("iPhone directly recognised by usbmuxd"))
             GLib.idle_add(self._iphone_flow_success, False)
             return
-        log_warn(_("iPhone niet herkend door usbmuxd — start auto-recovery"))
+        log_warn(_("iPhone not recognised by usbmuxd — starting auto-recovery"))
         GLib.idle_add(self._set_iphone_banner,
-                      _("🔧 Verbinding herstellen, even geduld…"))
+                      _("🔧 Restoring connection, please wait…"))
         reset_ok = False
         try:
             r = subprocess.run(
@@ -1502,7 +1502,7 @@ class MainWindow(Adw.ApplicationWindow):
             reset_ok = (r.returncode == 0)
             log_info(_("usbmuxd reset rc={rc}").format(rc=r.returncode))
         except Exception as e:
-            log_error(_("usbmuxd reset fout: {err}").format(err=e))
+            log_error(_("usbmuxd reset error: {err}").format(err=e))
             reset_ok = False
         if not reset_ok:
             GLib.idle_add(self._iphone_flow_fail)
@@ -1510,10 +1510,10 @@ class MainWindow(Adw.ApplicationWindow):
         time.sleep(2.5)
         has_device = self._idevice_check()
         if has_device:
-            log_info(_("iPhone herkend na reset"))
+            log_info(_("iPhone recognised after reset"))
             GLib.idle_add(self._iphone_flow_success, True)
         else:
-            log_warn(_("iPhone blijft onherkenbaar na reset"))
+            log_warn(_("iPhone still unrecognised after reset"))
             GLib.idle_add(self._iphone_flow_fail)
 
     def _idevice_check(self):
@@ -1530,8 +1530,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._recovery_prompt_active = False
         self._update_import_btn_state(True)
         self._set_iphone_banner(
-            _("✅ iPhone klaar — tap Trust op je iPhone indien gevraagd")
-            if was_reset else _("✅ iPhone verbonden")
+            _("✅ iPhone ready — tap Trust on your iPhone if asked")
+            if was_reset else _("✅ iPhone connected")
         )
         GLib.timeout_add_seconds(4, self._clear_iphone_banner)
         return False
@@ -1539,7 +1539,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _iphone_flow_fail(self):
         self._recovery_prompt_active = False
         self._set_iphone_banner(
-            _("⚠️ iPhone niet herkend — probeer Instellingen > iPhone-verbinding")
+            _("⚠️ iPhone not recognised — try Settings > iPhone connection")
         )
         GLib.timeout_add_seconds(8, self._clear_iphone_banner)
         return False
@@ -1592,11 +1592,11 @@ class MainWindow(Adw.ApplicationWindow):
         if has_device:
             ctx.add_class("pixora-import-active")
             self.import_btn.set_tooltip_text(
-                _("iPhone of iPad gedetecteerd — klik om te importeren")
+                _("iPhone or iPad detected — click to import")
             )
         else:
             ctx.remove_class("pixora-import-active")
-            self.import_btn.set_tooltip_text(_("Importeer van iPhone of iPad"))
+            self.import_btn.set_tooltip_text(_("Import from iPhone or iPad"))
         return False
 
     def _prewarm_gstreamer(self):
@@ -1685,11 +1685,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_update_message_dialog(self, new_version):
         dlg = Adw.AlertDialog(
-            heading=_("Update beschikbaar"),
-            body=_("Pixora {v} is beschikbaar. Wil je nu bijwerken?").format(v=new_version),
+            heading=_("Update available"),
+            body=_("Pixora {v} is available. Update now?").format(v=new_version),
         )
         dlg.add_response("later", _("Later"))
-        dlg.add_response("bijwerken", _("Bijwerken"))
+        dlg.add_response("bijwerken", _("Update"))
         dlg.set_response_appearance("bijwerken", Adw.ResponseAppearance.SUGGESTED)
         dlg.connect("response", self._on_update_dialog_response, new_version)
         self._present_dialog(dlg)
@@ -1699,7 +1699,7 @@ class MainWindow(Adw.ApplicationWindow):
         if response == "bijwerken":
             self._open_installer()
         else:
-            self.update_banner.set_title(_("Update beschikbaar: {v}").format(v=new_version))
+            self.update_banner.set_title(_("Update available: {v}").format(v=new_version))
             self.update_banner.set_revealed(True)
 
     def _on_update_banner_clicked(self, banner):
@@ -1760,12 +1760,12 @@ class MainWindow(Adw.ApplicationWindow):
                 )
             except Exception:
                 pass
-            log_info(_("pixora.desktop gerepareerd: Icon={p}").format(p=icon))
+            log_info(_("pixora.desktop repaired: Icon={p}").format(p=icon))
         except Exception:
             pass
 
     def _open_installer(self):
-        log_info(_("GUI-updater gestart"))
+        log_info(_("GUI updater started"))
         updater_path = os.path.abspath(os.path.join(
             os.path.dirname(__file__), "updater.py"
         ))
@@ -1773,7 +1773,7 @@ class MainWindow(Adw.ApplicationWindow):
             subprocess.Popen([sys.executable, updater_path],
                              start_new_session=True)
         except Exception as e:
-            log_error(_("GUI-updater kon niet starten: {err}").format(err=e))
+            log_error(_("GUI updater failed to start: {err}").format(err=e))
             return
         # Use on_close (with its 2s force-exit fallback) instead of app.quit()
         # — the latter leaves non-daemon threads + WebKit subprocess hanging,
@@ -1793,12 +1793,12 @@ class MainWindow(Adw.ApplicationWindow):
                 start_new_session=True,
             )
         except Exception as e:
-            log_warn(_("GitHub openen mislukt: {err}").format(err=e))
+            log_warn(_("Failed to open GitHub: {err}").format(err=e))
 
     def _on_view_license(self, btn):
         """GPL-3.0 summary popup (✓ / ! / ✗) with full license text."""
         win = Adw.Window()
-        win.set_title(_("Licentie"))
+        win.set_title(_("License"))
         win.set_transient_for(self)
         win.set_modal(False)
         win.set_default_size(780, 760)
@@ -1818,9 +1818,7 @@ class MainWindow(Adw.ApplicationWindow):
         body.append(heading)
 
         intro = Gtk.Label(
-            label=_("Pixora is vrije software onder GPL-3.0. Je mag 'm "
-                    "gebruiken, wijzigen en doorgeven — onder voorwaarde "
-                    "dat je die rechten voor anderen ook respecteert.")
+            label=_("Pixora is free software under GPL-3.0. You may use, modify and share it — as long as you respect those same rights for others.")
         )
         intro.add_css_class("dim-label")
         intro.set_halign(Gtk.Align.START)
@@ -1833,36 +1831,36 @@ class MainWindow(Adw.ApplicationWindow):
             homogeneous=True,
         )
         summary.append(self._license_summary_col(
-            _("Toegestaan"), "✓", "success",
+            _("Permitted"), "✓", "success",
             [
-                _("Privé én commercieel gebruiken"),
-                _("De code wijzigen"),
-                _("Distribueren (origineel of gewijzigd)"),
-                _("Patent-licenties van contributors"),
+                _("Private and commercial use"),
+                _("Modify the code"),
+                _("Distribute (original or modified)"),
+                _("Patent licenses from contributors"),
             ],
         ))
         summary.append(self._license_summary_col(
-            _("Verplicht"), "!", "warning",
+            _("Required"), "!", "warning",
             [
-                _("Broncode meeleveren bij distributie"),
-                _("Zelfde GPL-3 licentie gebruiken"),
-                _("Wijzigingen duidelijk markeren"),
-                _("Copyright-notice behouden"),
+                _("Include source code when distributing"),
+                _("Use the same GPL-3 license"),
+                _("Mark modifications clearly"),
+                _("Keep the copyright notice"),
             ],
         ))
         summary.append(self._license_summary_col(
-            _("Niet toegestaan"), "✗", "error",
+            _("Not permitted"), "✗", "error",
             [
-                _("Opnemen in proprietary software"),
-                _("Garantie claimen (er is geen)"),
-                _("Auteurs aansprakelijk stellen"),
+                _("Include in proprietary software"),
+                _("Claim warranty (there is none)"),
+                _("Hold authors liable"),
             ],
         ))
         body.append(summary)
 
         body.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
-        full_hdr = Gtk.Label(label=_("Volledige licentietekst"))
+        full_hdr = Gtk.Label(label=_("Full license text"))
         full_hdr.add_css_class("heading")
         full_hdr.set_halign(Gtk.Align.START)
         body.append(full_hdr)
@@ -1883,7 +1881,7 @@ class MainWindow(Adw.ApplicationWindow):
             with open(LICENSE_PATH, "r", encoding="utf-8") as f:
                 lic_text = f.read()
         except Exception as e:
-            lic_text = _("Kon licentie niet laden: {err}").format(err=e)
+            lic_text = _("Could not load license: {err}").format(err=e)
         tv.get_buffer().set_text(lic_text)
         scroll.set_child(tv)
         body.append(scroll)
@@ -1961,7 +1959,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self._update_check_btn.set_sensitive(True)
                 self._update_check_btn.set_opacity(1.0)
                 self._update_check_btn.set_tooltip_text(
-                    _("Nieuwe versie beschikbaar — klik om bij te werken")
+                    _("New version available — click to update")
                 )
                 self._update_btn_stack.set_visible_child_name("available")
                 # Pulse: alternate icon/label every 1.5s.
@@ -2030,16 +2028,16 @@ class MainWindow(Adw.ApplicationWindow):
         # Dialog may have closed meanwhile → widgets disposed.
         try:
             if remote_version is None:
-                self._update_check_row.set_subtitle(_("Controleren mislukt"))
+                self._update_check_row.set_subtitle(_("Check failed"))
                 self._set_update_state("idle")
                 return False
             self._update_remote_version = remote_version
             if local_version == remote_version:
-                self._update_check_row.set_subtitle(_("Je hebt de nieuwste versie"))
+                self._update_check_row.set_subtitle(_("You have the latest version"))
                 self._set_update_state("uptodate")
             else:
                 self._update_check_row.set_subtitle(
-                    _("Versie {v} beschikbaar").format(v=remote_version)
+                    _("Version {v} available").format(v=remote_version)
                 )
                 self._set_update_state("available")
         except Exception:
@@ -2087,7 +2085,7 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             save_favorites(self._favorites)
         except Exception as e:
-            log_error(_("Favorites save fout: {err}").format(err=e))
+            log_error(_("Favorites save error: {err}").format(err=e))
         return False
 
     def on_close(self, window):
@@ -2101,20 +2099,18 @@ class MainWindow(Adw.ApplicationWindow):
         # Guard against closing during backup/reorganize — ask to confirm.
         if not getattr(self, "_close_confirmed", False):
             if self._backup_running:
-                body = _("Pixora is bezig met een backup naar je USB-schijf. "
-                         "Als je nu sluit wordt de backup onderbroken.")
+                body = _("Pixora is backing up to your USB drive. Closing now will interrupt the backup.")
             elif self._reorganize_moving:
-                body = _("Pixora is bezig met mappenstructuur opruimen. "
-                         "Als je nu sluit kunnen foto's halverwege verplaatst zijn.")
+                body = _("Pixora is cleaning up the folder structure. Closing now may leave photos half-moved.")
             else:
                 body = None
             if body is not None:
                 dlg = Adw.AlertDialog(
-                    heading=_("Pixora afsluiten?"),
+                    heading=_("Quit Pixora?"),
                     body=body,
                 )
-                dlg.add_response("cancel", _("Annuleren"))
-                dlg.add_response("close", _("Toch sluiten"))
+                dlg.add_response("cancel", _("Cancel"))
+                dlg.add_response("close", _("Close anyway"))
                 dlg.set_response_appearance(
                     "close", Adw.ResponseAppearance.DESTRUCTIVE
                 )
@@ -2122,7 +2118,7 @@ class MainWindow(Adw.ApplicationWindow):
                 dlg.connect("response", self._on_close_guard_response)
                 self._present_dialog(dlg)
                 return True  # cancel close; dialog decides
-        log_info(_("Pixora wordt afgesloten — opruimen…"))
+        log_info(_("Pixora shutting down — cleaning up…"))
         # Kill rsync cleanly so the backup actually stops instead of hanging.
         if self._backup_running and self._backup_proc is not None:
             try:
@@ -2189,7 +2185,7 @@ class MainWindow(Adw.ApplicationWindow):
             if hasattr(self, "_map_widget") and self._map_widget:
                 self._map_widget = None
         except Exception as e:
-            log_error(_("Cleanup-fout: {err}").format(err=e))
+            log_error(_("Cleanup error: {err}").format(err=e))
         try:
             import gc
             gc.collect()
@@ -2217,7 +2213,7 @@ class MainWindow(Adw.ApplicationWindow):
         # gvfs-workers) otherwise keep the process in memory.
         def _force_exit():
             try:
-                print(_("Pixora proces forceert exit (lingering threads)"), flush=True)
+                print(_("Pixora process forcing exit (lingering threads)"), flush=True)
             except Exception:
                 pass
             os._exit(0)
@@ -2237,8 +2233,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.header.pack_start(self.logo_picture)
 
         self.sort_model = Gtk.StringList()
-        for item in [_("Datum (nieuwste eerst)"), _("Datum (oudste eerst)"),
-                     _("Naam (A-Z)"), _("Naam (Z-A)")]:
+        for item in [_("Date (newest first)"), _("Date (oldest first)"),
+                     _("Name (A-Z)"), _("Name (Z-A)")]:
             self.sort_model.append(item)
 
         self.sort_combo = Gtk.DropDown(model=self.sort_model)
@@ -2249,19 +2245,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.favorites_toggle = Gtk.ToggleButton()
         self.favorites_toggle.set_icon_name("starred-symbolic")
         self.favorites_toggle.add_css_class("flat")
-        self.favorites_toggle.set_tooltip_text(_("Alleen favorieten tonen"))
+        self.favorites_toggle.set_tooltip_text(_("Show only favorites"))
         self.favorites_toggle.connect("toggled", self.toggle_favorites_filter)
         self.header.pack_end(self.favorites_toggle)
 
         self.map_btn = Gtk.Button(label=_("🗺"))
         self.map_btn.add_css_class("flat")
-        self.map_btn.set_tooltip_text(_("Kaartweergave"))
+        self.map_btn.set_tooltip_text(_("Map view"))
         self.map_btn.connect("clicked", self.open_map)
         self.header.pack_end(self.map_btn)
 
         self.import_btn = Gtk.Button(icon_name="phone-symbolic")
         self.import_btn.add_css_class("flat")
-        self.import_btn.set_tooltip_text(_("Importeer van iPhone of iPad"))
+        self.import_btn.set_tooltip_text(_("Import from iPhone or iPad"))
         self.import_btn.connect("clicked", self.open_importer)
         self._import_btn_css = Gtk.CssProvider()
         self._import_btn_css.load_from_string(
@@ -2278,14 +2274,14 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self.header.pack_end(self.import_btn)
 
-        self.select_btn = Gtk.Button(label=_("Selecteren"))
+        self.select_btn = Gtk.Button(label=_("Select"))
         self.select_btn.add_css_class("flat")
         self.select_btn.connect("clicked", self.toggle_select_mode)
         self.header.pack_end(self.select_btn)
 
         self.settings_btn = Gtk.Button(icon_name="preferences-system-symbolic")
         self.settings_btn.add_css_class("flat")
-        self.settings_btn.set_tooltip_text(_("Instellingen"))
+        self.settings_btn.set_tooltip_text(_("Settings"))
         self.settings_btn.connect("clicked", self.on_settings_clicked)
         self.header.pack_end(self.settings_btn)
 
@@ -2299,7 +2295,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_donut_btn.add_css_class("flat")
         self._backup_donut_btn.add_css_class("circular")
         self._backup_donut_btn.set_child(self._backup_donut)
-        self._backup_donut_btn.set_tooltip_text(_("Backup bezig"))
+        self._backup_donut_btn.set_tooltip_text(_("Backup in progress"))
         self._backup_donut_btn.set_visible(False)
         self._backup_donut_btn.connect("clicked", self._on_backup_donut_clicked)
         self.header.pack_end(self._backup_donut_btn)
@@ -2347,7 +2343,7 @@ class MainWindow(Adw.ApplicationWindow):
         _clear_btn.add_css_class("circular")
         _clear_btn.add_css_class("flat")
         _clear_btn.set_valign(Gtk.Align.CENTER)
-        _clear_btn.set_tooltip_text(_("Filter wissen"))
+        _clear_btn.set_tooltip_text(_("Clear filter"))
         _clear_btn.connect("clicked", self.on_clear_cluster_filter)
         self.filter_info_bar.append(_clear_btn)
 
@@ -2366,7 +2362,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.spinner = Gtk.Spinner()
         self.spinner.set_size_request(48, 48)
-        self.spinner_label = Gtk.Label(label=_("Foto's laden..."))
+        self.spinner_label = Gtk.Label(label=_("Loading photos..."))
         self.spinner_label.add_css_class("dim-label")
         spinner_box.append(self.spinner)
         spinner_box.append(self.spinner_label)
@@ -2394,8 +2390,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         status_page = Adw.StatusPage()
         status_page.set_icon_name("image-missing-symbolic")
-        status_page.set_title(_("Geen foto's gevonden"))
-        status_page.set_description(_("Sluit je iPhone of iPad aan om foto's te importeren"))
+        status_page.set_title(_("No photos found"))
+        status_page.set_description(_("Connect your iPhone or iPad to import photos"))
         status_page.set_vexpand(True)
         status_page.set_hexpand(True)
         self.content_stack.add_named(status_page, "empty")
@@ -2414,11 +2410,11 @@ class MainWindow(Adw.ApplicationWindow):
 
         back_btn = Gtk.Button(icon_name="go-previous-symbolic")
         back_btn.add_css_class("flat")
-        back_btn.set_tooltip_text(_("Terug"))
+        back_btn.set_tooltip_text(_("Back"))
         back_btn.connect("clicked", self.close_map)
         map_header.pack_start(back_btn)
 
-        self.map_title_label = Gtk.Label(label=_("Kaartweergave"))
+        self.map_title_label = Gtk.Label(label=_("Map view"))
         self.map_title_label.add_css_class("dim-label")
         map_header.set_title_widget(self.map_title_label)
 
@@ -2434,7 +2430,7 @@ class MainWindow(Adw.ApplicationWindow):
         map_spinner_box.set_vexpand(True)
         self.map_spinner = Gtk.Spinner()
         self.map_spinner.set_size_request(48, 48)
-        self.map_spinner_label = Gtk.Label(label=_("Reisverhaal samenstellen…"))
+        self.map_spinner_label = Gtk.Label(label=_("Compiling travel story…"))
         self.map_spinner_label.add_css_class("dim-label")
         map_spinner_box.append(self.map_spinner)
         map_spinner_box.append(self.map_spinner_label)
@@ -2451,7 +2447,7 @@ class MainWindow(Adw.ApplicationWindow):
         return box
 
     def open_map(self, btn=None):
-        log_info(_("Kaart geopend ({n} foto's gaan naar GPS-scan)").format(n=len(self.photos)))
+        log_info(_("Map opened ({n} photos going to GPS scan)").format(n=len(self.photos)))
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
         try:
@@ -2459,7 +2455,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.toolbar_view.set_reveal_bottom_bars(False)
         except Exception:
             pass
-        self.map_btn.set_label(_("🗺 laden..."))
+        self.map_btn.set_label(_("🗺 loading..."))
         self.map_btn.set_sensitive(False)
         self.map_container.set_visible_child_name("loading")
         self.map_spinner.start()
@@ -2511,7 +2507,7 @@ class MainWindow(Adw.ApplicationWindow):
         for (lat, lon, filename, datum, paths) in grouped.values():
             markers.append((lat, lon, filename, datum, paths[0]))
         log_info(
-            _("Kaart: {m} markers uit {p} foto's (GPS), uit {t} totaal").format(
+            _("Map: {m} markers from {p} photos (GPS), out of {t} total").format(
                 m=len(markers), p=len(seen_paths), t=len(self.photos)
             )
         )
@@ -2523,7 +2519,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._map_widget = None
 
         try:
-            self.map_spinner_label.set_text(_("Verbinden met kaart-server…"))
+            self.map_spinner_label.set_text(_("Connecting to map server…"))
         except Exception:
             pass
 
@@ -2536,7 +2532,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._map_ready_fallback_id = GLib.timeout_add_seconds(
             12, self._on_map_ready_timeout
         )
-        self.map_title_label.set_text(_("Kaartweergave"))
+        self.map_title_label.set_text(_("Map view"))
         self.map_btn.set_label(_("🗺"))
         self.map_btn.set_sensitive(True)
         return False
@@ -2571,7 +2567,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_map_ready_timeout(self):
-        log_warn(_("Kaart-ready timeout — toon kaart alsnog"))
+        log_warn(_("Map-ready timeout — showing map anyway"))
         self._map_ready_fallback_id = None
         try:
             self.map_spinner.stop()
@@ -2630,8 +2626,8 @@ class MainWindow(Adw.ApplicationWindow):
                     daemon=True,
                 ).start()
 
-            title = loc if loc else _("Gefilterde locatie")
-            count_str = ngettext("%d foto", "%d foto's", len(valid)) % len(valid)
+            title = loc if loc else _("Filtered location")
+            count_str = ngettext("%d photo", "%d photos", len(valid)) % len(valid)
             subtitle = count_str if not date_range else f"{count_str} · {date_range}"
             self.filter_title_lbl.set_text(title)
             self.filter_subtitle_lbl.set_text(subtitle)
@@ -2670,12 +2666,12 @@ class MainWindow(Adw.ApplicationWindow):
     def on_clear_cluster_filter(self, btn=None):
         if not hasattr(self, "_photos_before_cluster") or not self._photos_before_cluster:
             return
-        log_info(_("Cluster-filter uitgezet → alle foto's"))
+        log_info(_("Cluster filter off → all photos"))
         self.photos = self._photos_before_cluster
         self._photos_before_cluster = None
         self._cluster_location_label = None
         n = len(self.photos)
-        self.photo_count_label.set_text(ngettext("%d foto", "%d foto's", n) % n)
+        self.photo_count_label.set_text(ngettext("%d photo", "%d photos", n) % n)
         try:
             self.filter_info_bar.set_visible(False)
         except Exception:
@@ -2683,7 +2679,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self.start_load)
 
     def close_map(self, btn=None):
-        log_info(_("Kaart gesloten"))
+        log_info(_("Map closed"))
         if getattr(self, "_map_ready_fallback_id", None):
             try:
                 GLib.source_remove(self._map_ready_fallback_id)
@@ -2733,7 +2729,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_close_btn.set_margin_top(16)
         self.viewer_close_btn.set_margin_end(16)
         self.viewer_close_btn.set_size_request(40, 40)
-        self.viewer_close_btn.set_tooltip_text(_("Sluiten"))
+        self.viewer_close_btn.set_tooltip_text(_("Close"))
         self.viewer_close_btn.connect("clicked", self.close_viewer)
         viewer_area.add_overlay(self.viewer_close_btn)
 
@@ -2745,7 +2741,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.viewer_delete_btn.set_margin_top(16)
         self.viewer_delete_btn.set_margin_end(68)
         self.viewer_delete_btn.set_size_request(40, 40)
-        self.viewer_delete_btn.set_tooltip_text(_("Verwijderen"))
+        self.viewer_delete_btn.set_tooltip_text(_("Delete"))
         self.viewer_delete_btn.connect("clicked", self.on_delete_current)
         viewer_area.add_overlay(self.viewer_delete_btn)
 
@@ -2757,7 +2753,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.edit_btn.set_margin_top(16)
         self.edit_btn.set_margin_end(120)
         self.edit_btn.set_size_request(40, 40)
-        self.edit_btn.set_tooltip_text(_("Foto bewerken"))
+        self.edit_btn.set_tooltip_text(_("Edit photo"))
         self.edit_btn.connect("clicked", self.on_edit_current)
         viewer_area.add_overlay(self.edit_btn)
 
@@ -2789,7 +2785,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.favorite_btn.set_margin_top(16)
         self.favorite_btn.set_margin_end(172)
         self.favorite_btn.set_size_request(40, 40)
-        self.favorite_btn.set_tooltip_text(_("Markeer als favoriet"))
+        self.favorite_btn.set_tooltip_text(_("Mark as favorite"))
         self.favorite_btn.connect("clicked", self.on_toggle_favorite)
         self._favorite_css = Gtk.CssProvider()
         self._favorite_css.load_from_string(
@@ -2811,7 +2807,7 @@ class MainWindow(Adw.ApplicationWindow):
         rot_left_btn.add_css_class("osd")
         rot_left_btn.add_css_class("circular")
         rot_left_btn.set_size_request(48, 48)
-        rot_left_btn.set_tooltip_text(_("Draaien links"))
+        rot_left_btn.set_tooltip_text(_("Rotate left"))
         rot_left_btn.connect("clicked", self.on_editor_rotate_left)
         self.editor_bar.append(rot_left_btn)
 
@@ -2819,7 +2815,7 @@ class MainWindow(Adw.ApplicationWindow):
         rot_right_btn.add_css_class("osd")
         rot_right_btn.add_css_class("circular")
         rot_right_btn.set_size_request(48, 48)
-        rot_right_btn.set_tooltip_text(_("Draaien rechts"))
+        rot_right_btn.set_tooltip_text(_("Rotate right"))
         rot_right_btn.connect("clicked", self.on_editor_rotate_right)
         self.editor_bar.append(rot_right_btn)
 
@@ -2827,7 +2823,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.crop_toggle_btn.add_css_class("osd")
         self.crop_toggle_btn.add_css_class("circular")
         self.crop_toggle_btn.set_size_request(48, 48)
-        self.crop_toggle_btn.set_tooltip_text(_("Bijsnijden"))
+        self.crop_toggle_btn.set_tooltip_text(_("Crop"))
         self.crop_toggle_btn.connect("toggled", self.on_editor_toggle_crop)
         self.editor_bar.append(self.crop_toggle_btn)
 
@@ -2836,7 +2832,7 @@ class MainWindow(Adw.ApplicationWindow):
         save_btn.add_css_class("circular")
         save_btn.add_css_class("suggested-action")
         save_btn.set_size_request(48, 48)
-        save_btn.set_tooltip_text(_("Opslaan"))
+        save_btn.set_tooltip_text(_("Save"))
         save_btn.connect("clicked", self.on_editor_save)
         self.editor_bar.append(save_btn)
 
@@ -2844,7 +2840,7 @@ class MainWindow(Adw.ApplicationWindow):
         cancel_editor_btn.add_css_class("osd")
         cancel_editor_btn.add_css_class("circular")
         cancel_editor_btn.set_size_request(48, 48)
-        cancel_editor_btn.set_tooltip_text(_("Annuleren"))
+        cancel_editor_btn.set_tooltip_text(_("Cancel"))
         cancel_editor_btn.connect("clicked", self.on_editor_cancel)
         self.editor_bar.append(cancel_editor_btn)
 
@@ -2898,7 +2894,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.prev_btn.set_margin_start(16)
         self.prev_btn.set_margin_bottom(105)
         self.prev_btn.set_size_request(48, 48)
-        self.prev_btn.set_tooltip_text(_("Vorige"))
+        self.prev_btn.set_tooltip_text(_("Previous"))
         self.prev_btn.connect("clicked", self.prev_photo)
         viewer_area.add_overlay(self.prev_btn)
 
@@ -2910,7 +2906,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.set_margin_end(16)
         self.next_btn.set_margin_bottom(105)
         self.next_btn.set_size_request(48, 48)
-        self.next_btn.set_tooltip_text(_("Volgende"))
+        self.next_btn.set_tooltip_text(_("Next"))
         self.next_btn.connect("clicked", self.next_photo)
         viewer_area.add_overlay(self.next_btn)
 
@@ -3077,18 +3073,18 @@ class MainWindow(Adw.ApplicationWindow):
         self.bottom_stack.set_transition_duration(150)
 
         normal_bar = Gtk.ActionBar()
-        self.photo_count_label = Gtk.Label(label=ngettext("%d foto", "%d foto's", 0) % 0)
+        self.photo_count_label = Gtk.Label(label=ngettext("%d photo", "%d photos", 0) % 0)
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
 
         self.bottom_stack.add_named(normal_bar, "normal")
 
         select_bar = Gtk.ActionBar()
-        self.select_count_label = Gtk.Label(label=ngettext("%d geselecteerd", "%d geselecteerd", 0) % 0)
+        self.select_count_label = Gtk.Label(label=ngettext("%d selected", "%d selected", 0) % 0)
         self.select_count_label.add_css_class("dim-label")
         select_bar.pack_start(self.select_count_label)
 
-        delete_selected_btn = Gtk.Button(label=_("Verwijderen"))
+        delete_selected_btn = Gtk.Button(label=_("Delete"))
         delete_selected_btn.add_css_class("destructive-action")
         delete_selected_btn.add_css_class("pill")
         delete_selected_btn.connect("clicked", self.on_delete_selected)
@@ -3112,17 +3108,17 @@ class MainWindow(Adw.ApplicationWindow):
 
     def toggle_select_mode(self, btn=None):
         self._select_mode = not self._select_mode
-        log_info(_("Selectie-modus: {state}").format(
-            state=_("aan") if self._select_mode else _("uit")
+        log_info(_("Selection mode: {state}").format(
+            state=_("on") if self._select_mode else _("off")
         ))
         self._selected.clear()
         if self._select_mode:
-            self.select_btn.set_label(_("Annuleren"))
+            self.select_btn.set_label(_("Cancel"))
             self.select_btn.add_css_class("suggested-action")
             self.bottom_stack.set_visible_child_name("select")
-            self.select_count_label.set_text(ngettext("%d geselecteerd", "%d geselecteerd", 0) % 0)
+            self.select_count_label.set_text(ngettext("%d selected", "%d selected", 0) % 0)
         else:
-            self.select_btn.set_label(_("Selecteren"))
+            self.select_btn.set_label(_("Select"))
             self.select_btn.remove_css_class("suggested-action")
             self.bottom_stack.set_visible_child_name("normal")
             self._update_all_selection_visuals()
@@ -3171,7 +3167,7 @@ class MainWindow(Adw.ApplicationWindow):
         photo_path = self.settings.get("photo_path", "")
         log_info(_("load_photos: scanning in {p}").format(p=photo_path))
         if not photo_path or not os.path.exists(photo_path):
-            log_warn(_("load_photos: photo_path leeg of bestaat niet — empty state"))
+            log_warn(_("load_photos: photo_path empty or missing — empty state"))
             self.show_empty_state()
             return False
         photos = []
@@ -3191,16 +3187,16 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         self.photos = photos
         n = len(self.photos)
-        count_text = ngettext("%d foto", "%d foto's", n) % n
+        count_text = ngettext("%d photo", "%d photos", n) % n
         if self._favorites_only:
-            count_text = _("{count} (favorieten)").format(count=count_text)
+            count_text = _("{count} (favorites)").format(count=count_text)
         self.photo_count_label.set_text(count_text)
         self.start_watcher(photo_path)
         # Sort + render async — first-time EXIF date-fetch takes seconds
         # for 2000 photos, so parallelize and keep the UI responsive.
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
-        self.spinner_label.set_text(_("Foto's sorteren…"))
+        self.spinner_label.set_text(_("Sorting photos…"))
         threading.Thread(
             target=self._sort_then_load, daemon=True
         ).start()
@@ -3226,7 +3222,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_empty_favorites(self):
         self.spinner.stop()
         self.content_stack.set_visible_child_name("empty")
-        self.photo_count_label.set_text(ngettext("%d favoriet", "%d favorieten", 0) % 0)
+        self.photo_count_label.set_text(ngettext("%d favorite", "%d favorites", 0) % 0)
         self._loading = False
 
     def start_load(self):
@@ -3245,7 +3241,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
         self.spinner_label.set_text(
-            _("Foto's laden… {loaded} / {total}").format(loaded=0, total=len(self.photos))
+            _("Loading photos… {loaded} / {total}").format(loaded=0, total=len(self.photos))
         )
         thread = threading.Thread(
             target=self._load_thread,
@@ -3277,7 +3273,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         def _header(dt):
             if dt == UNKNOWN:
-                return _("Onbekende datum")
+                return _("Unknown date")
             return format_date_header(dt)
 
         return [(_header(dt), dt, groups[dt]) for dt in sorted_dates]
@@ -3379,7 +3375,7 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             self._hydrate_viewport()
         except Exception as e:
-            log_error(_("viewport hydrate fout: {err}").format(err=e))
+            log_error(_("viewport hydrate error: {err}").format(err=e))
         return False
 
     def _hydrate_viewport(self):
@@ -3496,7 +3492,7 @@ class MainWindow(Adw.ApplicationWindow):
         if load_id != self._load_id:
             return False
         self.spinner_label.set_text(
-            _("Foto's laden… {loaded} / {total}").format(loaded=loaded, total=total)
+            _("Loading photos… {loaded} / {total}").format(loaded=loaded, total=total)
         )
         # Shared CSS providers — created once, reused per thumbnail.
         if not hasattr(self, '_thumb_css'):
@@ -3621,7 +3617,7 @@ class MainWindow(Adw.ApplicationWindow):
         cluster_lbl = getattr(self, '_cluster_location_label', None)
         self.photo_count_label.set_text(
             cluster_lbl if cluster_lbl
-            else ngettext("%d foto", "%d foto's", total) % total
+            else ngettext("%d photo", "%d photos", total) % total
         )
         self._loading = False
         GLib.timeout_add(800, self._update_timeline_from_positions)
@@ -3631,13 +3627,13 @@ class MainWindow(Adw.ApplicationWindow):
     def show_empty_state(self):
         self.spinner.stop()
         self.content_stack.set_visible_child_name("empty")
-        self.photo_count_label.set_text(ngettext("%d foto", "%d foto's", 0) % 0)
+        self.photo_count_label.set_text(ngettext("%d photo", "%d photos", 0) % 0)
         self._loading = False
 
     def on_thumb_clicked(self, index):
         path = self.photos[index] if 0 <= index < len(self.photos) else "?"
         if self._select_mode:
-            action = _("deselecteer") if index in self._selected else _("selecteer")
+            action = _("deselect") if index in self._selected else _("select")
             log_info(_("Thumbnail {action}: idx={i} path={p}").format(action=action, i=index, p=path))
             if index in self._selected:
                 self._selected.discard(index)
@@ -3645,9 +3641,9 @@ class MainWindow(Adw.ApplicationWindow):
                 self._selected.add(index)
             self._update_thumb_visual(index, self.thumb_widgets[index])
             n = len(self._selected)
-            self.select_count_label.set_text(ngettext("%d geselecteerd", "%d geselecteerd", n) % n)
+            self.select_count_label.set_text(ngettext("%d selected", "%d selected", n) % n)
         else:
-            log_info(_("Thumbnail geklikt → open foto: idx={i} path={p}").format(i=index, p=path))
+            log_info(_("Thumbnail clicked → open photo: idx={i} path={p}").format(i=index, p=path))
             self.open_photo(index)
 
     def apply_sort(self):
@@ -3665,9 +3661,9 @@ class MainWindow(Adw.ApplicationWindow):
     def on_sort_changed(self, combo, _pspec):
         if not self.photos:
             return
-        options = [_("Datum nieuwste"), _("Datum oudste"), _("Naam A-Z"), _("Naam Z-A")]
+        options = [_("Date newest"), _("Date oldest"), _("Name A-Z"), _("Name Z-A")]
         idx = combo.get_selected()
-        log_info(_("Sortering gewijzigd: {opt}").format(
+        log_info(_("Sorting changed: {opt}").format(
             opt=options[idx] if idx < len(options) else idx
         ))
         if self._sort_timer:
@@ -3678,7 +3674,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._sort_timer = None
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
-        self.spinner_label.set_text(_("Sorteren..."))
+        self.spinner_label.set_text(_("Sorting..."))
         sort_index = self.sort_combo.get_selected()
         threading.Thread(target=self._do_sort_bg, args=(sort_index,), daemon=True).start()
         return False
@@ -3701,7 +3697,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not self.photos or not (0 <= index < len(self.photos)):
             return
         path = self.photos[index]
-        kind = _("video") if is_video(path) else _("foto")
+        kind = _("video") if is_video(path) else _("photo")
         log_info(_("open_photo: {kind} idx={i} path={p}").format(kind=kind, i=index, p=path))
         self.current_index = index
         self.header.set_visible(False)
@@ -3754,7 +3750,7 @@ class MainWindow(Adw.ApplicationWindow):
             if state == "searching":
                 self.viewer_location_spinner.start()
                 self.viewer_location_spinner.set_visible(True)
-                self.viewer_location.set_text(_("Locatie zoeken…"))
+                self.viewer_location.set_text(_("Looking up location…"))
                 self.viewer_location_box.set_visible(True)
             elif state == "done":
                 self.viewer_location_spinner.stop()
@@ -3857,7 +3853,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._stop_video()
             self.current_index -= 1
             new_path = self.photos[self.current_index] if self.photos else "?"
-            log_info(_("Vorige foto: idx={i} → {name}").format(
+            log_info(_("Previous photo: idx={i} → {name}").format(
                 i=self.current_index, name=os.path.basename(new_path)
             ))
             self._schedule_photo_load()
@@ -3867,7 +3863,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._stop_video()
             self.current_index += 1
             new_path = self.photos[self.current_index] if self.photos else "?"
-            log_info(_("Volgende foto: idx={i} → {name}").format(
+            log_info(_("Next photo: idx={i} → {name}").format(
                 i=self.current_index, name=os.path.basename(new_path)
             ))
             self._schedule_photo_load()
@@ -3960,7 +3956,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def close_viewer(self, btn=None):
-        log_info(_("Viewer gesloten → terug naar grid"))
+        log_info(_("Viewer closed → back to grid"))
         self._stop_video()
         self._viewer_load_id += 1
         self.header.set_visible(True)
@@ -4588,7 +4584,7 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             ctx.remove_class("pixora-fav")
         self.favorite_btn.set_tooltip_text(
-            _("Verwijder uit favorieten") if is_fav else _("Markeer als favoriet")
+            _("Remove from favorites") if is_fav else _("Mark as favorite")
         )
 
     def on_toggle_favorite(self, btn):
@@ -4597,10 +4593,10 @@ class MainWindow(Adw.ApplicationWindow):
             return
         if path in self._favorites:
             self._favorites.discard(path)
-            log_info(_("Favoriet verwijderd: {p}").format(p=path))
+            log_info(_("Favorite removed: {p}").format(p=path))
         else:
             self._favorites.add(path)
-            log_info(_("Favoriet toegevoegd: {p}").format(p=path))
+            log_info(_("Favorite added: {p}").format(p=path))
         self._schedule_save_favorites()
         self._update_favorite_btn()
         # refresh thumbnail badge if visible
@@ -4623,15 +4619,15 @@ class MainWindow(Adw.ApplicationWindow):
 
     def toggle_favorites_filter(self, btn):
         self._favorites_only = btn.get_active()
-        log_info(_("Favorieten-filter: {state}").format(
-            state=_("aan") if self._favorites_only else _("uit")
+        log_info(_("Favorites filter: {state}").format(
+            state=_("on") if self._favorites_only else _("off")
         ))
         self.load_photos()
 
 
     def on_edit_current(self, btn):
         path = self._current_photo_path() or "?"
-        log_info(_("Editor geopend voor: {name}").format(name=os.path.basename(path)))
+        log_info(_("Editor opened for: {name}").format(name=os.path.basename(path)))
         self._editor_active         = True
         self._editor_rotation       = 0
         self._editor_crop_mode      = False
@@ -4646,7 +4642,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.next_btn.set_sensitive(False)
 
     def on_editor_cancel(self, btn=None):
-        log_info(_("Editor geannuleerd"))
+        log_info(_("Editor cancelled"))
         self._editor_active         = False
         self._editor_rotation       = 0
         self._editor_crop_mode      = False
@@ -4672,13 +4668,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_rect_origin = None
 
     def on_editor_rotate_left(self, btn):
-        log_info(_("Editor: draaien links (-90°)"))
+        log_info(_("Editor: rotate left (-90°)"))
         self._editor_rotation = (self._editor_rotation + 90) % 360
         self._reset_crop()
         self._editor_apply_preview()
 
     def on_editor_rotate_right(self, btn):
-        log_info(_("Editor: draaien rechts (+90°)"))
+        log_info(_("Editor: rotate right (+90°)"))
         self._editor_rotation = (self._editor_rotation - 90) % 360
         self._reset_crop()
         self._editor_apply_preview()
@@ -4702,8 +4698,8 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_editor_toggle_crop(self, btn):
         self._editor_crop_mode = btn.get_active()
-        log_info(_("Editor crop-modus: {state}").format(
-            state=_("aan") if self._editor_crop_mode else _("uit")
+        log_info(_("Editor crop mode: {state}").format(
+            state=_("on") if self._editor_crop_mode else _("off")
         ))
         self._crop_rect        = None
         self._crop_handle      = None
@@ -4835,7 +4831,7 @@ class MainWindow(Adw.ApplicationWindow):
     def on_editor_save(self, btn):
         path     = self.photos[self.current_index]
         rotation = self._editor_rotation
-        log_info(_("Editor opslaan: rotation={rot}° crop={crop} path={p}").format(
+        log_info(_("Editor save: rotation={rot}° crop={crop} path={p}").format(
             rot=rotation, crop=bool(self._crop_rect), p=path
         ))
 
@@ -4886,7 +4882,7 @@ class MainWindow(Adw.ApplicationWindow):
                 os.utime(path, (original_mtime, original_mtime))
                 GLib.idle_add(_after_save)
             except Exception as e:
-                log_error(_("Editor opslaan mislukt: {err}").format(err=e))
+                log_error(_("Editor save failed: {err}").format(err=e))
                 GLib.idle_add(_save_error, str(e))
 
         def _after_save():
@@ -4902,7 +4898,7 @@ class MainWindow(Adw.ApplicationWindow):
         def _save_error(msg):
             dialog = Adw.MessageDialog(
                 transient_for=self,
-                heading=_("Opslaan mislukt"),
+                heading=_("Save failed"),
                 body=msg
             )
             dialog.add_response("ok", _("OK"))
@@ -4916,14 +4912,14 @@ class MainWindow(Adw.ApplicationWindow):
         if getattr(self, "_shredding", False):
             return
         path = self.photos[self.current_index]
-        log_info(_("Verwijder bevestiging gevraagd: {p}").format(p=path))
+        log_info(_("Delete confirmation requested: {p}").format(p=path))
         dialog = Adw.MessageDialog(
             transient_for=self,
-            heading=_("Foto verwijderen?"),
-            body=_("Weet je zeker dat je '{name}' wilt verwijderen? Dit kan niet ongedaan worden gemaakt.").format(name=os.path.basename(path))
+            heading=_("Delete photo?"),
+            body=_("Are you sure you want to delete '{name}'? This cannot be undone.").format(name=os.path.basename(path))
         )
-        dialog.add_response("cancel", _("Annuleren"))
-        dialog.add_response("delete", _("Verwijderen"))
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("delete", _("Delete"))
         dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
@@ -4932,7 +4928,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_delete_current_response(self, dialog, response, path):
         if response != "delete":
-            log_info(_("Verwijderen geannuleerd: {p}").format(p=path))
+            log_info(_("Delete cancelled: {p}").format(p=path))
             return
         if getattr(self, "_shredding", False):
             return
@@ -4979,7 +4975,7 @@ class MainWindow(Adw.ApplicationWindow):
             Gdk.cairo_set_source_pixbuf(_tmp_ctx, anim_pb, 0, 0)
             _tmp_ctx.paint()
         except Exception as e:
-            log_error(_("Shred-animatie pre-render fout: {err}").format(err=e))
+            log_error(_("Shred animation pre-render error: {err}").format(err=e))
             on_done(path)
             return
 
@@ -5039,7 +5035,7 @@ class MainWindow(Adw.ApplicationWindow):
                     cr.paint_with_alpha(opacity)
                     cr.restore()
             except Exception as _e:
-                log_error(_("Shred-animatie draw fout: {err}").format(err=_e))
+                log_error(_("Shred animation draw error: {err}").format(err=_e))
 
         draw_area.set_draw_func(_draw_fn)
 
@@ -5094,7 +5090,7 @@ class MainWindow(Adw.ApplicationWindow):
                and parent.startswith(photo_root + os.sep)):
             try:
                 os.rmdir(parent)  # only succeeds when empty
-                log_info(_("Lege map opgeruimd: {p}").format(p=parent))
+                log_info(_("Empty folder removed: {p}").format(p=parent))
             except OSError:
                 break
             parent = os.path.dirname(parent)
@@ -5104,12 +5100,12 @@ class MainWindow(Adw.ApplicationWindow):
         n_before = len(self.photos)
         try:
             os.remove(path)
-            log_info(_("Foto verwijderd: {p}").format(p=path))
+            log_info(_("Photo deleted: {p}").format(p=path))
         except FileNotFoundError:
             # Already gone (prior delete / external tool / watcher race).
-            log_warn(_("Bestand al weg van disk: {p}").format(p=path))
+            log_warn(_("File already gone from disk: {p}").format(p=path))
         except Exception as e:
-            log_error(_("Verwijderen mislukt: {err}").format(err=e))
+            log_error(_("Delete failed: {err}").format(err=e))
             self._shredding = False
             return
         try:
@@ -5126,7 +5122,7 @@ class MainWindow(Adw.ApplicationWindow):
         # raise when path isn't in the list. Log count to surface bugs.
         self.photos = [p for p in self.photos if p != path]
         n_after = len(self.photos)
-        log_info(_("photos-list: {before} → {after}").format(before=n_before, after=n_after))
+        log_info(_("photos list: {before} → {after}").format(before=n_before, after=n_after))
         if not self.photos:
             self._shredding = False
             self.close_viewer()
@@ -5163,15 +5159,15 @@ class MainWindow(Adw.ApplicationWindow):
         count = len(self._selected)
         dialog = Adw.MessageDialog(
             transient_for=self,
-            heading=ngettext("%d foto verwijderen?", "%d foto's verwijderen?", count) % count,
+            heading=ngettext("Delete %d photo?", "Delete %d photos?", count) % count,
             body=ngettext(
-                "Weet je zeker dat je %d foto wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
-                "Weet je zeker dat je %d foto's wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+                "Are you sure you want to delete %d photo? This cannot be undone.",
+                "Are you sure you want to delete %d photos? This cannot be undone.",
                 count,
             ) % count,
         )
-        dialog.add_response("cancel", _("Annuleren"))
-        dialog.add_response("delete", ngettext("%d verwijderen", "%d verwijderen", count) % count)
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("delete", ngettext("Delete %d", "Delete %d", count) % count)
         dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
@@ -5190,7 +5186,7 @@ class MainWindow(Adw.ApplicationWindow):
                 if os.path.exists(cache_path):
                     os.remove(cache_path)
             except Exception as e:
-                log_error(_("Verwijderen mislukt: {err}").format(err=e))
+                log_error(_("Delete failed: {err}").format(err=e))
             if path in self._favorites:
                 self._favorites.discard(path)
                 fav_changed = True
@@ -5206,12 +5202,12 @@ class MainWindow(Adw.ApplicationWindow):
         if self._settings_dialog is not None:
             self._settings_dialog.present()
             return
-        log_info(_("Instellingen geopend"))
+        log_info(_("Settings opened"))
         # PreferencesWindow (own toplevel) instead of PreferencesDialog —
         # on Adw 1.5+ the latter blocks the main window's close-request, so
         # GNOME "Close N windows" can't kill Pixora while settings is open.
         dialog = Adw.PreferencesWindow()
-        dialog.set_title(_("Instellingen"))
+        dialog.set_title(_("Settings"))
         dialog.set_transient_for(self)
         dialog.set_modal(False)
         dialog.set_default_size(640, 720)
@@ -5229,30 +5225,30 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.connect("close-request", _on_settings_closed)
 
         display_page = Adw.PreferencesPage()
-        display_page.set_title(_("Weergave"))
+        display_page.set_title(_("Display"))
         display_page.set_icon_name("preferences-desktop-display-symbolic")
 
         import_page = Adw.PreferencesPage()
-        import_page.set_title(_("Importeren"))
+        import_page.set_title(_("Import"))
         import_page.set_icon_name("document-send-symbolic")
 
         advanced_page = Adw.PreferencesPage()
-        advanced_page.set_title(_("Geavanceerd"))
+        advanced_page.set_title(_("Advanced"))
         advanced_page.set_icon_name("applications-engineering-symbolic")
 
         about_page = Adw.PreferencesPage()
-        about_page.set_title(_("Over"))
+        about_page.set_title(_("About"))
         about_page.set_icon_name("help-about-symbolic")
 
         folder_group = Adw.PreferencesGroup()
-        folder_group.set_title(_("Foto map"))
-        folder_group.set_description(_("Waar worden je foto's opgeslagen"))
+        folder_group.set_title(_("Photo folder"))
+        folder_group.set_description(_("Where your photos are stored"))
 
         self.folder_row = Adw.ActionRow()
-        self.folder_row.set_title(_("Huidige map"))
-        self.folder_row.set_subtitle(self.settings.get("photo_path") or _("Niet ingesteld"))
+        self.folder_row.set_title(_("Current folder"))
+        self.folder_row.set_subtitle(self.settings.get("photo_path") or _("Not configured"))
 
-        change_folder_btn = Gtk.Button(label=_("Wijzigen"))
+        change_folder_btn = Gtk.Button(label=_("Change"))
         change_folder_btn.add_css_class("flat")
         change_folder_btn.set_valign(Gtk.Align.CENTER)
         change_folder_btn.connect("clicked", lambda b: self.change_folder(dialog))
@@ -5261,11 +5257,11 @@ class MainWindow(Adw.ApplicationWindow):
         display_page.add(folder_group)
 
         display_group = Adw.PreferencesGroup()
-        display_group.set_title(_("Weergave"))
-        display_group.set_description(_("Hoe foto's in het grid worden getoond"))
+        display_group.set_title(_("Display"))
+        display_group.set_description(_("How photos are displayed in the grid"))
 
         thumb_row = Adw.ActionRow(
-            title=_("Thumbnail grootte"),
+            title=_("Thumbnail size"),
             subtitle=f"{THUMB_SIZE} px"
         )
         thumb_adj = Gtk.Adjustment(
@@ -5287,7 +5283,7 @@ class MainWindow(Adw.ApplicationWindow):
         thumb_reset_btn.add_css_class("flat")
         thumb_reset_btn.add_css_class("circular")
         thumb_reset_btn.set_valign(Gtk.Align.CENTER)
-        thumb_reset_btn.set_tooltip_text(_("Terug naar standaard (200 px)"))
+        thumb_reset_btn.set_tooltip_text(_("Back to default (200 px)"))
         thumb_reset_btn.set_sensitive(int(thumb_adj.get_value()) != 200)
         thumb_reset_btn.connect("clicked", lambda b: thumb_adj.set_value(200.0))
         thumb_adj.connect(
@@ -5302,7 +5298,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._thumb_apply_btn.add_css_class("flat")
         self._thumb_apply_btn.add_css_class("circular")
         self._thumb_apply_btn.set_valign(Gtk.Align.CENTER)
-        self._thumb_apply_btn.set_tooltip_text(_("Toepassen"))
+        self._thumb_apply_btn.set_tooltip_text(_("Apply"))
         self._thumb_apply_btn.set_sensitive(False)
         self._thumb_apply_btn.connect("clicked", self._on_thumb_apply_clicked)
         thumb_row.add_suffix(self._thumb_apply_btn)
@@ -5316,16 +5312,16 @@ class MainWindow(Adw.ApplicationWindow):
         self._thumb_preview.set_draw_func(self._draw_thumb_preview)
         self._pending_thumb_size = THUMB_SIZE
         preview_row = Adw.ActionRow(
-            title=_("Voorbeeld"),
-            subtitle=_("Zo groot worden je thumbnails bij deze instelling"),
+            title=_("Preview"),
+            subtitle=_("How large your thumbnails will be at this setting"),
         )
         preview_row.add_suffix(self._thumb_preview)
         preview_row.set_activatable(False)
         display_group.add(preview_row)
 
         lang_row = Adw.ActionRow(
-            title=_("Taal"),
-            subtitle=_("Herstart van Pixora is nodig om een nieuwe taal te laden")
+            title=_("Language"),
+            subtitle=_("Pixora must be restarted to load a new language")
         )
         lang_model = Gtk.StringList()
         self._lang_codes = ["nl", "en", "de", "fr"]
@@ -5346,17 +5342,17 @@ class MainWindow(Adw.ApplicationWindow):
         display_page.add(display_group)
 
         dev_group = Adw.PreferencesGroup()
-        dev_group.set_title(_("Geavanceerd"))
+        dev_group.set_title(_("Advanced"))
         dev_group.set_description(
-            _("Developer mode toont Pixora met terminal-output en gebruikt de terminal-updater. Alleen aanzetten als je weet wat je doet.")
+            _("Developer mode shows Pixora with terminal output and uses the terminal updater. Only enable if you know what you're doing.")
         )
         current_dev = bool(self.settings.get("dev_mode", False))
         dev_row = Adw.ActionRow(
             title=_("Developer mode"),
-            subtitle=_("Actief") if current_dev else _("Inactief")
+            subtitle=_("Active") if current_dev else _("Inactive")
         )
         dev_btn = Gtk.Button(
-            label=_("Deactiveren") if current_dev else _("Activeren")
+            label=_("Deactivate") if current_dev else _("Activate")
         )
         dev_btn.add_css_class("flat")
         dev_btn.set_valign(Gtk.Align.CENTER)
@@ -5367,9 +5363,9 @@ class MainWindow(Adw.ApplicationWindow):
         advanced_page.add(dev_group)
 
         structure_group = Adw.PreferencesGroup()
-        structure_group.set_title(_("Mapstructuur"))
+        structure_group.set_title(_("Folder structure"))
         structure_group.set_description(
-            _("Bepaalt hoe Pixora geïmporteerde foto's opslaat in je bibliotheek.")
+            _("Controls how Pixora saves imported photos in your library.")
         )
         current_structure = self.settings.get("structure", "year_month")
 
@@ -5377,8 +5373,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_flat.set_active(current_structure == "flat")
         self.radio_flat.connect("toggled", lambda b: self.on_structure_changed("flat", b))
         flat_row = Adw.ActionRow(
-            title=_("Alles bij elkaar"),
-            subtitle=_("Alle foto's komen direct in één map — geen submappen."),
+            title=_("All together"),
+            subtitle=_("All photos go into a single folder — no subfolders."),
         )
         flat_row.add_prefix(Gtk.Image.new_from_icon_name("folder-symbolic"))
         flat_row.add_prefix(self.radio_flat)
@@ -5390,8 +5386,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_year.set_active(current_structure == "year")
         self.radio_year.connect("toggled", lambda b: self.on_structure_changed("year", b))
         year_row = Adw.ActionRow(
-            title=_("Per jaar"),
-            subtitle=_("Aparte map per jaar — bv. 2024/, 2025/."),
+            title=_("By year"),
+            subtitle=_("Separate folder per year — e.g. 2024/, 2025/."),
         )
         year_row.add_prefix(Gtk.Image.new_from_icon_name("folder-open-symbolic"))
         year_row.add_prefix(self.radio_year)
@@ -5403,23 +5399,23 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_month.set_active(current_structure == "year_month")
         self.radio_month.connect("toggled", lambda b: self.on_structure_changed("year_month", b))
         month_row = Adw.ActionRow(
-            title=_("Per jaar en maand"),
-            subtitle=_("Jaar-map met maand-submappen — bv. 2024/2024-03/."),
+            title=_("By year and month"),
+            subtitle=_("Year folder with month subfolders — e.g. 2024/2024-03/."),
         )
         month_row.add_prefix(Gtk.Image.new_from_icon_name("view-list-symbolic"))
         month_row.add_prefix(self.radio_month)
         month_row.set_activatable_widget(self.radio_month)
         structure_group.add(month_row)
 
-        reorganize_btn = Gtk.Button(label=_("Opruimen"))
+        reorganize_btn = Gtk.Button(label=_("Tidy up"))
         reorganize_btn.add_css_class("flat")
         reorganize_btn.set_valign(Gtk.Align.CENTER)
         reorganize_btn.connect(
             "clicked", lambda b: self._prompt_reorganize(from_startup=False)
         )
         reorganize_row = Adw.ActionRow(
-            title=_("Huidige mappen aanpassen"),
-            subtitle=_("Scan de foto-map en verplaats foto's zodat ze kloppen met de gekozen structuur. Bit-identieke duplicaten worden verwijderd."),
+            title=_("Reorganize current folders"),
+            subtitle=_("Scan the photo folder and move photos to match the chosen structure. Bit-identical duplicates are removed."),
         )
         reorganize_row.add_prefix(Gtk.Image.new_from_icon_name("view-refresh-symbolic"))
         reorganize_row.add_suffix(reorganize_btn)
@@ -5430,8 +5426,8 @@ class MainWindow(Adw.ApplicationWindow):
         structure_group.add(reorganize_row)
 
         silent_row = Adw.ActionRow(
-            title=_("Automatisch bevestigen"),
-            subtitle=_("Start direct als er iets te doen is zonder te storen."),
+            title=_("Auto-confirm"),
+            subtitle=_("Starts right away when there's work to do, without interrupting."),
         )
         silent_row.add_prefix(
             Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
@@ -5451,15 +5447,14 @@ class MainWindow(Adw.ApplicationWindow):
         import_page.add(structure_group)
 
         dup_group = Adw.PreferencesGroup()
-        dup_group.set_title(_("Duplicaat-detectie"))
-        dup_group.set_description(_("Controleer bij import of foto's al bestaan"))
+        dup_group.set_title(_("Duplicate detection"))
+        dup_group.set_description(_("Check for existing photos during import"))
         # Threshold 0 = off, ≥1 = on. "On" always uses strict (=1) for accuracy.
         dup_on = self.settings.get("duplicate_threshold", 2) != 0
 
         dup_info_row = Adw.ActionRow(
-            title=_("Hoe het werkt"),
-            subtitle=_("Pixora vergelijkt elke nieuwe foto visueel met je bibliotheek. "
-                       "Bij een match kies je per foto: overslaan, toch importeren of beide bewaren."),
+            title=_("How it works"),
+            subtitle=_("Pixora visually compares each new photo with your library. On a match you pick per photo: skip, import anyway, or keep both."),
         )
         dup_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
         dup_info_row.set_activatable(False)
@@ -5473,7 +5468,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dup_switch.set_valign(Gtk.Align.CENTER)
         self.settings_dup_switch.set_active(dup_on)
         self.settings_dup_switch.connect("notify::active", self.on_dup_switch_toggled)
-        dup_row = Adw.ActionRow(title=_("Duplicaat-detectie"))
+        dup_row = Adw.ActionRow(title=_("Duplicate detection"))
         dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
         dup_row.add_suffix(self.settings_dup_switch)
         dup_row.set_activatable_widget(self.settings_dup_switch)
@@ -5482,15 +5477,15 @@ class MainWindow(Adw.ApplicationWindow):
         import_page.add(dup_group)
 
         backup_group = Adw.PreferencesGroup()
-        backup_group.set_title(_("Automatische backup"))
-        backup_group.set_description(_("Backup naar externe USB schijf na elke import"))
+        backup_group.set_title(_("Automatic backup"))
+        backup_group.set_description(_("Backup to external USB drive after each import"))
 
         backup_on = bool(self.settings.get("backup_enabled"))
         drive_present = self._backup_drive_mountpoint() is not None
 
         if backup_on and self.settings.get("backup_uuid") and not drive_present:
             backup_group.set_description(
-                _("Drive niet aangesloten — sluit de USB-schijf aan om te backuppen.")
+                _("Drive not connected — plug in the USB drive to back up.")
             )
 
         self.settings_backup_switch = Gtk.Switch()
@@ -5498,7 +5493,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_backup_switch.set_active(backup_on)
         self.settings_backup_switch.connect("notify::active", self.on_settings_backup_toggle)
 
-        backup_toggle_row = Adw.ActionRow(title=_("Automatische backup"), subtitle=_("Synchroniseert na elke import"))
+        backup_toggle_row = Adw.ActionRow(title=_("Automatic backup"), subtitle=_("Synchronizes after each import"))
         backup_toggle_row.add_suffix(self.settings_backup_switch)
         backup_toggle_row.set_activatable_widget(self.settings_backup_switch)
         backup_group.add(backup_toggle_row)
@@ -5509,7 +5504,7 @@ class MainWindow(Adw.ApplicationWindow):
             for uuid, label in self.settings_drives:
                 self.settings_drive_model.append(label)
         else:
-            self.settings_drive_model.append(_("Geen externe schijven gevonden"))
+            self.settings_drive_model.append(_("No external drives found"))
 
         self.settings_drive_combo = Gtk.DropDown(model=self.settings_drive_model)
         self.settings_drive_combo.set_size_request(220, -1)
@@ -5526,31 +5521,31 @@ class MainWindow(Adw.ApplicationWindow):
         settings_refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
         settings_refresh_btn.add_css_class("flat")
         settings_refresh_btn.set_valign(Gtk.Align.CENTER)
-        settings_refresh_btn.set_tooltip_text(_("Drives opnieuw scannen"))
+        settings_refresh_btn.set_tooltip_text(_("Rescan drives"))
         settings_refresh_btn.connect("clicked", self.on_settings_refresh_drives)
 
         self.settings_drive_reset_btn = Gtk.Button(icon_name="edit-clear-symbolic")
         self.settings_drive_reset_btn.add_css_class("flat")
         self.settings_drive_reset_btn.set_valign(Gtk.Align.CENTER)
-        self.settings_drive_reset_btn.set_tooltip_text(_("Gekozen backup-schijf vergeten"))
+        self.settings_drive_reset_btn.set_tooltip_text(_("Forget saved backup drive"))
         self.settings_drive_reset_btn.set_visible(bool(self.settings.get("backup_uuid")))
         self.settings_drive_reset_btn.connect("clicked", self.on_settings_reset_drive)
 
-        self.settings_drive_row = Adw.ActionRow(title=_("Backup schijf"), subtitle=_("Alleen externe schijven"))
+        self.settings_drive_row = Adw.ActionRow(title=_("Backup drive"), subtitle=_("External drives only"))
         self.settings_drive_row.add_suffix(self.settings_drive_reset_btn)
         self.settings_drive_row.add_suffix(settings_refresh_btn)
         self.settings_drive_row.add_suffix(self.settings_drive_combo)
         self.settings_drive_row.set_sensitive(backup_on)
         backup_group.add(self.settings_drive_row)
 
-        current_backup_path = self.settings.get("backup_path") or _("Niet ingesteld")
+        current_backup_path = self.settings.get("backup_path") or _("Not configured")
         self.settings_backup_folder_row = Adw.ActionRow(
-            title=_("Map op backup schijf"),
+            title=_("Folder on backup drive"),
             subtitle=current_backup_path
         )
         self.settings_backup_folder_row.set_sensitive(backup_on and drive_present)
 
-        folder_btn_label = _("Wijzigen") if self.settings.get("backup_path") else _("Instellen")
+        folder_btn_label = _("Change") if self.settings.get("backup_path") else _("Set up")
         self.settings_backup_folder_btn = Gtk.Button(label=folder_btn_label)
         self.settings_backup_folder_btn.add_css_class("flat")
         self.settings_backup_folder_btn.set_valign(Gtk.Align.CENTER)
@@ -5567,8 +5562,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         mode_backup_row = Adw.ActionRow(
             title=_("Backup"),
-            subtitle=_("Eenrichtings-kopie: alleen toevoegen. Foto's die je in Pixora wist, "
-                       "blijven op de USB als archief staan."),
+            subtitle=_("One-way copy: additions only. Photos you delete in Pixora stay on the USB as an archive."),
         )
         mode_backup_row.add_prefix(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic"))
         mode_backup_row.add_prefix(self.radio_mode_backup)
@@ -5589,8 +5583,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         mode_sync_row = Adw.ActionRow(
             title=_("Sync"),
-            subtitle=_("Exacte kopie van je Pixora-bibliotheek. Foto's die je in Pixora "
-                       "wist, worden ook van de USB verwijderd bij de volgende backup."),
+            subtitle=_("Exact mirror of your Pixora library. Photos you delete in Pixora are also removed from the USB on the next backup."),
         )
         mode_sync_row.add_prefix(Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic"))
         mode_sync_row.add_prefix(self.radio_mode_sync)
@@ -5615,10 +5608,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings_dedup_switch.set_active(bool(self.settings.get("backup_dedup")))
         self.settings_dedup_switch.connect("notify::active", self.on_backup_dedup_toggle)
         dedup_row = Adw.ActionRow(
-            title=_("Duplicaat-detector voor backup"),
-            subtitle=_("Slaat foto's over die al op de USB staan, óók als ze daar onder een "
-                       "andere naam of in een andere map liggen. Vereist dat duplicaat-"
-                       "detectie hierboven aan staat."),
+            title=_("Backup duplicate detector"),
+            subtitle=_("Skips photos already on the USB, even if they are stored there under a different name or folder. Requires duplicate detection above to be enabled."),
         )
         dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
         dedup_row.add_suffix(self.settings_dedup_switch)
@@ -5637,8 +5628,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_silent_switch.set_active(bool(self.settings.get("backup_silent")))
         self.settings_silent_switch.connect("notify::active", self.on_backup_silent_toggle)
         silent_row = Adw.ActionRow(
-            title=_("Automatisch bevestigen"),
-            subtitle=_("Start direct als er iets te doen is zonder te storen."),
+            title=_("Auto-confirm"),
+            subtitle=_("Starts right away when there's work to do, without interrupting."),
         )
         silent_row.add_prefix(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
         silent_row.add_suffix(self.settings_silent_switch)
@@ -5660,7 +5651,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._scan_btn_stack = Gtk.Stack()
         self._scan_btn_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self._scan_btn_stack.set_transition_duration(250)
-        self._scan_btn_stack.add_named(Gtk.Label(label=_("Controleren")), "idle")
+        self._scan_btn_stack.add_named(Gtk.Label(label=_("Check")), "idle")
         _scan_spin_box = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL, spacing=0,
             halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER,
@@ -5681,8 +5672,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._scan_check_spinner.start()
             self.settings_manual_scan_btn.set_sensitive(False)
         manual_scan_row = Adw.ActionRow(
-            title=_("Nu controleren"),
-            subtitle=_("Scan USB op ontbrekende foto's"),
+            title=_("Check now"),
+            subtitle=_("Scan USB for missing photos"),
         )
         manual_scan_row.add_prefix(Gtk.Image.new_from_icon_name("system-search-symbolic"))
         manual_scan_row.add_suffix(self.settings_manual_scan_btn)
@@ -5695,11 +5686,11 @@ class MainWindow(Adw.ApplicationWindow):
         import_page.add(backup_group)
 
         about_group = Adw.PreferencesGroup()
-        about_group.set_title(_("Over"))
+        about_group.set_title(_("About"))
 
         app_row = Adw.ActionRow(
             title=_("Pixora"),
-            subtitle=_("Met ❤ gemaakt door LinuxGinger"))
+            subtitle=_("Made with ❤ by LinuxGinger"))
         icon_path = os.path.join(ASSETS_DIR, "pixora-icon.svg")
         if os.path.exists(icon_path):
             app_icon = Gtk.Image.new_from_file(icon_path)
@@ -5716,7 +5707,7 @@ class MainWindow(Adw.ApplicationWindow):
         github_btn.set_child(gh_box)
         github_btn.add_css_class("flat")
         github_btn.set_valign(Gtk.Align.CENTER)
-        github_btn.set_tooltip_text(_("Open de GitHub-pagina van Pixora"))
+        github_btn.set_tooltip_text(_("Open Pixora's GitHub page"))
         github_btn.connect("clicked", self._on_open_github)
         app_row.add_suffix(github_btn)
         about_group.add(app_row)
@@ -5726,11 +5717,11 @@ class MainWindow(Adw.ApplicationWindow):
             with open(installed_version_path) as _ivf:
                 installed_ver = _ivf.read().strip()
         except Exception:
-            installed_ver = _("Onbekend")
-        version_row = Adw.ActionRow(title=_("Versie"), subtitle=installed_ver)
+            installed_ver = _("Unknown")
+        version_row = Adw.ActionRow(title=_("Version"), subtitle=installed_ver)
         about_group.add(version_row)
 
-        self._update_check_row = Adw.ActionRow(title=_("Controleer op updates"))
+        self._update_check_row = Adw.ActionRow(title=_("Check for updates"))
 
         # Button has 4 states in a Gtk.Stack: idle / checking / uptodate /
         # available (the pulsing variant).
@@ -5749,7 +5740,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._update_btn_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self._update_btn_stack.set_transition_duration(250)
 
-        idle_lbl = Gtk.Label(label=_("Controleer"))
+        idle_lbl = Gtk.Label(label=_("Check"))
         self._update_btn_stack.add_named(idle_lbl, "idle")
 
         spin_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0,
@@ -5767,7 +5758,7 @@ class MainWindow(Adw.ApplicationWindow):
         warn_icon.add_css_class("accent")
         self._update_btn_stack.add_named(warn_icon, "available")
 
-        update_lbl = Gtk.Label(label=_("Bijwerken"))
+        update_lbl = Gtk.Label(label=_("Update"))
         update_lbl.add_css_class("accent")
         self._update_btn_stack.add_named(update_lbl, "available_label")
 
@@ -5781,7 +5772,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self._pending_update_version:
             self._update_remote_version = self._pending_update_version
             self._update_check_row.set_subtitle(
-                _("Versie {v} beschikbaar").format(v=self._pending_update_version)
+                _("Version {v} available").format(v=self._pending_update_version)
             )
             self._set_update_state("available")
 
@@ -5789,7 +5780,7 @@ class MainWindow(Adw.ApplicationWindow):
         # a description (no rows) renders as a free-standing dim-label.
         credit_group = Adw.PreferencesGroup()
         credit_group.set_description(
-            _("GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc.")
+            _("GitHub® and the Invertocat logo are trademarks of GitHub, Inc.")
             + "\n"
             + _("© {year} Pixora — LinuxGinger").format(
                 year=datetime.datetime.now().year)
@@ -5798,12 +5789,12 @@ class MainWindow(Adw.ApplicationWindow):
 
         license_group = Adw.PreferencesGroup()
         license_row = Adw.ActionRow(
-            title=_("Licentie"),
+            title=_("License"),
             subtitle=_("GNU General Public License v3.0"),
         )
         license_row.add_prefix(
             Gtk.Image.new_from_icon_name("text-x-generic-symbolic"))
-        license_btn = Gtk.Button(label=_("Bekijken"))
+        license_btn = Gtk.Button(label=_("View"))
         license_btn.add_css_class("flat")
         license_btn.set_valign(Gtk.Align.CENTER)
         license_btn.connect("clicked", self._on_view_license)
@@ -5945,12 +5936,11 @@ class MainWindow(Adw.ApplicationWindow):
         if new_size == THUMB_SIZE:
             return
         dlg = Adw.AlertDialog(
-            heading=_("Thumbnail-grootte wijzigen?"),
-            body=_("Pixora gaat alle thumbnails opnieuw genereren op {n} px. "
-                   "Dit kan even duren bij grote bibliotheken.").format(n=new_size),
+            heading=_("Change thumbnail size?"),
+            body=_("Pixora will regenerate all thumbnails at {n} px. This can take a while for large libraries.").format(n=new_size),
         )
-        dlg.add_response("cancel", _("Annuleren"))
-        dlg.add_response("apply", _("Opslaan"))
+        dlg.add_response("cancel", _("Cancel"))
+        dlg.add_response("apply", _("Save"))
         dlg.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("apply")
         dlg.set_close_response("cancel")
@@ -5964,7 +5954,7 @@ class MainWindow(Adw.ApplicationWindow):
         new_size = getattr(self, "_pending_thumb_size", THUMB_SIZE)
         if new_size == THUMB_SIZE:
             return
-        log_info(_("Thumbnail-grootte gewijzigd: {old}px → {new}px").format(
+        log_info(_("Thumbnail size changed: {old}px → {new}px").format(
             old=THUMB_SIZE, new=new_size,
         ))
         THUMB_SIZE = new_size
@@ -5975,9 +5965,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.load_photos()
 
     def _on_reset_usbmuxd(self, btn):
-        log_info(_("Reset usbmuxd aangeroepen (settings)"))
+        log_info(_("Reset usbmuxd invoked (settings)"))
         btn.set_sensitive(False)
-        btn.set_label(_("Bezig…"))
+        btn.set_label(_("Working…"))
 
         def do():
             result_msg = ""
@@ -5990,30 +5980,29 @@ class MainWindow(Adw.ApplicationWindow):
                 )
                 if r.returncode == 0:
                     ok = True
-                    result_msg = _("usbmuxd opnieuw gestart. Sluit je iPhone aan en tap Trust.")
+                    result_msg = _("usbmuxd restarted. Connect your iPhone and tap Trust.")
                 elif r.returncode == 126 or r.returncode == 127:
-                    result_msg = _("Wachtwoord geannuleerd of pkexec niet beschikbaar.")
+                    result_msg = _("Password cancelled or pkexec unavailable.")
                 else:
-                    result_msg = _("Herstart mislukt (code {code}).\n{err}").format(
+                    result_msg = _("Restart failed (code {code}).\n{err}").format(
                         code=r.returncode, err=r.stderr.strip()[:200]
                     )
             except FileNotFoundError:
-                result_msg = _("pkexec niet gevonden. Voer handmatig uit:\n"
-                               "  sudo killall usbmuxd; sudo usbmuxd")
+                result_msg = _("pkexec not found. Run manually:\n  sudo killall usbmuxd; sudo usbmuxd")
             except subprocess.TimeoutExpired:
-                result_msg = _("Herstart duurde te lang (timeout).")
+                result_msg = _("Restart timed out.")
             except Exception as e:
-                result_msg = _("Onverwachte fout: {err}").format(err=e)
+                result_msg = _("Unexpected error: {err}").format(err=e)
             GLib.idle_add(self._after_usbmuxd_reset, btn, ok, result_msg)
 
         threading.Thread(target=do, daemon=True).start()
 
     def _after_usbmuxd_reset(self, btn, ok, msg):
-        btn.set_label(_("Herstart"))
+        btn.set_label(_("Restart"))
         btn.set_sensitive(True)
         dialog = Adw.MessageDialog(
             transient_for=self,
-            heading=_("USB-verbinding herstart") if ok else _("Herstart mislukt"),
+            heading=_("USB connection restarted") if ok else _("Restart failed"),
             body=msg
         )
         dialog.add_response("ok", _("OK"))
@@ -6023,16 +6012,14 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_clear_pair_records(self, btn):
-        log_info(_("Pair-records wissen — bevestiging gevraagd"))
+        log_info(_("Clear pair records — confirmation requested"))
         confirm = Adw.MessageDialog(
             transient_for=self,
-            heading=_("Pair-records wissen?"),
-            body=_("Dit verwijdert alle bestaande iPhone-koppelingen in "
-                   "/var/lib/lockdown/. Je iPhone vraagt de volgende keer "
-                   "opnieuw om Trust.")
+            heading=_("Clear pair records?"),
+            body=_("This removes all existing iPhone pairings in /var/lib/lockdown/. Your iPhone will ask for Trust again next time.")
         )
-        confirm.add_response("cancel", _("Annuleren"))
-        confirm.add_response("clear", _("Wissen"))
+        confirm.add_response("cancel", _("Cancel"))
+        confirm.add_response("clear", _("Clear"))
         confirm.set_response_appearance("clear", Adw.ResponseAppearance.DESTRUCTIVE)
         confirm.set_default_response("cancel")
         confirm.connect("response", self._do_clear_pair_records)
@@ -6054,16 +6041,15 @@ class MainWindow(Adw.ApplicationWindow):
                 )
                 if r.returncode == 0:
                     ok = True
-                    result_msg = _("Pair-records gewist en usbmuxd opnieuw gestart. "
-                                   "Sluit je iPhone aan en tap Trust.")
+                    result_msg = _("Pair records cleared and usbmuxd restarted. Connect your iPhone and tap Trust.")
                 else:
-                    result_msg = _("Wissen mislukt (code {code}).").format(code=r.returncode)
+                    result_msg = _("Clear failed (code {code}).").format(code=r.returncode)
             except FileNotFoundError:
-                result_msg = _("pkexec niet gevonden.")
+                result_msg = _("pkexec not found.")
             except Exception as e:
-                result_msg = _("Fout: {err}").format(err=e)
+                result_msg = _("Error: {err}").format(err=e)
             GLib.idle_add(self._show_info_dialog,
-                          _("Klaar") if ok else _("Mislukt"), result_msg)
+                          _("Done") if ok else _("Failed"), result_msg)
 
         threading.Thread(target=do, daemon=True).start()
 
@@ -6086,7 +6072,7 @@ class MainWindow(Adw.ApplicationWindow):
             save_settings(self.settings)
         except Exception:
             pass
-        log_info(_("Taal gewijzigd naar: {lang} — Pixora wordt herstart").format(lang=new_lang))
+        log_info(_("Language changed to: {lang} — Pixora restarting").format(lang=new_lang))
 
         # Load translation in the NEW language for the overlay text.
         try:
@@ -6096,7 +6082,7 @@ class MainWindow(Adw.ApplicationWindow):
             )
             msg = new_trans.gettext("Taal wordt gewijzigd…")
         except Exception:
-            msg = _("Taal wordt gewijzigd…")
+            msg = _("Changing language…")
 
         # Non-closable modal overlay until relaunch.
         overlay = Gtk.Window()
@@ -6145,9 +6131,9 @@ class MainWindow(Adw.ApplicationWindow):
                     stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,
                 )
-                log_info(_("Taal-relaunch gepland (1.5s delay, log: {p})").format(p=log_file))
+                log_info(_("Language relaunch scheduled (1.5s delay, log: {p})").format(p=log_file))
             except Exception as e:
-                log_error(_("Relaunch na taal-wissel fout: {err}").format(err=e))
+                log_error(_("Relaunch after language switch failed: {err}").format(err=e))
             self.get_application().quit()
             return False
         GLib.timeout_add(1000, _relaunch)
@@ -6156,18 +6142,16 @@ class MainWindow(Adw.ApplicationWindow):
         currently_active = bool(self.settings.get("dev_mode", False))
         target = not currently_active
         if target:
-            heading = _("Developer mode activeren?")
-            body = _("Bij dev mode start Pixora in een terminal en gaan "
-                     "updates via de terminal zodat je output kunt zien. "
-                     "Pixora herstart direct.")
+            heading = _("Activate developer mode?")
+            body = _("In dev mode Pixora starts in a terminal and updates go through the terminal so you can see output. Pixora restarts immediately.")
         else:
-            heading = _("Developer mode deactiveren?")
-            body = _("Pixora start daarna zonder terminal en gebruikt de GUI-updater.")
+            heading = _("Deactivate developer mode?")
+            body = _("Pixora will then start without a terminal and use the GUI updater.")
         dialog = Adw.MessageDialog(
             transient_for=self, heading=heading, body=body
         )
-        dialog.add_response("cancel", _("Nee"))
-        dialog.add_response("apply", _("Ja"))
+        dialog.add_response("cancel", _("No"))
+        dialog.add_response("apply", _("Yes"))
         dialog.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
         dialog.set_default_response("cancel")
         dialog.connect("response", self._apply_dev_mode, target, row, btn)
@@ -6175,17 +6159,17 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _apply_dev_mode(self, dialog, response, target, row, btn):
         if response != "apply":
-            log_info(_("Dev-mode toggle geannuleerd (was: {was})").format(
+            log_info(_("Dev mode toggle cancelled (was: {was})").format(
                 was=self.settings.get('dev_mode', False)
             ))
             return
         self.settings["dev_mode"] = target
         save_settings(self.settings)
-        log_info(_("Dev-mode {state} → herstarten…").format(
-            state=_("geactiveerd") if target else _("gedeactiveerd")
+        log_info(_("Dev mode {state} → restarting…").format(
+            state=_("activated") if target else _("deactivated")
         ))
-        row.set_subtitle(_("Actief") if target else _("Inactief"))
-        btn.set_label(_("Deactiveren") if target else _("Activeren"))
+        row.set_subtitle(_("Active") if target else _("Inactive"))
+        btn.set_label(_("Deactivate") if target else _("Activate"))
         # Herstart de app
         GLib.timeout_add(300, self._restart_app)
 
@@ -6217,9 +6201,9 @@ class MainWindow(Adw.ApplicationWindow):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            log_info(_("Restart gepland (1.5s delay voor GApplication unregister)"))
+            log_info(_("Restart scheduled (1.5s delay for GApplication unregister)"))
         except Exception as e:
-            log_error(_("Restart fout: {err}").format(err=e))
+            log_error(_("Restart error: {err}").format(err=e))
         self.get_application().quit()
         return False
 
@@ -6249,15 +6233,15 @@ class MainWindow(Adw.ApplicationWindow):
         parts = []
         if photos:
             parts.append(ngettext(
-                "{n} foto", "{n} foto's", photos).format(n=photos))
+                "{n} photo", "{n} photos", photos).format(n=photos))
         if videos:
             parts.append(ngettext(
-                "{n} video", "{n} video's", videos).format(n=videos))
+                "{n} video", "{n} videos", videos).format(n=videos))
         if not parts:
             return ""
         if len(parts) == 1:
             return parts[0]
-        return _("{a} en {b}").format(a=parts[0], b=parts[1])
+        return _("{a} and {b}").format(a=parts[0], b=parts[1])
 
     def _photo_date_for_structure(self, src, st, exif_tags, video_exts,
                                   video_date_fn):
@@ -6375,8 +6359,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._reorganize_active = False
             if not from_startup:
                 dlg = Adw.AlertDialog(
-                    heading=_("Mappenstructuur klopt al"),
-                    body=_("Alle foto's staan al volgens je gekozen structuur."),
+                    heading=_("Folder structure is already correct"),
+                    body=_("All photos already match your chosen structure."),
                 )
                 dlg.add_response("ok", _("OK"))
                 dlg.set_default_response("ok")
@@ -6387,7 +6371,7 @@ class MainWindow(Adw.ApplicationWindow):
         # both auto-detection and a manual "Opruimen" click.
         if self.settings.get("reorganize_silent", False):
             self._reorganize_silent_run = True
-            log_info(_("Reorganize stil gestart: {m} moves, {d} dups").format(
+            log_info(_("Silent reorganize started: {m} moves, {d} dups").format(
                 m=len(moves), d=len(dups)))
             threading.Thread(
                 target=self._do_reorganize, args=(moves, dups),
@@ -6397,27 +6381,27 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_silent_run = False
         structure = self.settings.get("structure", "year_month")
         structure_label = {
-            "flat": _("Alles bij elkaar"),
-            "year": _("Per jaar"),
-            "year_month": _("Per jaar en maand"),
+            "flat": _("All together"),
+            "year": _("By year"),
+            "year_month": _("By year and month"),
         }.get(structure, structure)
         body_lines = [
-            _("Gekozen structuur: {s}").format(s=structure_label),
+            _("Chosen structure: {s}").format(s=structure_label),
         ]
         if moves:
             ph, vi = self._count_media(moves)
-            body_lines.append(_("{c} worden verplaatst naar de juiste map.").format(
+            body_lines.append(_("{c} will be moved to the right folder.").format(
                 c=self._format_media_counts(ph, vi)))
         if dups:
             ph, vi = self._count_media(dups)
-            body_lines.append(_("{c} zijn exact dezelfde en worden verwijderd.").format(
+            body_lines.append(_("{c} are exact duplicates and will be removed.").format(
                 c=self._format_media_counts(ph, vi)))
         dlg = Adw.AlertDialog(
-            heading=_("Mappenstructuur aanpassen?"),
+            heading=_("Reorganize folder structure?"),
             body="\n".join(body_lines),
         )
         dlg.add_response("cancel", _("Later"))
-        dlg.add_response("go", _("Nu ordenen"))
+        dlg.add_response("go", _("Organize now"))
         dlg.set_response_appearance("go", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("go")
         dlg.set_close_response("cancel")
@@ -6586,7 +6570,7 @@ class MainWindow(Adw.ApplicationWindow):
                     os.rmdir(root)
             except OSError:
                 pass
-        log_info(_("Reorganize: {m} verplaatst, {r} duplicaten weg, {e} fouten").format(
+        log_info(_("Reorganize: {m} moved, {r} duplicates removed, {e} errors").format(
             m=moved, r=removed, e=len(errors),
         ))
         GLib.idle_add(
@@ -6622,24 +6606,24 @@ class MainWindow(Adw.ApplicationWindow):
         # (back-to-grid + cooldown + backup trigger) runs on close click.
         parts = []
         if moved:
-            parts.append(_("{c} verplaatst").format(
+            parts.append(_("{c} moved").format(
                 c=self._format_media_counts(moved_photos, moved_videos)))
         if removed:
-            parts.append(_("{c} verwijderd (duplicaat)").format(
+            parts.append(_("{c} removed (duplicate)").format(
                 c=self._format_media_counts(removed_photos, removed_videos)))
         if not parts:
-            parts.append(_("Geen wijzigingen nodig"))
+            parts.append(_("No changes needed"))
         summary = ", ".join(parts) + "."
         if errors:
             summary += "\n" + ngettext(
-                "{n} fout — zie dev-log.",
-                "{n} fouten — zie dev-log.",
+                "{n} error — see dev log.",
+                "{n} errors — see dev log.",
                 len(errors),
             ).format(n=len(errors))
         if hasattr(self, "reorganize_subtitle"):
             self.reorganize_subtitle.set_text(summary)
         if hasattr(self, "reorganize_title"):
-            self.reorganize_title.set_text(_("Mappenstructuur bijgewerkt"))
+            self.reorganize_title.set_text(_("Folder structure updated"))
         if hasattr(self, "reorganize_bar"):
             self.reorganize_bar.set_fraction(1.0)
             self.reorganize_bar.set_text("100%")
@@ -6687,7 +6671,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.reorganize_spinner.set_halign(Gtk.Align.CENTER)
         box.append(self.reorganize_spinner)
 
-        self.reorganize_title = Gtk.Label(label=_("Mappenstructuur bijwerken"))
+        self.reorganize_title = Gtk.Label(label=_("Updating folder structure"))
         self.reorganize_title.add_css_class("title-2")
         self.reorganize_title.set_halign(Gtk.Align.CENTER)
         box.append(self.reorganize_title)
@@ -6711,7 +6695,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.reorganize_detail.set_max_width_chars(52)
         box.append(self.reorganize_detail)
 
-        self.reorganize_close_btn = Gtk.Button(label=_("Sluiten"))
+        self.reorganize_close_btn = Gtk.Button(label=_("Close"))
         self.reorganize_close_btn.add_css_class("pill")
         self.reorganize_close_btn.add_css_class("suggested-action")
         self.reorganize_close_btn.set_halign(Gtk.Align.CENTER)
@@ -6732,7 +6716,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.bottom_stack.set_visible(False)
         self.main_stack.set_visible_child_name("reorganize")
         if hasattr(self, "reorganize_title"):
-            self.reorganize_title.set_text(_("Mappenstructuur bijwerken"))
+            self.reorganize_title.set_text(_("Updating folder structure"))
         if hasattr(self, "reorganize_spinner"):
             self.reorganize_spinner.set_visible(True)
             self.reorganize_spinner.start()
@@ -6756,7 +6740,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_reorganize_silent_start(self):
         """Silent mode: show only the donut (no fullscreen swap); the tick
         periodically redraws it so the arc fills."""
-        tip = _("Mappenstructuur bijwerken…")
+        tip = _("Updating folder structure…")
         self._set_donuts_visible(True)
         if hasattr(self, "_backup_donut_btn"):
             self._backup_donut_btn.set_tooltip_text(tip)
@@ -6786,9 +6770,9 @@ class MainWindow(Adw.ApplicationWindow):
         total_gb = self._reorganize_total_bytes / (1024 ** 3)
         eta = self._format_reorganize_eta(frac)
         total_label = self._reorganize_total_label or str(total_n)
-        counts = _("{done} van {total_label}").format(
+        counts = _("{done} of {total_label}").format(
             done=done_n, total_label=total_label)
-        subtitle = _("{counts} · {dg:.2f} / {tg:.2f} GB · nog ± {eta}").format(
+        subtitle = _("{counts} · {dg:.2f} / {tg:.2f} GB · about {eta} left").format(
             counts=counts, dg=done_gb, tg=total_gb, eta=eta,
         )
         self.reorganize_subtitle.set_text(subtitle)
@@ -6797,16 +6781,16 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _format_reorganize_eta(self, frac):
         if frac <= 0.001:
-            return _("onbekend")
+            return _("unknown")
         elapsed = time.time() - self._reorganize_start_time
         if elapsed < 0.5:
-            return _("onbekend")
+            return _("unknown")
         remaining = max(0.0, elapsed * (1.0 - frac) / frac)
         if remaining < 60:
             secs = int(remaining)
-            return ngettext("{n} seconde", "{n} seconden", secs).format(n=secs)
+            return ngettext("{n} second", "{n} seconds", secs).format(n=secs)
         mins = int(remaining / 60)
-        return ngettext("{n} minuut", "{n} minuten", mins).format(n=mins)
+        return ngettext("{n} minute", "{n} minutes", mins).format(n=mins)
 
     def _maybe_trigger_backup_after_reorganize(self):
         """One-shot 10s after _reorganize_done: start backup-scan if idle."""
@@ -6819,7 +6803,7 @@ class MainWindow(Adw.ApplicationWindow):
                 return False
             if self._backup_drive_mountpoint() is None:
                 return False
-            log_info(_("Backup-scan na reorganize-cooldown"))
+            log_info(_("Backup scan after reorganize cooldown"))
             self._trigger_backup_scan()
         except Exception:
             pass
@@ -6845,7 +6829,7 @@ class MainWindow(Adw.ApplicationWindow):
             return
         self._structure_scanning = True
         self._backup_scan_phase = 0.0
-        tip = _("Controleren op mappenstructuur…")
+        tip = _("Checking folder structure…")
         if hasattr(self, "_backup_donut_btn"):
             self._set_donuts_visible(True)
             self._backup_donut_btn.set_tooltip_text(tip)
@@ -6854,7 +6838,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self._backup_scan_anim_id is None:
             self._backup_scan_anim_id = GLib.timeout_add(
                 120, self._tick_backup_scan)
-        log_info(_("Structuur-scan gestart"))
+        log_info(_("Structure scan started"))
 
         def _scan():
             try:
@@ -6872,11 +6856,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._redraw_donuts()
         had_mismatch = bool(moves or dups)
         if had_mismatch:
-            log_info(_("Structuur-scan klaar: {m} verplaatsingen, {d} duplicaten").format(
+            log_info(_("Structure scan done: {m} moves, {d} duplicates").format(
                 m=len(moves), d=len(dups),
             ))
         else:
-            log_info(_("Structuur-scan klaar: structuur klopt"))
+            log_info(_("Structure scan done: structure is correct"))
         if had_mismatch and not self._structure_popup_dismissed \
                 and not self._reorganize_active:
             self._reorganize_active = True
@@ -6943,12 +6927,11 @@ class MainWindow(Adw.ApplicationWindow):
             # Can't undo the switch during signal emit; schedule on idle.
             def _confirm():
                 dlg = Adw.AlertDialog(
-                    heading=_("Automatische backup uitzetten?"),
-                    body=_("Pixora stopt met backuppen tot je hem weer aanzet. "
-                           "De huidige instellingen blijven bewaard."),
+                    heading=_("Turn off automatic backup?"),
+                    body=_("Pixora will stop backing up until you turn it back on. The current settings are preserved."),
                 )
-                dlg.add_response("cancel", _("Annuleren"))
-                dlg.add_response("disable", _("Uitzetten"))
+                dlg.add_response("cancel", _("Cancel"))
+                dlg.add_response("disable", _("Turn off"))
                 dlg.set_response_appearance("disable", Adw.ResponseAppearance.DESTRUCTIVE)
                 dlg.set_close_response("cancel")
                 dlg.connect("response", self._on_backup_disable_response)
@@ -6998,12 +6981,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_settings_reset_drive(self, btn):
         dlg = Adw.AlertDialog(
-            heading=_("Backup-schijf vergeten?"),
-            body=_("De gekozen schijf en map worden losgekoppeld van Pixora. "
-                   "De bestanden op de schijf blijven staan."),
+            heading=_("Forget backup drive?"),
+            body=_("The chosen drive and folder will be unlinked from Pixora. Files on the drive are left untouched."),
         )
-        dlg.add_response("cancel", _("Annuleren"))
-        dlg.add_response("reset", _("Vergeten"))
+        dlg.add_response("cancel", _("Cancel"))
+        dlg.add_response("reset", _("Forget"))
         dlg.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE)
         dlg.set_close_response("cancel")
         dlg.connect("response", self._on_reset_drive_response)
@@ -7022,9 +7004,9 @@ class MainWindow(Adw.ApplicationWindow):
         if hasattr(self, "settings_drive_reset_btn"):
             self.settings_drive_reset_btn.set_visible(False)
         if hasattr(self, "settings_backup_folder_row"):
-            self.settings_backup_folder_row.set_subtitle(_("Niet ingesteld"))
+            self.settings_backup_folder_row.set_subtitle(_("Not configured"))
         if hasattr(self, "settings_backup_folder_btn"):
-            self.settings_backup_folder_btn.set_label(_("Instellen"))
+            self.settings_backup_folder_btn.set_label(_("Set up"))
         # Rebuild drive list to remove the forgotten drive.
         if hasattr(self, "settings_drive_model"):
             while self.settings_drive_model.get_n_items() > 0:
@@ -7034,7 +7016,7 @@ class MainWindow(Adw.ApplicationWindow):
                 for uuid, label in self.settings_drives:
                     self.settings_drive_model.append(label)
             else:
-                self.settings_drive_model.append(_("Geen externe schijven gevonden"))
+                self.settings_drive_model.append(_("No external drives found"))
 
     def on_backup_dedup_toggle(self, switch, _pspec):
         self.settings["backup_dedup"] = switch.get_active()
@@ -7046,13 +7028,11 @@ class MainWindow(Adw.ApplicationWindow):
             # User enables → confirm first; revert on cancel.
             def _confirm():
                 dlg = Adw.AlertDialog(
-                    heading=_("Automatisch bevestigen aanzetten?"),
-                    body=_("Pixora gaat backup/sync direct starten zonder "
-                           "bevestigingsdialog wanneer er iets te doen is. "
-                           "Alleen foutmeldingen blijven verschijnen."),
+                    heading=_("Turn on auto-confirm?"),
+                    body=_("Pixora will start backup/sync immediately without a confirmation dialog when there is work to do. Only error messages will still appear."),
                 )
-                dlg.add_response("cancel", _("Annuleren"))
-                dlg.add_response("enable", _("Aanzetten"))
+                dlg.add_response("cancel", _("Cancel"))
+                dlg.add_response("enable", _("Turn on"))
                 dlg.set_response_appearance("enable", Adw.ResponseAppearance.SUGGESTED)
                 dlg.set_close_response("cancel")
                 dlg.connect("response", self._on_silent_confirm_response)
@@ -7093,7 +7073,7 @@ class MainWindow(Adw.ApplicationWindow):
             # Reorganize gate blocks even an explicit user click. Log it.
             log_info("Manual scan: afgewezen — reorganize-gate actief")
             return
-        log_info(_("Backup-scan handmatig gestart"))
+        log_info(_("Backup scan started manually"))
         self._manual_scan_requested = True
         self._set_manual_scan_state("checking")
         self._trigger_backup_scan()
@@ -7147,7 +7127,7 @@ class MainWindow(Adw.ApplicationWindow):
         drives = list(get_available_drives())
         saved_uuid = self.settings.get("backup_uuid")
         if saved_uuid and not any(u == saved_uuid for u, _l in drives):
-            label = self.settings.get("backup_label") or _("Bekende backup-schijf")
+            label = self.settings.get("backup_label") or _("Saved backup drive")
             drives.insert(0, (saved_uuid, label))
         # Persist label when we see the drive for the first time.
         if saved_uuid and not self.settings.get("backup_label"):
@@ -7168,8 +7148,8 @@ class MainWindow(Adw.ApplicationWindow):
             if new_uuid != self.settings.get("backup_uuid"):
                 # Different drive picked → old path no longer valid.
                 self.settings["backup_path"] = None
-                self.settings_backup_folder_row.set_subtitle(_("Niet ingesteld"))
-                self.settings_backup_folder_btn.set_label(_("Instellen"))
+                self.settings_backup_folder_row.set_subtitle(_("Not configured"))
+                self.settings_backup_folder_btn.set_label(_("Set up"))
             self.settings["backup_uuid"] = new_uuid
             self.settings["backup_label"] = new_label
             save_settings(self.settings)
@@ -7185,7 +7165,7 @@ class MainWindow(Adw.ApplicationWindow):
             for uuid, label in self.settings_drives:
                 self.settings_drive_model.append(label)
         else:
-            self.settings_drive_model.append(_("Geen externe schijven gevonden"))
+            self.settings_drive_model.append(_("No external drives found"))
         saved_uuid = self.settings.get("backup_uuid")
         if saved_uuid:
             for i, (uuid, _l) in enumerate(self.settings_drives):
@@ -7200,8 +7180,8 @@ class MainWindow(Adw.ApplicationWindow):
         mountpoint = get_mountpoint_for_uuid(current_uuid) if current_uuid else None
         if not mountpoint:
             dlg = Adw.AlertDialog(
-                heading=_("Geen backup-schijf"),
-                body=_("Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."),
+                heading=_("No backup drive"),
+                body=_("Plug in a USB drive first and select it under 'Backup drive'."),
             )
             dlg.add_response("ok", _("OK"))
             self._present_dialog(dlg)
@@ -7217,7 +7197,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings["backup_path"] = chosen
         save_settings(self.settings)
         self.settings_backup_folder_row.set_subtitle(chosen)
-        self.settings_backup_folder_btn.set_label(_("Wijzigen"))
+        self.settings_backup_folder_btn.set_label(_("Change"))
         GLib.idle_add(self._sync_now_if_ready)
 
     def _refresh_settings_drive_state(self):
@@ -7231,7 +7211,7 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             self.settings_backup_folder_row.set_sensitive(backup_on and drive_present)
             self.settings_backup_folder_row.set_subtitle(
-                self.settings.get("backup_path") or _("Niet ingesteld")
+                self.settings.get("backup_path") or _("Not configured")
             )
             if hasattr(self, "settings_drive_combo"):
                 self.settings_drive_combo.set_sensitive(backup_on and drive_present)
@@ -7248,11 +7228,11 @@ class MainWindow(Adw.ApplicationWindow):
             if hasattr(self, "settings_backup_group"):
                 if backup_on and has_uuid and not drive_present:
                     self.settings_backup_group.set_description(_(
-                        "Drive niet aangesloten — sluit de USB-schijf aan om te backuppen."
+                        "Drive not connected — plug in the USB drive to back up."
                     ))
                 else:
                     self.settings_backup_group.set_description(
-                        _("Backup naar externe USB schijf na elke import")
+                        _("Backup to external USB drive after each import")
                     )
         except Exception:
             pass
@@ -7284,8 +7264,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scan_phase = 0.0
         # No percentage during scan — a previous time-guess was misleading.
         # Popover subtitle explains USB slowness so users don't think it hung.
-        self._backup_detail = _("Dit kan even duren op een USB-schijf")
-        tip = _("Scannen op nieuwe foto's…")
+        self._backup_detail = _("This may take a while on a USB drive")
+        tip = _("Scanning for new photos…")
         if hasattr(self, "_backup_donut_btn"):
             self._set_donuts_visible(True)
             self._backup_donut_btn.set_tooltip_text(tip)
@@ -7293,7 +7273,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._viewer_donut_btn.set_tooltip_text(tip)
         if self._backup_scan_anim_id is None:
             self._backup_scan_anim_id = GLib.timeout_add(120, self._tick_backup_scan)
-        log_info(_("Backup-scan gestart"))
+        log_info(_("Backup scan started"))
         threading.Thread(target=self._backup_scan_thread, daemon=True).start()
 
     def _tick_backup_scan(self):
@@ -7339,7 +7319,7 @@ class MainWindow(Adw.ApplicationWindow):
                     except OSError:
                         src_files[rel] = 0
         except Exception as e:
-            log_error(_("Scan fout: {err}").format(err=e))
+            log_error(_("Scan error: {err}").format(err=e))
             GLib.idle_add(self._handle_scan_result, None)
             return
 
@@ -7383,7 +7363,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._manual_scan_requested = False
         silent = bool(self.settings.get("backup_silent"))
         if result is None:
-            log_warn(_("Backup-scan niet voltooid"))
+            log_warn(_("Backup scan did not complete"))
             if hasattr(self, "_backup_donut_btn"):
                 self._set_donuts_visible(self._backup_running)
             self._set_manual_scan_state("idle")
@@ -7420,7 +7400,7 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 pass
             self._hide_backup_pending_banner()
-            log_info(_("Backup-scan: alles gesynct"))
+            log_info(_("Backup scan: everything in sync"))
             if hasattr(self, "_backup_donut_btn"):
                 self._set_donuts_visible(self._backup_running)
             # Orphans in backup-mode are still worth surfacing on a manual
@@ -7428,8 +7408,7 @@ class MainWindow(Adw.ApplicationWindow):
             if delete_count > 0 and mode == "backup" and manual_requested:
                 if (self.settings.get("backup_dedup")
                         and self._last_scan_orphan_rels):
-                    log_info(_("Manual scan: orphan-analyse gestart "
-                               "({n} orphans)").format(n=delete_count))
+                    log_info(_("Manual scan: orphan analysis started ({n} orphans)").format(n=delete_count))
                     threading.Thread(
                         target=self._review_orphans_thread, daemon=True
                     ).start()
@@ -7437,8 +7416,8 @@ class MainWindow(Adw.ApplicationWindow):
                     self._show_orphans_only_dialog(delete_count)
             elif not silent and manual_requested:
                 dlg = Adw.AlertDialog(
-                    heading=_("Alles al gesynct"),
-                    body=_("Je USB-schijf heeft al dezelfde foto's als Pixora."),
+                    heading=_("Already in sync"),
+                    body=_("Your USB drive already has the same photos as Pixora."),
                 )
                 dlg.add_response("ok", _("OK"))
                 dlg.set_default_response("ok")
@@ -7446,14 +7425,14 @@ class MainWindow(Adw.ApplicationWindow):
                 self._present_dialog(dlg)
             self._set_manual_scan_state("uptodate")
             return False
-        log_info(_("Backup-scan: {n} nieuw, {d} orphans (mode={m}), {b} bytes, {u} duplicaten").format(
+        log_info(_("Backup scan: {n} new, {d} orphans (mode={m}), {b} bytes, {u} duplicates").format(
             n=new_count, d=delete_count, m=mode,
             b=bytes_to_transfer, u=dup_count,
         ))
         # Silent-mode: skip the dialog and start backup, even on a manual
         # check — user opted into auto-confirm.
         if silent:
-            log_info(_("Silent-mode: backup start automatisch zonder dialog"))
+            log_info(_("Silent mode: backup starts automatically without dialog"))
             if hasattr(self, "_backup_donut_btn"):
                 self._set_donuts_visible(True)
             self.start_backup()
@@ -7470,12 +7449,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_orphans_only_dialog(self, orphan_count):
         dlg = Adw.AlertDialog(
-            heading=_("Alles in Pixora staat op de USB"),
+            heading=_("Everything in Pixora is on the USB"),
             body=ngettext(
-                "Er staat nog {n} foto op de USB die niet meer in Pixora is. "
-                "In Backup-modus blijft die bewaard als archief.",
-                "Er staan nog {n} foto's op de USB die niet meer in Pixora zijn. "
-                "In Backup-modus blijven ze bewaard als archief.",
+                "There is {n} photo on the USB that is no longer in Pixora. In Backup mode it stays as an archive.",
+                "There are {n} photos on the USB that are no longer in Pixora. In Backup mode they stay as an archive.",
                 orphan_count,
             ).format(n=orphan_count),
         )
@@ -7495,18 +7472,18 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _format_eta(self, bytes_total, bytes_per_sec=30 * 1024 * 1024):
         if bytes_total <= 0:
-            return _("minder dan een minuut")
+            return _("less than a minute")
         secs = bytes_total / bytes_per_sec
         if secs < 60:
-            return _("minder dan een minuut")
+            return _("less than a minute")
         mins = int(secs / 60 + 0.5)
         if mins < 60:
-            return ngettext("± {n} minuut", "± {n} minuten", mins).format(n=mins)
+            return ngettext("± {n} minute", "± {n} minutes", mins).format(n=mins)
         hours = mins // 60
         rem = mins % 60
         if rem == 0:
-            return ngettext("± {n} uur", "± {n} uur", hours).format(n=hours)
-        return _("± {h} u {m} min").format(h=hours, m=rem)
+            return ngettext("± {n} hour", "± {n} hours", hours).format(n=hours)
+        return _("± {h} h {m} min").format(h=hours, m=rem)
 
     def _show_backup_scan_dialog(self, new_count, delete_count, bytes_to_transfer,
                                  dup_count=0, mode="backup"):
@@ -7524,40 +7501,40 @@ class MainWindow(Adw.ApplicationWindow):
         lines = []
         if new_count > 0:
             lines.append(ngettext(
-                "{n} nieuwe foto (±{s})",
-                "{n} nieuwe foto's (±{s})",
+                "{n} new photo (±{s})",
+                "{n} new photos (±{s})",
                 new_count,
             ).format(n=new_count, s=self._format_bytes(bytes_to_transfer)))
         if delete_count > 0:
             if mode == "sync":
                 lines.append(ngettext(
-                    "{n} verouderde bestand wordt verwijderd op USB",
-                    "{n} verouderde bestanden worden verwijderd op USB",
+                    "{n} stale file will be removed from USB",
+                    "{n} stale files will be removed from USB",
                     delete_count,
                 ).format(n=delete_count))
             else:
                 # backup-mode: orphans are kept — purely informational.
                 lines.append(ngettext(
-                    "{n} foto op USB niet meer in Pixora (blijft bewaard)",
-                    "{n} foto's op USB niet meer in Pixora (blijven bewaard)",
+                    "{n} photo on USB no longer in Pixora (kept)",
+                    "{n} photos on USB no longer in Pixora (kept)",
                     delete_count,
                 ).format(n=delete_count))
         if dup_count > 0:
             lines.append(ngettext(
-                "{n} duplicaat wordt overgeslagen",
-                "{n} duplicaten worden overgeslagen",
+                "{n} duplicate will be skipped",
+                "{n} duplicates will be skipped",
                 dup_count,
             ).format(n=dup_count))
-        lines.append(_("Geschatte tijd: {eta}").format(
+        lines.append(_("Estimated time: {eta}").format(
             eta=self._format_eta(bytes_to_transfer)
         ))
         body = "\n".join(lines)
         if mode == "sync":
-            heading = _("Sync klaar om te starten")
-            now_label = _("Nu synchroniseren")
+            heading = _("Sync ready to start")
+            now_label = _("Sync now")
         else:
-            heading = _("Backup klaar om te starten")
-            now_label = _("Nu backuppen")
+            heading = _("Backup ready to start")
+            now_label = _("Back up now")
         dlg = Adw.AlertDialog(heading=heading, body=body)
         dlg.add_response("later", _("Later"))
         dlg.add_response("now", now_label)
@@ -7576,7 +7553,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def change_folder(self, parent_dialog):
         file_dialog = Gtk.FileDialog()
-        file_dialog.set_title(_("Kies foto map"))
+        file_dialog.set_title(_("Choose photo folder"))
         file_dialog.select_folder(self, None, self.on_folder_changed)
 
     def on_folder_changed(self, dialog, result):
@@ -7594,8 +7571,8 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def open_importer(self, btn=None):
-        log_info(_("Importer geopend (iOS device {state})").format(
-            state=_("aanwezig") if self._ios_device_present else _("niet gedetecteerd")
+        log_info(_("Importer opened (iOS device {state})").format(
+            state=_("present") if self._ios_device_present else _("not detected")
         ))
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
@@ -7603,7 +7580,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.importer_page.activate()
 
     def close_importer(self):
-        log_info(_("Importer gesloten"))
+        log_info(_("Importer closed"))
         self.importer_page.deactivate()
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
@@ -7733,12 +7710,11 @@ class MainWindow(Adw.ApplicationWindow):
         if self._backup_running:
             return False
         dlg = Adw.AlertDialog(
-            heading=_("Backup-schijf gedetecteerd"),
-            body=_("Je USB-schijf is aangesloten. Nieuwe foto's zijn klaar om "
-                   "geback-upt te worden. Nu starten?"),
+            heading=_("Backup drive detected"),
+            body=_("Your USB drive is connected. New photos are ready to be backed up. Start now?"),
         )
         dlg.add_response("later", _("Later"))
-        dlg.add_response("start", _("Nu backuppen"))
+        dlg.add_response("start", _("Back up now"))
         dlg.set_response_appearance("start", Adw.ResponseAppearance.SUGGESTED)
         dlg.connect("response", self._on_backup_prompt_response)
         self._present_dialog(dlg)
@@ -7760,7 +7736,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_fraction = 0.0
         self._backup_detail = ""
         self._hide_backup_pending_banner()
-        log_info(_("Backup gestart"))
+        log_info(_("Backup started"))
         threading.Thread(target=self._backup_thread, daemon=True).start()
 
     def _check_backup_dest_writable(self, drive_root, backup_dest):
@@ -7781,18 +7757,13 @@ class MainWindow(Adw.ApplicationWindow):
         except OSError as exc:
             if exc.errno == 30:  # EROFS — read-only filesystem
                 return _(
-                    "Backup-schijf is alleen-lezen gemount. Dit gebeurt vaak "
-                    "met NTFS/exFAT na onveilig verwijderen op Windows.\n\n"
-                    "Oplossing: ontkoppel de schijf in je bestandsbeheerder, "
-                    "sluit 'm opnieuw aan, of voer op de terminal uit:\n"
-                    "  sudo ntfsfix /dev/sdXN\n"
-                    "(vervang sdXN door je USB-device, bv. sdb1)"
+                    "Backup drive is mounted read-only. This often happens with NTFS/exFAT after an unsafe eject on Windows.\n\nFix: unmount the drive in your file manager and reconnect it, or run in a terminal:\n  sudo ntfsfix /dev/sdXN\n(replace sdXN with your USB device, e.g. sdb1)"
                 )
             if exc.errno == 13:  # EACCES
-                return _("Geen schrijfrechten op {p}: {err}").format(
+                return _("No write permission on {p}: {err}").format(
                     p=test_dir, err=exc
                 )
-            return _("Fout bij schrijven naar {p}: {err}").format(
+            return _("Error writing to {p}: {err}").format(
                 p=test_dir, err=exc
             )
 
@@ -7828,26 +7799,24 @@ class MainWindow(Adw.ApplicationWindow):
         # 10% threshold: USB must hold a substantial library before pHash
         # work is statistically worth it.
         if len(dest_rels) * 10 < len(src_rels):
-            log_info(_("Duplicaat-check overgeslagen: USB te leeg "
-                       "({d} foto's vs {s} in Pixora)").format(
+            log_info(_("Duplicate check skipped: USB is too empty ({d} photos vs {s} in Pixora)").format(
                 d=len(dest_rels), s=len(src_rels)))
             return []
 
-        log_info(_("Duplicaat-check: {n} nieuwe foto's tegen "
-                   "{u} op USB").format(n=len(to_check), u=len(dest_rels)))
+        log_info(_("Duplicate check: {n} new photos against {u} on USB").format(n=len(to_check), u=len(dest_rels)))
         try:
             from importer_page import (
                 perceptual_hash, build_library_hashes, find_duplicate,
                 SUPPORTED_EXT,
             )
         except Exception as e:
-            log_warn(_("Dedup-check overgeslagen: {err}").format(err=e))
+            log_warn(_("Dedup check skipped: {err}").format(err=e))
             return []
 
         self._backup_deduping = True
 
         def _start_dedup_ui():
-            tip = _("Duplicaat-check…")
+            tip = _("Duplicate check…")
             if hasattr(self, "_backup_donut_btn"):
                 try:
                     self._set_donuts_visible(True)
@@ -7873,7 +7842,7 @@ class MainWindow(Adw.ApplicationWindow):
             total = len(to_check)
             for i, rel in enumerate(to_check):
                 if i % 25 == 0:
-                    msg = _("Duplicaat-check: {c} / {t}").format(c=i, t=total)
+                    msg = _("Duplicate check: {c} / {t}").format(c=i, t=total)
                     GLib.idle_add(self._set_dedup_detail, msg)
                 src_file = photo_path / rel
                 if not src_file.is_file():
@@ -7884,13 +7853,12 @@ class MainWindow(Adw.ApplicationWindow):
                 if ph and find_duplicate(ph, usb_hashes, MAX_DIST):
                     excluded.append(rel)
         except Exception as e:
-            log_warn(_("Dedup-check overgeslagen: {err}").format(err=e))
+            log_warn(_("Dedup check skipped: {err}").format(err=e))
         finally:
             self._backup_deduping = False
             GLib.idle_add(self._set_dedup_detail, "")
         if excluded:
-            log_info(_("Duplicaat-check klaar: {n} dubbel, worden "
-                       "overgeslagen").format(n=len(excluded)))
+            log_info(_("Duplicate check done: {n} duplicates will be skipped").format(n=len(excluded)))
         return excluded
 
     def _set_dedup_detail(self, text):
@@ -7907,7 +7875,7 @@ class MainWindow(Adw.ApplicationWindow):
         backup_path_str = self.settings.get("backup_path")
         drive_root = self._backup_drive_mountpoint()
         if not drive_root:
-            GLib.idle_add(self._backup_finished, False, _("Back-upschijf niet gevonden."))
+            GLib.idle_add(self._backup_finished, False, _("Backup drive not found."))
             return
         backup_dest = _P(backup_path_str) if backup_path_str else drive_root / "Pixora"
         # Common case: NTFS/exFAT drive mounted read-only after unsafe eject
@@ -7919,7 +7887,7 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             backup_dest.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            GLib.idle_add(self._backup_finished, False, _("Fout: {err}").format(err=e))
+            GLib.idle_add(self._backup_finished, False, _("Error: {err}").format(err=e))
             return
 
         def _on_rsync_line(line):
@@ -7967,7 +7935,7 @@ class MainWindow(Adw.ApplicationWindow):
                 success = proc.returncode == 0
                 rsync_err = _err.strip()
             except Exception as e:
-                log_error(_("Backup fout: {err}").format(err=e))
+                log_error(_("Backup error: {err}").format(err=e))
                 success = False
                 rsync_err = str(e)
             finally:
@@ -7995,16 +7963,14 @@ class MainWindow(Adw.ApplicationWindow):
             if "read-only" in err_low or "readonly" in err_low \
                     or "permission denied" in err_low:
                 note = _(
-                    "USB is alleen-lezen gemount. Ontkoppel 'm en sluit "
-                    "opnieuw aan, of voer op de terminal `sudo ntfsfix "
-                    "/dev/sdXN` uit."
+                    "USB is mounted read-only. Unmount and reconnect it, or run `sudo ntfsfix /dev/sdXN` in a terminal."
                 )
             elif rsync_err:
                 # First line of rsync stderr usually holds the real reason.
                 first = rsync_err.splitlines()[0] if rsync_err else ""
-                note = _("Backup mislukt: {err}").format(err=first[:200])
+                note = _("Backup failed: {err}").format(err=first[:200])
             else:
-                note = _("Backup gedeeltelijk mislukt.")
+                note = _("Backup partially failed.")
         GLib.idle_add(self._backup_finished, success, note)
 
     def _manual_backup(self, src, dst, delete_extraneous=False, excluded=None):
@@ -8046,7 +8012,7 @@ class MainWindow(Adw.ApplicationWindow):
                                 pass
             return True
         except Exception as e:
-            log_error(_("Backup fout: {err}").format(err=e))
+            log_error(_("Backup error: {err}").format(err=e))
             return False
 
     def _update_backup_progress(self, fraction, detail):
@@ -8188,35 +8154,35 @@ class MainWindow(Adw.ApplicationWindow):
         is_sync = self.settings.get("backup_mode", "backup") == "sync"
         # Pick title + visible fields based on what's running.
         if self._reorganize_moving:
-            title = _("Mappenstructuur bijwerken")
+            title = _("Updating folder structure")
             pct_val = int(max(0.0, min(1.0, self._reorganize_fraction)) * 100)
             pct = f"{pct_val}%"
             detail = self._reorganize_current_name or ""
         elif self._structure_scanning:
-            title = _("Mappenstructuur controleren…")
+            title = _("Checking folder structure…")
             pct = ""
             detail = ""
         elif self._backup_deduping:
-            title = _("Duplicaat-check…")
+            title = _("Duplicate check…")
             pct = ""
             detail = (self._backup_detail or "").strip()
         elif self._orphan_reviewing:
-            title = _("Analyseren op dubbele kopieën…")
+            title = _("Analyzing for duplicate copies…")
             pct = ""
             detail = (self._backup_detail or "").strip()
         elif self._backup_running and not self._backup_scanning:
-            title = _("Sync bezig") if is_sync else _("Backup bezig")
+            title = _("Sync in progress") if is_sync else _("Backup in progress")
             pct = f"{int(self._backup_fraction * 100)}%"
             d = (self._backup_detail or "").strip()
             detail = "" if (d and d.rstrip("%").strip().isdigit()) else d
         elif self._backup_scanning:
-            title = _("Sync scannen…") if is_sync else _("Backup scannen…")
+            title = _("Scanning sync…") if is_sync else _("Scanning backup…")
             pct = ""
             detail = (self._backup_detail or "").strip()
             if detail and detail.rstrip("%").strip().isdigit():
                 detail = ""
         else:
-            title = _("Sync bezig") if is_sync else _("Backup bezig")
+            title = _("Sync in progress") if is_sync else _("Backup in progress")
             pct = ""
             detail = ""
         self._donut_pop_title.set_text(title)
@@ -8234,9 +8200,9 @@ class MainWindow(Adw.ApplicationWindow):
                 save_settings(self.settings)
             except Exception:
                 pass
-            log_info(_("Backup voltooid"))
+            log_info(_("Backup complete"))
         else:
-            log_warn(_("Backup mislukt: {note}").format(note=note or ""))
+            log_warn(_("Backup failed: {note}").format(note=note or ""))
         if hasattr(self, "_backup_donut_btn"):
             try:
                 self._set_donuts_visible(False)
@@ -8261,8 +8227,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Orphans + dedup on → run pHash analysis + choice dialog (replaces
         # the done popup). Without dedup, just a simple "heads up" message.
         if has_orphans and dedup_on:
-            log_info(_("Backup voltooid, orphan-analyse gestart "
-                       "({n} orphans)").format(n=orphan_count))
+            log_info(_("Backup complete, orphan analysis started ({n} orphans)").format(n=orphan_count))
             threading.Thread(
                 target=self._review_orphans_thread, daemon=True
             ).start()
@@ -8273,17 +8238,12 @@ class MainWindow(Adw.ApplicationWindow):
         # user knows something unexpected sits on the USB.
         if success and self.settings.get("backup_silent"):
             if has_orphans:
-                log_info(_("Silent-mode: backup voltooid, {n} orphans "
-                           "gemeld").format(n=orphan_count))
+                log_info(_("Silent mode: backup complete, {n} orphans reported").format(n=orphan_count))
                 dlg = Adw.AlertDialog(
-                    heading=_("Backup voltooid — let op"),
+                    heading=_("Backup complete — note"),
                     body=ngettext(
-                        "Er staat {n} foto op je USB die niet in Pixora "
-                        "staat (bv. een handmatig gekopieerde map). Deze "
-                        "blijft bewaard als archief.",
-                        "Er staan {n} foto's op je USB die niet in Pixora "
-                        "staan (bv. een handmatig gekopieerde map). Deze "
-                        "blijven bewaard als archief.",
+                        "There is {n} photo on your USB that is not in Pixora (e.g. a manually copied folder). It is kept as an archive.",
+                        "There are {n} photos on your USB that are not in Pixora (e.g. a manually copied folder). They are kept as an archive.",
                         orphan_count,
                     ).format(n=orphan_count),
                 )
@@ -8292,36 +8252,32 @@ class MainWindow(Adw.ApplicationWindow):
                 dlg.set_close_response("ok")
                 self._present_dialog(dlg)
                 return
-            log_info(_("Silent-mode: backup voltooid zonder popup"))
+            log_info(_("Silent mode: backup completed without popup"))
             return
 
         if success:
             if mode == "sync":
-                heading = _("Sync voltooid")
-                body = _("Je USB-schijf is nu identiek aan Pixora.")
+                heading = _("Sync complete")
+                body = _("Your USB drive is now identical to Pixora.")
             elif has_orphans:
-                heading = _("Backup voltooid — let op")
+                heading = _("Backup complete — note")
                 body = ngettext(
-                    "Alle foto's uit Pixora staan op de USB. Let op: er "
-                    "staat {n} foto op je USB die niet in Pixora staat "
-                    "(blijft bewaard als archief).",
-                    "Alle foto's uit Pixora staan op de USB. Let op: er "
-                    "staan {n} foto's op je USB die niet in Pixora staan "
-                    "(blijven bewaard als archief).",
+                    "All photos from Pixora are on the USB. Note: there is {n} photo on your USB that is not in Pixora (kept as an archive).",
+                    "All photos from Pixora are on the USB. Note: there are {n} photos on your USB that are not in Pixora (kept as an archive).",
                     orphan_count,
                 ).format(n=orphan_count)
             else:
-                heading = _("Backup voltooid")
-                body = _("Alle foto's staan op de USB-schijf.")
+                heading = _("Backup complete")
+                body = _("All photos are on the USB drive.")
             dlg = Adw.AlertDialog(heading=heading, body=body)
         else:
             if mode == "sync":
-                heading = _("Sync mislukt")
+                heading = _("Sync failed")
             else:
-                heading = _("Backup mislukt")
+                heading = _("Backup failed")
             dlg = Adw.AlertDialog(
                 heading=heading,
-                body=note or _("Onbekende fout."),
+                body=note or _("Unknown error."),
             )
         dlg.add_response("ok", _("OK"))
         dlg.set_default_response("ok")
@@ -8341,7 +8297,7 @@ class MainWindow(Adw.ApplicationWindow):
                 SUPPORTED_EXT,
             )
         except Exception as e:
-            log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
+            log_warn(_("Orphan analysis skipped: {err}").format(err=e))
             return [], list(orphan_rels)
 
         # Throttle build_library_hashes progress to every 25 for calm UI.
@@ -8355,7 +8311,7 @@ class MainWindow(Adw.ApplicationWindow):
             src_hashes = build_library_hashes(
                 photo_path, progress_cb=_build_progress)
         except Exception as e:
-            log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
+            log_warn(_("Orphan analysis skipped: {err}").format(err=e))
             return [], list(orphan_rels)
 
         dup_rels, unique_rels = [], []
@@ -8382,7 +8338,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _start_orphan_review_ui(self):
         """Enable donut spinner + tooltip for the pHash phase."""
-        tip = _("Analyseren op dubbele kopieën…")
+        tip = _("Analyzing for duplicate copies…")
         if hasattr(self, "_backup_donut_btn"):
             try:
                 self._set_donuts_visible(True)
@@ -8416,9 +8372,9 @@ class MainWindow(Adw.ApplicationWindow):
 
         def _progress(cur, total, phase):
             if phase == "build":
-                msg = _("Hash-cache bouwen: {c} / {t}").format(c=cur, t=total)
+                msg = _("Building hash cache: {c} / {t}").format(c=cur, t=total)
             else:
-                msg = _("Analyseren: {c} / {t}").format(c=cur, t=total)
+                msg = _("Analyzing: {c} / {t}").format(c=cur, t=total)
             GLib.idle_add(self._set_dedup_detail, msg)
 
         try:
@@ -8429,8 +8385,7 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._set_dedup_detail, "")
             GLib.idle_add(self._finish_review_ui)
 
-        log_info(_("Orphan-analyse: {d} dubbele kopieën, "
-                   "{u} uniek op USB").format(
+        log_info(_("Orphan analysis: {d} duplicate copies, {u} unique on USB").format(
             d=len(dup_rels), u=len(unique_rels)))
         GLib.idle_add(self._show_orphan_review_dialog, dup_rels, unique_rels)
 
@@ -8449,32 +8404,29 @@ class MainWindow(Adw.ApplicationWindow):
         lines = []
         if dup_rels:
             lines.append(ngettext(
-                "{n} dubbele kopie — zelfde beeld als een foto in "
-                "Pixora, maar onder andere naam of in andere map.",
-                "{n} dubbele kopieën — zelfde beeld als foto's in "
-                "Pixora, maar onder andere naam of in andere map.",
+                "{n} duplicate copy — same image as a photo in Pixora, but under a different name or in a different folder.",
+                "{n} duplicate copies — same image as photos in Pixora, but under different names or in different folders.",
                 len(dup_rels),
             ).format(n=len(dup_rels)))
         if unique_rels:
             lines.append(ngettext(
-                "{n} unieke foto — staat op USB maar niet in Pixora.",
-                "{n} unieke foto's — staan op USB maar niet in Pixora.",
+                "{n} unique photo — on USB but not in Pixora.",
+                "{n} unique photos — on USB but not in Pixora.",
                 len(unique_rels),
             ).format(n=len(unique_rels)))
         if dup_rels:
             lines.append("")
-            lines.append(_("Wil je de dubbele kopieën van de USB "
-                           "verwijderen?"))
+            lines.append(_("Do you want to remove the duplicate copies from the USB?"))
         body = "\n".join(lines)
         dlg = Adw.AlertDialog(
-            heading=_("Foto's op USB die niet in Pixora zitten"),
+            heading=_("Photos on USB that are not in Pixora"),
             body=body,
         )
         if dup_rels:
-            dlg.add_response("delete", _("Verwijder dubbele kopieën"))
+            dlg.add_response("delete", _("Remove duplicate copies"))
             dlg.set_response_appearance(
                 "delete", Adw.ResponseAppearance.DESTRUCTIVE)
-        dlg.add_response("keep", _("Alles behouden"))
+        dlg.add_response("keep", _("Keep everything"))
         dlg.set_default_response("keep")
         dlg.set_close_response("keep")
 
@@ -8500,8 +8452,7 @@ class MainWindow(Adw.ApplicationWindow):
                 path.unlink()
                 deleted += 1
             except OSError as e:
-                log_warn(_("Kon orphan niet verwijderen: {p} "
-                           "({err})").format(p=str(path), err=e))
+                log_warn(_("Could not delete orphan: {p} ({err})").format(p=str(path), err=e))
         # Prune empty dirs on USB bottom-up.
         try:
             for root, _dirs, _files in os.walk(
@@ -8515,16 +8466,16 @@ class MainWindow(Adw.ApplicationWindow):
                         pass
         except Exception:
             pass
-        log_info(_("Orphans verwijderd: {n}").format(n=deleted))
+        log_info(_("Orphans removed: {n}").format(n=deleted))
         GLib.idle_add(self._show_orphans_deleted_dialog, deleted)
 
 
     def _show_orphans_deleted_dialog(self, count):
         dlg = Adw.AlertDialog(
-            heading=_("Opruimen voltooid"),
+            heading=_("Cleanup complete"),
             body=ngettext(
-                "{n} dubbele kopie verwijderd van de USB.",
-                "{n} dubbele kopieën verwijderd van de USB.",
+                "{n} duplicate copy removed from the USB.",
+                "{n} duplicate copies removed from the USB.",
                 count,
             ).format(n=count),
         )

@@ -49,7 +49,7 @@ fi
 step() { echo "STEP:$1:$2"; }
 step_done() { echo "STEP:$1:DONE"; }
 
-step deps "Dependencies installeren"
+step deps "Installing dependencies"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     python3 python3-gi python3-gi-cairo \
     gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-gudev-1.0 \
@@ -62,7 +62,7 @@ runuser -u "$TARGET_USER" -- python3 -m pip install -q \
     Pillow pillow-heif imagehash watchdog >/dev/null 2>&1 || true
 step_done deps
 
-step clone "Pixora ophalen van GitHub"
+step clone "Fetching Pixora from GitHub"
 if [ -d "$INSTALL_DIR/.git" ]; then
     runuser -u "$TARGET_USER" -- git -C "$INSTALL_DIR" fetch -q origin >/dev/null 2>&1
     runuser -u "$TARGET_USER" -- git -C "$INSTALL_DIR" reset --hard origin/main -q >/dev/null 2>&1
@@ -74,7 +74,7 @@ else
 fi
 step_done clone
 
-step finalize "Configuratie en services"
+step finalize "Configuration and services"
 mkdir -p "$(dirname "$VERSION_FILE")"
 cp -f "$INSTALL_DIR/version.txt" "$VERSION_FILE"
 

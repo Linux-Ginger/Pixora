@@ -3,10 +3,10 @@ msgid ""
 msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 
-msgid "0 foto's"
+msgid "0 photos"
 msgstr ""
 
-msgid "0 geselecteerd"
+msgid "0 selected"
 msgstr ""
 
 msgid "0:00 / 0:00"
@@ -18,328 +18,327 @@ msgstr ""
 msgid "2024/2024-03/   2024/2024-04/"
 msgstr ""
 
-msgid "Actief"
+msgid "Active"
 msgstr ""
 
-msgid "Activeren"
+msgid "Activate"
 msgstr ""
 
-msgid "Alle importeren"
+msgid "Import all"
 msgstr ""
 
-msgid "Alle overslaan"
+msgid "Skip all"
 msgstr ""
 
-msgid "Alleen exact dezelfde foto's"
+msgid "Only exactly identical photos"
 msgstr ""
 
-msgid "Alleen externe schijven"
+msgid "External drives only"
 msgstr ""
 
-msgid "Alleen externe schijven worden getoond"
+msgid "Only external drives are shown"
 msgstr ""
 
-msgid "Alleen favorieten tonen"
+msgid "Show only favorites"
 msgstr ""
 
-msgid "Alles in één map"
+msgid "Everything in one folder"
 msgstr ""
 
-msgid "Annuleren"
+msgid "Cancel"
 msgstr ""
 
-msgid "Apparaat"
+msgid "Device"
 msgstr ""
 
-msgid "Apparaat gevonden"
+msgid "Device found"
 msgstr ""
 
-msgid "Apple USB-device aangesloten (vendor=05ac) — check na 2.5s"
+msgid "Apple USB device connected (vendor=05ac) — check after 2.5s"
 msgstr ""
 
-msgid "Automatische backup"
+msgid "Automatic backup"
 msgstr ""
 
-msgid "Backup naar externe USB schijf na elke import"
+msgid "Backup to external USB drive after each import"
 msgstr ""
 
-msgid "Backup schijf"
+msgid "Backup drive"
 msgstr ""
 
-msgid "Bezig…"
+msgid "Working…"
 msgstr ""
 
-msgid "Bijna identieke foto's worden gedetecteerd"
+msgid "Near-identical photos are detected"
 msgstr ""
 
-msgid "Bijsnijden"
+msgid "Crop"
 msgstr ""
 
-msgid "Bijwerken"
+msgid "Update"
 msgstr ""
 
-msgid "Bladeren…"
+msgid "Browse…"
 msgstr ""
 
 msgid "Cache: {p}"
 msgstr ""
 
-msgid "Cluster-filter uitgezet → alle foto's"
+msgid "Cluster filter off → all photos"
 msgstr ""
 
 msgid "Config: {p}"
 msgstr ""
 
-msgid "Configuratie + services"
+msgid "Configuration + services"
 msgstr ""
 
-msgid "Configuratie en services"
+msgid "Configuration and services"
 msgstr ""
 
-msgid "Controleer"
+msgid "Check"
 msgstr ""
 
-msgid "Controleer op updates"
+msgid "Check for updates"
 msgstr ""
 
-msgid "Controleren mislukt"
+msgid "Check failed"
 msgstr ""
 
-msgid "Datum (nieuwste eerst)"
+msgid "Date (newest first)"
 msgstr ""
 
-msgid "Datum (oudste eerst)"
+msgid "Date (oldest first)"
 msgstr ""
 
-msgid "Deactiveren"
+msgid "Deactivate"
 msgstr ""
 
-msgid "Deselecteer alles"
+msgid "Deselect all"
 msgstr ""
 
-msgid "Developer mode toont Pixora met terminal-output en gebruikt de terminal-updater. Alleen aanzetten als je weet wat je doet."
+msgid ""
+"Developer mode shows Pixora with terminal output and uses the "
+"terminal updater. Only enable if you know what you're doing."
 msgstr ""
 
-msgid "Doorgaan"
+msgid "Continue"
 msgstr ""
 
-msgid "Doorgaan met importeren"
+msgid "Continue importing"
 msgstr ""
 
-msgid "Downloaden"
+msgid "Downloading"
 msgstr ""
 
-msgid "Draaien links"
+msgid "Rotate left"
 msgstr ""
 
-msgid "Draaien rechts"
+msgid "Rotate right"
 msgstr ""
 
-msgid "Duplicaat detectie"
+msgid "Duplicate detection"
 msgstr ""
 
-msgid "Duplicate detectie"
+msgid "Editor cancelled"
 msgstr ""
 
-msgid "Editor geannuleerd"
+msgid "Editor: rotate left (-90°)"
 msgstr ""
 
-msgid "Editor: draaien links (-90°)"
+msgid "Editor: rotate right (+90°)"
 msgstr ""
 
-msgid "Editor: draaien rechts (+90°)"
+msgid "An error occurred"
 msgstr ""
 
-msgid "Er is een fout opgetreden"
+msgid "Photo &amp; video manager by LinuxGinger"
 msgstr ""
 
-msgid "Foto &amp; video manager door LinuxGinger"
+msgid "Edit photo"
 msgstr ""
 
-msgid "Foto bewerken"
+msgid "Photo folder"
 msgstr ""
 
-msgid "Foto map"
+msgid "Loading photos..."
 msgstr ""
 
-msgid "Foto's laden..."
+msgid "GUI updater started"
 msgstr ""
 
-msgid "GUI-updater gestart"
+msgid "Advanced"
 msgstr ""
 
-msgid "Geavanceerd"
+msgid "No external drives found"
 msgstr ""
 
-msgid "Geen externe schijven gevonden"
+msgid "No photos found"
 msgstr ""
 
-msgid "Geen foto's gevonden"
+msgid "No terminal found for dev-mode; Pixora starts without."
 msgstr ""
 
-msgid "Geen terminal gevonden voor dev-mode; Pixora start zonder."
+msgid "Restart"
 msgstr ""
 
-msgid "Herstart"
+msgid "Pixora must be restarted to load a new language"
 msgstr ""
 
-msgid "Herstart van Pixora is nodig om een nieuwe taal te laden"
+msgid "How photos are displayed in the grid"
 msgstr ""
 
-msgid "Hoe foto's in het grid worden getoond"
+msgid "How strict duplicate detection is"
 msgstr ""
 
-msgid "Hoe streng worden duplicaten gedetecteerd"
+msgid "How your photos are organized"
 msgstr ""
 
-msgid "Hoe worden je foto's georganiseerd"
+msgid "Current folder"
 msgstr ""
 
-msgid "Huidige map"
+msgid "Import complete"
 msgstr ""
 
-msgid "Import voltooid"
+msgid "Import from iPhone or iPad"
 msgstr ""
 
-msgid "Importeer van iPhone of iPad"
+msgid "Import"
 msgstr ""
 
-msgid "Importeren"
+msgid "Inactive"
 msgstr ""
 
-msgid "Inactief"
+msgid "Install required packages"
 msgstr ""
 
-msgid "Installeer vereiste pakketten"
+msgid "Installing"
 msgstr ""
 
-msgid "Installeren"
+msgid "Settings"
 msgstr ""
 
-msgid "Instellingen"
+msgid "Settings opened"
 msgstr ""
 
-msgid "Instellingen geopend"
+msgid "Yes"
 msgstr ""
 
-msgid "Ja"
+msgid "Your device is connected and ready to import."
 msgstr ""
 
-msgid "Je apparaat is verbonden en klaar om te importeren."
+msgid "You have the latest version"
 msgstr ""
 
-msgid "Je hebt de nieuwste versie"
+msgid "Map closed"
 msgstr ""
 
-msgid "Kaart gesloten"
+msgid "Map → first tiles loaded"
 msgstr ""
 
-msgid "Kaart → eerste tiles geladen"
+msgid "Map → offline / tile errors"
 msgstr ""
 
-msgid "Kaart → offline / tile-errors"
+msgid "Map-ready timeout — showing map anyway"
 msgstr ""
 
-msgid "Kaart-ready timeout — toon kaart alsnog"
+msgid "Map view"
 msgstr ""
 
-msgid "Kaartweergave"
+msgid "Choose a folder…"
 msgstr ""
 
-msgid "Kies een map…"
+msgid "Choose photo folder"
 msgstr ""
 
-msgid "Kies foto map"
+msgid "Choose folder on backup drive"
 msgstr ""
 
-msgid "Kies map op backup schijf"
+msgid "Choose…"
 msgstr ""
 
-msgid "Kiezen…"
+msgid "Click cluster to view filtered"
 msgstr ""
 
-msgid "Klik cluster om gefilterd te bekijken"
-msgstr ""
-
-msgid "Klik om te openen"
+msgid "Click to open"
 msgstr ""
 
 msgid "Later"
 msgstr ""
 
-msgid "Launcher aanmaken"
+msgid "Creating launcher"
 msgstr ""
 
-msgid "Map op backup schijf"
+msgid "Folder on backup drive"
 msgstr ""
 
-msgid "Mapstructuur"
+msgid "Folder structure"
 msgstr ""
 
-msgid "Markeer als favoriet (F)"
+msgid "Mark as favorite (F)"
 msgstr ""
 
-msgid "Mogelijke duplicaten"
+msgid "Possible duplicates"
 msgstr ""
 
-msgid "Naam (A-Z)"
+msgid "Name (A-Z)"
 msgstr ""
 
-msgid "Naam (Z-A)"
+msgid "Name (Z-A)"
 msgstr ""
 
-msgid "Nee"
+msgid "No"
 msgstr ""
 
-msgid "Niet ingesteld"
+msgid "Not configured"
 msgstr ""
 
-msgid "Nieuwste versie"
+msgid "Latest version"
 msgstr ""
 
-msgid "Nog geen map gekozen"
+msgid "No folder chosen yet"
 msgstr ""
 
-msgid "Nog geen schijf geselecteerd"
+msgid "No drive selected yet"
 msgstr ""
 
-msgid "Normaal"
+msgid "Normal"
 msgstr ""
 
 msgid "OK"
 msgstr ""
 
-msgid "Onbekend"
+msgid "Unknown"
 msgstr ""
 
-msgid "Ook licht bewerkte foto's worden gedetecteerd"
+msgid "Lightly edited photos are also detected"
 msgstr ""
 
-msgid "Opnieuw installeren"
+msgid "Reinstall"
 msgstr ""
 
-msgid "Opnieuw proberen"
+msgid "Try again"
 msgstr ""
 
-msgid "Opslaan"
+msgid "Save"
 msgstr ""
 
-msgid "Opslaan in"
+msgid "Save to"
 msgstr ""
 
-msgid "Over"
+msgid "About"
 msgstr ""
 
 msgid "PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks"
 msgstr ""
 
-msgid "Pair-records wissen — bevestiging gevraagd"
+msgid "Clear pair records — confirmation requested"
 msgstr ""
 
-msgid "Per jaar"
+msgid "By year"
 msgstr ""
 
-msgid "Per jaar/maand"
+msgid "By year/month"
 msgstr ""
 
 msgid "Pixora"
@@ -351,118 +350,118 @@ msgstr ""
 msgid "Pixora Updater"
 msgstr ""
 
-msgid "Pixora bestanden downloaden"
+msgid "Downloading Pixora files"
 msgstr ""
 
-msgid "Pixora bijwerken"
+msgid "Update Pixora"
 msgstr ""
 
-msgid "Pixora is al geïnstalleerd"
+msgid "Pixora is already installed"
 msgstr ""
 
-msgid "Pixora ophalen van GitHub"
+msgid "Fetching Pixora from GitHub"
 msgstr ""
 
-msgid "Pixora starten"
+msgid "Start Pixora"
 msgstr ""
 
-msgid "Pixora wordt afgesloten — opruimen…"
+msgid "Pixora shutting down — cleaning up…"
 msgstr ""
 
-msgid "Pixora wordt gestart…"
+msgid "Pixora is starting…"
 msgstr ""
 
-msgid "Pixora — Instellen"
+msgid "Pixora — Setup"
 msgstr ""
 
-msgid "Plat"
+msgid "Flat"
 msgstr ""
 
-msgid "Python packages installeren"
+msgid "Installing Python packages"
 msgstr ""
 
-msgid "Reisverhaal samenstellen…"
+msgid "Compiling travel story…"
 msgstr ""
 
-msgid "Reset usbmuxd aangeroepen (settings)"
+msgid "Reset usbmuxd invoked (settings)"
 msgstr ""
 
-msgid "Restart gepland (1.2s delay voor GApplication unregister)"
+msgid "Restart scheduled (1.2s delay for GApplication unregister)"
 msgstr ""
 
-msgid "Selecteer alles"
+msgid "Select all"
 msgstr ""
 
-msgid "Selecteer welke versie je wilt installeren"
+msgid "Select which version to install"
 msgstr ""
 
-msgid "Selecteren"
+msgid "Select"
 msgstr ""
 
-msgid "Services activeren"
+msgid "Activating services"
 msgstr ""
 
-msgid "Sluit dit venster om Pixora te sluiten."
+msgid "Close this window to quit Pixora."
 msgstr ""
 
-msgid "Sluit je iPhone of iPad aan om foto's te importeren"
+msgid "Connect your iPhone or iPad to import photos"
 msgstr ""
 
-msgid "Sluiten"
+msgid "Close"
 msgstr ""
 
-msgid "Soepel"
+msgid "Loose"
 msgstr ""
 
-msgid "Sorteren..."
+msgid "Sorting..."
 msgstr ""
 
-msgid "Starten"
+msgid "Starting"
 msgstr ""
 
-msgid "Startup fase 1: MainWindow __init__ begonnen"
+msgid "Startup phase 1: MainWindow __init__ started"
 msgstr ""
 
-msgid "Startup fase 2: pages opbouwen…"
+msgid "Startup phase 2: building pages…"
 msgstr ""
 
-msgid "Startup fase 3: pages klaar"
+msgid "Startup phase 3: pages ready"
 msgstr ""
 
-msgid "Startup fase 4: foto's laden gepland via idle_add"
+msgid "Startup phase 4: loading photos scheduled via idle_add"
 msgstr ""
 
-msgid "Streng"
+msgid "Strict"
 msgstr ""
 
-msgid "Synchroniseert na elke import"
+msgid "Synchronizes after each import"
 msgstr ""
 
-msgid "Synchroniseert na elke import naar externe schijf"
+msgid "Syncs to external drive after each import"
 msgstr ""
 
-msgid "Systeem packages controleren"
+msgid "Checking system packages"
 msgstr ""
 
-msgid "Systeem packages installeren"
+msgid "Installing system packages"
 msgstr ""
 
-msgid "Taal"
+msgid "Language"
 msgstr ""
 
-msgid "Taal wordt gewijzigd…"
+msgid "Changing language…"
 msgstr ""
 
-msgid "Terug"
+msgid "Back"
 msgstr ""
 
-msgid "Terug naar galerij"
+msgid "Back to gallery"
 msgstr ""
 
-msgid "Terug naar standaard (200 px)"
+msgid "Back to default (200 px)"
 msgstr ""
 
-msgid "Thumbnail grootte"
+msgid "Thumbnail size"
 msgstr ""
 
 msgid "Thumbnail load done: {n} photos — UI ready"
@@ -471,109 +470,109 @@ msgstr ""
 msgid "Thumbs: {px}px — favorites: {n}"
 msgstr ""
 
-msgid "Update beschikbaar"
+msgid "Update available"
 msgstr ""
 
-msgid "Update beschikbaar: {v}"
+msgid "Update available: {v}"
 msgstr ""
 
-msgid "Verbind je iPhone of iPad"
+msgid "Connect your iPhone or iPad"
 msgstr ""
 
-msgid "Verbinden met kaart-server…"
+msgid "Connecting to map server…"
 msgstr ""
 
-msgid "Vernieuwen"
+msgid "Refresh"
 msgstr ""
 
-msgid "Versie"
+msgid "Version"
 msgstr ""
 
-msgid "Versie kiezen"
+msgid "Choose version"
 msgstr ""
 
-msgid "Versie {v} beschikbaar"
+msgid "Version {v} available"
 msgstr ""
 
-msgid "Verwijderen"
+msgid "Delete"
 msgstr ""
 
-msgid "Lege map opgeruimd: {p}"
+msgid "Empty folder removed: {p}"
 msgstr ""
 
-msgid "Viewer gesloten → terug naar grid"
+msgid "Viewer closed → back to grid"
 msgstr ""
 
-msgid "Volgende"
+msgid "Next"
 msgstr ""
 
-msgid "Voorbereiden"
+msgid "Preparing"
 msgstr ""
 
-msgid "Waar wil je je foto's opslaan?"
+msgid "Where do you want to save your photos?"
 msgstr ""
 
-msgid "Waar worden je foto's opgeslagen"
+msgid "Where your photos are stored"
 msgstr ""
 
-msgid "Wachten op sudo…"
+msgid "Waiting for sudo…"
 msgstr ""
 
-msgid "WebKit typelib installeren"
+msgid "Installing WebKit typelib"
 msgstr ""
 
-msgid "Weergave"
+msgid "Display"
 msgstr ""
 
-msgid "Welkom bij Pixora!"
+msgid "Welcome to Pixora!"
 msgstr ""
 
-msgid "Wijzigen"
+msgid "Change"
 msgstr ""
 
-msgid "Wissen"
+msgid "Clear"
 msgstr ""
 
-msgid "Zoeken naar apparaat…"
+msgid "Searching for device…"
 msgstr ""
 
-msgid "andere foto's in deze cluster"
+msgid "other photos in this cluster"
 msgstr ""
 
-msgid "april"
+msgid "April"
 msgstr ""
 
-msgid "augustus"
+msgid "August"
 msgstr ""
 
-msgid "december"
+msgid "December"
 msgstr ""
 
-msgid "februari"
+msgid "February"
 msgstr ""
 
-msgid "iPhone blijft onherkenbaar na reset"
+msgid "iPhone still unrecognised after reset"
 msgstr ""
 
-msgid "iPhone direct herkend door usbmuxd"
+msgid "iPhone directly recognised by usbmuxd"
 msgstr ""
 
-msgid "iPhone herkend na reset"
+msgid "iPhone recognised after reset"
 msgstr ""
 
-msgid "iPhone niet herkend door usbmuxd — start auto-recovery"
+msgid "iPhone not recognised by usbmuxd — starting auto-recovery"
 msgstr ""
 
-msgid "januari"
+msgid "January"
 msgstr ""
 
-msgid "juli"
+msgid "July"
 msgstr ""
 
-msgid "juni"
+msgid "June"
 msgstr ""
 
-msgid "load_photos: photo_path leeg of bestaat niet — empty state"
+msgid "load_photos: photo_path empty or missing — empty state"
 msgstr ""
 
 msgid "load_photos: scanning in {p}"
@@ -582,22 +581,22 @@ msgstr ""
 msgid "load_photos: {n} files found"
 msgstr ""
 
-msgid "maart"
+msgid "March"
 msgstr ""
 
-msgid "mei"
+msgid "May"
 msgstr ""
 
-msgid "november"
+msgid "November"
 msgstr ""
 
-msgid "oktober"
+msgid "October"
 msgstr ""
 
-msgid "register_script_message_handler mislukt met alle varianten"
+msgid "register_script_message_handler failed with all variants"
 msgstr ""
 
-msgid "september"
+msgid "September"
 msgstr ""
 
 msgid "signal"
@@ -606,80 +605,76 @@ msgstr ""
 msgid "─── Pixora (dev mode) ───"
 msgstr ""
 
-msgid "═══ Pixora gestart in Developer Mode ═══"
+msgid "═══ Pixora started in Developer Mode ═══"
 msgstr ""
 
-msgid "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"
+msgid "⚠ No internet connection — map tiles cannot be loaded"
 msgstr ""
 
-msgid "⚠️ iPhone niet herkend — probeer Instellingen > iPhone-verbinding"
+msgid "⚠️ iPhone not recognised — try Settings > iPhone connection"
 msgstr ""
 
-msgid "✅ iPhone klaar — tap Trust op je iPhone indien gevraagd"
+msgid "✅ iPhone ready — tap Trust on your iPhone if asked"
 msgstr ""
 
-msgid "✅ iPhone verbonden"
+msgid "✅ iPhone connected"
 msgstr ""
 
-msgid "✕ Toon alle foto's"
+msgid "✕ Show all photos"
 msgstr ""
 
-msgid "📱 iPhone gedetecteerd, even geduld…"
+msgid "📱 iPhone detected, please wait…"
 msgstr ""
 
-msgid "🔧 Verbinding herstellen, even geduld…"
+msgid "🔧 Restoring connection, please wait…"
 msgstr ""
 
 msgid "🗺"
 msgstr ""
 
-msgid "🗺 laden..."
+msgid "🗺 loading..."
 msgstr ""
 
-
-msgid "Instellen"
+msgid "Set up"
 msgstr ""
 
-msgid "Kies backup-map"
+msgid "Choose backup folder"
 msgstr ""
 
-msgid "Hoofdmap van USB-schijf"
+msgid "Root of USB drive"
 msgstr ""
 
-msgid "Nieuwe map maken"
+msgid "New folder"
 msgstr ""
 
-msgid "Gebruik deze map"
+msgid "Use this folder"
 msgstr ""
 
-msgid "Nieuwe map"
+msgid "Enter a name for the new folder:"
 msgstr ""
 
-msgid "Geef een naam voor de nieuwe map:"
+msgid "Folder name"
 msgstr ""
 
-msgid "Map-naam"
+msgid "Create"
 msgstr ""
 
-msgid "Aanmaken"
+msgid "Could not create folder"
 msgstr ""
 
-msgid "Kon map niet aanmaken"
+msgid "No subfolders"
 msgstr ""
 
-msgid "Geen submappen"
+msgid "Create one with the button below"
 msgstr ""
 
-msgid "Maak er eentje aan met de knop hieronder"
+msgid "No backup drive"
 msgstr ""
 
-msgid "Geen backup-schijf"
+msgid "Plug in a USB drive first and select it under 'Backup drive'."
 msgstr ""
 
-msgid "Sluit eerst een USB-schijf aan en kies hem bij 'Backup schijf'."
-msgstr ""
-
-msgid "Backup gestart via settings-setup"
+msgid "Backup started via settings setup"
 msgstr ""
 
 msgid "Backup"
@@ -688,396 +683,415 @@ msgstr ""
 msgid "Sync"
 msgstr ""
 
-msgid "Kopieert foto's naar USB. Verwijderen uit Pixora laat de backup staan."
+msgid "Copies photos to USB. Deleting from Pixora leaves the backup intact."
 msgstr ""
 
-msgid "Spiegelt Pixora naar USB. Verwijderen uit Pixora verwijdert ook op USB."
+msgid "Mirrors Pixora to USB. Deleting from Pixora also deletes on USB."
 msgstr ""
 
-msgid "Scannen…"
+msgid "Scanning…"
 msgstr ""
 
-msgid "Scannen op nieuwe foto's…"
+msgid "Scanning for new photos…"
 msgstr ""
 
-msgid "Dit kan even duren op een USB-schijf"
-msgstr ""
-
-msgid "Duplicaat-check overgeslagen: USB te leeg ({d} foto's vs {s} in Pixora)"
-msgstr ""
-
-msgid "Duplicaat-check: {n} nieuwe foto's tegen {u} op USB"
-msgstr ""
-
-msgid "Duplicaat-check: {c} / {t}"
-msgstr ""
-
-msgid "Duplicaat-check…"
-msgstr ""
-
-msgid "Duplicaat-check klaar: {n} dubbel, worden overgeslagen"
-msgstr ""
-
-msgid "Backup voltooid — let op"
-msgstr ""
-
-msgid "Silent-mode: backup voltooid, {n} orphans gemeld"
+msgid "This may take a while on a USB drive"
 msgstr ""
 
 msgid ""
-"Er staat {n} foto op je USB die niet in Pixora staat (bv. een handmatig "
-"gekopieerde map). Deze blijft bewaard als archief."
-msgid_plural ""
-"Er staan {n} foto's op je USB die niet in Pixora staan (bv. een handmatig "
-"gekopieerde map). Deze blijven bewaard als archief."
-msgstr[0] ""
-msgstr[1] ""
+"Duplicate check skipped: USB is too empty ({d} photos vs {s} in "
+"Pixora)"
+msgstr ""
+
+msgid "Duplicate check: {n} new photos against {u} on USB"
+msgstr ""
+
+msgid "Duplicate check: {c} / {t}"
+msgstr ""
+
+msgid "Duplicate check…"
+msgstr ""
+
+msgid "Duplicate check done: {n} duplicates will be skipped"
+msgstr ""
+
+msgid "Backup complete — note"
+msgstr ""
+
+msgid "Silent mode: backup complete, {n} orphans reported"
+msgstr ""
 
 msgid ""
-"Alle foto's uit Pixora staan op de USB. Let op: er staat {n} foto op je USB "
-"die niet in Pixora staat (blijft bewaard als archief)."
+"There is {n} photo on your USB that is not in Pixora (e.g. a manually "
+"copied folder). It is kept as an archive."
 msgid_plural ""
-"Alle foto's uit Pixora staan op de USB. Let op: er staan {n} foto's op je "
-"USB die niet in Pixora staan (blijven bewaard als archief)."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Backup voltooid, orphan-analyse gestart ({n} orphans)"
-msgstr ""
-
-msgid "Manual scan: orphan-analyse gestart ({n} orphans)"
-msgstr ""
-
-msgid "Analyseren op dubbele kopieën…"
-msgstr ""
-
-msgid "Analyseren: {c} / {t}"
-msgstr ""
-
-msgid "Hash-cache bouwen: {c} / {t}"
-msgstr ""
-
-msgid "Pre-sync review: {d} dubbele kopieën, {u} uniek — wacht op keuze"
-msgstr ""
-
-msgid "Pre-sync review: user koos '{c}'"
-msgstr ""
-
-msgid "Sync wil foto's wissen van de USB"
-msgstr ""
-
-msgid "Sync wil {n} foto van de USB verwijderen die niet in Pixora staat:"
-msgid_plural ""
-"Sync wil {n} foto's van de USB verwijderen die niet in Pixora staan:"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "• {n} dubbele kopie (zelfde beeld als een foto in Pixora)"
-msgid_plural "• {n} dubbele kopieën (zelfde beeld als foto's in Pixora)"
+"There are {n} photos on your USB that are not in Pixora (e.g. a "
+"manually copied folder). They are kept as an archive."
 msgstr[0] ""
 msgstr[1] ""
 
 msgid ""
-"• {n} unieke foto (geen match in Pixora — mogelijk eerder verwijderd)"
+"All photos from Pixora are on the USB. Note: there is {n} photo on "
+"your USB that is not in Pixora (kept as an archive)."
 msgid_plural ""
-"• {n} unieke foto's (geen match in Pixora — mogelijk eerder verwijderd)"
+"All photos from Pixora are on the USB. Note: there are {n} photos on "
+"your USB that are not in Pixora (kept as an archive)."
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Alles verwijderen"
+msgid "Backup complete, orphan analysis started ({n} orphans)"
 msgstr ""
 
-msgid "Alleen dubbele verwijderen"
+msgid "Manual scan: orphan analysis started ({n} orphans)"
 msgstr ""
 
-msgid "Sync annuleren"
+msgid "Analyzing for duplicate copies…"
 msgstr ""
 
-msgid "Verwijderen en doorgaan"
+msgid "Analyzing: {c} / {t}"
 msgstr ""
 
-msgid "Sync geannuleerd"
-msgstr ""
-
-msgid "De USB is niet veranderd."
-msgstr ""
-
-msgid "Orphan-analyse overgeslagen: {err}"
-msgstr ""
-
-msgid "Orphan-analyse: {d} dubbele kopieën, {u} uniek op USB"
-msgstr ""
-
-msgid "Foto's op USB die niet in Pixora zitten"
+msgid "Building hash cache: {c} / {t}"
 msgstr ""
 
 msgid ""
-"{n} dubbele kopie — zelfde beeld als een foto in Pixora, maar onder andere "
-"naam of in andere map."
+"Pre-sync review: {d} duplicate copies, {u} unique — waiting for choice"
+msgstr ""
+
+msgid "Pre-sync review: user chose '{c}'"
+msgstr ""
+
+msgid "Sync wants to remove photos from the USB"
+msgstr ""
+
+msgid "Sync wants to remove {n} photo from the USB that is not in Pixora:"
 msgid_plural ""
-"{n} dubbele kopieën — zelfde beeld als foto's in Pixora, maar onder andere "
-"naam of in andere map."
+"Sync wants to remove {n} photos from the USB that are not in Pixora:"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{n} unieke foto — staat op USB maar niet in Pixora."
-msgid_plural "{n} unieke foto's — staan op USB maar niet in Pixora."
+msgid "• {n} duplicate copy (same image as a photo in Pixora)"
+msgid_plural "• {n} duplicate copies (same image as photos in Pixora)"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Wil je de dubbele kopieën van de USB verwijderen?"
-msgstr ""
-
-msgid "Verwijder dubbele kopieën"
-msgstr ""
-
-msgid "Alles behouden"
-msgstr ""
-
-msgid "Kon orphan niet verwijderen: {p} ({err})"
-msgstr ""
-
-msgid "Orphans verwijderd: {n}"
-msgstr ""
-
-msgid "Opruimen voltooid"
-msgstr ""
-
-msgid "{n} dubbele kopie verwijderd van de USB."
-msgid_plural "{n} dubbele kopieën verwijderd van de USB."
+msgid ""
+"• {n} unique photo (no match in Pixora — possibly previously removed)"
+msgid_plural ""
+"• {n} unique photos (no match in Pixora — possibly previously removed)"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Backup-scan gestart"
+msgid "Remove all"
 msgstr ""
 
-msgid "Backup-scan handmatig gestart"
+msgid "Remove duplicates only"
 msgstr ""
 
-msgid "Scan fout: {err}"
+msgid "Cancel sync"
 msgstr ""
 
-msgid "Backup-scan niet voltooid"
+msgid "Remove and continue"
 msgstr ""
 
-msgid "Backup-scan: alles gesynct"
+msgid "Sync cancelled"
 msgstr ""
 
-msgid "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes"
+msgid "The USB has not been changed."
 msgstr ""
 
-msgid "minder dan een minuut"
+msgid "Orphan analysis skipped: {err}"
 msgstr ""
 
-msgid "± {h} u {m} min"
+msgid "Orphan analysis: {d} duplicate copies, {u} unique on USB"
 msgstr ""
 
-msgid "Geschatte tijd: {eta}"
+msgid "Photos on USB that are not in Pixora"
 msgstr ""
 
-msgid "Backup klaar om te starten"
-msgstr ""
-
-msgid "Drive niet aangesloten"
-msgstr ""
-
-msgid "Drive niet aangesloten — sluit je USB-schijf aan om de backup te gebruiken."
-msgstr ""
-
-msgid "± {n} minuut"
-msgid_plural "± {n} minuten"
+msgid ""
+"{n} duplicate copy — same image as a photo in Pixora, but under a "
+"different name or in a different folder."
+msgid_plural ""
+"{n} duplicate copies — same image as photos in Pixora, but under "
+"different names or in different folders."
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "± {n} uur"
-msgid_plural "± {n} uur"
+msgid "{n} unique photo — on USB but not in Pixora."
+msgid_plural "{n} unique photos — on USB but not in Pixora."
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{n} nieuwe foto (±{s})"
-msgid_plural "{n} nieuwe foto's (±{s})"
+msgid "Do you want to remove the duplicate copies from the USB?"
+msgstr ""
+
+msgid "Remove duplicate copies"
+msgstr ""
+
+msgid "Keep everything"
+msgstr ""
+
+msgid "Could not delete orphan: {p} ({err})"
+msgstr ""
+
+msgid "Orphans removed: {n}"
+msgstr ""
+
+msgid "Cleanup complete"
+msgstr ""
+
+msgid "{n} duplicate copy removed from the USB."
+msgid_plural "{n} duplicate copies removed from the USB."
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{n} verouderde bestand wordt verwijderd op USB"
-msgid_plural "{n} verouderde bestanden worden verwijderd op USB"
+msgid "Backup scan started"
+msgstr ""
+
+msgid "Backup scan started manually"
+msgstr ""
+
+msgid "Scan error: {err}"
+msgstr ""
+
+msgid "Backup scan did not complete"
+msgstr ""
+
+msgid "Backup scan: everything in sync"
+msgstr ""
+
+msgid "Backup scan: {n} new, {d} to delete, {b} bytes"
+msgstr ""
+
+msgid "less than a minute"
+msgstr ""
+
+msgid "± {h} h {m} min"
+msgstr ""
+
+msgid "Estimated time: {eta}"
+msgstr ""
+
+msgid "Backup ready to start"
+msgstr ""
+
+msgid "Drive not connected"
+msgstr ""
+
+msgid "Drive not connected — plug in your USB drive to use the backup."
+msgstr ""
+
+msgid "± {n} minute"
+msgid_plural "± {n} minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Drive niet aangesloten — sluit de USB-schijf aan om te backuppen."
-msgstr ""
-
-msgid "Bekende backup-schijf"
-msgstr ""
-
-msgid "Drives opnieuw scannen"
-msgstr ""
-
-msgid "Gekozen backup-schijf vergeten"
-msgstr ""
-
-msgid "Backup-schijf vergeten?"
-msgstr ""
-
-msgid "De gekozen schijf en map worden losgekoppeld van Pixora. De bestanden op de schijf blijven staan."
-msgstr ""
-
-msgid "Vergeten"
-msgstr ""
-
-msgid "Automatische backup uitzetten?"
-msgstr ""
-
-msgid "Pixora stopt met backuppen tot je hem weer aanzet. De huidige instellingen blijven bewaard."
-msgstr ""
-
-msgid "Uitzetten"
-msgstr ""
-
-msgid "Alle foto's staan op de USB-schijf."
-msgstr ""
-
-msgid "Onbekende fout."
-msgstr ""
-
-msgid "Controleer bij import of foto's al bestaan"
-msgstr ""
-
-msgid "Aan"
-msgstr ""
-
-msgid "Uit"
-msgstr ""
-
-msgid "Strikte controle op bijna-identieke foto's"
-msgstr ""
-
-msgid "Geen duplicate-controle bij import"
-msgstr ""
-
-msgid "Duplicaat-detector voor backup"
-msgstr ""
-
-msgid "Foto's die al op USB staan (ook onder andere naam) worden overgeslagen"
-msgstr ""
-
-msgid "Dedup-check overgeslagen: {err}"
-msgstr ""
-
-msgid "Backup-scan: alles gesynct, {d} duplicaten overgeslagen"
-msgstr ""
-
-msgid "Backup-scan: {n} nieuw, {d} te verwijderen, {b} bytes, {u} duplicaten overgeslagen"
-msgstr ""
-
-msgid "{n} duplicaat wordt overgeslagen"
-msgid_plural "{n} duplicaten worden overgeslagen"
+msgid "± {n} hour"
+msgid_plural "± {n} hours"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Controleren"
+msgid "{n} new photo (±{s})"
+msgid_plural "{n} new photos (±{s})"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} stale file will be removed from USB"
+msgid_plural "{n} stale files will be removed from USB"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Drive not connected — plug in the USB drive to back up."
 msgstr ""
 
-msgid "Nu controleren"
+msgid "Saved backup drive"
 msgstr ""
 
-msgid "Scan USB op ontbrekende foto's"
+msgid "Rescan drives"
 msgstr ""
 
-msgid "Alles al gesynct"
+msgid "Forget saved backup drive"
 msgstr ""
 
-msgid "Je USB-schijf heeft al dezelfde foto's als Pixora."
+msgid "Forget backup drive?"
 msgstr ""
 
-msgid "Duplicaat-detectie"
+msgid ""
+"The chosen drive and folder will be unlinked from Pixora. Files on "
+"the drive are left untouched."
 msgstr ""
 
-msgid "Hoe het werkt"
+msgid "Forget"
 msgstr ""
 
-msgid "Pixora vergelijkt elke nieuwe foto visueel met je bibliotheek en vraagt per match wat je wilt doen: overslaan, toch importeren of beide bewaren."
+msgid "Turn off automatic backup?"
 msgstr ""
 
-msgid "Pixora vergelijkt nieuwe foto's visueel met je bibliotheek\nen markeert visuele kopieën zodat je ze kunt overslaan."
+msgid ""
+"Pixora will stop backing up until you turn it back on. The current "
+"settings are preserved."
 msgstr ""
 
-msgid "Bij een match vraagt Pixora per foto wat je wilt: overslaan, toch importeren of beide bewaren."
+msgid "Turn off"
 msgstr ""
 
-msgid "Locatie zoeken…"
+msgid "All photos are on the USB drive."
 msgstr ""
 
-msgid "Inschakelen"
+msgid "Unknown error."
 msgstr ""
 
-msgid "Bepaalt hoe Pixora geïmporteerde foto's opslaat in je bibliotheek."
+msgid "Check for existing photos during import"
 msgstr ""
 
-msgid "Alles bij elkaar"
+msgid "On"
 msgstr ""
 
-msgid "Alle foto's komen direct in één map — geen submappen."
+msgid "Off"
 msgstr ""
 
-msgid "Aparte map per jaar — bv. 2024/, 2025/."
+msgid "Strict check for near-identical photos"
 msgstr ""
 
-msgid "Per jaar en maand"
+msgid "No duplicate checking during import"
 msgstr ""
 
-msgid "Jaar-map met maand-submappen — bv. 2024/2024-03/."
+msgid "Backup duplicate detector"
 msgstr ""
 
-msgid "Pixora vergelijkt elke nieuwe foto visueel met je bibliotheek. Bij een match kies je per foto: overslaan, toch importeren of beide bewaren."
+msgid "Photos already on USB (even under a different name) will be skipped"
 msgstr ""
 
-msgid "Eenrichtings-kopie: alleen toevoegen. Foto's die je in Pixora wist, blijven op de USB als archief staan."
+msgid "Dedup check skipped: {err}"
 msgstr ""
 
-msgid "Exacte kopie van je Pixora-bibliotheek. Foto's die je in Pixora wist, worden ook van de USB verwijderd bij de volgende backup."
+msgid "Backup scan: everything in sync, {d} duplicates skipped"
 msgstr ""
 
-msgid "Slaat foto's over die al op de USB staan, óók als ze daar onder een andere naam of in een andere map liggen. Vereist dat duplicaat-detectie hierboven aan staat."
+msgid ""
+"Backup scan: {n} new, {d} to delete, {b} bytes, {u} duplicates skipped"
 msgstr ""
 
-msgid "Met ❤ gemaakt door LinuxGinger"
+msgid "{n} duplicate will be skipped"
+msgid_plural "{n} duplicates will be skipped"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Check now"
+msgstr ""
+
+msgid "Scan USB for missing photos"
+msgstr ""
+
+msgid "Already in sync"
+msgstr ""
+
+msgid "Your USB drive already has the same photos as Pixora."
+msgstr ""
+
+msgid "How it works"
+msgstr ""
+
+msgid ""
+"Pixora visually compares each new photo with your library and asks "
+"per match what you want to do: skip, import anyway, or keep both."
+msgstr ""
+
+msgid ""
+"Pixora visually compares new photos with your library\nand flags "
+"visual copies so you can skip them."
+msgstr ""
+
+msgid ""
+"On a match Pixora asks per photo what you want: skip, import anyway, "
+"or keep both."
+msgstr ""
+
+msgid "Looking up location…"
+msgstr ""
+
+msgid "Enable"
+msgstr ""
+
+msgid "Controls how Pixora saves imported photos in your library."
+msgstr ""
+
+msgid "All together"
+msgstr ""
+
+msgid "All photos go into a single folder — no subfolders."
+msgstr ""
+
+msgid "Separate folder per year — e.g. 2024/, 2025/."
+msgstr ""
+
+msgid "By year and month"
+msgstr ""
+
+msgid "Year folder with month subfolders — e.g. 2024/2024-03/."
+msgstr ""
+
+msgid ""
+"Pixora visually compares each new photo with your library. On a match "
+"you pick per photo: skip, import anyway, or keep both."
+msgstr ""
+
+msgid ""
+"One-way copy: additions only. Photos you delete in Pixora stay on the "
+"USB as an archive."
+msgstr ""
+
+msgid ""
+"Exact mirror of your Pixora library. Photos you delete in Pixora are "
+"also removed from the USB on the next backup."
+msgstr ""
+
+msgid ""
+"Skips photos already on the USB, even if they are stored there under "
+"a different name or folder. Requires duplicate detection above to be "
+"enabled."
+msgstr ""
+
+msgid "Made with ❤ by LinuxGinger"
 msgstr ""
 
 msgid "GitHub"
 msgstr ""
 
-msgid "Open de GitHub-pagina van Pixora"
+msgid "Open Pixora's GitHub page"
 msgstr ""
 
-msgid "GitHub openen mislukt: {err}"
+msgid "Failed to open GitHub: {err}"
 msgstr ""
 
-msgid "Voorbeeld"
+msgid "Preview"
 msgstr ""
 
-msgid "Zo groot worden je thumbnails bij deze instelling"
+msgid "How large your thumbnails will be at this setting"
 msgstr ""
 
-msgid "Toepassen"
+msgid "Apply"
 msgstr ""
 
-msgid "Thumbnail-grootte wijzigen?"
+msgid "Change thumbnail size?"
 msgstr ""
 
-msgid "Pixora gaat alle thumbnails opnieuw genereren op {n} px. Dit kan even duren bij grote bibliotheken."
+msgid ""
+"Pixora will regenerate all thumbnails at {n} px. This can take a "
+"while for large libraries."
 msgstr ""
 
-msgid "Restart gepland (1.5s delay voor GApplication unregister)"
+msgid "Restart scheduled (1.5s delay for GApplication unregister)"
 msgstr ""
 
-msgid "Taal-relaunch gepland (1.5s delay, log: {p})"
+msgid "Language relaunch scheduled (1.5s delay, log: {p})"
 msgstr ""
 
-msgid "Controleren bij import"
+msgid "Check on import"
 msgstr ""
 
-msgid "GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc."
+msgid "GitHub® and the Invertocat logo are trademarks of GitHub, Inc."
 msgstr ""
 
 msgid "© {year} Pixora"
@@ -1086,311 +1100,338 @@ msgstr ""
 msgid "© {year} Pixora — LinuxGinger"
 msgstr ""
 
-msgid "Licentie"
+msgid "License"
 msgstr ""
 
 msgid "GNU General Public License v3.0"
 msgstr ""
 
-msgid "Bekijken"
+msgid "View"
 msgstr ""
 
 msgid ""
-"Pixora is vrije software onder GPL-3.0. Je mag 'm gebruiken, wijzigen en "
-"doorgeven — onder voorwaarde dat je die rechten voor anderen ook "
-"respecteert."
+"Pixora is free software under GPL-3.0. You may use, modify and share "
+"it — as long as you respect those same rights for others."
 msgstr ""
 
-msgid "Toegestaan"
+msgid "Permitted"
 msgstr ""
 
-msgid "Verplicht"
+msgid "Required"
 msgstr ""
 
-msgid "Niet toegestaan"
+msgid "Not permitted"
 msgstr ""
 
-msgid "Volledige licentietekst"
+msgid "Full license text"
 msgstr ""
 
-msgid "Kon licentie niet laden: {err}"
+msgid "Could not load license: {err}"
 msgstr ""
 
-msgid "Privé én commercieel gebruiken"
+msgid "Private and commercial use"
 msgstr ""
 
-msgid "De code wijzigen"
+msgid "Modify the code"
 msgstr ""
 
-msgid "Distribueren (origineel of gewijzigd)"
+msgid "Distribute (original or modified)"
 msgstr ""
 
-msgid "Patent-licenties van contributors"
+msgid "Patent licenses from contributors"
 msgstr ""
 
-msgid "Broncode meeleveren bij distributie"
+msgid "Include source code when distributing"
 msgstr ""
 
-msgid "Zelfde GPL-3 licentie gebruiken"
+msgid "Use the same GPL-3 license"
 msgstr ""
 
-msgid "Wijzigingen duidelijk markeren"
+msgid "Mark modifications clearly"
 msgstr ""
 
-msgid "Copyright-notice behouden"
+msgid "Keep the copyright notice"
 msgstr ""
 
-msgid "Opnemen in proprietary software"
+msgid "Include in proprietary software"
 msgstr ""
 
-msgid "Garantie claimen (er is geen)"
+msgid "Claim warranty (there is none)"
 msgstr ""
 
-msgid "Auteurs aansprakelijk stellen"
+msgid "Hold authors liable"
 msgstr ""
 
-msgid "Backup mislukt"
+msgid "Backup failed"
 msgstr ""
 
-msgid "Kon {term} niet starten: {err}"
+msgid "Could not start {term}: {err}"
 msgstr ""
 
-msgid "Updater-script downloaden mislukt: {err}"
+msgid "Updater script download failed: {err}"
 msgstr ""
 
-msgid "pixora.desktop gerepareerd: Icon={p}"
+msgid "pixora.desktop repaired: Icon={p}"
 msgstr ""
 
-msgid "Nieuwe versie beschikbaar — klik om bij te werken"
+msgid "New version available — click to update"
 msgstr ""
 
-msgid "Alles in Pixora staat op de USB"
+msgid "Everything in Pixora is on the USB"
 msgstr ""
 
-msgid "Backup-scan: {n} nieuw, {d} orphans (mode={m}), {b} bytes, {u} duplicaten"
+msgid ""
+"Backup scan: {n} new, {d} orphans (mode={m}), {b} bytes, {u} "
+"duplicates"
 msgstr ""
 
-msgid "Structuur-scan gestart"
+msgid "Structure scan started"
 msgstr ""
 
-msgid "Structuur-scan klaar: {m} verplaatsingen, {d} duplicaten"
+msgid "Structure scan done: {m} moves, {d} duplicates"
 msgstr ""
 
-msgid "Structuur-scan klaar: structuur klopt"
+msgid "Structure scan done: structure is correct"
 msgstr ""
 
-msgid "Controleren op mappenstructuur…"
+msgid "Checking folder structure…"
 msgstr ""
 
-msgid "Backup-scan na reorganize-cooldown"
+msgid "Backup scan after reorganize cooldown"
 msgstr ""
 
-msgid "Er staat nog {n} foto op de USB die niet meer in Pixora is. In Backup-modus blijft die bewaard als archief."
-msgid_plural "Er staan nog {n} foto's op de USB die niet meer in Pixora zijn. In Backup-modus blijven ze bewaard als archief."
+msgid ""
+"There is {n} photo on the USB that is no longer in Pixora. In Backup "
+"mode it stays as an archive."
+msgid_plural ""
+"There are {n} photos on the USB that are no longer in Pixora. In "
+"Backup mode they stay as an archive."
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{n} foto op USB niet meer in Pixora (blijft bewaard)"
-msgid_plural "{n} foto's op USB niet meer in Pixora (blijven bewaard)"
+msgid "{n} photo on USB no longer in Pixora (kept)"
+msgid_plural "{n} photos on USB no longer in Pixora (kept)"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Backup-schijf is alleen-lezen gemount. Dit gebeurt vaak met NTFS/exFAT na onveilig verwijderen op Windows.\n\nOplossing: ontkoppel de schijf in je bestandsbeheerder, sluit 'm opnieuw aan, of voer op de terminal uit:\n  sudo ntfsfix /dev/sdXN\n(vervang sdXN door je USB-device, bv. sdb1)"
+msgid ""
+"Backup drive is mounted read-only. This often happens with NTFS/exFAT "
+"after an unsafe eject on Windows.\n\nFix: unmount the drive in your "
+"file manager and reconnect it, or run in a terminal:\n  sudo ntfsfix "
+"/dev/sdXN\n(replace sdXN with your USB device, e.g. sdb1)"
 msgstr ""
 
-msgid "Geen schrijfrechten op {p}: {err}"
+msgid "No write permission on {p}: {err}"
 msgstr ""
 
-msgid "Fout bij schrijven naar {p}: {err}"
+msgid "Error writing to {p}: {err}"
 msgstr ""
 
-msgid "USB is alleen-lezen gemount. Ontkoppel 'm en sluit opnieuw aan, of voer op de terminal `sudo ntfsfix /dev/sdXN` uit."
+msgid ""
+"USB is mounted read-only. Unmount and reconnect it, or run `sudo "
+"ntfsfix /dev/sdXN` in a terminal."
 msgstr ""
 
-msgid "Backup mislukt: {err}"
+msgid "Backup failed: {err}"
 msgstr ""
 
-msgid "Sync klaar om te starten"
+msgid "Sync ready to start"
 msgstr ""
 
-msgid "Nu synchroniseren"
+msgid "Sync now"
 msgstr ""
 
-msgid "Sync voltooid"
+msgid "Sync complete"
 msgstr ""
 
-msgid "Je USB-schijf is nu identiek aan Pixora."
+msgid "Your USB drive is now identical to Pixora."
 msgstr ""
 
-msgid "Sync mislukt"
+msgid "Sync failed"
 msgstr ""
 
-msgid "Automatisch bevestigen"
+msgid "Auto-confirm"
 msgstr ""
 
-msgid "Sla de pop-up over en start backup/sync direct wanneer er iets te doen is."
+msgid ""
+"Skip the pop-up and start backup/sync immediately when there is work "
+"to do."
 msgstr ""
 
-msgid "Sla de pop-up over en start opruimen direct wanneer er iets te doen is."
+msgid ""
+"Skip the pop-up and start cleaning up immediately when there is work "
+"to do."
 msgstr ""
 
-msgid "Start direct als er iets te doen is zonder te storen."
+msgid "Starts right away when there's work to do, without interrupting."
 msgstr ""
 
-msgid "Mappenstructuur controleren…"
+msgid "Scanning backup…"
 msgstr ""
 
-msgid "Backup scannen…"
+msgid "Sync in progress"
 msgstr ""
 
-msgid "Sync bezig"
+msgid "Scanning sync…"
 msgstr ""
 
-msgid "Sync scannen…"
+msgid "Scanning {pct}%"
 msgstr ""
 
-msgid "Scannen {pct}%"
+msgid "Scanning 0%"
 msgstr ""
 
-msgid "Scannen 0%"
+msgid "Silent mode: backup starts automatically without dialog"
 msgstr ""
 
-msgid "Silent-mode: backup start automatisch zonder dialog"
+msgid "Silent mode: backup completed without popup"
 msgstr ""
 
-msgid "Silent-mode: backup voltooid zonder popup"
+msgid "Turn on"
 msgstr ""
 
-msgid "Aanzetten"
+msgid "Turn on auto-confirm?"
 msgstr ""
 
-msgid "Automatisch bevestigen aanzetten?"
+msgid ""
+"Pixora will start backup/sync immediately without a confirmation "
+"dialog when there is work to do. Only error messages will still "
+"appear."
 msgstr ""
 
-msgid "Pixora gaat backup/sync direct starten zonder bevestigingsdialog wanneer er iets te doen is. Alleen foutmeldingen blijven verschijnen."
+msgid "Folder structure is already correct"
 msgstr ""
 
-msgid "Mappenstructuur klopt al"
+msgid "All photos already match your chosen structure."
 msgstr ""
 
-msgid "Alle foto's staan al volgens je gekozen structuur."
+msgid "Chosen structure: {s}"
 msgstr ""
 
-msgid "Gekozen structuur: {s}"
+msgid "Reorganize folder structure?"
 msgstr ""
 
-msgid "Mappenstructuur aanpassen?"
+msgid "Organize now"
 msgstr ""
 
-msgid "Nu ordenen"
+msgid "Folder structure updated"
 msgstr ""
 
-msgid "Mappenstructuur bijgewerkt"
+msgid "Updating folder structure…"
 msgstr ""
 
-msgid "Mappenstructuur bijwerken…"
+msgid "Updating folder structure"
 msgstr ""
 
-msgid "Mappenstructuur bijwerken"
+msgid "Run silently"
 msgstr ""
 
-msgid "Stil uitvoeren"
+msgid ""
+"On automatic detection, clean up immediately without popup or "
+"fullscreen. Manual 'Clean up' works as usual."
 msgstr ""
 
-msgid "Bij automatische detectie direct opruimen zonder popup of fullscreen. Handmatige 'Opruimen' werkt normaal."
+msgid "Silent reorganize started: {m} moves, {d} dups"
 msgstr ""
 
-msgid "Reorganize stil gestart: {m} moves, {d} dups"
+msgid ""
+"Pixora is cleaning up the folder structure. Closing now may leave "
+"photos half-moved."
 msgstr ""
 
-msgid "Pixora is bezig met mappenstructuur opruimen. Als je nu sluit kunnen foto's halverwege verplaatst zijn."
-msgstr ""
-
-msgid "{n} foto"
-msgid_plural "{n} foto's"
+msgid "{n} photo"
+msgid_plural "{n} photos"
 msgstr[0] ""
 msgstr[1] ""
 
 msgid "{n} video"
-msgid_plural "{n} video's"
+msgid_plural "{n} videos"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{a} en {b}"
+msgid "{a} and {b}"
 msgstr ""
 
-msgid "{c} worden verplaatst naar de juiste map."
+msgid "{c} will be moved to the right folder."
 msgstr ""
 
-msgid "{c} zijn exact dezelfde en worden verwijderd."
+msgid "{c} are exact duplicates and will be removed."
 msgstr ""
 
-msgid "{c} verplaatst"
+msgid "{c} moved"
 msgstr ""
 
-msgid "{c} verwijderd (duplicaat)"
+msgid "{c} removed (duplicate)"
 msgstr ""
 
-msgid "{done} van {total_label}"
+msgid "{done} of {total_label}"
 msgstr ""
 
-msgid "{done} van {total} foto"
-msgid_plural "{done} van {total} foto's"
+msgid "{done} of {total} photo"
+msgid_plural "{done} of {total} photos"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{counts} · {dg:.2f} / {tg:.2f} GB · nog ± {eta}"
+msgid "{counts} · {dg:.2f} / {tg:.2f} GB · about {eta} left"
 msgstr ""
 
-msgid "onbekend"
+msgid "unknown"
 msgstr ""
 
-msgid "{n} seconde"
-msgid_plural "{n} seconden"
+msgid "{n} second"
+msgid_plural "{n} seconds"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{n} minuut"
-msgid_plural "{n} minuten"
+msgid "{n} minute"
+msgid_plural "{n} minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Geen wijzigingen nodig"
+msgid "No changes needed"
 msgstr ""
 
-msgid "Opruimen"
+msgid "Tidy up"
 msgstr ""
 
-msgid "Huidige mappen aanpassen"
+msgid "Reorganize current folders"
 msgstr ""
 
-msgid "Scan de foto-map en verplaats foto's zodat ze kloppen met de gekozen structuur. Bit-identieke duplicaten worden verwijderd."
+msgid ""
+"Scan the photo folder and move photos to match the chosen structure. "
+"Bit-identical duplicates are removed."
 msgstr ""
 
-msgid "Reorganize: {m} verplaatst, {r} duplicaten weg, {e} fouten"
+msgid "Reorganize: {m} moved, {r} duplicates removed, {e} errors"
 msgstr ""
 
-msgid "{n} foto wordt verplaatst naar de juiste map."
-msgid_plural "{n} foto's worden verplaatst naar de juiste map."
+msgid "{n} photo will be moved to the correct folder."
+msgid_plural "{n} photos will be moved to the correct folder."
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{n} exact dezelfde foto op een andere plek wordt verwijderd."
-msgid_plural "{n} exact dezelfde foto's op andere plekken worden verwijderd."
+msgid "{n} exact same photo in another location will be removed."
+msgid_plural "{n} exact same photos in other locations will be removed."
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{n} foto verplaatst"
-msgid_plural "{n} foto's verplaatst"
+msgid "{n} photo moved"
+msgid_plural "{n} photos moved"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{n} duplicaat verwijderd"
-msgid_plural "{n} duplicaten verwijderd"
+msgid "{n} duplicate removed"
+msgid_plural "{n} duplicates removed"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{n} fout — zie dev-log."
-msgid_plural "{n} fouten — zie dev-log."
+msgid "{n} error — see dev log."
+msgid_plural "{n} errors — see dev log."
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Sorting photos…"
+msgstr ""
+
+msgid "Installing dependencies"
+msgstr ""

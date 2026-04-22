@@ -60,7 +60,7 @@ def get_available_drives():
                 elif mountpoint:
                     display = f"💾  {mountpoint}  ({size})"
                 else:
-                    display = f"💾  {_('Externe schijf')}  ({size})"
+                    display = f"💾  {_('External drive')}  ({size})"
                 drives.append((uuid, display))
 
             for child in device.get("children", []):
@@ -71,7 +71,7 @@ def get_available_drives():
             process_device(device)
 
     except Exception as e:
-        print(_("Drive detectie fout: {err}").format(err=e))
+        print(_("Drive detection error: {err}").format(err=e))
 
     return drives
 
@@ -83,7 +83,7 @@ class SetupWizard(Adw.Window):
         self.drives = []
         self.selected_backup_path = None
 
-        self.set_title(_("Pixora — Instellen"))
+        self.set_title(_("Pixora — Setup"))
         self.set_default_size(480, 400)
         self.set_resizable(False)
 
@@ -117,7 +117,7 @@ class SetupWizard(Adw.Window):
         btn_bar.set_margin_start(16)
         btn_bar.set_margin_end(16)
 
-        self.back_btn = Gtk.Button(label=_("Terug"))
+        self.back_btn = Gtk.Button(label=_("Back"))
         self.back_btn.connect("clicked", self.go_back)
         self.back_btn.set_visible(False)
         btn_bar.append(self.back_btn)
@@ -126,7 +126,7 @@ class SetupWizard(Adw.Window):
         spacer.set_hexpand(True)
         btn_bar.append(spacer)
 
-        self.next_btn = Gtk.Button(label=_("Volgende"))
+        self.next_btn = Gtk.Button(label=_("Next"))
         self.next_btn.add_css_class("suggested-action")
         self.next_btn.connect("clicked", self.go_next)
         btn_bar.append(self.next_btn)
@@ -166,15 +166,13 @@ class SetupWizard(Adw.Window):
         self.welcome_logo.set_halign(Gtk.Align.CENTER)
         page.append(self.welcome_logo)
 
-        title = Gtk.Label(label=_("Welkom bij Pixora!"))
+        title = Gtk.Label(label=_("Welcome to Pixora!"))
         title.add_css_class("title-1")
         title.set_halign(Gtk.Align.CENTER)
         page.append(title)
 
         subtitle = Gtk.Label(
-            label=_("Pixora importeert foto's en video's van je iPhone,\n"
-                    "detecteert duplicaten en maakt automatisch backups.\n\n"
-                    "Deze wizard helpt je Pixora instellen in een paar stappen.")
+            label=_("Pixora imports photos and videos from your iPhone,\ndetects duplicates and makes automatic backups.\n\nThis wizard helps you set up Pixora in a few steps.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.CENTER)
@@ -193,14 +191,13 @@ class SetupWizard(Adw.Window):
         page.set_margin_end(40)
         page.set_valign(Gtk.Align.START)
 
-        title = Gtk.Label(label=_("Waar wil je je foto's opslaan?"))
+        title = Gtk.Label(label=_("Where do you want to save your photos?"))
         title.add_css_class("title-2")
         title.set_halign(Gtk.Align.START)
         page.append(title)
 
         subtitle = Gtk.Label(
-            label=_("Kies een map op je computer waar Pixora\n"
-                    "je foto's en video's naartoe kopieert.")
+            label=_("Choose a folder on your computer where Pixora\ncopies your photos and videos.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -209,10 +206,10 @@ class SetupWizard(Adw.Window):
         row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
         self.folder_entry = Gtk.Entry()
-        self.folder_entry.set_placeholder_text(_("Kies een map…"))
+        self.folder_entry.set_placeholder_text(_("Choose a folder…"))
         self.folder_entry.set_hexpand(True)
 
-        browse_btn = Gtk.Button(label=_("Bladeren…"))
+        browse_btn = Gtk.Button(label=_("Browse…"))
         browse_btn.connect("clicked", self._on_browse_folder)
 
         row_box.append(self.folder_entry)
@@ -231,14 +228,13 @@ class SetupWizard(Adw.Window):
         page.set_margin_end(40)
         page.set_valign(Gtk.Align.START)
 
-        title = Gtk.Label(label=_("Automatische backup"))
+        title = Gtk.Label(label=_("Automatic backup"))
         title.add_css_class("title-2")
         title.set_halign(Gtk.Align.START)
         page.append(title)
 
         subtitle = Gtk.Label(
-            label=_("Pixora kan na elke import automatisch een backup\n"
-                    "maken naar een externe USB schijf of HDD.")
+            label=_("Pixora can automatically back up to an external USB drive\nor HDD after each import.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -251,14 +247,14 @@ class SetupWizard(Adw.Window):
         self.backup_switch.connect("notify::active", self._on_backup_toggle)
 
         backup_row = Adw.ActionRow(
-            title=_("Automatische backup"),
-            subtitle=_("Synchroniseert na elke import naar externe schijf"))
+            title=_("Automatic backup"),
+            subtitle=_("Syncs to external drive after each import"))
         backup_row.add_suffix(self.backup_switch)
         backup_row.set_activatable_widget(self.backup_switch)
         group.add(backup_row)
 
         self.drive_model = Gtk.StringList()
-        self.drive_model.append(_("Geen externe schijven gevonden"))
+        self.drive_model.append(_("No external drives found"))
 
         self.drive_combo = Gtk.DropDown(model=self.drive_model)
         self.drive_combo.set_sensitive(False)
@@ -268,21 +264,21 @@ class SetupWizard(Adw.Window):
         self.refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
         self.refresh_btn.add_css_class("flat")
         self.refresh_btn.set_valign(Gtk.Align.CENTER)
-        self.refresh_btn.set_tooltip_text(_("Vernieuwen"))
+        self.refresh_btn.set_tooltip_text(_("Refresh"))
         self.refresh_btn.connect("clicked", self._on_refresh_drives)
 
         self.drive_row = Adw.ActionRow(
-            title=_("Backup schijf"),
-            subtitle=_("Alleen externe schijven worden getoond"))
+            title=_("Backup drive"),
+            subtitle=_("Only external drives are shown"))
         self.drive_row.add_suffix(self.refresh_btn)
         self.drive_row.add_suffix(self.drive_combo)
         self.drive_row.set_sensitive(False)
         group.add(self.drive_row)
 
         self.backup_folder_row = Adw.ActionRow(
-            title=_("Map op backup schijf"),
-            subtitle=_("Nog geen schijf geselecteerd"))
-        self.backup_folder_btn = Gtk.Button(label=_("Kiezen…"))
+            title=_("Folder on backup drive"),
+            subtitle=_("No drive selected yet"))
+        self.backup_folder_btn = Gtk.Button(label=_("Choose…"))
         self.backup_folder_btn.add_css_class("flat")
         self.backup_folder_btn.set_valign(Gtk.Align.CENTER)
         self.backup_folder_btn.connect("clicked", self._on_browse_backup_folder)
@@ -290,7 +286,7 @@ class SetupWizard(Adw.Window):
         self.backup_folder_row.set_sensitive(False)
         group.add(self.backup_folder_row)
 
-        self.backup_error = Gtk.Label(label=_("⚠️  Kies een backup schijf om door te gaan"))
+        self.backup_error = Gtk.Label(label=_("⚠️  Choose a backup drive to continue"))
         self.backup_error.add_css_class("error")
         self.backup_error.set_halign(Gtk.Align.START)
         self.backup_error.set_visible(False)
@@ -307,14 +303,13 @@ class SetupWizard(Adw.Window):
         page.set_margin_end(40)
         page.set_valign(Gtk.Align.START)
 
-        title = Gtk.Label(label=_("Duplicaat detectie"))
+        title = Gtk.Label(label=_("Duplicate detection"))
         title.add_css_class("title-2")
         title.set_halign(Gtk.Align.START)
         page.append(title)
 
         subtitle = Gtk.Label(
-            label=_("Pixora vergelijkt nieuwe foto's visueel met je bibliotheek\n"
-                    "en markeert visuele kopieën zodat je ze kunt overslaan.")
+            label=_("Pixora visually compares new photos with your library\nand flags visual copies so you can skip them.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -326,8 +321,8 @@ class SetupWizard(Adw.Window):
         self.dup_switch.set_valign(Gtk.Align.CENTER)
         self.dup_switch.set_active(True)
         dup_row = Adw.ActionRow(
-            title=_("Duplicaat-detectie"),
-            subtitle=_("Strikte controle op bijna-identieke foto's"),
+            title=_("Duplicate detection"),
+            subtitle=_("Strict check for near-identical photos"),
         )
         dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
         dup_row.add_suffix(self.dup_switch)
@@ -335,9 +330,8 @@ class SetupWizard(Adw.Window):
         group.add(dup_row)
 
         info_row = Adw.ActionRow(
-            title=_("Hoe het werkt"),
-            subtitle=_("Bij een match vraagt Pixora per foto wat je wilt: "
-                       "overslaan, toch importeren of beide bewaren."),
+            title=_("How it works"),
+            subtitle=_("On a match Pixora asks per photo what you want: skip, import anyway, or keep both."),
         )
         info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
         info_row.set_activatable(False)
@@ -357,8 +351,8 @@ class SetupWizard(Adw.Window):
             if not self.folder_entry.get_text().strip():
                 dialog = Adw.MessageDialog(
                     transient_for=self,
-                    heading=_("Geen map gekozen"),
-                    body=_("Kies een map waar je foto's opgeslagen worden.")
+                    heading=_("No folder chosen"),
+                    body=_("Choose a folder where your photos will be saved.")
                 )
                 dialog.add_response("ok", _("OK"))
                 dialog.present()
@@ -367,11 +361,11 @@ class SetupWizard(Adw.Window):
         if page == "backup":
             if self.backup_switch.get_active():
                 if not self.drives or self.drive_combo.get_selected() >= len(self.drives):
-                    self.backup_error.set_label(_("⚠️  Kies een backup schijf om door te gaan"))
+                    self.backup_error.set_label(_("⚠️  Choose a backup drive to continue"))
                     self.backup_error.set_visible(True)
                     return
                 if not self.selected_backup_path:
-                    self.backup_error.set_label(_("⚠️  Kies ook een map op de backup schijf"))
+                    self.backup_error.set_label(_("⚠️  Also choose a folder on the backup drive"))
                     self.backup_error.set_visible(True)
                     return
             self.backup_error.set_visible(False)
@@ -380,7 +374,7 @@ class SetupWizard(Adw.Window):
             self.current += 1
             self.stack.set_visible_child_name(self.pages[self.current])
             self.back_btn.set_visible(True)
-            self.next_btn.set_label(_("Voltooien") if self.current == len(self.pages) - 1 else _("Volgende"))
+            self.next_btn.set_label(_("Finish") if self.current == len(self.pages) - 1 else _("Next"))
         else:
             self._save_and_finish()
 
@@ -391,13 +385,13 @@ class SetupWizard(Adw.Window):
             self.stack.set_visible_child_name(self.pages[self.current])
             self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
             self.back_btn.set_visible(self.current > 0)
-            self.next_btn.set_label(_("Volgende"))
+            self.next_btn.set_label(_("Next"))
             if hasattr(self, "backup_error"):
                 self.backup_error.set_visible(False)
 
     def _on_browse_folder(self, btn):
         dialog = Gtk.FileDialog()
-        dialog.set_title(_("Kies foto map"))
+        dialog.set_title(_("Choose photo folder"))
         dialog.select_folder(self, None, self._on_folder_selected)
 
     def _on_folder_selected(self, dialog, result):
@@ -419,13 +413,13 @@ class SetupWizard(Adw.Window):
         selected = combo.get_selected()
         if self.drives and selected < len(self.drives):
             self.backup_folder_row.set_sensitive(True)
-            self.backup_folder_row.set_subtitle(_("Nog geen map gekozen"))
+            self.backup_folder_row.set_subtitle(_("No folder chosen yet"))
             self.selected_backup_path = None
             self.backup_error.set_visible(False)
 
     def _on_browse_backup_folder(self, btn):
         dialog = Gtk.FileDialog()
-        dialog.set_title(_("Kies map op backup schijf"))
+        dialog.set_title(_("Choose folder on backup drive"))
 
         selected = self.drive_combo.get_selected()
         if self.drives and selected < len(self.drives):
@@ -461,10 +455,10 @@ class SetupWizard(Adw.Window):
                     uuid = self.drives[selected][0]
                     mountpoint = self._get_mountpoint_for_uuid(uuid)
                     if mountpoint and not chosen_path.startswith(mountpoint):
-                        self.backup_error.set_label(_("⚠️  Kies een map op de backup schijf, niet op je computer"))
+                        self.backup_error.set_label(_("⚠️  Choose a folder on the backup drive, not on your computer"))
                         self.backup_error.set_visible(True)
                         self.selected_backup_path = None
-                        self.backup_folder_row.set_subtitle(_("Nog geen map gekozen"))
+                        self.backup_folder_row.set_subtitle(_("No folder chosen yet"))
                         return
 
                 self.selected_backup_path = chosen_path
@@ -498,7 +492,7 @@ class SetupWizard(Adw.Window):
             for uuid, label in drives:
                 self.drive_model.append(label)
         else:
-            self.drive_model.append(_("Geen externe schijven gevonden"))
+            self.drive_model.append(_("No external drives found"))
         self.drive_combo.set_sensitive(backup_on)
 
         return False

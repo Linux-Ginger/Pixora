@@ -42,17 +42,17 @@ REPO_URL     = "https://github.com/Linux-Ginger/Pixora.git"
 RELEASES_API = "https://api.github.com/repos/Linux-Ginger/Pixora/releases"
 
 PHASES = [
-    (_("Downloaden"), [
-        (_("Pixora bestanden downloaden"), "clone"),
+    (_("Downloading"), [
+        (_("Downloading Pixora files"), "clone"),
     ]),
-    (_("Installeren"), [
-        (_("Systeem packages installeren"), "apt"),
-        (_("Python packages installeren"),  "pip"),
-        (_("Launcher aanmaken"),            "desktop"),
+    (_("Installing"), [
+        (_("Installing system packages"), "apt"),
+        (_("Installing Python packages"),  "pip"),
+        (_("Creating launcher"),            "desktop"),
     ]),
-    (_("Starten"), [
-        (_("Services activeren"),           "services"),
-        (_("Pixora starten"),               "launch"),
+    (_("Starting"), [
+        (_("Activating services"),           "services"),
+        (_("Start Pixora"),               "launch"),
     ]),
 ]
 
@@ -121,7 +121,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         title.add_css_class("title-1")
         top.append(title)
 
-        sub = Gtk.Label(label=_("door LinuxGinger"))
+        sub = Gtk.Label(label=_("by LinuxGinger"))
         sub.add_css_class("dim-label")
         top.append(sub)
 
@@ -133,7 +133,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         ver_box.set_margin_end(24)
         ver_box.set_margin_top(24)
 
-        ver_lbl = Gtk.Label(label=_("Versie"))
+        ver_lbl = Gtk.Label(label=_("Version"))
         ver_lbl.add_css_class("heading")
         ver_lbl.set_halign(Gtk.Align.START)
         ver_box.append(ver_lbl)
@@ -144,7 +144,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         if already_installed:
             self.installed_row = Adw.ActionRow(
-                title=_("Pixora is al geïnstalleerd"),
+                title=_("Pixora is already installed"),
                 subtitle=current_version if current_version else ""
             )
             self.installed_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
@@ -153,15 +153,15 @@ class InstallerWindow(Adw.ApplicationWindow):
             listbox.append(self.installed_row)
 
         self.version_model = Gtk.StringList()
-        self.version_model.append(_("Nieuwste versie"))
+        self.version_model.append(_("Latest version"))
 
         self.version_combo = Gtk.DropDown(model=self.version_model)
         self.version_combo.set_size_request(220, -1)
         self.version_combo.set_valign(Gtk.Align.CENTER)
 
         ver_row = Adw.ActionRow(
-            title=_("Versie kiezen"),
-            subtitle=_("Selecteer welke versie je wilt installeren"))
+            title=_("Choose version"),
+            subtitle=_("Select which version to install"))
         ver_row.add_suffix(self.version_combo)
         listbox.append(ver_row)
 
@@ -175,7 +175,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         btn_box.set_margin_top(8)
         btn_box.set_margin_bottom(20)
 
-        btn_label = _("Bijwerken") if already_installed else _("Installeren")  # bijgewerkt door _fetch_releases
+        btn_label = _("Update") if already_installed else _("Installing")  # bijgewerkt door _fetch_releases
         self.install_btn = Gtk.Button(label=btn_label)
         self.install_btn.add_css_class("suggested-action")
         self.install_btn.add_css_class("pill")
@@ -204,7 +204,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         title.add_css_class("title-1")
         top.append(title)
 
-        sub = Gtk.Label(label=_("door LinuxGinger"))
+        sub = Gtk.Label(label=_("by LinuxGinger"))
         sub.add_css_class("dim-label")
         top.append(sub)
 
@@ -311,18 +311,18 @@ class InstallerWindow(Adw.ApplicationWindow):
     def _update_install_status(self, remote_version):
         local = self._local_version or ""
         if local == remote_version:
-            self.installed_row.set_title(_("Pixora is al geïnstalleerd"))
-            self.installed_row.set_subtitle(_("Versie {v} — up to date").format(v=local))
-            self.install_btn.set_label(_("Opnieuw installeren"))
+            self.installed_row.set_title(_("Pixora is already installed"))
+            self.installed_row.set_subtitle(_("Version {v} — up to date").format(v=local))
+            self.install_btn.set_label(_("Reinstall"))
             self.installed_icon.set_from_icon_name("emblem-ok-symbolic")
             self.installed_icon.remove_css_class("warning")
             self.installed_icon.add_css_class("success")
         else:
-            self.installed_row.set_title(_("Update beschikbaar"))
-            self.installed_row.set_subtitle(_("Update beschikbaar: {local} → {remote}").format(
+            self.installed_row.set_title(_("Update available"))
+            self.installed_row.set_subtitle(_("Update available: {local} → {remote}").format(
                 local=local, remote=remote_version
             ))
-            self.install_btn.set_label(_("Bijwerken"))
+            self.install_btn.set_label(_("Update"))
             self.installed_icon.set_from_icon_name("software-update-urgent-symbolic")
             self.installed_icon.remove_css_class("success")
             self.installed_icon.add_css_class("warning")
@@ -332,7 +332,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         while self.version_model.get_n_items() > 0:
             self.version_model.remove(0)
 
-        self.version_model.append(_("Nieuwste versie"))
+        self.version_model.append(_("Latest version"))
         for tag in tags:
             self.version_model.append(tag)
 
@@ -370,17 +370,17 @@ class InstallerWindow(Adw.ApplicationWindow):
         stack.set_visible_child_name("check")
 
     def _set_error(self, msg):
-        self.status_lbl.set_text(_("Fout: {err}").format(err=msg))
+        self.status_lbl.set_text(_("Error: {err}").format(err=msg))
         self.progress.add_css_class("error")
 
     def _run_install(self):
         steps = [
-            ("clone",    "Pixora bestanden downloaden", self._clone_repo),
-            ("apt",      "Systeem packages installeren", self._install_apt),
-            ("pip",      "Python packages installeren",  self._install_pip),
-            ("desktop",  "Launcher aanmaken",            self._create_launcher),
-            ("services", "Services activeren",           self._start_services),
-            ("launch",   "Pixora starten",               self._launch_app),
+            ("clone",    "Downloading Pixora files", self._clone_repo),
+            ("apt",      "Installing system packages", self._install_apt),
+            ("pip",      "Installing Python packages",  self._install_pip),
+            ("desktop",  "Creating launcher",            self._create_launcher),
+            ("services", "Activating services",           self._start_services),
+            ("launch",   "Start Pixora",               self._launch_app),
         ]
         for key, label, fn in steps:
             GLib.idle_add(self._set_step_active, key, label)
@@ -426,7 +426,7 @@ class InstallerWindow(Adw.ApplicationWindow):
                                    check=True, capture_output=True)
             return True, ""
         except subprocess.CalledProcessError:
-            return False, _("downloaden mislukt")
+            return False, _("download failed")
 
     def _install_apt(self):
         packages = [
@@ -439,7 +439,7 @@ class InstallerWindow(Adw.ApplicationWindow):
             subprocess.run(["sudo", "apt-get", "install", "-y", "-qq"] + packages,
                            check=True, capture_output=True)
         except subprocess.CalledProcessError:
-            return False, _("apt mislukt")
+            return False, _("apt failed")
         # WebKit typelib — probeer 6.0 eerst, valt terug op 4.1
         for wk in ("gir1.2-webkit-6.0", "gir1.2-webkit2-4.1"):
             try:
@@ -460,7 +460,7 @@ class InstallerWindow(Adw.ApplicationWindow):
             )
             return True, ""
         except subprocess.CalledProcessError:
-            return False, _("pip mislukt")
+            return False, _("pip failed")
 
     def _create_launcher(self):
         try:

@@ -591,11 +591,11 @@ class ImporterPage(Gtk.Box):
 
         back_btn = Gtk.Button(icon_name="go-previous-symbolic")
         back_btn.add_css_class("flat")
-        back_btn.set_tooltip_text(_("Terug"))
+        back_btn.set_tooltip_text(_("Back"))
         back_btn.connect("clicked", self._on_back_clicked)
         header.pack_start(back_btn)
 
-        title_lbl = Gtk.Label(label=_("Importeren"))
+        title_lbl = Gtk.Label(label=_("Import"))
         header.set_title_widget(title_lbl)
 
         self.append(header)
@@ -661,13 +661,13 @@ class ImporterPage(Gtk.Box):
         icon.set_halign(Gtk.Align.CENTER)
         inner.append(icon)
 
-        title_lbl = Gtk.Label(label=_("Verbind je iPhone of iPad"))
+        title_lbl = Gtk.Label(label=_("Connect your iPhone or iPad"))
         title_lbl.add_css_class("title-3")
         title_lbl.set_halign(Gtk.Align.CENTER)
         title_lbl.set_margin_top(4)
         inner.append(title_lbl)
 
-        desc_lbl = Gtk.Label(label=_("Sluit je iPhone of iPad aan via een USB-kabel en ontgrendel het scherm.\nAls je apparaat vraagt om deze computer te vertrouwen, tik dan op 'Vertrouw'."))
+        desc_lbl = Gtk.Label(label=_("Connect your iPhone or iPad via a USB cable and unlock the screen.\nIf your device asks to trust this computer, tap 'Trust'."))
         desc_lbl.add_css_class("dim-label")
         desc_lbl.set_halign(Gtk.Align.CENTER)
         desc_lbl.set_justify(Gtk.Justification.CENTER)
@@ -680,12 +680,12 @@ class ImporterPage(Gtk.Box):
         listbox.add_css_class("boxed-list")
 
         for ico_name, title, subtitle in [
-            ("drive-removable-media-symbolic", _("USB-kabel"),              _("Gebruik bij voorkeur de originele Apple-kabel")),
-            ("security-medium-symbolic",       _("Vertrouw deze computer"), _("Tik op 'Vertrouw' als je apparaat dat vraagt")),
-            ("system-lock-screen-symbolic",    _("Ontgrendeld scherm"),     _("Zorg dat je apparaat ontgrendeld is tijdens de import")),
-            ("media-flash-symbolic",           _("Gebruik een blauwe USB-poort"), _("USB 3.0 (blauw) is veel sneller dan zwarte USB 2.0 poorten")),
-            ("weather-overcast-symbolic",      _("iCloud foto's"),          _("iCloud Foto's uitgeschakeld? Dan staan alle foto's lokaal op je toestel en worden ze allemaal gevonden.")),
-            ("document-save-symbolic",         _("Bestandsformaat"),        _("Zet op je apparaat: Instellingen → Foto's → 'Zet over naar Mac of pc' → 'Behoud originelen'")),
+            ("drive-removable-media-symbolic", _("USB cable"),              _("Preferably use the original Apple cable")),
+            ("security-medium-symbolic",       _("Trust this computer"), _("Tap 'Trust' if your device asks")),
+            ("system-lock-screen-symbolic",    _("Unlocked screen"),     _("Make sure your device is unlocked during import")),
+            ("media-flash-symbolic",           _("Use a blue USB port"), _("USB 3.0 (blue) is much faster than black USB 2.0 ports")),
+            ("weather-overcast-symbolic",      _("iCloud photos"),          _("iCloud Photos disabled? Then all photos are stored locally on your device and will all be found.")),
+            ("document-save-symbolic",         _("File format"),        _("On your device: Settings → Photos → 'Transfer to Mac or PC' → 'Keep Originals'")),
         ]:
             row = Adw.ActionRow()
             row.set_title(title)
@@ -703,7 +703,7 @@ class ImporterPage(Gtk.Box):
         spin = Gtk.Spinner()
         spin.start()
         spinner_box.append(spin)
-        lbl = Gtk.Label(label=_("Zoeken naar apparaat…"))
+        lbl = Gtk.Label(label=_("Searching for device…"))
         lbl.add_css_class("dim-label")
         spinner_box.append(lbl)
         inner.append(spinner_box)
@@ -715,8 +715,8 @@ class ImporterPage(Gtk.Box):
     def _build_detected_page(self):
         status = Adw.StatusPage()
         status.set_icon_name("object-select-symbolic")
-        status.set_title(_("Apparaat gevonden"))
-        status.set_description(_("Je apparaat is verbonden en klaar om te importeren."))
+        status.set_title(_("Device found"))
+        status.set_description(_("Your device is connected and ready to import."))
 
         clamp = Adw.Clamp()
         clamp.set_maximum_size(420)
@@ -729,7 +729,7 @@ class ImporterPage(Gtk.Box):
         info_group = Adw.PreferencesGroup()
 
         self.device_row = Adw.ActionRow()
-        self.device_row.set_title(_("Apparaat"))
+        self.device_row.set_title(_("Device"))
         self.device_row.set_subtitle("iPhone")
         ic = Gtk.Image.new_from_icon_name("computer-symbolic")
         ic.set_pixel_size(16)
@@ -737,7 +737,7 @@ class ImporterPage(Gtk.Box):
         info_group.add(self.device_row)
 
         self.dest_row = Adw.ActionRow()
-        self.dest_row.set_title(_("Opslaan in"))
+        self.dest_row.set_title(_("Save to"))
         self.dest_row.set_subtitle(self.settings.get("photo_path") or "~")
         ic2 = Gtk.Image.new_from_icon_name("folder-symbolic")
         ic2.set_pixel_size(16)
@@ -746,12 +746,12 @@ class ImporterPage(Gtk.Box):
 
         struct = self.settings.get("structure", "year_month")
         struct_labels = {
-            "flat":       _("Alles in één map"),
-            "year":       _("Per jaar"),
-            "year_month": _("Per jaar/maand"),
+            "flat":       _("Everything in one folder"),
+            "year":       _("By year"),
+            "year_month": _("By year/month"),
         }
         self.struct_row = Adw.ActionRow()
-        self.struct_row.set_title(_("Mapstructuur"))
+        self.struct_row.set_title(_("Folder structure"))
         self.struct_row.set_subtitle(struct_labels.get(struct, struct))
         ic3 = Gtk.Image.new_from_icon_name("folder-open-symbolic")
         ic3.set_pixel_size(16)
@@ -760,7 +760,7 @@ class ImporterPage(Gtk.Box):
 
         box.append(info_group)
 
-        import_btn = Gtk.Button(label=_("Importeren"))
+        import_btn = Gtk.Button(label=_("Import"))
         import_btn.add_css_class("suggested-action")
         import_btn.add_css_class("pill")
         import_btn.set_halign(Gtk.Align.CENTER)
@@ -868,11 +868,11 @@ class ImporterPage(Gtk.Box):
 
         action_bar = Gtk.ActionBar()
 
-        sel_all_btn = Gtk.Button(label=_("Selecteer alles"))
+        sel_all_btn = Gtk.Button(label=_("Select all"))
         sel_all_btn.connect("clicked", self._on_select_all)
         action_bar.pack_start(sel_all_btn)
 
-        desel_all_btn = Gtk.Button(label=_("Deselecteer alles"))
+        desel_all_btn = Gtk.Button(label=_("Deselect all"))
         desel_all_btn.connect("clicked", self._on_deselect_all)
         action_bar.pack_start(desel_all_btn)
 
@@ -880,7 +880,7 @@ class ImporterPage(Gtk.Box):
         self.select_count_lbl.add_css_class("dim-label")
         action_bar.set_center_widget(self.select_count_lbl)
 
-        self.select_continue_btn = Gtk.Button(label=_("Doorgaan"))
+        self.select_continue_btn = Gtk.Button(label=_("Continue"))
         self.select_continue_btn.add_css_class("suggested-action")
         self.select_continue_btn.connect("clicked", self._on_selecting_continue)
         action_bar.pack_end(self.select_continue_btn)
@@ -897,7 +897,7 @@ class ImporterPage(Gtk.Box):
         header_box.set_margin_start(24)
         header_box.set_margin_end(24)
 
-        title_lbl = Gtk.Label(label=_("Mogelijke duplicaten"))
+        title_lbl = Gtk.Label(label=_("Possible duplicates"))
         title_lbl.add_css_class("title-1")
         title_lbl.set_halign(Gtk.Align.START)
         header_box.append(title_lbl)
@@ -923,15 +923,15 @@ class ImporterPage(Gtk.Box):
 
         action_bar = Gtk.ActionBar()
 
-        skip_all_btn = Gtk.Button(label=_("Alle overslaan"))
+        skip_all_btn = Gtk.Button(label=_("Skip all"))
         skip_all_btn.connect("clicked", self._on_skip_all)
         action_bar.pack_start(skip_all_btn)
 
-        import_all_btn = Gtk.Button(label=_("Alle importeren"))
+        import_all_btn = Gtk.Button(label=_("Import all"))
         import_all_btn.connect("clicked", self._on_import_all)
         action_bar.pack_start(import_all_btn)
 
-        continue_btn = Gtk.Button(label=_("Doorgaan met importeren"))
+        continue_btn = Gtk.Button(label=_("Continue importing"))
         continue_btn.add_css_class("suggested-action")
         continue_btn.connect("clicked", self._on_review_continue)
         action_bar.pack_end(continue_btn)
@@ -942,7 +942,7 @@ class ImporterPage(Gtk.Box):
     def _build_done_page(self):
         self.done_status = Adw.StatusPage()
         self.done_status.set_icon_name("emblem-ok-symbolic")
-        self.done_status.set_title(_("Import voltooid"))
+        self.done_status.set_title(_("Import complete"))
 
         clamp = Adw.Clamp()
         clamp.set_maximum_size(420)
@@ -955,7 +955,7 @@ class ImporterPage(Gtk.Box):
         self.done_stats_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.append(self.done_stats_box)
 
-        close_btn = Gtk.Button(label=_("Terug naar galerij"))
+        close_btn = Gtk.Button(label=_("Back to gallery"))
         close_btn.add_css_class("pill")
         close_btn.set_halign(Gtk.Align.CENTER)
         close_btn.connect("clicked", self._on_back_clicked)
@@ -971,7 +971,7 @@ class ImporterPage(Gtk.Box):
     def _build_error_page(self):
         self.error_status = Adw.StatusPage()
         self.error_status.set_icon_name("dialog-error-symbolic")
-        self.error_status.set_title(_("Er is een fout opgetreden"))
+        self.error_status.set_title(_("An error occurred"))
 
         clamp = Adw.Clamp()
         clamp.set_maximum_size(420)
@@ -982,7 +982,7 @@ class ImporterPage(Gtk.Box):
         box.set_margin_end(12)
 
         self.error_deps_group = Adw.PreferencesGroup()
-        self.error_deps_group.set_title(_("Installeer vereiste pakketten"))
+        self.error_deps_group.set_title(_("Install required packages"))
         self.error_deps_group.set_visible(False)
 
         for pkg, cmd in [
@@ -1000,7 +1000,7 @@ class ImporterPage(Gtk.Box):
 
         box.append(self.error_deps_group)
 
-        retry_btn = Gtk.Button(label=_("Opnieuw proberen"))
+        retry_btn = Gtk.Button(label=_("Try again"))
         retry_btn.add_css_class("pill")
         retry_btn.set_halign(Gtk.Align.CENTER)
         retry_btn.connect("clicked", self._on_retry)
@@ -1086,12 +1086,11 @@ class ImporterPage(Gtk.Box):
 
         dialog = Adw.MessageDialog.new(
             window,
-            _("Apparaat losgekoppeld"),
-            _("Je apparaat is losgekoppeld tijdens het selecteren van foto's.\n"
-              "Sluit het apparaat opnieuw aan en probeer het opnieuw.")
+            _("Device disconnected"),
+            _("Your device was disconnected while selecting photos.\nReconnect the device and try again.")
         )
-        dialog.add_response("cancel", _("Annuleren"))
-        dialog.add_response("retry", _("Opnieuw proberen"))
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("retry", _("Try again"))
         dialog.set_default_response("retry")
         dialog.set_close_response("cancel")
         dialog.connect("response", self._on_disconnect_response)
@@ -1103,25 +1102,23 @@ class ImporterPage(Gtk.Box):
         self._start_detection_poll()
 
     def _on_import_clicked(self, _btn):
-        self._set_progress(_("Apparaat koppelen…"), _("Even geduld, dit duurt maar even."))
+        self._set_progress(_("Mounting device…"), _("Please wait, this takes just a moment."))
         self._show_state(STATE_MOUNTING)
         threading.Thread(target=self._do_mount, daemon=True).start()
 
     def _do_mount(self):
         if not _cmd_available("ifuse") or not _cmd_available("idevice_id"):
             GLib.idle_add(self._show_error,
-                _("ifuse of libimobiledevice is niet geïnstalleerd. "
-                  "Installeer de vereiste pakketten hieronder."), True)
+                _("ifuse or libimobiledevice is not installed. Install the required packages below."), True)
             return
         if not mount_iphone(self.udid, MOUNT_POINT):
             GLib.idle_add(self._show_error,
-                _("Kon het apparaat niet koppelen. Zorg dat het scherm ontgrendeld is "
-                  "en tik op 'Vertrouw' als dat wordt gevraagd."), False)
+                _("Could not mount the device. Make sure the screen is unlocked and tap 'Trust' when asked."), False)
             return
         GLib.idle_add(self._start_scan)
 
     def _start_scan(self):
-        self._set_progress(_("Foto's scannen…"), _("Zoeken naar foto's en video's op je apparaat."))
+        self._set_progress(_("Scanning photos…"), _("Searching for photos and videos on your device."))
         self._show_state(STATE_SCANNING)
         self._start_detection_poll()
         self._start_progress_pulse()
@@ -1154,15 +1151,15 @@ class ImporterPage(Gtk.Box):
         def on_progress(count):
             GLib.idle_add(
                 self.progress_subtitle.set_text,
-                ngettext("%d bestand gevonden…", "%d bestanden gevonden…", count) % count,
+                ngettext("%d file found…", "%d files found…", count) % count,
             )
         files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
         total = len(files)
         GLib.idle_add(
             self.progress_subtitle.set_text,
             ngettext(
-                "%d bestand gevonden, sorteren op datum…",
-                "%d bestanden gevonden, sorteren op datum…",
+                "%d file found, sorting by date…",
+                "%d files found, sorting by date…",
                 total,
             ) % total,
         )
@@ -1170,7 +1167,7 @@ class ImporterPage(Gtk.Box):
         GLib.idle_add(self._begin_sort_progress, total)
         if total <= 500:
             files.sort(key=get_photo_date, reverse=True)
-            GLib.idle_add(self._update_progress, 1.0, _("Sorteren klaar ({n})").format(n=total), "")
+            GLib.idle_add(self._update_progress, 1.0, _("Sorting done ({n})").format(n=total), "")
         else:
             date_cache = {}
             for i, f in enumerate(files):
@@ -1178,7 +1175,7 @@ class ImporterPage(Gtk.Box):
                 frac = (i + 1) / total
                 GLib.idle_add(
                     self._update_progress, frac,
-                    _("Sorteren: {i} / {total}").format(i=i + 1, total=total), f.name
+                    _("Sorting: {i} / {total}").format(i=i + 1, total=total), f.name
                 )
             files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
         GLib.idle_add(self._on_scan_done, files)
@@ -1194,14 +1191,13 @@ class ImporterPage(Gtk.Box):
         if not files:
             unmount_iphone(MOUNT_POINT)
             self._show_error(
-                _("Geen foto's of video's gevonden op het apparaat.\n"
-                  "Mogelijk zijn alle media al eerder geïmporteerd."), False)
+                _("No photos or videos found on the device.\nAll media may already have been imported."), False)
             return
         self._show_selecting(files)
 
     def _start_hashing(self, files: list[Path]):
-        self._set_progress(_("Duplicaten controleren…"),
-                           _("Foto's worden vergeleken met je bestaande archief."))
+        self._set_progress(_("Checking duplicates…"),
+                           _("Photos are being compared with your existing archive."))
         self._show_state(STATE_HASHING)
         threading.Thread(target=self._do_hashing, args=(files,), daemon=True).start()
 
@@ -1217,7 +1213,7 @@ class ImporterPage(Gtk.Box):
         def lib_progress(i, total, name):
             frac = (i / total) * 0.5 if total > 0 else 0
             GLib.idle_add(self._update_progress, frac,
-                          _("Archief scannen: {i}/{total}").format(i=i, total=total), name)
+                          _("Scanning archive: {i}/{total}").format(i=i, total=total), name)
 
         library_hashes = build_library_hashes(photo_path, lib_progress)
         self.library_hashes = library_hashes
@@ -1229,7 +1225,7 @@ class ImporterPage(Gtk.Box):
         for i, fp in enumerate(iphone_files):
             frac = 0.5 + (i / total) * 0.5 if total > 0 else 0.5
             GLib.idle_add(self._update_progress, frac,
-                          _("Apparaat scannen: {i}/{total}").format(i=i + 1, total=total), fp.name)
+                          _("Scanning device: {i}/{total}").format(i=i + 1, total=total), fp.name)
             ph = perceptual_hash(fp)
             if ph:
                 dup = find_duplicate(ph, library_hashes, max_dist)
@@ -1253,10 +1249,9 @@ class ImporterPage(Gtk.Box):
 
     def _show_selecting(self, files: list[Path]):
         n = len(files)
-        self.select_title.set_text(ngettext("%d bestand gevonden", "%d bestanden gevonden", n) % n)
+        self.select_title.set_text(ngettext("%d file found", "%d files found", n) % n)
         self.select_subtitle.set_text(
-            _("Kies welke foto's en video's je wilt importeren.\n"
-              "💡 Tip: leeg eerst de prullenbak op je iPhone om verwijderde foto's uit te sluiten.")
+            _("Choose which photos and videos to import.\n💡 Tip: empty the trash on your iPhone first to exclude deleted photos.")
         )
 
         self.selected_files = {str(f) for f in files}
@@ -1387,7 +1382,7 @@ class ImporterPage(Gtk.Box):
         n = len(self.selected_files)
         total = len(self.iphone_files)
         self.select_count_lbl.set_text(
-            _("{n} van {total} geselecteerd").format(n=n, total=total)
+            _("{n} of {total} selected").format(n=n, total=total)
         )
         self.select_continue_btn.set_sensitive(n > 0)
 
@@ -1404,10 +1399,8 @@ class ImporterPage(Gtk.Box):
         n = len(duplicates)
         self.review_subtitle.set_text(
             ngettext(
-                "%d foto lijkt al in je archief te staan. "
-                "Kies wat je wilt doen, of gebruik de knoppen onderaan.",
-                "%d foto's lijken al in je archief te staan. "
-                "Kies per foto wat je wilt doen, of gebruik de knoppen onderaan voor alles tegelijk.",
+                "%d photo may already be in your archive. Choose what to do, or use the buttons below.",
+                "%d photos may already be in your archive. Choose per photo what to do, or use the buttons below for all at once.",
                 n,
             ) % n
         )
@@ -1440,8 +1433,8 @@ class ImporterPage(Gtk.Box):
         img_row.set_margin_end(12)
         img_row.set_margin_bottom(10)
 
-        for path, caption in [(iphone_path, _("📱 iPhone — nieuw")),
-                               (lib_path,    _("🗂️ Archief — bestaand"))]:
+        for path, caption in [(iphone_path, _("📱 iPhone — new")),
+                               (lib_path,    _("🗂️ Archive — existing"))]:
             col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
             col.set_hexpand(True)
 
@@ -1467,9 +1460,9 @@ class ImporterPage(Gtk.Box):
         btn_row.set_margin_bottom(12)
         btn_row.set_homogeneous(True)
 
-        keep_btn   = Gtk.ToggleButton(label=_("Bestaande behouden"))
-        import_btn = Gtk.ToggleButton(label=_("Nieuwe importeren"))
-        both_btn   = Gtk.ToggleButton(label=_("Beide bewaren"))
+        keep_btn   = Gtk.ToggleButton(label=_("Keep existing"))
+        import_btn = Gtk.ToggleButton(label=_("Import new"))
+        both_btn   = Gtk.ToggleButton(label=_("Keep both"))
         keep_btn.set_active(True)
 
         def on_keep(b, ip=iphone_path):
@@ -1541,10 +1534,10 @@ class ImporterPage(Gtk.Box):
     def _start_import(self):
         total = len(self.to_import)
         self._set_progress(
-            _("Importeren…"),
+            _("Importing…"),
             ngettext(
-                "%d bestand wordt gekopieerd.",
-                "%d bestanden worden gekopieerd.",
+                "%d file is being copied.",
+                "%d files are being copied.",
                 total,
             ) % total
         )
@@ -1596,8 +1589,8 @@ class ImporterPage(Gtk.Box):
         self._finish()
 
     def _start_backup(self):
-        self._set_progress(_("Back-up maken…"),
-                           _("Foto's worden gesynchroniseerd naar je externe schijf."))
+        self._set_progress(_("Backing up…"),
+                           _("Photos are being synced to your external drive."))
         self._show_state(STATE_BACKUP)
         threading.Thread(target=self._do_backup, daemon=True).start()
 
@@ -1608,7 +1601,7 @@ class ImporterPage(Gtk.Box):
 
         drive_root = get_backup_mountpoint(backup_uuid)
         if not drive_root:
-            GLib.idle_add(self._finish, _("Back-upschijf niet gevonden. Sluit de schijf aan en probeer opnieuw via de instellingen."))
+            GLib.idle_add(self._finish, _("Backup drive not found. Connect the drive and try again from settings."))
             return
 
         backup_dest = Path(backup_path_str) if backup_path_str else drive_root / "Pixora"
@@ -1619,7 +1612,7 @@ class ImporterPage(Gtk.Box):
                 if part.endswith("%"):
                     try:
                         frac = int(part[:-1]) / 100
-                        GLib.idle_add(self._update_progress, frac, _("Back-up: {pct}").format(pct=part), "")
+                        GLib.idle_add(self._update_progress, frac, _("Backup: {pct}").format(pct=part), "")
                     except ValueError:
                         pass
 
@@ -1651,7 +1644,7 @@ class ImporterPage(Gtk.Box):
             success = self._manual_backup(photo_path, backup_dest)
 
         GLib.idle_add(self._finish, None if success else
-                      _("Back-up gedeeltelijk mislukt. De import zelf is wel geslaagd."))
+                      _("Backup partially failed. The import itself did succeed."))
 
     def _manual_backup(self, src: Path, dst: Path) -> bool:
         try:
@@ -1678,15 +1671,15 @@ class ImporterPage(Gtk.Box):
         skipped = sum(1 for d in self.duplicate_decisions.values() if d == "skip")
 
         desc_parts = [
-            ngettext("%d bestand geïmporteerd", "%d bestanden geïmporteerd", n) % n
+            ngettext("%d file imported", "%d files imported", n) % n
         ]
         if dup_n:
             desc_parts.append(
-                ngettext("%d duplicaat gevonden", "%d duplicaten gevonden", dup_n) % dup_n
+                ngettext("%d duplicate found", "%d duplicates found", dup_n) % dup_n
             )
         if skipped:
             desc_parts.append(
-                ngettext("%d overgeslagen", "%d overgeslagen", skipped) % skipped
+                ngettext("%d skipped", "%d skipped", skipped) % skipped
             )
         if note:
             desc_parts.append(note)

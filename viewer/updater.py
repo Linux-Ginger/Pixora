@@ -39,10 +39,10 @@ UPDATE_URL = "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/updater
 
 # Phases emitted by updater.sh as "STEP:<key>:<label>" lines.
 PHASES = [
-    ("Bijwerken", [
-        ("Dependencies installeren", "deps"),
-        ("Pixora ophalen van GitHub", "clone"),
-        ("Configuratie + services", "finalize"),
+    ("Update", [
+        ("Installing dependencies", "deps"),
+        ("Fetching Pixora from GitHub", "clone"),
+        ("Configuration + services", "finalize"),
     ]),
 ]
 ALL_STEPS = [(label, key) for _, steps in PHASES for label, key in steps]
@@ -73,10 +73,10 @@ class UpdaterWindow(Adw.ApplicationWindow):
         top.set_margin_bottom(12)
         top.set_halign(Gtk.Align.CENTER)
         top.append(self._make_logo(40))
-        title = Gtk.Label(label=_("Pixora bijwerken"))
+        title = Gtk.Label(label=_("Update Pixora"))
         title.add_css_class("title-1")
         top.append(title)
-        sub = Gtk.Label(label=_("door LinuxGinger"))
+        sub = Gtk.Label(label=_("by LinuxGinger"))
         sub.add_css_class("dim-label")
         top.append(sub)
         page.append(top)
@@ -119,7 +119,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
 
         page.append(phases_box)
 
-        self.status_lbl = Gtk.Label(label=_("Wachten op sudo…"))
+        self.status_lbl = Gtk.Label(label=_("Waiting for sudo…"))
         self.status_lbl.add_css_class("dim-label")
         self.status_lbl.set_margin_top(16)
         self.status_lbl.set_margin_bottom(8)
@@ -134,12 +134,12 @@ class UpdaterWindow(Adw.ApplicationWindow):
         self._btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._btn_box.set_halign(Gtk.Align.CENTER)
         self._btn_box.set_margin_bottom(16)
-        self._close_btn = Gtk.Button(label=_("Sluiten"))
+        self._close_btn = Gtk.Button(label=_("Close"))
         self._close_btn.add_css_class("pill")
         self._close_btn.set_size_request(140, 40)
         self._close_btn.set_sensitive(False)
         self._close_btn.connect("clicked", lambda b: self.close())
-        self._relaunch_btn = Gtk.Button(label=_("Pixora starten"))
+        self._relaunch_btn = Gtk.Button(label=_("Start Pixora"))
         self._relaunch_btn.add_css_class("suggested-action")
         self._relaunch_btn.add_css_class("pill")
         self._relaunch_btn.set_size_request(160, 40)
@@ -221,7 +221,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
             os.chmod(script_path, 0o755)
         except Exception as e:
             GLib.idle_add(self._finish, False,
-                          _("Updater-script downloaden mislukt: {err}").format(err=e))
+                          _("Updater script download failed: {err}").format(err=e))
             return
 
         uid = str(os.getuid())
@@ -241,7 +241,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
             except Exception:
                 pass
             GLib.idle_add(self._finish, False,
-                          _("pkexec niet gevonden. Installeer policykit-1."))
+                          _("pkexec not found. Install policykit-1."))
             return
 
         for line in proc.stdout:
@@ -260,7 +260,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         GLib.idle_add(self._finish, ok,
-                      _("Pixora is bijgewerkt.") if ok else _("Update mislukt."))
+                      _("Pixora has been updated.") if ok else _("Update failed."))
 
     def _finish(self, ok, message):
         if self._pulse_timer:
