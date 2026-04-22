@@ -7224,10 +7224,11 @@ class MainWindow(Adw.ApplicationWindow):
             return
         self._backup_scanning = True
         self._backup_scan_phase = 0.0
-        # Geen percentage meer tijdens scannen: rsync --dry-run streamt geen
-        # voortgang, en een tijdsgok was misleidend. Donut draait als spinner
-        # en de popover-titel "Backup scannen…" zegt al genoeg.
-        self._backup_detail = ""
+        # Geen percentage meer tijdens scannen — dat was een misleidende
+        # tijdsgok. Subtitel onder de donut-popover laat wél zien dat een
+        # USB-schijf traag kan zijn, zodat de gebruiker niet denkt dat 'ie
+        # vastloopt als het even duurt.
+        self._backup_detail = _("Dit kan even duren op een USB-schijf")
         tip = _("Scannen op nieuwe foto's…")
         if hasattr(self, "_backup_donut_btn"):
             self._set_donuts_visible(True)
@@ -7264,125 +7265,41 @@ class MainWindow(Adw.ApplicationWindow):
         mode = self.settings.get("backup_mode", "backup")
         dedup_enabled = bool(self.settings.get("backup_dedup"))
 
-        # Short-circuit: lege USB-map → alle bronbestanden zijn per definitie
-        # nieuw en er zijn geen orphans. Scheelt op USB-schijven 30-60s
-        # stat-latency van de rsync-vergelijking. Alleen een os.walk over
-        # de bron (lokale schijf, snel) is nodig om totaal + bytes te weten.
+        # Pure Python set-diff op relatieve paden. Eerder gebruikten we hier
+        # rsync --dry-run, maar dat blokkeerde soms minutenlang op trage of
+        # flaky USB-schijven (rsync stat't elke dest-file voor attribute-
+        # preservation — op FAT/exFAT is dat veel langzamer dan strikt nodig).
+        # rsync wordt alsnog gebruikt voor de *echte* backup hieronder.
+        src_files = {}
         try:
-            dest_empty = not any(backup_dest.iterdir())
-        except OSError:
-            dest_empty = False
-        if dest_empty:
-            new_count = 0
-            bytes_to_transfer = 0
-            to_transfer_rels = []
-            try:
-                for root, _dirs, files in os.walk(str(photo_path)):
-                    for fn in files:
-                        sf = os.path.join(root, fn)
-                        rel = os.path.relpath(sf, str(photo_path))
-                        to_transfer_rels.append(rel)
-                        new_count += 1
-                        try:
-                            bytes_to_transfer += os.path.getsize(sf)
-                        except OSError:
-                            pass
-            except Exception as e:
-                log_error(_("Scan fout: {err}").format(err=e))
-                GLib.idle_add(self._handle_scan_result, None)
-                return
-            log_info(_("Backup-scan: USB-map leeg, {n} bestanden in bron").format(n=new_count))
-            GLib.idle_add(
-                self._handle_scan_result,
-                {
-                    "new": new_count,
-                    "bytes": bytes_to_transfer,
-                    "delete": 0,
-                    "dup_count": 0,
-                    "excluded": [],
-                    "mode": mode,
-                },
-            )
+            for root, _dirs, files in os.walk(str(photo_path)):
+                for fn in files:
+                    sf = os.path.join(root, fn)
+                    rel = os.path.relpath(sf, str(photo_path))
+                    try:
+                        src_files[rel] = os.path.getsize(sf)
+                    except OSError:
+                        src_files[rel] = 0
+        except Exception as e:
+            log_error(_("Scan fout: {err}").format(err=e))
+            GLib.idle_add(self._handle_scan_result, None)
             return
 
-        to_transfer_rels = []
-        if _cmd_available_bk("rsync"):
-            # Altijd --delete in dry-run: we willen weten of er orphans op
-            # USB staan (bestanden die niet meer in Pixora zijn). In
-            # backup-modus verwijderen we ze niet — dan is de count puur
-            # informatief. In sync-modus → echt weg bij volgende backup.
-            cmd = ["rsync", "-a", "--dry-run", "--stats",
-                   "--modify-window=2", "--delete",
-                   "--out-format=__RELPATH__%n"]
-            cmd += [str(photo_path) + "/", str(backup_dest) + "/"]
+        dest_rels = set()
+        if backup_dest.is_dir():
             try:
-                out = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=300
-                ).stdout
-                new_count, bytes_to_transfer, delete_count = \
-                    self._parse_rsync_stats(out)
-                for line in out.splitlines():
-                    if not line.startswith("__RELPATH__"):
-                        continue
-                    rel = line[len("__RELPATH__"):].strip()
-                    if not rel or rel.endswith("/") or rel.startswith("*"):
-                        continue
-                    to_transfer_rels.append(rel)
-            except Exception as e:
-                log_error(_("Scan fout: {err}").format(err=e))
-                GLib.idle_add(self._handle_scan_result, None)
-                return
-        else:
-            # Fallback: handmatig diff
-            src_files = {}
-            try:
-                for root, _dirs, files in os.walk(str(photo_path)):
-                    for fn in files:
-                        sf = os.path.join(root, fn)
-                        rel = os.path.relpath(sf, str(photo_path))
-                        try:
-                            src_files[rel] = os.path.getsize(sf)
-                        except Exception:
-                            src_files[rel] = 0
-            except Exception:
-                GLib.idle_add(self._handle_scan_result, None)
-                return
-            new_count = 0
-            bytes_to_transfer = 0
-            for rel, size in src_files.items():
-                df = os.path.join(str(backup_dest), rel)
-                if not os.path.exists(df):
-                    new_count += 1
-                    bytes_to_transfer += size
-            # Altijd orphans op USB tellen; mode bepaalt later of ze
-            # daadwerkelijk weg gaan.
-            delete_count = 0
-            if os.path.isdir(str(backup_dest)):
                 for root, _dirs, files in os.walk(str(backup_dest)):
                     for fn in files:
                         df = os.path.join(root, fn)
-                        rel = os.path.relpath(df, str(backup_dest))
-                        if rel not in src_files:
-                            delete_count += 1
-            # to_transfer_rels = relatieve paden van nieuwe bestanden
-            to_transfer_rels = [rel for rel in src_files
-                                if not os.path.exists(os.path.join(str(backup_dest), rel))]
+                        dest_rels.add(os.path.relpath(df, str(backup_dest)))
+            except Exception:
+                pass  # onvolledige enumeratie → missende files worden als 'nieuw' behandeld
 
-        # rsync --dry-run --stats zet "Total transferred file size" vaak op
-        # 0 in dry-run — geen bytes gemoved, dus de stat is betekenisloos.
-        # We hebben to_transfer_rels al; som hun echte grootte zelf op zodat
-        # het scan-dialog een realistische ETA + ±MB/GB toont.
-        try:
-            manual_bytes = 0
-            for rel in to_transfer_rels:
-                try:
-                    manual_bytes += (photo_path / rel).stat().st_size
-                except OSError:
-                    pass
-            if manual_bytes > 0:
-                bytes_to_transfer = manual_bytes
-        except Exception:
-            pass
+        src_rels = set(src_files.keys())
+        to_transfer_rels = sorted(src_rels - dest_rels)
+        new_count = len(to_transfer_rels)
+        delete_count = len(dest_rels - src_rels)
+        bytes_to_transfer = sum(src_files[rel] for rel in to_transfer_rels)
 
         # Optionele dedup: vergelijk pHash van bestanden-die-zouden-overdragen
         # tegen pHash van bestaande bestanden op USB.
@@ -7428,34 +7345,6 @@ class MainWindow(Adw.ApplicationWindow):
                 "mode": mode,
             },
         )
-
-    def _parse_rsync_stats(self, stdout):
-        """rsync --stats schrijft regels als
-            Number of deleted files: 1 (reg: 1)
-        op moderne versies. Door altijd alleen het eerste woord na de `:`
-        te nemen werkt de parser op zowel "1" als "1 (reg: 1)"."""
-        def _int_after_colon(s):
-            parts = s.split(":", 1)
-            if len(parts) != 2:
-                return 0
-            val = parts[1].strip().split()[0].replace(",", "") if parts[1].strip() else ""
-            try:
-                return int(val)
-            except ValueError:
-                return 0
-
-        new_count = 0
-        bytes_to_transfer = 0
-        delete_count = 0
-        for line in stdout.splitlines():
-            s = line.strip()
-            if s.startswith("Number of regular files transferred:"):
-                new_count = _int_after_colon(s)
-            elif s.startswith("Total transferred file size:"):
-                bytes_to_transfer = _int_after_colon(s)
-            elif s.startswith("Number of deleted files:"):
-                delete_count = _int_after_colon(s)
-        return new_count, bytes_to_transfer, delete_count
 
     def _handle_scan_result(self, result):
         self._backup_scanning = False

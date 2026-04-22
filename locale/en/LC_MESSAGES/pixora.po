@@ -1356,6 +1356,9 @@ msgstr "Scanning…"
 msgid "Scannen op nieuwe foto's…"
 msgstr "Scanning for new photos…"
 
+msgid "Dit kan even duren op een USB-schijf"
+msgstr "This may take a while on a USB drive"
+
 msgid "Backup-scan gestart"
 msgstr "Backup scan started"
 
