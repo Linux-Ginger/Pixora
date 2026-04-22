@@ -1264,7 +1264,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_rect             = None   # [x1, y1, x2, y2] widget coords
         self._crop_handle           = None   # 'tl','tr','bl','br','move'
         self._crop_rect_origin      = None   # rect state at drag start
-        self._filmstrip_thumbs      = {}     # index -> pixbuf
+        self._filmstrip_thumbs      = {}     # visual_pos -> pixbuf
+        self._filmstrip_view_order  = []     # list van self.photos-indices, nieuwste-eerst
         self._filmstrip_load_id     = 0
         self._video_media           = None
         self._video_poll_id         = None
@@ -3012,6 +3013,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.filmstrip_area = Gtk.DrawingArea()
         self.filmstrip_area.set_draw_func(self._draw_filmstrip)
         self.filmstrip_area.set_size_request(FILM_THUMB + 4, FILM_THUMB + 8)
+        # halign START: als het totaal aan thumbs smaller zou zijn dan het
+        # scroll-viewport (kleine bibliotheek), wordt de DrawingArea niet
+        # ge-centered in de overschot-ruimte — dus thumb 1 blijft altijd
+        # tegen de linker rand staan.
+        self.filmstrip_area.set_halign(Gtk.Align.START)
 
         film_click = Gtk.GestureClick()
         film_click.connect("pressed", self._on_filmstrip_click)
@@ -3215,13 +3221,11 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 dt = UNKNOWN
             groups[dt].append(i)
-        # Groepsvolgorde: default newest-first, maar bij "Datum oudste" sort
-        # moeten de oudste groepen bovenaan staan — anders draaide de grid
-        # precies andersom dan de filmstrip (die self.photos direct volgt).
-        sort_idx = (self.sort_combo.get_selected()
-                    if hasattr(self, "sort_combo") else 0)
-        oldest_first = (sort_idx == 1)
-        sorted_dates = sorted(groups.keys(), reverse=not oldest_first)
+        # Groepsvolgorde altijd newest-first: oudste-boven voelt onnatuurlijk
+        # bij een foto-archief. Sort-keuze beïnvloedt de volgorde binnen een
+        # dag (voor de grid-rendering) en de viewer-tape heeft z'n eigen
+        # altijd-nieuwste-links volgorde.
+        sorted_dates = sorted(groups.keys(), reverse=True)
 
         def _header(dt):
             if dt == UNKNOWN:
@@ -3928,24 +3932,37 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Filmstrip ─────────────────────────────────────────────────────
     def _update_filmstrip(self):
-        """Resize the DrawingArea and start loading thumbnails for all photos."""
+        """Resize the DrawingArea en laad thumbnails. De filmstrip gebruikt een
+        eigen volgorde (altijd nieuwste-links → oudste-rechts), onafhankelijk
+        van de grid-sortering. Dat is intuïtiever voor viewer-navigatie:
+        links gaat naar een nieuwere foto, rechts naar een oudere."""
         n = len(self.photos)
         w = n * (FILM_THUMB + 4)
         self.filmstrip_area.set_size_request(max(w, FILM_THUMB + 4), FILM_THUMB + 8)
+        date_map = {p: get_photo_date(p) for p in self.photos}
+        self._filmstrip_view_order = sorted(
+            range(n), key=lambda i: date_map[self.photos[i]], reverse=True
+        )
         self._filmstrip_load_id += 1
         load_id = self._filmstrip_load_id
         threading.Thread(
             target=self._load_filmstrip_bg,
-            args=(list(self.photos), load_id),
+            args=(list(self.photos),
+                  list(self._filmstrip_view_order),
+                  load_id),
             daemon=True
         ).start()
 
-    def _load_filmstrip_bg(self, photos, load_id):
-        n = len(photos)
+    def _load_filmstrip_bg(self, photos, view_order, load_id):
+        n = len(view_order)
         if n == 0:
             return
-        # Laad eerst rond de huidige foto, dan naar buiten toe
-        center = min(self.current_index, n - 1)
+        # Zoek de huidige visuele positie (= visual_pos van current_index
+        # in view_order). Start laden vanuit dat centrum naar buiten toe.
+        try:
+            center = view_order.index(self.current_index)
+        except ValueError:
+            center = 0
         order = [center]
         for dist in range(1, n):
             if load_id != self._filmstrip_load_id:
@@ -3954,10 +3971,11 @@ class MainWindow(Adw.ApplicationWindow):
                 order.append(center - dist)
             if center + dist < n:
                 order.append(center + dist)
-        order = [i for i in order if i not in self._filmstrip_thumbs]
+        order = [vp for vp in order if vp not in self._filmstrip_thumbs]
 
-        def load_one(i):
-            path = photos[i]
+        def load_one(vp):
+            photo_idx = view_order[vp]
+            path = photos[photo_idx]
             try:
                 if is_video(path):
                     pb = load_thumbnail(path)
@@ -3971,13 +3989,13 @@ class MainWindow(Adw.ApplicationWindow):
                         path, FILM_THUMB, FILM_THUMB, True)
             except Exception:
                 pb = None
-            return i, pb
+            return vp, pb
 
         with ThreadPoolExecutor(max_workers=3) as pool:
-            for count, (i, pb) in enumerate(pool.map(load_one, order)):
+            for count, (vp, pb) in enumerate(pool.map(load_one, order)):
                 if load_id != self._filmstrip_load_id:
                     return
-                self._filmstrip_thumbs[i] = pb
+                self._filmstrip_thumbs[vp] = pb
                 if count % 5 == 0 and self.filmstrip_scroll.get_visible():
                     GLib.idle_add(self.filmstrip_area.queue_draw)
         if self.filmstrip_scroll.get_visible():
@@ -3993,7 +4011,8 @@ class MainWindow(Adw.ApplicationWindow):
         cr.close_path()
 
     def _draw_filmstrip(self, area, cr, width, height):
-        n = len(self.photos)
+        view = self._filmstrip_view_order
+        n = len(view)
         if n == 0:
             return
         cell = FILM_THUMB + 4
@@ -4007,10 +4026,16 @@ class MainWindow(Adw.ApplicationWindow):
         visible_w = adj.get_page_size() if adj else width
         first_visible = max(0, int(scroll_x / cell) - 1)
         last_visible = min(n, int((scroll_x + visible_w) / cell) + 2)
-        for i in range(first_visible, last_visible):
-            x = i * cell + 2
+        # Huidige visuele positie voor de oranje highlight.
+        try:
+            current_visual = view.index(self.current_index)
+        except ValueError:
+            current_visual = -1
+        for vp in range(first_visible, last_visible):
+            photo_idx = view[vp]
+            x = vp * cell + 2
             y = (height - FILM_THUMB) // 2
-            pb = self._filmstrip_thumbs.get(i)
+            pb = self._filmstrip_thumbs.get(vp)
             if pb:
                 pw = pb.get_width()
                 ph = pb.get_height()
@@ -4027,7 +4052,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self._film_rounded_rect(cr, x, y, FILM_THUMB, FILM_THUMB, 6)
                 cr.fill()
             # video: draw play triangle
-            if i < len(self.photos) and is_video(self.photos[i]):
+            if 0 <= photo_idx < len(self.photos) and is_video(self.photos[photo_idx]):
                 cx = x + FILM_THUMB // 2
                 cy = y + FILM_THUMB // 2
                 cr.set_source_rgba(0, 0, 0, 0.45)
@@ -4040,7 +4065,7 @@ class MainWindow(Adw.ApplicationWindow):
                 cr.close_path()
                 cr.fill()
             # highlight current with orange rounded border
-            if i == self.current_index:
+            if vp == current_visual:
                 cr.set_source_rgba(0.914, 0.329, 0.125, 1.0)
                 cr.set_line_width(3)
                 self._film_rounded_rect(cr, x + 1.5, y + 1.5, FILM_THUMB - 3, FILM_THUMB - 3, 5)
@@ -4048,28 +4073,38 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_filmstrip_click(self, gesture, n_press, x, y):
         cell = FILM_THUMB + 4
-        idx = int(x // cell)
-        if 0 <= idx < len(self.photos) and idx != self.current_index:
-            self.current_index = idx
-            self._viewer_load_id += 1
-            load_id = self._viewer_load_id
-            self._set_viewer_location("empty")
-            self.filmstrip_area.queue_draw()
-            threading.Thread(
-                target=self._load_full_photo,
-                args=(self.photos[idx], load_id),
-                daemon=True
-            ).start()
+        vp = int(x // cell)
+        view = self._filmstrip_view_order
+        if 0 <= vp < len(view):
+            photo_idx = view[vp]
+            if 0 <= photo_idx < len(self.photos) and photo_idx != self.current_index:
+                self.current_index = photo_idx
+                self._viewer_load_id += 1
+                load_id = self._viewer_load_id
+                self._set_viewer_location("empty")
+                self.filmstrip_area.queue_draw()
+                threading.Thread(
+                    target=self._load_full_photo,
+                    args=(self.photos[photo_idx], load_id),
+                    daemon=True
+                ).start()
 
     def _scroll_filmstrip_to_current(self):
-        """Scroll the filmstrip so the current photo is always centered."""
+        """Scroll the filmstrip so the current photo is centered. Voor de
+        eerste/laatste visuele positie valt de clamp naar 0 / (upper-page),
+        dus die komen netjes aan de rand te staan i.p.v. gecentreerd."""
         cell = FILM_THUMB + 4
         adj  = self.filmstrip_scroll.get_hadjustment()
         page = adj.get_page_size()
         if page <= 0:
             GLib.timeout_add(50, self._scroll_filmstrip_to_current)
             return False
-        center_of_current = self.current_index * cell + cell / 2
+        view = self._filmstrip_view_order
+        try:
+            vp = view.index(self.current_index)
+        except ValueError:
+            vp = 0
+        center_of_current = vp * cell + cell / 2
         target = center_of_current - page / 2
         adj.set_value(max(0, min(target, adj.get_upper() - page)))
         return False
