@@ -1295,6 +1295,59 @@ msgstr[1] ""
 "Alle foto's uit Pixora staan op de USB. Let op: er staan {n} foto's op je "
 "USB die niet in Pixora staan (blijven bewaard als archief)."
 
+msgid "Backup voltooid, orphan-analyse gestart ({n} orphans)"
+msgstr "Backup voltooid, orphan-analyse gestart ({n} orphans)"
+
+msgid "Orphan-analyse overgeslagen: {err}"
+msgstr "Orphan-analyse overgeslagen: {err}"
+
+msgid "Orphan-analyse: {d} dubbele kopieën, {u} uniek op USB"
+msgstr "Orphan-analyse: {d} dubbele kopieën, {u} uniek op USB"
+
+msgid "Foto's op USB die niet in Pixora zitten"
+msgstr "Foto's op USB die niet in Pixora zitten"
+
+msgid ""
+"{n} dubbele kopie — zelfde beeld als een foto in Pixora, maar onder andere "
+"naam of in andere map."
+msgid_plural ""
+"{n} dubbele kopieën — zelfde beeld als foto's in Pixora, maar onder andere "
+"naam of in andere map."
+msgstr[0] ""
+"{n} dubbele kopie — zelfde beeld als een foto in Pixora, maar onder andere "
+"naam of in andere map."
+msgstr[1] ""
+"{n} dubbele kopieën — zelfde beeld als foto's in Pixora, maar onder andere "
+"naam of in andere map."
+
+msgid "{n} unieke foto — staat op USB maar niet in Pixora."
+msgid_plural "{n} unieke foto's — staan op USB maar niet in Pixora."
+msgstr[0] "{n} unieke foto — staat op USB maar niet in Pixora."
+msgstr[1] "{n} unieke foto's — staan op USB maar niet in Pixora."
+
+msgid "Wil je de dubbele kopieën van de USB verwijderen?"
+msgstr "Wil je de dubbele kopieën van de USB verwijderen?"
+
+msgid "Verwijder dubbele kopieën"
+msgstr "Verwijder dubbele kopieën"
+
+msgid "Alles behouden"
+msgstr "Alles behouden"
+
+msgid "Kon orphan niet verwijderen: {p} ({err})"
+msgstr "Kon orphan niet verwijderen: {p} ({err})"
+
+msgid "Orphans verwijderd: {n}"
+msgstr "Orphans verwijderd: {n}"
+
+msgid "Opruimen voltooid"
+msgstr "Opruimen voltooid"
+
+msgid "{n} dubbele kopie verwijderd van de USB."
+msgid_plural "{n} dubbele kopieën verwijderd van de USB."
+msgstr[0] "{n} dubbele kopie verwijderd van de USB."
+msgstr[1] "{n} dubbele kopieën verwijderd van de USB."
+
 msgid "Backup mislukt: {note}"
 msgstr "Backup mislukt: {note}"
 

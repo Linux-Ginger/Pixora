@@ -1295,6 +1295,59 @@ msgstr[1] ""
 "All photos from Pixora are on the USB. Note: there are {n} photos on your "
 "USB that are not in Pixora (kept as an archive)."
 
+msgid "Backup voltooid, orphan-analyse gestart ({n} orphans)"
+msgstr "Backup complete, orphan analysis started ({n} orphans)"
+
+msgid "Orphan-analyse overgeslagen: {err}"
+msgstr "Orphan analysis skipped: {err}"
+
+msgid "Orphan-analyse: {d} dubbele kopieën, {u} uniek op USB"
+msgstr "Orphan analysis: {d} duplicate copies, {u} unique on USB"
+
+msgid "Foto's op USB die niet in Pixora zitten"
+msgstr "Photos on USB that are not in Pixora"
+
+msgid ""
+"{n} dubbele kopie — zelfde beeld als een foto in Pixora, maar onder andere "
+"naam of in andere map."
+msgid_plural ""
+"{n} dubbele kopieën — zelfde beeld als foto's in Pixora, maar onder andere "
+"naam of in andere map."
+msgstr[0] ""
+"{n} duplicate copy — same image as a photo in Pixora, but under a different "
+"name or in a different folder."
+msgstr[1] ""
+"{n} duplicate copies — same image as photos in Pixora, but under different "
+"names or in different folders."
+
+msgid "{n} unieke foto — staat op USB maar niet in Pixora."
+msgid_plural "{n} unieke foto's — staan op USB maar niet in Pixora."
+msgstr[0] "{n} unique photo — on USB but not in Pixora."
+msgstr[1] "{n} unique photos — on USB but not in Pixora."
+
+msgid "Wil je de dubbele kopieën van de USB verwijderen?"
+msgstr "Do you want to remove the duplicate copies from the USB?"
+
+msgid "Verwijder dubbele kopieën"
+msgstr "Remove duplicate copies"
+
+msgid "Alles behouden"
+msgstr "Keep everything"
+
+msgid "Kon orphan niet verwijderen: {p} ({err})"
+msgstr "Could not delete orphan: {p} ({err})"
+
+msgid "Orphans verwijderd: {n}"
+msgstr "Orphans removed: {n}"
+
+msgid "Opruimen voltooid"
+msgstr "Cleanup complete"
+
+msgid "{n} dubbele kopie verwijderd van de USB."
+msgid_plural "{n} dubbele kopieën verwijderd van de USB."
+msgstr[0] "{n} duplicate copy removed from the USB."
+msgstr[1] "{n} duplicate copies removed from the USB."
+
 msgid "Backup mislukt: {note}"
 msgstr "Backup failed: {note}"
 

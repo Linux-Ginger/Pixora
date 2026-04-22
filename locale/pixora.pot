@@ -739,6 +739,55 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Backup voltooid, orphan-analyse gestart ({n} orphans)"
+msgstr ""
+
+msgid "Orphan-analyse overgeslagen: {err}"
+msgstr ""
+
+msgid "Orphan-analyse: {d} dubbele kopieën, {u} uniek op USB"
+msgstr ""
+
+msgid "Foto's op USB die niet in Pixora zitten"
+msgstr ""
+
+msgid ""
+"{n} dubbele kopie — zelfde beeld als een foto in Pixora, maar onder andere "
+"naam of in andere map."
+msgid_plural ""
+"{n} dubbele kopieën — zelfde beeld als foto's in Pixora, maar onder andere "
+"naam of in andere map."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} unieke foto — staat op USB maar niet in Pixora."
+msgid_plural "{n} unieke foto's — staan op USB maar niet in Pixora."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Wil je de dubbele kopieën van de USB verwijderen?"
+msgstr ""
+
+msgid "Verwijder dubbele kopieën"
+msgstr ""
+
+msgid "Alles behouden"
+msgstr ""
+
+msgid "Kon orphan niet verwijderen: {p} ({err})"
+msgstr ""
+
+msgid "Orphans verwijderd: {n}"
+msgstr ""
+
+msgid "Opruimen voltooid"
+msgstr ""
+
+msgid "{n} dubbele kopie verwijderd van de USB."
+msgid_plural "{n} dubbele kopieën verwijderd van de USB."
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Backup-scan gestart"
 msgstr ""
 

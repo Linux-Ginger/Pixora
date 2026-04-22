@@ -1286,6 +1286,59 @@ msgstr[1] ""
 "Alle Fotos aus Pixora sind auf dem USB. Hinweis: es liegen {n} Fotos auf "
 "deinem USB, die nicht in Pixora sind (werden als Archiv aufbewahrt)."
 
+msgid "Backup voltooid, orphan-analyse gestart ({n} orphans)"
+msgstr "Backup abgeschlossen, Waisen-Analyse gestartet ({n} Waisen)"
+
+msgid "Orphan-analyse overgeslagen: {err}"
+msgstr "Waisen-Analyse übersprungen: {err}"
+
+msgid "Orphan-analyse: {d} dubbele kopieën, {u} uniek op USB"
+msgstr "Waisen-Analyse: {d} doppelte Kopien, {u} einzigartig auf USB"
+
+msgid "Foto's op USB die niet in Pixora zitten"
+msgstr "Fotos auf USB, die nicht in Pixora sind"
+
+msgid ""
+"{n} dubbele kopie — zelfde beeld als een foto in Pixora, maar onder andere "
+"naam of in andere map."
+msgid_plural ""
+"{n} dubbele kopieën — zelfde beeld als foto's in Pixora, maar onder andere "
+"naam of in andere map."
+msgstr[0] ""
+"{n} doppelte Kopie — dasselbe Bild wie ein Foto in Pixora, aber unter "
+"anderem Namen oder in anderem Ordner."
+msgstr[1] ""
+"{n} doppelte Kopien — dasselbe Bild wie Fotos in Pixora, aber unter anderen "
+"Namen oder in anderen Ordnern."
+
+msgid "{n} unieke foto — staat op USB maar niet in Pixora."
+msgid_plural "{n} unieke foto's — staan op USB maar niet in Pixora."
+msgstr[0] "{n} einzigartiges Foto — auf USB aber nicht in Pixora."
+msgstr[1] "{n} einzigartige Fotos — auf USB aber nicht in Pixora."
+
+msgid "Wil je de dubbele kopieën van de USB verwijderen?"
+msgstr "Möchtest du die doppelten Kopien vom USB entfernen?"
+
+msgid "Verwijder dubbele kopieën"
+msgstr "Doppelte Kopien entfernen"
+
+msgid "Alles behouden"
+msgstr "Alles behalten"
+
+msgid "Kon orphan niet verwijderen: {p} ({err})"
+msgstr "Konnte Waise nicht entfernen: {p} ({err})"
+
+msgid "Orphans verwijderd: {n}"
+msgstr "Waisen entfernt: {n}"
+
+msgid "Opruimen voltooid"
+msgstr "Aufräumen abgeschlossen"
+
+msgid "{n} dubbele kopie verwijderd van de USB."
+msgid_plural "{n} dubbele kopieën verwijderd van de USB."
+msgstr[0] "{n} doppelte Kopie vom USB entfernt."
+msgstr[1] "{n} doppelte Kopien vom USB entfernt."
+
 msgid "Backup mislukt: {note}"
 msgstr "Backup fehlgeschlagen: {note}"
 

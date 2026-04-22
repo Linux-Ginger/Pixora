@@ -1297,6 +1297,8 @@ class MainWindow(Adw.ApplicationWindow):
         # in Pixora zijn. Gebruikt voor waarschuwing na silent-backup
         # (bv. als user handmatig een dubbele map op USB heeft gekopieerd).
         self._last_scan_orphan_count = 0
+        self._last_scan_orphan_rels = []  # relatieve paden t.o.v. backup_dest
+        self._last_scan_backup_dest = None  # Path van dest, voor deletion
         self._backup_scan_anim_id = None
         self._backup_scan_dialog_open = False
         self._manual_scan_requested = False
@@ -7304,8 +7306,9 @@ class MainWindow(Adw.ApplicationWindow):
 
         src_rels = set(src_files.keys())
         to_transfer_rels = sorted(src_rels - dest_rels)
+        orphan_rels = sorted(dest_rels - src_rels)
         new_count = len(to_transfer_rels)
-        delete_count = len(dest_rels - src_rels)
+        delete_count = len(orphan_rels)
         bytes_to_transfer = sum(src_files[rel] for rel in to_transfer_rels)
 
         GLib.idle_add(
@@ -7314,6 +7317,7 @@ class MainWindow(Adw.ApplicationWindow):
                 "new": new_count,
                 "bytes": bytes_to_transfer,
                 "delete": delete_count,
+                "orphans": orphan_rels,
                 "dup_count": 0,
                 "excluded": [],
                 "mode": mode,
@@ -7343,7 +7347,19 @@ class MainWindow(Adw.ApplicationWindow):
         mode = result.get("mode", self.settings.get("backup_mode", "backup"))
         # Onthouden voor de post-backup melding in silent-mode. In sync-mode
         # worden orphans verwijderd → dan is de melding achteraf niet relevant.
+        orphans = result.get("orphans", [])
         self._last_scan_orphan_count = delete_count if mode == "backup" else 0
+        self._last_scan_orphan_rels = orphans if mode == "backup" else []
+        # backup_dest onthouden zodat orphan-review na de backup weet waar
+        # de files te vinden/verwijderen zijn.
+        drive_root = self._backup_drive_mountpoint()
+        if drive_root:
+            from pathlib import Path as _P
+            backup_path_str = self.settings.get("backup_path")
+            self._last_scan_backup_dest = (
+                _P(backup_path_str) if backup_path_str
+                else drive_root / "Pixora"
+            )
 
         # In backup-modus zijn orphans (delete_count) informatief — ze worden
         # bewaard. Voor de "is alles al gesynct?"-check behandelen we ze dan
@@ -8195,57 +8211,37 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _show_backup_done_banner(self, success, note):
-        # Banner uitgeschakeld — voltooid-feedback gebeurt nu via een popup
-        # (zelfde stijl als de start-dialog). Heading kiest op backup_mode
-        # zodat sync-users "Sync voltooid" zien i.p.v. "Backup voltooid".
+        # Banner uitgeschakeld — voltooid-feedback gebeurt via popup (zelfde
+        # stijl als de start-dialog). Heading kiest op backup_mode zodat
+        # sync-users "Sync voltooid" zien i.p.v. "Backup voltooid".
         try:
             self.backup_done_banner.set_revealed(False)
         except Exception:
             pass
         orphan_count = self._last_scan_orphan_count
         mode = self.settings.get("backup_mode", "backup")
-        # Silent-mode: success-popup overslaan. Fouten blijven wél zichtbaar —
-        # anders merkt de gebruiker een kapotte backup nooit. Uitzondering:
-        # als er orphans op de USB staan (bv. handmatig gekopieerde map)
-        # tonen we tóch een melding, anders ziet de gebruiker dat nooit.
+
+        # Orphans in backup-mode → start pHash-analyse. Die dialog toont
+        # info + keuze (dubbele kopieën verwijderen / alles behouden) en
+        # vervangt de standaard voltooid-popup. Werkt ook in silent-mode.
+        if (success and mode == "backup" and orphan_count > 0
+                and self._last_scan_orphan_rels):
+            log_info(_("Backup voltooid, orphan-analyse gestart "
+                       "({n} orphans)").format(n=orphan_count))
+            threading.Thread(
+                target=self._review_orphans_thread, daemon=True
+            ).start()
+            return
+
+        # Silent-mode: success-popup overslaan. Fouten blijven wél zichtbaar.
         if success and self.settings.get("backup_silent"):
-            if mode == "backup" and orphan_count > 0:
-                log_info(_("Silent-mode: backup voltooid, {n} orphans "
-                           "gemeld").format(n=orphan_count))
-                dlg = Adw.AlertDialog(
-                    heading=_("Backup voltooid — let op"),
-                    body=ngettext(
-                        "Er staat {n} foto op je USB die niet in Pixora "
-                        "staat (bv. een handmatig gekopieerde map). Deze "
-                        "blijft bewaard als archief.",
-                        "Er staan {n} foto's op je USB die niet in Pixora "
-                        "staan (bv. een handmatig gekopieerde map). Deze "
-                        "blijven bewaard als archief.",
-                        orphan_count,
-                    ).format(n=orphan_count),
-                )
-                dlg.add_response("ok", _("OK"))
-                dlg.set_default_response("ok")
-                dlg.set_close_response("ok")
-                self._present_dialog(dlg)
-                return
             log_info(_("Silent-mode: backup voltooid zonder popup"))
             return
+
         if success:
             if mode == "sync":
                 heading = _("Sync voltooid")
                 body = _("Je USB-schijf is nu identiek aan Pixora.")
-            elif orphan_count > 0:
-                heading = _("Backup voltooid — let op")
-                body = ngettext(
-                    "Alle foto's uit Pixora staan op de USB. Let op: er "
-                    "staat {n} foto op je USB die niet in Pixora staat "
-                    "(blijft bewaard als archief).",
-                    "Alle foto's uit Pixora staan op de USB. Let op: er "
-                    "staan {n} foto's op je USB die niet in Pixora staan "
-                    "(blijven bewaard als archief).",
-                    orphan_count,
-                ).format(n=orphan_count)
             else:
                 heading = _("Backup voltooid")
                 body = _("Alle foto's staan op de USB-schijf.")
@@ -8263,5 +8259,140 @@ class MainWindow(Adw.ApplicationWindow):
         dlg.set_default_response("ok")
         dlg.set_close_response("ok")
         self._present_dialog(dlg)
+
+    def _review_orphans_thread(self):
+        """Categoriseer de orphans op USB via pHash tegen de Pixora-library:
+        'dubbele kopie' (visueel = een foto in Pixora) vs 'uniek op USB'.
+        Toont daarna een keuze-dialog op de main-thread."""
+        from pathlib import Path as _P
+        photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
+        backup_dest = self._last_scan_backup_dest
+        orphan_rels = list(self._last_scan_orphan_rels)
+        if not backup_dest or not orphan_rels:
+            return
+        try:
+            from importer_page import (
+                perceptual_hash, build_library_hashes, find_duplicate,
+                SUPPORTED_EXT,
+            )
+        except Exception as e:
+            log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
+            return
+        try:
+            src_hashes = build_library_hashes(photo_path)
+        except Exception as e:
+            log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
+            return
+
+        dup_rels = []
+        unique_rels = []
+        MAX_DIST = 2
+        for rel in orphan_rels:
+            orph_file = backup_dest / rel
+            if not orph_file.is_file():
+                continue
+            if orph_file.suffix.lower() not in SUPPORTED_EXT:
+                unique_rels.append(rel)
+                continue
+            ph = perceptual_hash(orph_file)
+            if ph and find_duplicate(ph, src_hashes, MAX_DIST):
+                dup_rels.append(rel)
+            else:
+                unique_rels.append(rel)
+
+        log_info(_("Orphan-analyse: {d} dubbele kopieën, "
+                   "{u} uniek op USB").format(
+            d=len(dup_rels), u=len(unique_rels)))
+        GLib.idle_add(self._show_orphan_review_dialog, dup_rels, unique_rels)
+
+    def _show_orphan_review_dialog(self, dup_rels, unique_rels):
+        if not dup_rels and not unique_rels:
+            return False
+        lines = []
+        if dup_rels:
+            lines.append(ngettext(
+                "{n} dubbele kopie — zelfde beeld als een foto in "
+                "Pixora, maar onder andere naam of in andere map.",
+                "{n} dubbele kopieën — zelfde beeld als foto's in "
+                "Pixora, maar onder andere naam of in andere map.",
+                len(dup_rels),
+            ).format(n=len(dup_rels)))
+        if unique_rels:
+            lines.append(ngettext(
+                "{n} unieke foto — staat op USB maar niet in Pixora.",
+                "{n} unieke foto's — staan op USB maar niet in Pixora.",
+                len(unique_rels),
+            ).format(n=len(unique_rels)))
+        if dup_rels:
+            lines.append("")
+            lines.append(_("Wil je de dubbele kopieën van de USB "
+                           "verwijderen?"))
+        body = "\n".join(lines)
+        dlg = Adw.AlertDialog(
+            heading=_("Foto's op USB die niet in Pixora zitten"),
+            body=body,
+        )
+        if dup_rels:
+            dlg.add_response("delete", _("Verwijder dubbele kopieën"))
+            dlg.set_response_appearance(
+                "delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dlg.add_response("keep", _("Alles behouden"))
+        dlg.set_default_response("keep")
+        dlg.set_close_response("keep")
+
+        def _on_resp(_d, resp):
+            if resp == "delete" and dup_rels:
+                threading.Thread(
+                    target=self._delete_orphans_thread,
+                    args=(list(dup_rels),),
+                    daemon=True,
+                ).start()
+        dlg.connect("response", _on_resp)
+        self._present_dialog(dlg)
+        return False
+
+    def _delete_orphans_thread(self, rels):
+        backup_dest = self._last_scan_backup_dest
+        if not backup_dest or not backup_dest.is_dir():
+            return
+        deleted = 0
+        for rel in rels:
+            path = backup_dest / rel
+            try:
+                path.unlink()
+                deleted += 1
+            except OSError as e:
+                log_warn(_("Kon orphan niet verwijderen: {p} "
+                           "({err})").format(p=str(path), err=e))
+        # Lege mappen op USB achter elkaar opruimen (van diep naar ondiep)
+        try:
+            for root, _dirs, _files in os.walk(
+                    str(backup_dest), topdown=False):
+                if root == str(backup_dest):
+                    continue
+                if not os.listdir(root):
+                    try:
+                        os.rmdir(root)
+                    except OSError:
+                        pass
+        except Exception:
+            pass
+        log_info(_("Orphans verwijderd: {n}").format(n=deleted))
+        GLib.idle_add(self._show_orphans_deleted_dialog, deleted)
+
+    def _show_orphans_deleted_dialog(self, count):
+        dlg = Adw.AlertDialog(
+            heading=_("Opruimen voltooid"),
+            body=ngettext(
+                "{n} dubbele kopie verwijderd van de USB.",
+                "{n} dubbele kopieën verwijderd van de USB.",
+                count,
+            ).format(n=count),
+        )
+        dlg.add_response("ok", _("OK"))
+        dlg.set_default_response("ok")
+        dlg.set_close_response("ok")
+        self._present_dialog(dlg)
+        return False
 
 
