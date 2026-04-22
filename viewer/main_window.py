@@ -3208,16 +3208,22 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _group_by_date(self, photos):
         groups = defaultdict(list)
-        # Sentinel voor onleesbare / epoch-0 mtime: sorteer ze apart als
+        # Sentinel voor onleesbare / epoch-0 datum: sorteer ze apart als
         # "Onbekende datum" i.p.v. te tonen als 1 januari 1970.
         UNKNOWN = datetime.date.min
+        # Belangrijk: zelfde datum-bron als apply_sort / filmstrip view_order
+        # (get_photo_date: EXIF eerst, anders mtime). Als we hier mtime zouden
+        # gebruiken en de sort gebruikt EXIF, dan matcht de grid-indeling niet
+        # met de self.photos-volgorde — foto 1 in de grid zou dan op een hoog
+        # self.photos-index kunnen liggen en de viewer-counter geeft het
+        # "verkeerde" nummer.
         for i, path in enumerate(photos):
             try:
-                mtime = os.path.getmtime(path)
-                if mtime <= 0 or mtime < 946684800:  # < Jan 1 2000 = bogus
+                ts = get_photo_date(path)
+                if ts <= 0 or ts < 946684800:  # < Jan 1 2000 = bogus
                     dt = UNKNOWN
                 else:
-                    dt = datetime.datetime.fromtimestamp(mtime).date()
+                    dt = datetime.datetime.fromtimestamp(ts).date()
             except Exception:
                 dt = UNKNOWN
             groups[dt].append(i)
