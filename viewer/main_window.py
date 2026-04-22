@@ -4924,6 +4924,18 @@ class MainWindow(Adw.ApplicationWindow):
         draw_area.set_hexpand(True)
         draw_area.set_can_target(False)
         self.viewer_area.add_overlay(draw_area)
+        # Onderliggende picture/video verbergen zodat de thumbnail niet
+        # naast/over de live video staat te flikkeren. Voor video's eerst
+        # media pauzeren en display loskoppelen — anders blijft 'ie spelen
+        # onder de animatie en ziet de user het zwart/foto-gewissel.
+        is_vid = is_video(path)
+        if is_vid:
+            try:
+                if self._video_media is not None:
+                    self._video_media.pause()
+                self.video_display.set_visible(False)
+            except Exception:
+                pass
         self.photo_picture.set_visible(False)
 
         N_STRIPS = 12
@@ -4997,7 +5009,17 @@ class MainWindow(Adw.ApplicationWindow):
                     self._set_viewer_location("empty")
                 except Exception:
                     pass
+                # photo_picture én video_display beide weer zichtbaar zetten;
+                # on_done navigeert naar volgende file en die toont óf een
+                # foto óf een video, dus beide widgets moeten klaar staan.
+                # show_full_photo/show_full_video regelen daarna wie zichtbaar
+                # blijft op basis van de nieuwe file.
                 self.photo_picture.set_visible(True)
+                if is_vid:
+                    try:
+                        self.video_display.set_visible(True)
+                    except Exception:
+                        pass
                 on_done(path)
                 return False
             return True
