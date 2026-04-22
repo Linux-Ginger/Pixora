@@ -103,10 +103,10 @@ def _launch_dev_terminal():
         _t = _gt.translation("pixora", localedir=_locale_dir,
                              languages=[_lang], fallback=True)
         header = _t.gettext("─── Pixora (dev mode) ───")
-        hint = _t.gettext("Sluit dit venster om Pixora te sluiten.")
+        hint = _t.gettext("Close this window to quit Pixora.")
     except Exception:
         header = "─── Pixora (dev mode) ───"
-        hint = "Sluit dit venster om Pixora te sluiten."
+        hint = "Close this window to quit Pixora."
 
     # Set PIXORA_IN_DEV_TERM inside the bash command — gnome-terminal-server
     # drops Popen env when handing off to its child shell.
@@ -137,12 +137,12 @@ def _launch_dev_terminal():
                 sys.exit(0)
             except Exception as e:
                 try:
-                    print(_t.gettext("Kon {term} niet starten: {err}").format(term=term, err=e))
+                    print(_t.gettext("Could not start {term}: {err}").format(term=term, err=e))
                 except Exception:
                     print(f"Could not start {term}: {e}")
                 continue
     try:
-        print(_t.gettext("Geen terminal gevonden voor dev-mode; Pixora start zonder."))
+        print(_t.gettext("No terminal found for dev-mode; Pixora starts without."))
     except Exception:
         print("No terminal found for dev-mode; Pixora starts without.")
 
@@ -216,7 +216,8 @@ class PixoraApp(Adw.Application):
 
 def _consume_restart_sentinel():
     """If a language/mode change left a sentinel, exec ourselves in-place.
-    Avoids D-Bus name collisions that the old bash-sleep approach hit."""
+    Preserves env (incl. PIXORA_IN_DEV_TERM) — we stay in the same terminal,
+    main.py will see we're already in the dev-terminal and skip re-spawning."""
     sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
     if not os.path.exists(sentinel):
         return
@@ -224,10 +225,7 @@ def _consume_restart_sentinel():
         os.remove(sentinel)
     except Exception:
         pass
-    env = {k: v for k, v in os.environ.items()
-           if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")}
-    os.environ.clear()
-    os.environ.update(env)
+    print("Pixora: restart sentinel detected, exec'ing…", flush=True)
     pixora_bin = os.path.expanduser("~/.local/bin/pixora")
     try:
         if os.path.exists(pixora_bin):
