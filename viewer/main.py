@@ -214,6 +214,31 @@ class PixoraApp(Adw.Application):
         win.set_visible(True)
 
 
+def _consume_restart_sentinel():
+    """If a language/mode change left a sentinel, exec ourselves in-place.
+    Avoids D-Bus name collisions that the old bash-sleep approach hit."""
+    sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
+    if not os.path.exists(sentinel):
+        return
+    try:
+        os.remove(sentinel)
+    except Exception:
+        pass
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")}
+    os.environ.clear()
+    os.environ.update(env)
+    pixora_bin = os.path.expanduser("~/.local/bin/pixora")
+    try:
+        if os.path.exists(pixora_bin):
+            os.execvp(pixora_bin, [pixora_bin])
+        else:
+            script = os.path.abspath(__file__)
+            os.execvp(sys.executable, [sys.executable, script])
+    except Exception as e:
+        print(f"Pixora restart failed: {e}", flush=True)
+
+
 def main():
     global _PIXORA_APP
     _PIXORA_APP = PixoraApp()
@@ -223,6 +248,7 @@ def main():
             print("Pixora clean exit (rc=" + str(rc) + ")", flush=True)
     except Exception:
         pass
+    _consume_restart_sentinel()
     return rc
 
 

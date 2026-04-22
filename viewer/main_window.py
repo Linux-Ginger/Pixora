@@ -6074,21 +6074,20 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         log_info(_("Language changed to: {lang} — Pixora restarting").format(lang=new_lang))
 
-        # Load translation in the NEW language for the overlay text.
+        # Overlay-tekst in de NIEUWE taal zodat de user de switch al ziet.
         try:
             new_trans = _gettext_mod.translation(
                 "pixora", localedir=_LOCALE_DIR,
                 languages=[new_lang], fallback=True
             )
-            msg = new_trans.gettext("Taal wordt gewijzigd…")
+            msg = new_trans.gettext("Changing language…")
         except Exception:
             msg = _("Changing language…")
 
-        # Non-closable modal overlay until relaunch.
         overlay = Gtk.Window()
         overlay.set_modal(True)
         overlay.set_transient_for(self)
-        overlay.set_title(_("Pixora"))
+        overlay.set_title("Pixora")
         overlay.set_default_size(320, 140)
         overlay.set_resizable(False)
         overlay.set_deletable(False)
@@ -6110,33 +6109,16 @@ class MainWindow(Adw.ApplicationWindow):
         overlay.set_child(box)
         overlay.present()
 
-        def _relaunch():
-            pixora_bin = os.path.expanduser("~/.local/bin/pixora")
-            if os.path.exists(pixora_bin):
-                relaunch_cmd = f'"{pixora_bin}"'
-            else:
-                script = os.path.join(INSTALL_DIR, "viewer", "main.py")
-                relaunch_cmd = f'{sys.executable!s} {script!r}'
-            child_env = {k: v for k, v in os.environ.items()
-                         if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")}
-            try:
-                log_file = os.path.expanduser("~/.cache/pixora/relaunch.log")
-                os.makedirs(os.path.dirname(log_file), exist_ok=True)
-                subprocess.Popen(
-                    ["bash", "-c",
-                     f"sleep 1.5 && exec {relaunch_cmd} >>{log_file!s} 2>&1"],
-                    env=child_env,
-                    start_new_session=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    stdin=subprocess.DEVNULL,
-                )
-                log_info(_("Language relaunch scheduled (1.5s delay, log: {p})").format(p=log_file))
-            except Exception as e:
-                log_error(_("Relaunch after language switch failed: {err}").format(err=e))
-            self.get_application().quit()
-            return False
-        GLib.timeout_add(1000, _relaunch)
+        # Sentinel + in-place exec na app.run() returnt. Betrouwbaarder dan
+        # een bash-subprocess die 1.5s wacht: geen D-Bus-race, zelfde proces.
+        try:
+            sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
+            os.makedirs(os.path.dirname(sentinel), exist_ok=True)
+            with open(sentinel, "w") as f:
+                f.write("1")
+        except Exception as e:
+            log_error(_("Restart sentinel write failed: {err}").format(err=e))
+        GLib.timeout_add(600, lambda: (self.get_application().quit(), False)[1])
 
     def _on_toggle_dev_mode(self, btn, row):
         currently_active = bool(self.settings.get("dev_mode", False))
@@ -6174,34 +6156,16 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add(300, self._restart_app)
 
     def _restart_app(self):
+        # Sentinel + in-place exec na app.run() returnt. main.py checkt de
+        # sentinel en roept os.execvp zichzelf aan — geen D-Bus-race, geen
+        # bash-subprocess, en de dev-terminal-handoff blijft werken omdat
+        # main.py in het nieuwe proces helemaal opnieuw begint.
         try:
-            # Strip IN_DEV_TERM + DEV_LOG_OPENED so the new main.py spawns a
-            # fresh dev-terminal instead of assuming it already runs in one.
-            env = {
-                k: v for k, v in os.environ.items()
-                if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")
-            }
-            pixora_bin = os.path.expanduser("~/.local/bin/pixora")
-            if os.path.exists(pixora_bin):
-                relaunch = f'"{pixora_bin}"'
-            else:
-                script = os.path.abspath(os.path.join(
-                    os.path.dirname(__file__), "main.py"
-                ))
-                relaunch = f'{sys.executable!s} {script!s}'
-            # 1.5s sleep gives D-Bus time to release the unique name; log to
-            # file so relaunch errors are visible after the dev-terminal closes.
-            log_file = os.path.expanduser("~/.cache/pixora/relaunch.log")
-            os.makedirs(os.path.dirname(log_file), exist_ok=True)
-            subprocess.Popen(
-                ["bash", "-c",
-                 f"sleep 1.5 && exec {relaunch} >>{log_file!s} 2>&1"],
-                env=env,
-                start_new_session=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            log_info(_("Restart scheduled (1.5s delay for GApplication unregister)"))
+            sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
+            os.makedirs(os.path.dirname(sentinel), exist_ok=True)
+            with open(sentinel, "w") as f:
+                f.write("1")
+            log_info(_("Restart scheduled"))
         except Exception as e:
             log_error(_("Restart error: {err}").format(err=e))
         self.get_application().quit()
