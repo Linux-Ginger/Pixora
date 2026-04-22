@@ -552,7 +552,7 @@ def _reverse_geocode_raw(lat, lon):
         # city/country labels in die taal terugkomen (bv. "Parijs, Frankrijk"
         # in NL-modus i.p.v. de standaard Engelse "Paris, France").
         req = urllib.request.Request(url, headers={
-            "User-Agent": "Pixora/1.0",
+            "User-Agent": "Pixora/1.0 (+https://github.com/Linux-Ginger/Pixora)",
             "Accept-Language": _lang,
         })
         with urllib.request.urlopen(req, timeout=5) as resp:
