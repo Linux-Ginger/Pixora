@@ -3227,11 +3227,13 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 dt = UNKNOWN
             groups[dt].append(i)
-        # Groepsvolgorde altijd newest-first: oudste-boven voelt onnatuurlijk
-        # bij een foto-archief. Sort-keuze beïnvloedt de volgorde binnen een
-        # dag (voor de grid-rendering) en de viewer-tape heeft z'n eigen
-        # altijd-nieuwste-links volgorde.
-        sorted_dates = sorted(groups.keys(), reverse=True)
+        # Groepsvolgorde volgt de sort-keuze: "Datum oudste" → oudste
+        # groep bovenaan, anders nieuwste boven (default). De filmstrip
+        # heeft z'n eigen altijd-nieuwste-links volgorde ongeacht grid-sort.
+        sort_idx = (self.sort_combo.get_selected()
+                    if hasattr(self, "sort_combo") else 0)
+        oldest_first = (sort_idx == 1)
+        sorted_dates = sorted(groups.keys(), reverse=not oldest_first)
 
         def _header(dt):
             if dt == UNKNOWN:
@@ -3837,6 +3839,19 @@ class MainWindow(Adw.ApplicationWindow):
         """Direct tonen bij cache-hit, anders thumbnail-placeholder + async load."""
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
+        # Counter en prev/next-knoppen meteen updaten zodat bij
+        # pijltjes-ingedrukt-houden de "X / N" realtime meeloopt,
+        # ook als de echte photo-load achterop raakt.
+        try:
+            self.viewer_counter.set_text(
+                f"{self.current_index + 1} / {len(self.photos)}"
+            )
+            self.prev_btn.set_sensitive(self.current_index > 0)
+            self.next_btn.set_sensitive(
+                self.current_index < len(self.photos) - 1
+            )
+        except Exception:
+            pass
         self._set_viewer_location("empty")
         self.filmstrip_area.queue_draw()
         self._scroll_filmstrip_to_current()
