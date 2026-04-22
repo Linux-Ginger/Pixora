@@ -428,6 +428,9 @@ _metadata_dirty = False
 _metadata_save_lock = threading.Lock()
 
 
+_METADATA_MAX_GEOCODE = 3000
+
+
 def _load_metadata_cache():
     global _metadata_dirty
     try:
@@ -437,13 +440,29 @@ def _load_metadata_cache():
             v = data.get(k)
             if isinstance(v, dict):
                 _metadata_cache[k] = v
-        # Eenmalige cleanup: oude geocode-cache met lege waarden of oude
-        # key-format (zonder "{lang}:" prefix) verwijderen — die blokkeerden
-        # retries en gaven altijd Engelse labels terug.
+        # Oude geocode-entries met lege waarde of pre-lang key-format weg.
         geo = _metadata_cache.get("geocode", {})
         pruned = {k: v for k, v in geo.items() if v and ":" in k}
         if len(pruned) != len(geo):
             _metadata_cache["geocode"] = pruned
+            _metadata_dirty = True
+        # Stale file-based entries (pad bestaat niet meer) verwijderen zodat
+        # de cache niet oneindig groeit na deletes. Alleen bij startup —
+        # O(N) stat-calls maar eenmalig.
+        for bucket in ("photo_date", "video_duration", "gps_coords"):
+            entries = _metadata_cache.get(bucket, {})
+            stale = [p for p in entries if not os.path.exists(p)]
+            for p in stale:
+                entries.pop(p, None)
+            if stale:
+                _metadata_dirty = True
+        # Geocode-bucket trimmen als hij te groot is. Zonder access-timing
+        # kunnen we niet echt LRU — behoud de meest recent toegevoegde
+        # (dict preserveert insertion-order in Py3.7+).
+        geo = _metadata_cache.get("geocode", {})
+        if len(geo) > _METADATA_MAX_GEOCODE:
+            keep = dict(list(geo.items())[-_METADATA_MAX_GEOCODE:])
+            _metadata_cache["geocode"] = keep
             _metadata_dirty = True
     except Exception:
         pass
@@ -533,18 +552,29 @@ def _get_gps_coords_raw(photo_path):
     except Exception:
         return None
 
+_geocode_failed_at = {}
+
+
 def reverse_geocode(lat, lon):
     # Cache-sleutel inclusief taal: zelfde coördinaten krijgen andere labels
     # per taal (bv. "Paris, France" vs "Parijs, Frankrijk" vs "Paris, Frankreich").
     global _metadata_dirty
     key = f"{_lang}:{lat:.4f},{lon:.4f}"
     cached = _metadata_cache["geocode"].get(key)
-    if cached:  # alleen gebruiken als niet-leeg (lege cache = vorige faal, opnieuw proberen)
+    if cached:
         return cached
+    # Retry-rate-limit: als een eerdere lookup faalde (offline / server-down),
+    # niet elke keer opnieuw 5s timeout'en. Na 30 min mag een retry.
+    last_fail = _geocode_failed_at.get(key, 0)
+    if time.time() - last_fail < 1800:
+        return ""
     result = _reverse_geocode_raw(lat, lon)
     if result:
         _metadata_cache["geocode"][key] = result
         _metadata_dirty = True
+        _geocode_failed_at.pop(key, None)
+    else:
+        _geocode_failed_at[key] = time.time()
     return result
 
 
@@ -1462,6 +1492,11 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add_seconds(8, self._poll_backup_drive)
         GLib.idle_add(self._check_pending_backup)
         GLib.timeout_add_seconds(300, self._periodic_scan)
+        # Periodic save voorkomt dat we bij een crash alle cache-work
+        # sinds laatste start kwijtraken.
+        GLib.timeout_add_seconds(
+            300, lambda: (save_metadata_cache(), True)[1]
+        )
 
     def _start_services(self):
         try:
@@ -2765,6 +2800,12 @@ class MainWindow(Adw.ApplicationWindow):
 
     def close_map(self, btn=None):
         log_info(_("Kaart gesloten"))
+        if getattr(self, "_map_ready_fallback_id", None):
+            try:
+                GLib.source_remove(self._map_ready_fallback_id)
+            except Exception:
+                pass
+            self._map_ready_fallback_id = None
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
         try:
@@ -7074,7 +7115,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._viewer_donut_btn.set_tooltip_text(tip)
         if self._backup_scan_anim_id is None:
             self._backup_scan_anim_id = GLib.timeout_add(
-                80, self._tick_backup_scan)
+                120, self._tick_backup_scan)
         log_info(_("Structuur-scan gestart"))
 
         def _scan():
@@ -7529,7 +7570,7 @@ class MainWindow(Adw.ApplicationWindow):
         if hasattr(self, "_viewer_donut_btn"):
             self._viewer_donut_btn.set_tooltip_text(tip)
         if self._backup_scan_anim_id is None:
-            self._backup_scan_anim_id = GLib.timeout_add(80, self._tick_backup_scan)
+            self._backup_scan_anim_id = GLib.timeout_add(120, self._tick_backup_scan)
         log_info(_("Backup-scan gestart"))
         threading.Thread(target=self._backup_scan_thread, daemon=True).start()
 
@@ -8669,7 +8710,7 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
         if self._backup_scan_anim_id is None:
             self._backup_scan_anim_id = GLib.timeout_add(
-                80, self._tick_backup_scan)
+                120, self._tick_backup_scan)
         return False
 
     def _review_orphans_thread(self):
