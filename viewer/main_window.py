@@ -229,6 +229,9 @@ if not WEBKIT_AVAILABLE:
 
 ASSETS_DIR       = os.path.join(os.path.dirname(__file__), "..", "assets", "logos")
 VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
+LICENSE_PATH     = os.path.abspath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "LICENSE"
+))
 INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
 GITHUB_RELEASES_API = "https://api.github.com/repos/Linux-Ginger/pixora/releases/latest"
 CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
@@ -1840,6 +1843,128 @@ class MainWindow(Adw.ApplicationWindow):
             )
         except Exception as e:
             log_warn(_("GitHub openen mislukt: {err}").format(err=e))
+
+    def _on_view_license(self, btn):
+        """Popup met GPL-3.0 samenvatting (✓ / ! / ✗) + volledige tekst."""
+        win = Adw.Window()
+        win.set_title(_("Licentie"))
+        win.set_transient_for(self)
+        win.set_modal(False)
+        win.set_default_size(780, 760)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        outer.append(Adw.HeaderBar())
+
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        body.set_margin_top(16)
+        body.set_margin_bottom(16)
+        body.set_margin_start(18)
+        body.set_margin_end(18)
+
+        heading = Gtk.Label(label=_("GNU General Public License v3.0"))
+        heading.add_css_class("title-2")
+        heading.set_halign(Gtk.Align.START)
+        body.append(heading)
+
+        intro = Gtk.Label(
+            label=_("Pixora is vrije software onder GPL-3.0. Je mag 'm "
+                    "gebruiken, wijzigen en doorgeven — onder voorwaarde "
+                    "dat je die rechten voor anderen ook respecteert.")
+        )
+        intro.add_css_class("dim-label")
+        intro.set_halign(Gtk.Align.START)
+        intro.set_wrap(True)
+        intro.set_xalign(0)
+        body.append(intro)
+
+        # Drie kolommen: mag / moet / mag niet.
+        summary = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL, spacing=12,
+            homogeneous=True,
+        )
+        summary.append(self._license_summary_col(
+            _("Toegestaan"), "✓", "success",
+            [
+                _("Privé én commercieel gebruiken"),
+                _("De code wijzigen"),
+                _("Distribueren (origineel of gewijzigd)"),
+                _("Patent-licenties van contributors"),
+            ],
+        ))
+        summary.append(self._license_summary_col(
+            _("Verplicht"), "!", "warning",
+            [
+                _("Broncode meeleveren bij distributie"),
+                _("Zelfde GPL-3 licentie gebruiken"),
+                _("Wijzigingen duidelijk markeren"),
+                _("Copyright-notice behouden"),
+            ],
+        ))
+        summary.append(self._license_summary_col(
+            _("Niet toegestaan"), "✗", "error",
+            [
+                _("Opnemen in proprietary software"),
+                _("Garantie claimen (er is geen)"),
+                _("Auteurs aansprakelijk stellen"),
+            ],
+        ))
+        body.append(summary)
+
+        body.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+
+        full_hdr = Gtk.Label(label=_("Volledige licentietekst"))
+        full_hdr.add_css_class("heading")
+        full_hdr.set_halign(Gtk.Align.START)
+        body.append(full_hdr)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_min_content_height(260)
+        tv = Gtk.TextView()
+        tv.set_editable(False)
+        tv.set_cursor_visible(False)
+        tv.set_monospace(True)
+        tv.set_wrap_mode(Gtk.WrapMode.WORD)
+        tv.set_left_margin(12)
+        tv.set_right_margin(12)
+        tv.set_top_margin(12)
+        tv.set_bottom_margin(12)
+        try:
+            with open(LICENSE_PATH, "r", encoding="utf-8") as f:
+                lic_text = f.read()
+        except Exception as e:
+            lic_text = _("Kon licentie niet laden: {err}").format(err=e)
+        tv.get_buffer().set_text(lic_text)
+        scroll.set_child(tv)
+        body.append(scroll)
+
+        outer.append(body)
+        win.set_content(outer)
+        win.present()
+
+    def _license_summary_col(self, title, icon_char, css_class, items):
+        """Kolom voor de licentie-samenvatting. icon_char is een Unicode
+        teken (✓ / ! / ✗) omdat dat onafhankelijk is van icon-themes en
+        ook mooi rendert in monospace-fallback."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        badge = Gtk.Label(label=icon_char)
+        badge.add_css_class("heading")
+        badge.add_css_class(css_class)
+        header.append(badge)
+        hlbl = Gtk.Label(label=title)
+        hlbl.add_css_class("heading")
+        hlbl.set_halign(Gtk.Align.START)
+        header.append(hlbl)
+        box.append(header)
+        for item in items:
+            lbl = Gtk.Label(label="• " + item)
+            lbl.set_halign(Gtk.Align.START)
+            lbl.set_wrap(True)
+            lbl.set_xalign(0)
+            lbl.add_css_class("caption")
+            box.append(lbl)
+        return box
 
     def _on_settings_check_update(self, btn):
         # Als er een update klaarstaat → knop-klik start de updater.
@@ -5825,9 +5950,27 @@ class MainWindow(Adw.ApplicationWindow):
         credit_group.set_description(
             _("GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc.")
             + "\n"
-            + _("© {year} Pixora").format(year=datetime.datetime.now().year)
+            + _("© {year} Pixora — LinuxGinger").format(
+                year=datetime.datetime.now().year)
         )
         about_page.add(credit_group)
+
+        # Licentie-row met "Bekijken"-knop die de GPL-3 popup opent.
+        license_group = Adw.PreferencesGroup()
+        license_row = Adw.ActionRow(
+            title=_("Licentie"),
+            subtitle=_("GNU General Public License v3.0"),
+        )
+        license_row.add_prefix(
+            Gtk.Image.new_from_icon_name("text-x-generic-symbolic"))
+        license_btn = Gtk.Button(label=_("Bekijken"))
+        license_btn.add_css_class("flat")
+        license_btn.set_valign(Gtk.Align.CENTER)
+        license_btn.connect("clicked", self._on_view_license)
+        license_row.add_suffix(license_btn)
+        license_row.set_activatable_widget(license_btn)
+        license_group.add(license_row)
+        about_page.add(license_group)
 
         dialog.add(display_page)
         dialog.add(import_page)

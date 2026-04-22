@@ -1750,6 +1750,75 @@ msgstr "GitHub® et le logo Invertocat sont des marques de GitHub, Inc."
 msgid "© {year} Pixora"
 msgstr "© {year} Pixora"
 
+msgid "© {year} Pixora — LinuxGinger"
+msgstr "© {year} Pixora — LinuxGinger"
+
+msgid "Licentie"
+msgstr "Licence"
+
+msgid "GNU General Public License v3.0"
+msgstr "GNU General Public License v3.0"
+
+msgid "Bekijken"
+msgstr "Afficher"
+
+msgid ""
+"Pixora is vrije software onder GPL-3.0. Je mag 'm gebruiken, wijzigen en "
+"doorgeven — onder voorwaarde dat je die rechten voor anderen ook "
+"respecteert."
+msgstr ""
+"Pixora est un logiciel libre sous licence GPL-3.0. Vous pouvez l'utiliser, "
+"le modifier et le redistribuer — à condition de respecter ces mêmes droits "
+"pour les autres."
+
+msgid "Toegestaan"
+msgstr "Autorisé"
+
+msgid "Verplicht"
+msgstr "Obligatoire"
+
+msgid "Niet toegestaan"
+msgstr "Non autorisé"
+
+msgid "Volledige licentietekst"
+msgstr "Texte complet de la licence"
+
+msgid "Kon licentie niet laden: {err}"
+msgstr "Impossible de charger la licence : {err}"
+
+msgid "Privé én commercieel gebruiken"
+msgstr "Usage privé et commercial"
+
+msgid "De code wijzigen"
+msgstr "Modifier le code"
+
+msgid "Distribueren (origineel of gewijzigd)"
+msgstr "Distribuer (original ou modifié)"
+
+msgid "Patent-licenties van contributors"
+msgstr "Licences de brevet des contributeurs"
+
+msgid "Broncode meeleveren bij distributie"
+msgstr "Fournir le code source lors de la distribution"
+
+msgid "Zelfde GPL-3 licentie gebruiken"
+msgstr "Utiliser la même licence GPL-3"
+
+msgid "Wijzigingen duidelijk markeren"
+msgstr "Indiquer clairement les modifications"
+
+msgid "Copyright-notice behouden"
+msgstr "Conserver la mention de copyright"
+
+msgid "Opnemen in proprietary software"
+msgstr "Inclure dans un logiciel propriétaire"
+
+msgid "Garantie claimen (er is geen)"
+msgstr "Réclamer une garantie (il n'y en a pas)"
+
+msgid "Auteurs aansprakelijk stellen"
+msgstr "Tenir les auteurs responsables"
+
 msgid "Backup mislukt"
 msgstr "Échec de la sauvegarde"
 

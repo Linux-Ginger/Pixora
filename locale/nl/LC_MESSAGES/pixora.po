@@ -1756,6 +1756,75 @@ msgstr "GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc."
 msgid "© {year} Pixora"
 msgstr "© {year} Pixora"
 
+msgid "© {year} Pixora — LinuxGinger"
+msgstr "© {year} Pixora — LinuxGinger"
+
+msgid "Licentie"
+msgstr "Licentie"
+
+msgid "GNU General Public License v3.0"
+msgstr "GNU General Public License v3.0"
+
+msgid "Bekijken"
+msgstr "Bekijken"
+
+msgid ""
+"Pixora is vrije software onder GPL-3.0. Je mag 'm gebruiken, wijzigen en "
+"doorgeven — onder voorwaarde dat je die rechten voor anderen ook "
+"respecteert."
+msgstr ""
+"Pixora is vrije software onder GPL-3.0. Je mag 'm gebruiken, wijzigen en "
+"doorgeven — onder voorwaarde dat je die rechten voor anderen ook "
+"respecteert."
+
+msgid "Toegestaan"
+msgstr "Toegestaan"
+
+msgid "Verplicht"
+msgstr "Verplicht"
+
+msgid "Niet toegestaan"
+msgstr "Niet toegestaan"
+
+msgid "Volledige licentietekst"
+msgstr "Volledige licentietekst"
+
+msgid "Kon licentie niet laden: {err}"
+msgstr "Kon licentie niet laden: {err}"
+
+msgid "Privé én commercieel gebruiken"
+msgstr "Privé én commercieel gebruiken"
+
+msgid "De code wijzigen"
+msgstr "De code wijzigen"
+
+msgid "Distribueren (origineel of gewijzigd)"
+msgstr "Distribueren (origineel of gewijzigd)"
+
+msgid "Patent-licenties van contributors"
+msgstr "Patent-licenties van contributors"
+
+msgid "Broncode meeleveren bij distributie"
+msgstr "Broncode meeleveren bij distributie"
+
+msgid "Zelfde GPL-3 licentie gebruiken"
+msgstr "Zelfde GPL-3 licentie gebruiken"
+
+msgid "Wijzigingen duidelijk markeren"
+msgstr "Wijzigingen duidelijk markeren"
+
+msgid "Copyright-notice behouden"
+msgstr "Copyright-notice behouden"
+
+msgid "Opnemen in proprietary software"
+msgstr "Opnemen in proprietary software"
+
+msgid "Garantie claimen (er is geen)"
+msgstr "Garantie claimen (er is geen)"
+
+msgid "Auteurs aansprakelijk stellen"
+msgstr "Auteurs aansprakelijk stellen"
+
 msgid "Backup mislukt"
 msgstr "Backup mislukt"
 

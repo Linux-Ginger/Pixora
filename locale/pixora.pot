@@ -1083,6 +1083,72 @@ msgstr ""
 msgid "© {year} Pixora"
 msgstr ""
 
+msgid "© {year} Pixora — LinuxGinger"
+msgstr ""
+
+msgid "Licentie"
+msgstr ""
+
+msgid "GNU General Public License v3.0"
+msgstr ""
+
+msgid "Bekijken"
+msgstr ""
+
+msgid ""
+"Pixora is vrije software onder GPL-3.0. Je mag 'm gebruiken, wijzigen en "
+"doorgeven — onder voorwaarde dat je die rechten voor anderen ook "
+"respecteert."
+msgstr ""
+
+msgid "Toegestaan"
+msgstr ""
+
+msgid "Verplicht"
+msgstr ""
+
+msgid "Niet toegestaan"
+msgstr ""
+
+msgid "Volledige licentietekst"
+msgstr ""
+
+msgid "Kon licentie niet laden: {err}"
+msgstr ""
+
+msgid "Privé én commercieel gebruiken"
+msgstr ""
+
+msgid "De code wijzigen"
+msgstr ""
+
+msgid "Distribueren (origineel of gewijzigd)"
+msgstr ""
+
+msgid "Patent-licenties van contributors"
+msgstr ""
+
+msgid "Broncode meeleveren bij distributie"
+msgstr ""
+
+msgid "Zelfde GPL-3 licentie gebruiken"
+msgstr ""
+
+msgid "Wijzigingen duidelijk markeren"
+msgstr ""
+
+msgid "Copyright-notice behouden"
+msgstr ""
+
+msgid "Opnemen in proprietary software"
+msgstr ""
+
+msgid "Garantie claimen (er is geen)"
+msgstr ""
+
+msgid "Auteurs aansprakelijk stellen"
+msgstr ""
+
 msgid "Backup mislukt"
 msgstr ""
 
