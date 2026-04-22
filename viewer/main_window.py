@@ -8220,12 +8220,14 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         orphan_count = self._last_scan_orphan_count
         mode = self.settings.get("backup_mode", "backup")
+        dedup_on = bool(self.settings.get("backup_dedup"))
+        has_orphans = (success and mode == "backup" and orphan_count > 0
+                       and self._last_scan_orphan_rels)
 
-        # Orphans in backup-mode → start pHash-analyse. Die dialog toont
-        # info + keuze (dubbele kopieën verwijderen / alles behouden) en
-        # vervangt de standaard voltooid-popup. Werkt ook in silent-mode.
-        if (success and mode == "backup" and orphan_count > 0
-                and self._last_scan_orphan_rels):
+        # Orphans + dedup aan → pHash-analyse met keuze-dialog (vervangt de
+        # voltooid-popup). Zonder dedup-toggle doen we geen pHash-werk;
+        # alleen een simpele "let op"-melding.
+        if has_orphans and dedup_on:
             log_info(_("Backup voltooid, orphan-analyse gestart "
                        "({n} orphans)").format(n=orphan_count))
             threading.Thread(
@@ -8234,7 +8236,29 @@ class MainWindow(Adw.ApplicationWindow):
             return
 
         # Silent-mode: success-popup overslaan. Fouten blijven wél zichtbaar.
+        # Uitzondering: orphans in backup-mode zonder dedup → tóch een info-
+        # popup zodat de gebruiker weet dat er iets vreemds op de USB staat.
         if success and self.settings.get("backup_silent"):
+            if has_orphans:
+                log_info(_("Silent-mode: backup voltooid, {n} orphans "
+                           "gemeld").format(n=orphan_count))
+                dlg = Adw.AlertDialog(
+                    heading=_("Backup voltooid — let op"),
+                    body=ngettext(
+                        "Er staat {n} foto op je USB die niet in Pixora "
+                        "staat (bv. een handmatig gekopieerde map). Deze "
+                        "blijft bewaard als archief.",
+                        "Er staan {n} foto's op je USB die niet in Pixora "
+                        "staan (bv. een handmatig gekopieerde map). Deze "
+                        "blijven bewaard als archief.",
+                        orphan_count,
+                    ).format(n=orphan_count),
+                )
+                dlg.add_response("ok", _("OK"))
+                dlg.set_default_response("ok")
+                dlg.set_close_response("ok")
+                self._present_dialog(dlg)
+                return
             log_info(_("Silent-mode: backup voltooid zonder popup"))
             return
 
@@ -8242,6 +8266,17 @@ class MainWindow(Adw.ApplicationWindow):
             if mode == "sync":
                 heading = _("Sync voltooid")
                 body = _("Je USB-schijf is nu identiek aan Pixora.")
+            elif has_orphans:
+                heading = _("Backup voltooid — let op")
+                body = ngettext(
+                    "Alle foto's uit Pixora staan op de USB. Let op: er "
+                    "staat {n} foto op je USB die niet in Pixora staat "
+                    "(blijft bewaard als archief).",
+                    "Alle foto's uit Pixora staan op de USB. Let op: er "
+                    "staan {n} foto's op je USB die niet in Pixora staan "
+                    "(blijven bewaard als archief).",
+                    orphan_count,
+                ).format(n=orphan_count)
             else:
                 heading = _("Backup voltooid")
                 body = _("Alle foto's staan op de USB-schijf.")
