@@ -715,6 +715,30 @@ msgstr ""
 msgid "Duplicaat-check klaar: {n} dubbel, worden overgeslagen"
 msgstr ""
 
+msgid "Backup voltooid — let op"
+msgstr ""
+
+msgid "Silent-mode: backup voltooid, {n} orphans gemeld"
+msgstr ""
+
+msgid ""
+"Er staat {n} foto op je USB die niet in Pixora staat (bv. een handmatig "
+"gekopieerde map). Deze blijft bewaard als archief."
+msgid_plural ""
+"Er staan {n} foto's op je USB die niet in Pixora staan (bv. een handmatig "
+"gekopieerde map). Deze blijven bewaard als archief."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"Alle foto's uit Pixora staan op de USB. Let op: er staat {n} foto op je USB "
+"die niet in Pixora staat (blijft bewaard als archief)."
+msgid_plural ""
+"Alle foto's uit Pixora staan op de USB. Let op: er staan {n} foto's op je "
+"USB die niet in Pixora staan (blijven bewaard als archief)."
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Backup-scan gestart"
 msgstr ""
 

@@ -1293,6 +1293,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scanning  = False
         self._backup_deduping  = False  # dedup-fase vóór rsync
         self._backup_scan_phase = 0.0
+        # Orphan-count uit de laatste scan — foto's op USB die niet meer
+        # in Pixora zijn. Gebruikt voor waarschuwing na silent-backup
+        # (bv. als user handmatig een dubbele map op USB heeft gekopieerd).
+        self._last_scan_orphan_count = 0
         self._backup_scan_anim_id = None
         self._backup_scan_dialog_open = False
         self._manual_scan_requested = False
@@ -7337,6 +7341,9 @@ class MainWindow(Adw.ApplicationWindow):
         bytes_to_transfer = result["bytes"]
         dup_count = result.get("dup_count", 0)
         mode = result.get("mode", self.settings.get("backup_mode", "backup"))
+        # Onthouden voor de post-backup melding in silent-mode. In sync-mode
+        # worden orphans verwijderd → dan is de melding achteraf niet relevant.
+        self._last_scan_orphan_count = delete_count if mode == "backup" else 0
 
         # In backup-modus zijn orphans (delete_count) informatief — ze worden
         # bewaard. Voor de "is alles al gesynct?"-check behandelen we ze dan
@@ -8195,16 +8202,50 @@ class MainWindow(Adw.ApplicationWindow):
             self.backup_done_banner.set_revealed(False)
         except Exception:
             pass
+        orphan_count = self._last_scan_orphan_count
+        mode = self.settings.get("backup_mode", "backup")
         # Silent-mode: success-popup overslaan. Fouten blijven wél zichtbaar —
-        # anders merkt de gebruiker een kapotte backup nooit.
+        # anders merkt de gebruiker een kapotte backup nooit. Uitzondering:
+        # als er orphans op de USB staan (bv. handmatig gekopieerde map)
+        # tonen we tóch een melding, anders ziet de gebruiker dat nooit.
         if success and self.settings.get("backup_silent"):
+            if mode == "backup" and orphan_count > 0:
+                log_info(_("Silent-mode: backup voltooid, {n} orphans "
+                           "gemeld").format(n=orphan_count))
+                dlg = Adw.AlertDialog(
+                    heading=_("Backup voltooid — let op"),
+                    body=ngettext(
+                        "Er staat {n} foto op je USB die niet in Pixora "
+                        "staat (bv. een handmatig gekopieerde map). Deze "
+                        "blijft bewaard als archief.",
+                        "Er staan {n} foto's op je USB die niet in Pixora "
+                        "staan (bv. een handmatig gekopieerde map). Deze "
+                        "blijven bewaard als archief.",
+                        orphan_count,
+                    ).format(n=orphan_count),
+                )
+                dlg.add_response("ok", _("OK"))
+                dlg.set_default_response("ok")
+                dlg.set_close_response("ok")
+                self._present_dialog(dlg)
+                return
             log_info(_("Silent-mode: backup voltooid zonder popup"))
             return
-        mode = self.settings.get("backup_mode", "backup")
         if success:
             if mode == "sync":
                 heading = _("Sync voltooid")
                 body = _("Je USB-schijf is nu identiek aan Pixora.")
+            elif orphan_count > 0:
+                heading = _("Backup voltooid — let op")
+                body = ngettext(
+                    "Alle foto's uit Pixora staan op de USB. Let op: er "
+                    "staat {n} foto op je USB die niet in Pixora staat "
+                    "(blijft bewaard als archief).",
+                    "Alle foto's uit Pixora staan op de USB. Let op: er "
+                    "staan {n} foto's op je USB die niet in Pixora staan "
+                    "(blijven bewaard als archief).",
+                    orphan_count,
+                ).format(n=orphan_count)
             else:
                 heading = _("Backup voltooid")
                 body = _("Alle foto's staan op de USB-schijf.")
