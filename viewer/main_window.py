@@ -5824,6 +5824,8 @@ class MainWindow(Adw.ApplicationWindow):
         credit_group = Adw.PreferencesGroup()
         credit_group.set_description(
             _("GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc.")
+            + "\n"
+            + _("© {year} Pixora").format(year=datetime.datetime.now().year)
         )
         about_page.add(credit_group)
 

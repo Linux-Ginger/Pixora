@@ -1747,6 +1747,9 @@ msgstr "Vérifier à l'import"
 msgid "GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc."
 msgstr "GitHub® et le logo Invertocat sont des marques de GitHub, Inc."
 
+msgid "© {year} Pixora"
+msgstr "© {year} Pixora"
+
 msgid "Backup mislukt"
 msgstr "Échec de la sauvegarde"
 

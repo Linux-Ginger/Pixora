@@ -1080,6 +1080,9 @@ msgstr ""
 msgid "GitHub® en het Invertocat-logo zijn handelsmerken van GitHub, Inc."
 msgstr ""
 
+msgid "© {year} Pixora"
+msgstr ""
+
 msgid "Backup mislukt"
 msgstr ""
 
