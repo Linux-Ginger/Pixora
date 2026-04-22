@@ -2218,11 +2218,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.select_btn.connect("clicked", self.toggle_select_mode)
         self.header.pack_end(self.select_btn)
 
-        settings_btn = Gtk.Button(icon_name="preferences-system-symbolic")
-        settings_btn.add_css_class("flat")
-        settings_btn.set_tooltip_text(_("Instellingen"))
-        settings_btn.connect("clicked", self.on_settings_clicked)
-        self.header.pack_end(settings_btn)
+        self.settings_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+        self.settings_btn.add_css_class("flat")
+        self.settings_btn.set_tooltip_text(_("Instellingen"))
+        self.settings_btn.connect("clicked", self.on_settings_clicked)
+        self.header.pack_end(self.settings_btn)
 
         # Backup-progress donut (verborgen tot backup actief is).
         # Gtk.Button met custom DrawingArea-child zodat de cirkel meedraait
@@ -5097,6 +5097,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     # ── Instellingen ──────────────────────────────────────────────────
     def on_settings_clicked(self, btn):
+        # Settings-knop uitgrijzen zolang dialog open is, zodat je niet
+        # meerdere instances naast elkaar kan openen.
+        if self._settings_dialog is not None:
+            self._settings_dialog.present()
+            return
         log_info(_("Instellingen geopend"))
         # Gebruik PreferencesWindow (eigen toplevel) i.p.v.
         # PreferencesDialog — die laatste blokkeert op Adw 1.5+ de
@@ -5113,10 +5118,16 @@ class MainWindow(Adw.ApplicationWindow):
         # geen 50 rijen dus die verbergen we.
         dialog.set_search_enabled(False)
         self._settings_dialog = dialog
-        dialog.connect(
-            "close-request",
-            lambda _d: (setattr(self, "_settings_dialog", None), False)[1],
-        )
+        if hasattr(self, "settings_btn"):
+            self.settings_btn.set_sensitive(False)
+
+        def _on_settings_closed(_d):
+            self._settings_dialog = None
+            if hasattr(self, "settings_btn"):
+                self.settings_btn.set_sensitive(True)
+            return False
+
+        dialog.connect("close-request", _on_settings_closed)
 
         display_page = Adw.PreferencesPage()
         display_page.set_title(_("Weergave"))
