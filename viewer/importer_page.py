@@ -34,6 +34,7 @@ import hashlib
 import subprocess
 import threading
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime
 
@@ -430,7 +431,9 @@ def save_hash_cache(cache: dict):
 
 
 def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
-    """Bouw een hash-index van alle foto's in het archief."""
+    """Bouw een hash-index van alle foto's in het archief. Niet-cached
+    foto's worden parallel gehasht (pool=4) — pHash-compute is CPU-bound
+    maar PIL release de GIL tijdens decode, dus threads versnellen dit."""
     cache = load_hash_cache()
     hashes = {}
 
@@ -440,22 +443,36 @@ def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
             if Path(fn).suffix.lower() in SUPPORTED_EXT:
                 all_files.append(Path(root) / fn)
 
-    for i, fp in enumerate(all_files):
-        if progress_cb:
-            progress_cb(i, len(all_files), fp.name)
+    cache_keys = {}
+    to_hash = []
+    for fp in all_files:
         try:
             stat = fp.stat()
         except OSError:
             continue
         cache_key = f"{fp}:{int(stat.st_mtime)}:{stat.st_size}"
+        cache_keys[fp] = cache_key
         if cache_key in cache:
             ph = cache[cache_key]
-        else:
-            ph = perceptual_hash(fp)
             if ph:
-                cache[cache_key] = ph
-        if ph:
-            hashes[str(fp)] = ph
+                hashes[str(fp)] = ph
+        else:
+            to_hash.append(fp)
+
+    if to_hash:
+        done = 0
+        total = len(all_files)
+        cached = total - len(to_hash)
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            for fp, ph in zip(to_hash, pool.map(perceptual_hash, to_hash)):
+                done += 1
+                if progress_cb:
+                    progress_cb(cached + done, total, fp.name)
+                if ph:
+                    cache[cache_keys[fp]] = ph
+                    hashes[str(fp)] = ph
+    elif progress_cb:
+        progress_cb(len(all_files), len(all_files), "")
 
     save_hash_cache(cache)
     return hashes

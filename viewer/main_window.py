@@ -1458,16 +1458,10 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._poll_import_device)
         GLib.timeout_add_seconds(10, self._poll_import_device)
         self._setup_usb_monitor()
-        # Poll de backup-drive elke 4s zodat we een drive-insert snel zien
-        # (betrouwbaarder dan GUdev voor block-device mount-events).
         self._backup_drive_last_seen = False
-        GLib.timeout_add_seconds(4, self._poll_backup_drive)
-        # Bij startup: als pending + drive aangesloten → meteen popup
+        GLib.timeout_add_seconds(8, self._poll_backup_drive)
         GLib.idle_add(self._check_pending_backup)
-        # Elke 60s: structuur-scan + backup-scan in één tick. Structuur-scan
-        # werkt ook zonder drive; backup-scan alleen als alles geconfigureerd
-        # is. Zie _periodic_scan.
-        GLib.timeout_add_seconds(60, self._periodic_scan)
+        GLib.timeout_add_seconds(300, self._periodic_scan)
 
     def _start_services(self):
         try:
@@ -3290,15 +3284,39 @@ class MainWindow(Adw.ApplicationWindow):
             self.start_watcher(photo_path)
             return False
         self.photos = photos
-        self.apply_sort()
         n = len(self.photos)
         count_text = ngettext("%d foto", "%d foto's", n) % n
         if self._favorites_only:
             count_text = _("{count} (favorieten)").format(count=count_text)
         self.photo_count_label.set_text(count_text)
-        self.start_load()
         self.start_watcher(photo_path)
+        # Sort + render async — bij eerste keer duurt date-fetch (EXIF)
+        # seconden voor 2000 foto's. Thread-pool doet 'm parallel en
+        # blokkeert de UI niet.
+        self.content_stack.set_visible_child_name("loading")
+        self.spinner.start()
+        self.spinner_label.set_text(_("Foto's sorteren…"))
+        threading.Thread(
+            target=self._sort_then_load, daemon=True
+        ).start()
         return False
+
+    def _sort_then_load(self):
+        sort_idx = (self.sort_combo.get_selected()
+                    if hasattr(self, "sort_combo") else 0)
+        photos = list(self.photos)
+        if sort_idx in (0, 1) and photos:
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                dates = list(pool.map(get_photo_date, photos))
+            date_map = dict(zip(photos, dates))
+            photos.sort(key=date_map.get, reverse=(sort_idx == 0))
+        elif sort_idx == 2:
+            photos.sort(key=lambda p: os.path.basename(p).lower())
+        elif sort_idx == 3:
+            photos.sort(key=lambda p: os.path.basename(p).lower(),
+                        reverse=True)
+        self.photos = photos
+        GLib.idle_add(self.start_load)
 
     def _show_empty_favorites(self):
         self.spinner.stop()
@@ -3457,7 +3475,7 @@ class MainWindow(Adw.ApplicationWindow):
         if getattr(self, "_viewport_hydrate_pending", False):
             return
         self._viewport_hydrate_pending = True
-        GLib.timeout_add(80, self._run_viewport_hydrate)
+        GLib.timeout_add(150, self._run_viewport_hydrate)
 
     def _run_viewport_hydrate(self):
         self._viewport_hydrate_pending = False
@@ -3481,6 +3499,10 @@ class MainWindow(Adw.ApplicationWindow):
         if not hasattr(self, "_hydrated_indices"):
             self._hydrated_indices = set()
         want = set()
+        # thumb_widgets is een dict met insertion-order = photo-index order =
+        # grofweg top-to-bottom in de grid. Na de visible range kunnen we
+        # stoppen i.p.v. alle 2000 thumbs coördinaten te laten berekenen.
+        seen_visible = False
         for index, (btn, _check) in self.thumb_widgets.items():
             if not hasattr(btn, "_pixora_cache_path"):
                 continue
@@ -3499,6 +3521,9 @@ class MainWindow(Adw.ApplicationWindow):
             btn_bottom = dst_y + h
             if btn_bottom >= -buffer_px and btn_top <= v_page + buffer_px:
                 want.add(index)
+                seen_visible = True
+            elif seen_visible and btn_top > v_page + buffer_px:
+                break
         to_hydrate = want - self._hydrated_indices
         to_drop = self._hydrated_indices - want
         for idx in to_hydrate:
@@ -3766,10 +3791,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _do_sort_bg(self, sort_index):
         photos = list(self.photos)
-        if sort_index == 0:
-            photos.sort(key=get_photo_date, reverse=True)
-        elif sort_index == 1:
-            photos.sort(key=get_photo_date)
+        if sort_index in (0, 1) and photos:
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                dates = list(pool.map(get_photo_date, photos))
+            date_map = dict(zip(photos, dates))
+            photos.sort(key=date_map.get, reverse=(sort_index == 0))
         elif sort_index == 2:
             photos.sort(key=lambda p: os.path.basename(p).lower())
         elif sort_index == 3:
