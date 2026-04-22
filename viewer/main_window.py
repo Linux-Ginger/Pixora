@@ -3215,7 +3215,13 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 dt = UNKNOWN
             groups[dt].append(i)
-        sorted_dates = sorted(groups.keys(), reverse=True)
+        # Groepsvolgorde: default newest-first, maar bij "Datum oudste" sort
+        # moeten de oudste groepen bovenaan staan — anders draaide de grid
+        # precies andersom dan de filmstrip (die self.photos direct volgt).
+        sort_idx = (self.sort_combo.get_selected()
+                    if hasattr(self, "sort_combo") else 0)
+        oldest_first = (sort_idx == 1)
+        sorted_dates = sorted(groups.keys(), reverse=not oldest_first)
 
         def _header(dt):
             if dt == UNKNOWN:
