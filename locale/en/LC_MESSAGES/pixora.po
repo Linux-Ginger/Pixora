@@ -1301,6 +1301,12 @@ msgstr "Backup complete, orphan analysis started ({n} orphans)"
 msgid "Manual scan: orphan-analyse gestart ({n} orphans)"
 msgstr "Manual scan: orphan analysis started ({n} orphans)"
 
+msgid "Analyseren op dubbele kopieën…"
+msgstr "Analyzing for duplicate copies…"
+
+msgid "Analyseren: {c} / {t}"
+msgstr "Analyzing: {c} / {t}"
+
 msgid "Orphan-analyse overgeslagen: {err}"
 msgstr "Orphan analysis skipped: {err}"
 

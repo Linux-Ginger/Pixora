@@ -745,6 +745,12 @@ msgstr ""
 msgid "Manual scan: orphan-analyse gestart ({n} orphans)"
 msgstr ""
 
+msgid "Analyseren op dubbele kopieën…"
+msgstr ""
+
+msgid "Analyseren: {c} / {t}"
+msgstr ""
+
 msgid "Orphan-analyse overgeslagen: {err}"
 msgstr ""
 

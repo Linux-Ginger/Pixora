@@ -1292,6 +1292,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_done      = 0
         self._backup_scanning  = False
         self._backup_deduping  = False  # dedup-fase vóór rsync
+        self._orphan_reviewing = False  # pHash-analyse ná backup
         self._backup_scan_phase = 0.0
         # Orphan-count uit de laatste scan — foto's op USB die niet meer
         # in Pixora zijn. Gebruikt voor waarschuwing na silent-backup
@@ -7249,7 +7250,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _tick_backup_scan(self):
         if (not self._backup_scanning
                 and not self._structure_scanning
-                and not self._backup_deduping):
+                and not self._backup_deduping
+                and not self._orphan_reviewing):
             self._backup_scan_anim_id = None
             return False
         self._backup_scan_phase = (self._backup_scan_phase + 0.18) % (2 * math.pi)
@@ -8079,13 +8081,14 @@ class MainWindow(Adw.ApplicationWindow):
             # Kleur: oranje als backup actief is, anders donker-blauw.
             # Zowel de structuur-scan als de reorganize-voortgang vallen
             # onder "geen backup-context" en krijgen dus de blauwe tint.
-            if self._backup_scanning or self._backup_running:
+            if (self._backup_scanning or self._backup_running
+                    or self._orphan_reviewing):
                 color = (0.914, 0.329, 0.125)  # orange
             else:
                 color = (0.10, 0.20, 0.55)  # dark blue
 
             if (self._backup_scanning or self._structure_scanning
-                    or self._backup_deduping):
+                    or self._backup_deduping or self._orphan_reviewing):
                 start = self._backup_scan_phase - math.pi / 2
                 end = start + math.pi / 2  # kwart cirkel
                 cr.set_source_rgb(*color)
@@ -8176,6 +8179,10 @@ class MainWindow(Adw.ApplicationWindow):
             detail = ""
         elif self._backup_deduping:
             title = _("Duplicaat-check…")
+            pct = ""
+            detail = (self._backup_detail or "").strip()
+        elif self._orphan_reviewing:
+            title = _("Analyseren op dubbele kopieën…")
             pct = ""
             detail = (self._backup_detail or "").strip()
         elif self._backup_running and not self._backup_scanning:
@@ -8322,32 +8329,72 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
             return
-        try:
-            src_hashes = build_library_hashes(photo_path)
-        except Exception as e:
-            log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
-            return
+
+        # Donut-spinner aan tijdens de analyse zodat er geen 'dood gat'
+        # zit tussen backup-klaar en het keuze-dialog.
+        self._orphan_reviewing = True
+
+        def _start_review_ui():
+            tip = _("Analyseren op dubbele kopieën…")
+            if hasattr(self, "_backup_donut_btn"):
+                try:
+                    self._set_donuts_visible(True)
+                    self._backup_donut_btn.set_tooltip_text(tip)
+                except Exception:
+                    pass
+            if hasattr(self, "_viewer_donut_btn"):
+                try:
+                    self._viewer_donut_btn.set_tooltip_text(tip)
+                except Exception:
+                    pass
+            if self._backup_scan_anim_id is None:
+                self._backup_scan_anim_id = GLib.timeout_add(
+                    80, self._tick_backup_scan)
+            return False
+        GLib.idle_add(_start_review_ui)
 
         dup_rels = []
         unique_rels = []
-        MAX_DIST = 2
-        for rel in orphan_rels:
-            orph_file = backup_dest / rel
-            if not orph_file.is_file():
-                continue
-            if orph_file.suffix.lower() not in SUPPORTED_EXT:
-                unique_rels.append(rel)
-                continue
-            ph = perceptual_hash(orph_file)
-            if ph and find_duplicate(ph, src_hashes, MAX_DIST):
-                dup_rels.append(rel)
-            else:
-                unique_rels.append(rel)
+        try:
+            src_hashes = build_library_hashes(photo_path)
+            MAX_DIST = 2
+            total = len(orphan_rels)
+            for i, rel in enumerate(orphan_rels):
+                if i % 25 == 0:
+                    msg = _("Analyseren: {c} / {t}").format(c=i, t=total)
+                    GLib.idle_add(self._set_dedup_detail, msg)
+                orph_file = backup_dest / rel
+                if not orph_file.is_file():
+                    continue
+                if orph_file.suffix.lower() not in SUPPORTED_EXT:
+                    unique_rels.append(rel)
+                    continue
+                ph = perceptual_hash(orph_file)
+                if ph and find_duplicate(ph, src_hashes, MAX_DIST):
+                    dup_rels.append(rel)
+                else:
+                    unique_rels.append(rel)
+        except Exception as e:
+            log_warn(_("Orphan-analyse overgeslagen: {err}").format(err=e))
+            dup_rels, unique_rels = [], list(orphan_rels)
+        finally:
+            self._orphan_reviewing = False
+            GLib.idle_add(self._set_dedup_detail, "")
+            GLib.idle_add(self._finish_review_ui)
 
         log_info(_("Orphan-analyse: {d} dubbele kopieën, "
                    "{u} uniek op USB").format(
             d=len(dup_rels), u=len(unique_rels)))
         GLib.idle_add(self._show_orphan_review_dialog, dup_rels, unique_rels)
+
+    def _finish_review_ui(self):
+        """Donut verbergen nadat de orphan-analyse klaar is."""
+        if hasattr(self, "_backup_donut_btn"):
+            try:
+                self._set_donuts_visible(self._backup_running)
+            except Exception:
+                pass
+        return False
 
     def _show_orphan_review_dialog(self, dup_rels, unique_rels):
         if not dup_rels and not unique_rels:

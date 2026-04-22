@@ -1292,6 +1292,12 @@ msgstr "Backup abgeschlossen, Waisen-Analyse gestartet ({n} Waisen)"
 msgid "Manual scan: orphan-analyse gestart ({n} orphans)"
 msgstr "Manueller Scan: Waisen-Analyse gestartet ({n} Waisen)"
 
+msgid "Analyseren op dubbele kopieën…"
+msgstr "Analysiere auf doppelte Kopien…"
+
+msgid "Analyseren: {c} / {t}"
+msgstr "Analyse: {c} / {t}"
+
 msgid "Orphan-analyse overgeslagen: {err}"
 msgstr "Waisen-Analyse übersprungen: {err}"
 

@@ -1292,6 +1292,12 @@ msgstr "Sauvegarde terminée, analyse des orphelins lancée ({n} orphelins)"
 msgid "Manual scan: orphan-analyse gestart ({n} orphans)"
 msgstr "Analyse manuelle : analyse des orphelins lancée ({n} orphelins)"
 
+msgid "Analyseren op dubbele kopieën…"
+msgstr "Analyse des copies en double…"
+
+msgid "Analyseren: {c} / {t}"
+msgstr "Analyse : {c} / {t}"
+
 msgid "Orphan-analyse overgeslagen: {err}"
 msgstr "Analyse des orphelins ignorée : {err}"
 
