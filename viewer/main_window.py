@@ -1482,6 +1482,20 @@ class MainWindow(Adw.ApplicationWindow):
             return True  # keep repeating
         GLib.timeout_add_seconds(300, _periodic_save_cache)
 
+    def _set_toolbars_revealed(self, visible):
+        """Adw.ToolbarView has no reveal-duration API, so when animations
+        are off we skip set_reveal_*_bars entirely — the caller has already
+        hidden the header/bottom individually, which collapses the bars
+        to zero height instantly."""
+        enabled = bool(self.settings.get("animations_enabled", True))
+        if not enabled:
+            return
+        try:
+            self.toolbar_view.set_reveal_top_bars(visible)
+            self.toolbar_view.set_reveal_bottom_bars(visible)
+        except Exception:
+            pass
+
     def _apply_animations_state(self):
         """Gate the Adwaita transition-durations on the user's preference.
         When animations are off we set every stack to 0ms so view-swaps
@@ -2610,11 +2624,7 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(_("Map opened ({n} photos going to GPS scan)").format(n=len(self.photos)))
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
-        try:
-            self.toolbar_view.set_reveal_top_bars(False)
-            self.toolbar_view.set_reveal_bottom_bars(False)
-        except Exception:
-            pass
+        self._set_toolbars_revealed(False)
         self.map_btn.set_label(_("🗺 loading..."))
         self.map_btn.set_sensitive(False)
         self.map_container.set_visible_child_name("loading")
@@ -2850,11 +2860,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._map_ready_fallback_id = None
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
-        try:
-            self.toolbar_view.set_reveal_top_bars(True)
-            self.toolbar_view.set_reveal_bottom_bars(True)
-        except Exception:
-            pass
+        self._set_toolbars_revealed(True)
         self.main_stack.set_visible_child_name("grid")
 
     def build_viewer_page(self):
@@ -3852,11 +3858,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.current_index = index
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
-        try:
-            self.toolbar_view.set_reveal_top_bars(False)
-            self.toolbar_view.set_reveal_bottom_bars(False)
-        except Exception:
-            pass
+        self._set_toolbars_revealed(False)
         self._stop_video()
         self.photo_picture.set_pixbuf(None)
         self._set_viewer_location("empty")
@@ -4111,11 +4113,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_load_id += 1
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
-        try:
-            self.toolbar_view.set_reveal_top_bars(True)
-            self.toolbar_view.set_reveal_bottom_bars(True)
-        except Exception:
-            pass
+        self._set_toolbars_revealed(True)
         # Don't clear the cluster filter here — user is still in a filtered
         # grid; the ✕ on the info-banner is how they exit it.
         self.main_stack.set_visible_child_name("grid")
