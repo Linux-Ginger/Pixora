@@ -33,6 +33,8 @@ import hashlib
 import subprocess
 import threading
 import tempfile
+import time
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime
@@ -76,7 +78,6 @@ STATE_SELECTING = "selecting"
 STATE_HASHING   = "hashing"
 STATE_REVIEWING = "reviewing"
 STATE_IMPORTING = "importing"
-STATE_BACKUP    = "backup"
 STATE_DONE      = "done"
 STATE_ERROR     = "error"
 
@@ -125,8 +126,7 @@ def ensure_services():
                                    capture_output=True, timeout=5)
                 except Exception:
                     pass
-            import time as _time
-            _time.sleep(1)
+            time.sleep(1)
     except Exception:
         pass
 
@@ -171,8 +171,7 @@ def mount_iphone(udid: str, mountpoint: Path) -> bool:
         except Exception:
             pass
         if mountpoint.exists() and not still_mounted:
-            import shutil as _shutil
-            _shutil.rmtree(str(mountpoint), ignore_errors=True)
+            shutil.rmtree(str(mountpoint), ignore_errors=True)
     except Exception:
         pass
     try:
@@ -208,8 +207,7 @@ def _get_video_date(path: Path) -> float | None:
             capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
-            import json as _json
-            info = _json.loads(result.stdout)
+            info = json.loads(result.stdout)
             ct = info.get("format", {}).get("tags", {}).get("creation_time", "")
             if ct:
                 dt = datetime.strptime(ct[:19], "%Y-%m-%dT%H:%M:%S")
@@ -227,8 +225,7 @@ def _get_video_duration(path: Path) -> str | None:
             capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
-            import json as _json
-            info = _json.loads(result.stdout)
+            info = json.loads(result.stdout)
             secs = float(info.get("format", {}).get("duration", 0))
             if secs > 0:
                 mins = int(secs) // 60
@@ -260,7 +257,6 @@ def get_photo_date(path: Path) -> float:
             return ts
     # Fallback: iPhone filenames (IMG_1234) are chronological — use the counter
     # as sort key so we don't depend on (often wrong) mtime.
-    import re
     m = re.search(r'(\d{4,})', path.stem)
     if m:
         return float(m.group(1))
@@ -286,8 +282,7 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
         except zlib.error:
             json_str = raw  # some AAE files are uncompressed
 
-        import json as _json
-        data = _json.loads(json_str)
+        data = json.loads(json_str)
         adjustments = data.get("adjustments", [])
         if not adjustments:
             return False
@@ -366,8 +361,7 @@ def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
             except OSError:
                 if attempt == 2:
                     return
-                import time as _time
-                _time.sleep(0.3)
+                time.sleep(0.3)
         else:
             return
 
@@ -1029,7 +1023,6 @@ class ImporterPage(Gtk.Box):
             STATE_HASHING:   "progress",
             STATE_REVIEWING: "review",
             STATE_IMPORTING: "progress",
-            STATE_BACKUP:    "progress",
             STATE_DONE:      "done",
             STATE_ERROR:     "error",
         }
@@ -1587,83 +1580,6 @@ class ImporterPage(Gtk.Box):
         # Backup flow is in main_window now; on_done_cb sets last_import_time
         # and triggers the backup. Importer only shows the done page.
         self._finish()
-
-    def _start_backup(self):
-        self._set_progress(_("Backing up…"),
-                           _("Photos are being synced to your external drive."))
-        self._show_state(STATE_BACKUP)
-        threading.Thread(target=self._do_backup, daemon=True).start()
-
-    def _do_backup(self):
-        backup_uuid = self.settings.get("backup_uuid")
-        backup_path_str = self.settings.get("backup_path")
-        photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
-
-        drive_root = get_backup_mountpoint(backup_uuid)
-        if not drive_root:
-            GLib.idle_add(self._finish, _("Backup drive not found. Connect the drive and try again from settings."))
-            return
-
-        backup_dest = Path(backup_path_str) if backup_path_str else drive_root / "Pixora"
-        backup_dest.mkdir(parents=True, exist_ok=True)
-
-        def rsync_progress(line):
-            for part in line.split():
-                if part.endswith("%"):
-                    try:
-                        frac = int(part[:-1]) / 100
-                        GLib.idle_add(self._update_progress, frac, _("Backup: {pct}").format(pct=part), "")
-                    except ValueError:
-                        pass
-
-        success = False
-        if _cmd_available("rsync"):
-            proc = None
-            try:
-                proc = subprocess.Popen(
-                    ["rsync", "-a", "--info=progress2",
-                     str(photo_path) + "/", str(backup_dest) + "/"],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                    text=True
-                )
-                for line in proc.stdout:
-                    rsync_progress(line)
-                proc.wait(timeout=600)
-                success = proc.returncode == 0
-            except Exception:
-                success = False
-            finally:
-                # Make sure rsync doesn't linger as a zombie.
-                if proc is not None and proc.poll() is None:
-                    try:
-                        proc.kill()
-                        proc.wait(timeout=5)
-                    except Exception:
-                        pass
-        else:
-            success = self._manual_backup(photo_path, backup_dest)
-
-        GLib.idle_add(self._finish, None if success else
-                      _("Backup partially failed. The import itself did succeed."))
-
-    def _manual_backup(self, src: Path, dst: Path) -> bool:
-        try:
-            all_src = []
-            for root, _, files in os.walk(src):
-                for fn in files:
-                    all_src.append(Path(root) / fn)
-            total = len(all_src)
-            for i, sf in enumerate(all_src):
-                rel = sf.relative_to(src)
-                df = dst / rel
-                df.parent.mkdir(parents=True, exist_ok=True)
-                if not df.exists():
-                    shutil.copy2(sf, df)
-                frac = (i + 1) / total if total > 0 else 1.0
-                GLib.idle_add(self._update_progress, frac, f"{i + 1} / {total}", sf.name)
-            return True
-        except Exception:
-            return False
 
     def _finish(self, note: str | None = None):
         n = self.import_count

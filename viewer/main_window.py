@@ -164,15 +164,9 @@ if _DEV_MODE:
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk, Pango
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gdk, Pango
 gi.require_foreign("cairo")
 import cairo
-
-try:
-    import cairo
-    CAIRO_AVAILABLE = True
-except ImportError:
-    CAIRO_AVAILABLE = False
 
 try:
     from watchdog.observers import Observer
@@ -1474,9 +1468,10 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._check_pending_backup)
         GLib.timeout_add_seconds(300, self._periodic_scan)
         # Periodic save — otherwise a crash loses all cache work since startup.
-        GLib.timeout_add_seconds(
-            300, lambda: (save_metadata_cache(), True)[1]
-        )
+        def _periodic_save_cache():
+            save_metadata_cache()
+            return True  # keep repeating
+        GLib.timeout_add_seconds(300, _periodic_save_cache)
 
     def _start_services(self):
         try:
@@ -3143,17 +3138,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         return self.bottom_stack
 
-    def _on_timeline_click(self, scroll_px):
-        adj     = self.scroll.get_vadjustment()
-        max_val = adj.get_upper() - adj.get_page_size()
-        adj.set_value(max(0.0, min(scroll_px, max(0.0, max_val))))
-
-    def _on_scroll_changed(self, adj):
-        pass  # timeline disabled in beta
-
-    def _update_timeline_from_positions(self):
-        return False  # timeline disabled in beta
-
     def toggle_select_mode(self, btn=None):
         self._select_mode = not self._select_mode
         log_info(_("Selection mode: {state}").format(
@@ -3673,7 +3657,6 @@ class MainWindow(Adw.ApplicationWindow):
             else ngettext("%d photo", "%d photos", total) % total
         )
         self._loading = False
-        GLib.timeout_add(800, self._update_timeline_from_positions)
         GLib.timeout_add(120, self._run_viewport_hydrate)
         return False
 
@@ -3698,13 +3681,6 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             log_info(_("Thumbnail clicked → open photo: idx={i} path={p}").format(i=index, p=path))
             self.open_photo(index)
-
-    def apply_sort(self):
-        index = self.sort_combo.get_selected()
-        # Precompute dates so sort() does O(n) fetch + O(n log n) compare,
-        # not O(n log n) EXIF reads.
-        date_map = {p: get_photo_date(p) for p in self.photos}
-        self.photos.sort(key=date_map.get, reverse=(index == 0))
 
     def on_sort_changed(self, combo, _pspec):
         idx = combo.get_selected()
