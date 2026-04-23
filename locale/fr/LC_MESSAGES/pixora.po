@@ -762,6 +762,9 @@ msgstr "Tri : {i} / {total}"
 msgid "Sorting changed: {opt}"
 msgstr "Tri modifié : {opt}"
 
+msgid "Failed to save sort_index: {e}"
+msgstr "Échec de l'enregistrement de sort_index : {e}"
+
 msgid "Starting"
 msgstr "Démarrage"
 

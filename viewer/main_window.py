@@ -2233,12 +2233,15 @@ class MainWindow(Adw.ApplicationWindow):
         self.header.pack_start(self.logo_picture)
 
         self.sort_model = Gtk.StringList()
-        for item in [_("Date (newest first)"), _("Date (oldest first)"),
-                     _("Name (A-Z)"), _("Name (Z-A)")]:
+        for item in [_("Date (newest first)"), _("Date (oldest first)")]:
             self.sort_model.append(item)
 
         self.sort_combo = Gtk.DropDown(model=self.sort_model)
         self.sort_combo.set_size_request(180, -1)
+        saved_sort = self.settings.get("sort_index", 0)
+        if saved_sort not in (0, 1):
+            saved_sort = 0
+        self.sort_combo.set_selected(saved_sort)
         self.sort_combo.connect("notify::selected", self.on_sort_changed)
         self.header.pack_start(self.sort_combo)
 
@@ -3648,48 +3651,46 @@ class MainWindow(Adw.ApplicationWindow):
 
     def apply_sort(self):
         index = self.sort_combo.get_selected()
-        if index in (0, 1):
-            # Precompute dates so sort() does O(n) fetch + O(n log n) compare,
-            # not O(n log n) EXIF reads.
-            date_map = {p: get_photo_date(p) for p in self.photos}
-            self.photos.sort(key=date_map.get, reverse=(index == 0))
-        elif index == 2:
-            self.photos.sort(key=lambda p: os.path.basename(p).lower())
-        elif index == 3:
-            self.photos.sort(key=lambda p: os.path.basename(p).lower(), reverse=True)
+        # Precompute dates so sort() does O(n) fetch + O(n log n) compare,
+        # not O(n log n) EXIF reads.
+        date_map = {p: get_photo_date(p) for p in self.photos}
+        self.photos.sort(key=date_map.get, reverse=(index == 0))
 
     def on_sort_changed(self, combo, _pspec):
-        if not self.photos:
-            return
-        options = [_("Date newest"), _("Date oldest"), _("Name A-Z"), _("Name Z-A")]
         idx = combo.get_selected()
+        options = [_("Date newest"), _("Date oldest")]
         log_info(_("Sorting changed: {opt}").format(
             opt=options[idx] if idx < len(options) else idx
         ))
+        self.settings["sort_index"] = idx
+        try:
+            save_settings(self.settings)
+        except Exception as e:
+            log_info(_("Failed to save sort_index: {e}").format(e=e))
+        if not self.photos:
+            return
+        # Show the loading state instantly so the user never stares at a
+        # frozen grid during the debounce + background sort.
+        self.content_stack.set_visible_child_name("loading")
+        self.spinner.start()
+        self.spinner_label.set_text(_("Sorting..."))
         if self._sort_timer:
             GLib.source_remove(self._sort_timer)
         self._sort_timer = GLib.timeout_add(400, self._do_sort)
 
     def _do_sort(self):
         self._sort_timer = None
-        self.content_stack.set_visible_child_name("loading")
-        self.spinner.start()
-        self.spinner_label.set_text(_("Sorting..."))
         sort_index = self.sort_combo.get_selected()
         threading.Thread(target=self._do_sort_bg, args=(sort_index,), daemon=True).start()
         return False
 
     def _do_sort_bg(self, sort_index):
         photos = list(self.photos)
-        if sort_index in (0, 1) and photos:
+        if photos:
             with ThreadPoolExecutor(max_workers=4) as pool:
                 dates = list(pool.map(get_photo_date, photos))
             date_map = dict(zip(photos, dates))
             photos.sort(key=date_map.get, reverse=(sort_index == 0))
-        elif sort_index == 2:
-            photos.sort(key=lambda p: os.path.basename(p).lower())
-        elif sort_index == 3:
-            photos.sort(key=lambda p: os.path.basename(p).lower(), reverse=True)
         self.photos = photos
         GLib.idle_add(self.start_load)
 

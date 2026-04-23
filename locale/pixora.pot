@@ -416,6 +416,9 @@ msgstr ""
 msgid "Sorting..."
 msgstr ""
 
+msgid "Failed to save sort_index: {e}"
+msgstr ""
+
 msgid "Starting"
 msgstr ""
 

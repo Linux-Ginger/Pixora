@@ -762,6 +762,9 @@ msgstr "Sortieren: {i} / {total}"
 msgid "Sorting changed: {opt}"
 msgstr "Sortierung geändert: {opt}"
 
+msgid "Failed to save sort_index: {e}"
+msgstr "sort_index konnte nicht gespeichert werden: {e}"
+
 msgid "Starting"
 msgstr "Starten"
 

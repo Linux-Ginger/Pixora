@@ -1172,6 +1172,9 @@ msgstr "Selectie-modus: {state}"
 msgid "Sorting changed: {opt}"
 msgstr "Sortering gewijzigd: {opt}"
 
+msgid "Failed to save sort_index: {e}"
+msgstr "Kon sort_index niet opslaan: {e}"
+
 msgid "Language changed to: {lang} — Pixora restarting"
 msgstr "Taal gewijzigd naar: {lang} — Pixora wordt herstart"
 
