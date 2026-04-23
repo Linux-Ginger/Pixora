@@ -315,6 +315,45 @@ def save_favorites(favorites):
     except Exception:
         pass
 
+# Module-level lsblk cache. Both get_available_drives() and
+# get_mountpoint_for_uuid() hit the same JSON, so caching it once avoids
+# back-to-back 5-sec subprocess calls when Settings opens (both helpers
+# run during dialog construction).
+_LSBLK_CACHE = {"ts": 0.0, "data": None}
+# 10s TTL covers burst-calls during Settings open and usually survives
+# between 8s drive-polls without a second subprocess. Polling forces a
+# refresh anyway, so the cache doesn't lie about attach/detach.
+_LSBLK_CACHE_TTL = 10.0
+
+def _lsblk_fetch():
+    """Run lsblk. Returns parsed JSON or None on failure/timeout."""
+    try:
+        result = subprocess.run(
+            ["lsblk", "-o", "NAME,UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT,HOTPLUG,RM,TRAN", "-J"],
+            capture_output=True, text=True, timeout=5,
+        )
+        return json.loads(result.stdout)
+    except Exception as e:
+        log_error(_("Drive detection error: {err}").format(err=e))
+        return None
+
+def _lsblk_data(force=False):
+    """Cached lsblk JSON. Refetches when stale (>TTL) or force=True."""
+    now = time.time()
+    if (not force
+            and _LSBLK_CACHE["data"] is not None
+            and now - _LSBLK_CACHE["ts"] < _LSBLK_CACHE_TTL):
+        return _LSBLK_CACHE["data"]
+    data = _lsblk_fetch()
+    if data is not None:
+        _LSBLK_CACHE["ts"] = now
+        _LSBLK_CACHE["data"] = data
+    return data
+
+def _warm_lsblk_cache_async():
+    """Fire-and-forget pre-warm so the first Settings open is instant."""
+    threading.Thread(target=_lsblk_data, daemon=True).start()
+
 def get_available_drives():
     """Return drives suitable as backup target: supported fstype, external
     (hotplug/removable/USB/mounted under /media/, /run/media/, /mnt/), and
@@ -323,48 +362,42 @@ def get_available_drives():
     SYS_MOUNTS = {"/", "/boot", "/boot/efi", "/home", "/var", "/usr", "/etc"}
     EXTERNAL_PREFIXES = ("/media/", "/run/media/", "/mnt/")
     seen_uuids = set()
-    try:
-        result = subprocess.run(
-            ["lsblk", "-o", "NAME,UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT,HOTPLUG,RM,TRAN", "-J"],
-            capture_output=True, text=True, timeout=5
-        )
-        data = json.loads(result.stdout)
+    data = _lsblk_data()
+    if data is None:
+        return drives
 
-        def _is_external(mountpoint, hotplug, rm, tran):
-            if hotplug or rm:
-                return True
-            if tran in ("usb", "ieee1394"):
-                return True
-            if mountpoint and any(mountpoint.startswith(p) for p in EXTERNAL_PREFIXES):
-                return True
-            return False
+    def _is_external(mountpoint, hotplug, rm, tran):
+        if hotplug or rm:
+            return True
+        if tran in ("usb", "ieee1394"):
+            return True
+        if mountpoint and any(mountpoint.startswith(p) for p in EXTERNAL_PREFIXES):
+            return True
+        return False
 
-        def process_device(device, parent_hotplug=False, parent_rm=False, parent_tran=""):
-            hotplug = bool(device.get("hotplug", False)) or parent_hotplug
-            rm = bool(device.get("rm", False)) or parent_rm
-            tran = (device.get("tran") or parent_tran or "").lower()
-            uuid       = device.get("uuid")
-            fstype     = (device.get("fstype") or "").lower()
-            label      = (device.get("label") or "").strip()
-            size       = device.get("size") or ""
-            mountpoint = (device.get("mountpoint") or "").strip()
-            if mountpoint in SYS_MOUNTS:
-                pass  # skip system partition but still recurse into children
-            elif uuid and fstype in BACKUP_FSTYPES:
-                if _is_external(mountpoint, hotplug, rm, tran) and uuid not in seen_uuids:
-                    seen_uuids.add(uuid)
-                    display = (f"💾  {label}  ({size})" if label else
-                               f"💾  {mountpoint}  ({size})" if mountpoint else
-                               f"💾  {_('External drive')}  ({size})")
-                    drives.append((uuid, display))
-            for child in device.get("children", []):
-                process_device(child, hotplug, rm, tran)
+    def process_device(device, parent_hotplug=False, parent_rm=False, parent_tran=""):
+        hotplug = bool(device.get("hotplug", False)) or parent_hotplug
+        rm = bool(device.get("rm", False)) or parent_rm
+        tran = (device.get("tran") or parent_tran or "").lower()
+        uuid       = device.get("uuid")
+        fstype     = (device.get("fstype") or "").lower()
+        label      = (device.get("label") or "").strip()
+        size       = device.get("size") or ""
+        mountpoint = (device.get("mountpoint") or "").strip()
+        if mountpoint in SYS_MOUNTS:
+            pass  # skip system partition but still recurse into children
+        elif uuid and fstype in BACKUP_FSTYPES:
+            if _is_external(mountpoint, hotplug, rm, tran) and uuid not in seen_uuids:
+                seen_uuids.add(uuid)
+                display = (f"💾  {label}  ({size})" if label else
+                           f"💾  {mountpoint}  ({size})" if mountpoint else
+                           f"💾  {_('External drive')}  ({size})")
+                drives.append((uuid, display))
+        for child in device.get("children", []):
+            process_device(child, hotplug, rm, tran)
 
-        for device in data.get("blockdevices", []):
-            process_device(device)
-    except Exception as e:
-        log_error(_("Drive detection error: {err}").format(err=e))
-    log_info(_("Drive scan: {n} external drives found").format(n=len(drives)))
+    for device in data.get("blockdevices", []):
+        process_device(device)
     return drives
 
 def _cmd_available_bk(cmd):
@@ -372,15 +405,13 @@ def _cmd_available_bk(cmd):
     return _sh.which(cmd) is not None
 
 def get_mountpoint_for_uuid(uuid):
-    try:
-        result = subprocess.run(["lsblk", "-o", "UUID,MOUNTPOINT", "-J"], capture_output=True, text=True, timeout=5)
-        data = json.loads(result.stdout)
-        for device in data.get("blockdevices", []):
-            for child in device.get("children", [device]):
-                if child.get("uuid") == uuid:
-                    return child.get("mountpoint")
-    except Exception:
-        pass
+    data = _lsblk_data()
+    if data is None:
+        return None
+    for device in data.get("blockdevices", []):
+        for child in device.get("children", [device]):
+            if child.get("uuid") == uuid:
+                return child.get("mountpoint")
     return None
 
 _MONTH_KEYS = [
@@ -1429,6 +1460,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.connect("close-request", self.on_close)
         GLib.idle_add(self._check_for_update)
         threading.Thread(target=self._start_services, daemon=True).start()
+        # Pre-warm drive cache so the first Settings/backup click doesn't
+        # pay a ~5s synchronous lsblk. Cheap on its own thread.
+        _warm_lsblk_cache_async()
         self._ios_device_present = False
         self._recovery_prompt_active = False
         self._recovery_cooldown_until = 0.0
@@ -7138,6 +7172,8 @@ class MainWindow(Adw.ApplicationWindow):
                 self.settings_drive_reset_btn.set_visible(True)
 
     def on_settings_refresh_drives(self, btn):
+        # The user explicitly asked for fresh data; bypass the cache.
+        _lsblk_data(force=True)
         while self.settings_drive_model.get_n_items() > 0:
             self.settings_drive_model.remove(0)
         self.settings_drives = self._build_settings_drive_list()
@@ -7667,6 +7703,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _poll_backup_drive(self):
         """Drive attach/detach → UI update. Attach: scan for diff; detach:
         grey out settings-backup + show banner."""
+        # Force-refresh lsblk so cache never lies about attach/detach state.
+        _lsblk_data(force=True)
         drive_now = self._backup_drive_mountpoint() is not None
         just_attached = drive_now and not self._backup_drive_last_seen
         just_detached = (not drive_now) and self._backup_drive_last_seen
