@@ -1561,6 +1561,15 @@ class MainWindow(Adw.ApplicationWindow):
         When animations are off we set every stack to 0ms so view-swaps
         are instant — big difference on VM/software-rendered GTK."""
         enabled = bool(self.settings.get("animations_enabled", True))
+        # GTK-wide switch — when False, ALL default CSS transitions are
+        # disabled (button hover outline, focus ring fades, etc.). Our
+        # explicit per-stack durations are still honored when True.
+        try:
+            gtk_settings = Gtk.Settings.get_default()
+            if gtk_settings is not None:
+                gtk_settings.set_property("gtk-enable-animations", enabled)
+        except Exception:
+            pass
         main_d = 200 if enabled else 0
         content_d = 150 if enabled else 0
         bottom_d = 150 if enabled else 0
