@@ -15,7 +15,9 @@ INSTALL_DIR="$HOME/.local/share/pixora"
 
 GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
-WHITE='\033[1;97m'   # bold bright white — leesbaar op zowel dark als light
+# Voor de PIXORA-banner: puur bold, geen kleurcode. Inherit de terminal-
+# default foreground (wit op dark, zwart op light). \033[1;97m gaf op
+# sommige terminals een bruin/geel-achtige render.
 BOLD='\033[1m'
 NC='\033[0m'
 
@@ -75,7 +77,7 @@ PIXORA_TEXT=(
 print_ascii_logo() {
     local line
     for line in "${PIXORA_TEXT[@]}"; do
-        printf '%b%s%b\n' "${WHITE}" "  $line" "${NC}"
+        printf '%b  %s%b\n' "${BOLD}" "$line" "${NC}"
     done
 }
 
@@ -125,25 +127,38 @@ render_real_logo() {
     mapfile -t icon_arr <<< "$out"
     local icon_rows=${#icon_arr[@]}
     local text_rows=${#PIXORA_TEXT[@]}
-    # Verticaal centreren: offset = hoeveel blank boven text om 'm onder
-    # het icoon hoogte-te-lijnen te krijgen.
-    local vpad=$(( (icon_rows - text_rows) / 2 ))
-    local max=$icon_rows
-    [ "$text_rows" -gt "$max" ] && max=$text_rows
 
+    # Terminal-breedte check: icoon ~18 + gap 2 + tekst ~45 + margin 2 ≈ 67.
+    # Onder die grens printen we stacked — side-by-side zou wrappen.
+    local term_w
+    term_w=$(tput cols 2>/dev/null || echo 80)
     clear
     echo ""
-    local i left ti right
-    for ((i=0; i<max; i++)); do
-        left="${icon_arr[$i]:-}"
-        ti=$(( i - vpad ))
-        if [ "$ti" -ge 0 ] && [ "$ti" -lt "$text_rows" ]; then
-            right="${PIXORA_TEXT[$ti]}"
-            printf '  %s  %b%s%b\n' "$left" "$WHITE" "$right" "$NC"
-        else
-            printf '  %s\n' "$left"
-        fi
-    done
+    if [ "$term_w" -lt 70 ]; then
+        local line
+        for line in "${icon_arr[@]}"; do
+            printf '  %s\n' "$line"
+        done
+        echo ""
+        print_ascii_logo
+    else
+        # Verticaal centreren: offset = hoeveel blank boven text om 'm onder
+        # het icoon hoogte-te-lijnen te krijgen.
+        local vpad=$(( (icon_rows - text_rows) / 2 ))
+        local max=$icon_rows
+        [ "$text_rows" -gt "$max" ] && max=$text_rows
+        local i left ti right
+        for ((i=0; i<max; i++)); do
+            left="${icon_arr[$i]:-}"
+            ti=$(( i - vpad ))
+            if [ "$ti" -ge 0 ] && [ "$ti" -lt "$text_rows" ]; then
+                right="${PIXORA_TEXT[$ti]}"
+                printf '  %s  %b%s%b\n' "$left" "$BOLD" "$right" "$NC"
+            else
+                printf '  %s\n' "$left"
+            fi
+        done
+    fi
     echo ""
     echo -e "  ${BOLD}${LBL_BY}${NC}"
     echo ""
