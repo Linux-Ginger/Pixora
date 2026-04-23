@@ -143,22 +143,27 @@ render_real_logo() {
     return 0
 }
 
-LOGO_RENDERED=0
+# Bootstrap: als chafa of curl nog niet op het systeem staan, eerst
+# even die twee kleine pakketten installeren (één sudo-prompt) zodat
+# we daarna het kleurlogo kunnen renderen VOOR de zware deps-install.
+# sudo cachet de credential, dus de grote apt-stap daarna prompt niet
+# nog een keer.
+if ! command -v chafa &>/dev/null || ! command -v curl &>/dev/null; then
+    echo -e "  ${ORANGE}${LBL_PREP}${NC}"
+    sudo apt-get install -y -qq chafa curl 2>/dev/null || true
+fi
 
-# Proberen het kleurlogo meteen te renderen — als chafa + curl al op
-# het systeem staan, ziet de user het logo VOOR de sudo-prompt. Zo
-# niet, valt het terug op de ASCII-banner en proberen we het na de
-# deps-install opnieuw (dan is chafa er wel).
-if render_real_logo; then
-    LOGO_RENDERED=1
-else
+# Nu renderen — op eerste install na de bootstrap chafa aanwezig, op
+# latere installs direct. ASCII-fallback alleen als chafa/curl echt
+# niet te krijgen zijn (geen net, locked apt, etc.).
+if ! render_real_logo; then
     print_ascii_logo
     echo -e "  ${BOLD}${LBL_BY}${NC}"
     echo ""
 fi
 
-# ── Minimale deps ── (chafa meegenomen zodat we het logo na install
-# alsnog kunnen tonen wanneer de eerste poging faalde)
+# ── Hoofd-deps ── (geen tweede password-prompt — sudo credential
+# gecachet door de bootstrap-stap hierboven)
 echo -e "  ${ORANGE}${LBL_PREP}${NC}"
 sudo apt-get install -y -qq \
     python3 \
@@ -169,16 +174,7 @@ sudo apt-get install -y -qq \
     gir1.2-gudev-1.0 \
     git \
     gettext \
-    chafa \
-    curl \
     2>/dev/null
-
-# Als de eerste render faalde (chafa was toen nog niet geïnstalleerd),
-# nu opnieuw proberen — de apt-install hierboven heeft chafa + curl
-# meegenomen. Silent falen is prima; dan blijft de ASCII gewoon staan.
-if [ "$LOGO_RENDERED" -eq 0 ]; then
-    render_real_logo || true
-fi
 
 # WebKitGTK typelib — probeer nieuwste (6.0) eerst, valt terug op 4.1
 sudo apt-get install -y -qq gir1.2-webkit-6.0 2>/dev/null || \
