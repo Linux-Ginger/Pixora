@@ -2355,3 +2355,18 @@ msgstr "Deaktiviert Fade-/Slide-Übergänge zwischen Ansichten."
 
 msgid "Failed to save animations_enabled: {e}"
 msgstr "animations_enabled konnte nicht gespeichert werden: {e}"
+
+msgid "Pixora is running slowly on this system"
+msgstr "Pixora läuft auf diesem System langsam"
+
+msgid "This can happen without GPU acceleration. You can reduce animations under Settings → Advanced → Performance to make Pixora feel smoother."
+msgstr "Das kann ohne GPU-Beschleunigung passieren. Du kannst unter Einstellungen → Erweitert → Leistung die Animationen reduzieren, damit Pixora flüssiger wirkt."
+
+msgid "Don't show again"
+msgstr "Nicht mehr anzeigen"
+
+msgid "Open Settings"
+msgstr "Einstellungen öffnen"
+
+msgid "Failed to save perf_warning_dismissed: {e}"
+msgstr "perf_warning_dismissed konnte nicht gespeichert werden: {e}"

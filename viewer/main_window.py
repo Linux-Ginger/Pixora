@@ -1462,6 +1462,10 @@ class MainWindow(Adw.ApplicationWindow):
         # animations are off, transition_duration(0) makes view switches
         # snap instantly — helps on slow/VM renderers.
         self._apply_animations_state()
+        # Wait 5s so the startup-load burst doesn't poison the sample, then
+        # check renderer + frame-timing. Shows a one-time popup if the app
+        # appears slow.
+        GLib.timeout_add_seconds(5, self._start_perf_check)
         self._ios_device_present = False
         self._recovery_prompt_active = False
         self._recovery_cooldown_until = 0.0
@@ -1492,6 +1496,98 @@ class MainWindow(Adw.ApplicationWindow):
             self.content_stack.set_transition_duration(content_d)
         if hasattr(self, "bottom_stack"):
             self.bottom_stack.set_transition_duration(bottom_d)
+
+    def _start_perf_check(self):
+        """Two detection passes that share one popup:
+          1) GSK renderer = Cairo (pure software fallback) — instant flag.
+          2) Passive frame-timing over 30s — catches VMware-LLVMpipe-etc.
+        Either hit → popup unless user already dismissed."""
+        if self.settings.get("perf_warning_dismissed"):
+            return False
+        try:
+            native = self.get_native()
+            renderer = native.get_renderer() if native is not None else None
+            rname = type(renderer).__name__ if renderer is not None else ""
+            if "Cairo" in rname:
+                self._show_perf_warning_popup()
+                return False
+        except Exception:
+            pass
+        self._perf_frame_times = []
+        try:
+            self._perf_tick_id = self.add_tick_callback(self._perf_sample)
+        except Exception:
+            self._perf_tick_id = None
+            return False
+        # Hard stop after 30s regardless of samples.
+        GLib.timeout_add_seconds(30, self._stop_perf_sampling)
+        return False
+
+    def _perf_sample(self, widget, frame_clock):
+        if self.settings.get("perf_warning_dismissed"):
+            return False  # stop; user already said no-thanks
+        try:
+            t = frame_clock.get_frame_time()
+        except Exception:
+            return False
+        self._perf_frame_times.append(t)
+        if len(self._perf_frame_times) > 60:
+            self._perf_frame_times = self._perf_frame_times[-60:]
+        if len(self._perf_frame_times) >= 30:
+            durations = [
+                self._perf_frame_times[i] - self._perf_frame_times[i - 1]
+                for i in range(1, len(self._perf_frame_times))
+            ]
+            # 33_000 µs = 33ms = below 30fps. Count those as "slow frames".
+            slow = sum(1 for d in durations if d > 33_000)
+            if slow / len(durations) > 0.6:
+                self._show_perf_warning_popup()
+                self._stop_perf_sampling()
+                return False
+        return True  # keep sampling
+
+    def _stop_perf_sampling(self):
+        tid = getattr(self, "_perf_tick_id", None)
+        if tid is not None:
+            try:
+                self.remove_tick_callback(tid)
+            except Exception:
+                pass
+            self._perf_tick_id = None
+        return False
+
+    def _show_perf_warning_popup(self):
+        if self.settings.get("perf_warning_dismissed"):
+            return
+        dlg = Adw.AlertDialog(
+            heading=_("Pixora is running slowly on this system"),
+            body=_("This can happen without GPU acceleration. You can reduce animations under Settings → Advanced → Performance to make Pixora feel smoother."),
+        )
+        dlg.add_response("dismiss", _("Don't show again"))
+        dlg.add_response("open", _("Open Settings"))
+        dlg.set_default_response("open")
+        dlg.set_close_response("dismiss")
+        dlg.set_response_appearance("open", Adw.ResponseAppearance.SUGGESTED)
+        dlg.connect("response", self._on_perf_warning_response)
+        try:
+            self._present_dialog(dlg)
+        except Exception:
+            try:
+                dlg.present(self)
+            except Exception:
+                pass
+
+    def _on_perf_warning_response(self, dlg, response):
+        self.settings["perf_warning_dismissed"] = True
+        try:
+            save_settings(self.settings)
+        except Exception as e:
+            log_error(_("Failed to save perf_warning_dismissed: {e}").format(e=e))
+        if response == "open":
+            try:
+                self.on_settings_clicked(None)
+            except Exception:
+                pass
 
     def _start_services(self):
         try:

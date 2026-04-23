@@ -2371,3 +2371,18 @@ msgstr "Désactive les transitions fondu/glissement entre les vues."
 
 msgid "Failed to save animations_enabled: {e}"
 msgstr "Échec de l'enregistrement de animations_enabled : {e}"
+
+msgid "Pixora is running slowly on this system"
+msgstr "Pixora fonctionne lentement sur ce système"
+
+msgid "This can happen without GPU acceleration. You can reduce animations under Settings → Advanced → Performance to make Pixora feel smoother."
+msgstr "Cela peut se produire sans accélération GPU. Vous pouvez réduire les animations dans Paramètres → Avancé → Performances pour rendre Pixora plus fluide."
+
+msgid "Don't show again"
+msgstr "Ne plus afficher"
+
+msgid "Open Settings"
+msgstr "Ouvrir les paramètres"
+
+msgid "Failed to save perf_warning_dismissed: {e}"
+msgstr "Échec de l'enregistrement de perf_warning_dismissed : {e}"

@@ -1501,3 +1501,18 @@ msgstr ""
 
 msgid "Failed to save animations_enabled: {e}"
 msgstr ""
+
+msgid "Pixora is running slowly on this system"
+msgstr ""
+
+msgid "This can happen without GPU acceleration. You can reduce animations under Settings → Advanced → Performance to make Pixora feel smoother."
+msgstr ""
+
+msgid "Don't show again"
+msgstr ""
+
+msgid "Open Settings"
+msgstr ""
+
+msgid "Failed to save perf_warning_dismissed: {e}"
+msgstr ""
