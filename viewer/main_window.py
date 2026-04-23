@@ -1339,6 +1339,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_silent_run = False
         self._video_paused_by_popup = False
         self._settings_dialog = None
+        self._settings_stack = None
         # Structure-scan state: detects folders outside the chosen structure,
         # works without a backup drive. Donut turns dark-blue (no backup ctx).
         self._structure_scanning = False
@@ -1568,6 +1569,20 @@ class MainWindow(Adw.ApplicationWindow):
             self.content_stack.set_transition_duration(content_d)
         if hasattr(self, "bottom_stack"):
             self.bottom_stack.set_transition_duration(bottom_d)
+        # If Settings is open right now, its tab-switch stack needs a live
+        # update too — toggling the switch should take effect immediately.
+        stack = getattr(self, "_settings_stack", None)
+        if stack is not None:
+            try:
+                stack.set_transition_duration(450 if enabled else 0)
+                stack.set_transition_type(
+                    Gtk.StackTransitionType.SLIDE_LEFT_RIGHT if enabled
+                    else Gtk.StackTransitionType.NONE
+                )
+            except Exception:
+                pass
+        # The viewer_stack (between photos) reads animations_enabled in
+        # _show_full_photo each time, so it doesn't need a live push.
 
     def _start_perf_check(self):
         """Two detection passes that share one popup:
@@ -5766,6 +5781,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         def _on_settings_closed(_d):
             self._settings_dialog = None
+            self._settings_stack = None
             if hasattr(self, "settings_btn"):
                 self.settings_btn.set_sensitive(True)
             return False
@@ -6396,6 +6412,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Adw.ViewStack has no transitions; we need Gtk.Stack for that.
         # Gtk.StackSwitcher picks up page-level "icon-name" + "title".
         stack = Gtk.Stack()
+        self._settings_stack = stack  # so _apply_animations_state can tune it live
         anim_on = bool(self.settings.get("animations_enabled", True))
         stack.set_transition_duration(450 if anim_on else 0)
         stack.set_transition_type(
