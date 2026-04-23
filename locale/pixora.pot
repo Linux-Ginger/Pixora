@@ -1439,9 +1439,6 @@ msgstr ""
 msgid "Installing dependencies"
 msgstr ""
 
-msgid "Thumbnail size"
-msgstr ""
-
 msgid "Larger thumbnails are easier to see but use more memory.\nThe default (200 px) works well on most machines."
 msgstr ""
 

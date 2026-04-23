@@ -2281,9 +2281,6 @@ msgstr "Foto's sorteren…"
 msgid "Installing dependencies"
 msgstr "Dependencies installeren"
 
-msgid "Thumbnail size"
-msgstr "Thumbnail-grootte"
-
 msgid "Larger thumbnails are easier to see but use more memory.\nThe default (200 px) works well on most machines."
 msgstr "Grotere thumbnails zijn makkelijker te zien maar gebruiken meer geheugen.\nDe standaard (200 px) werkt goed op de meeste systemen."
 
