@@ -5554,10 +5554,13 @@ class MainWindow(Adw.ApplicationWindow):
                 "  opacity: 1.0;"
                 "}"
                 ".pixora-tab-indicator {"
-                "  background: alpha(@accent_bg_color, 0.18);"
+                # Match the default Adwaita :checked pill — a neutral
+                # 10% tint of the current fg color rather than a blue
+                # accent. Same rounding as a button, margins 0 so the
+                # pill is full-height (was 3px top/bottom → looked
+                # slightly shorter than before).
+                "  background: alpha(currentColor, 0.10);"
                 "  border-radius: 10px;"
-                "  margin-top: 3px;"
-                "  margin-bottom: 3px;"
                 "}"
             )
 
@@ -5646,17 +5649,21 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._place_settings_indicator_under, tabs[0][0])
         return overlay
 
-    def _place_settings_indicator_under(self, btn):
+    def _place_settings_indicator_under(self, btn, tries=0):
         try:
             alloc = btn.get_allocation()
         except Exception:
             alloc = None
-        if alloc is None or alloc.width <= 0:
-            # Widget not laid out yet — retry once.
-            GLib.timeout_add(40, self._place_settings_indicator_under, btn)
+        if (alloc is None or alloc.width <= 0) and tries < 25:
+            # Layout not done yet — keep retrying up to ~625ms before
+            # giving up. On first open the overlay needs a couple of
+            # ticks before the button has real x/width.
+            GLib.timeout_add(25, self._place_settings_indicator_under,
+                             btn, tries + 1)
             return False
-        self._settings_tab_indicator.set_margin_start(alloc.x)
-        self._settings_tab_indicator.set_size_request(alloc.width, -1)
+        if alloc is not None and alloc.width > 0:
+            self._settings_tab_indicator.set_margin_start(alloc.x)
+            self._settings_tab_indicator.set_size_request(alloc.width, -1)
         return False
 
     def _animate_settings_indicator_to(self, btn):
