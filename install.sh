@@ -52,16 +52,6 @@ esac
 
 clear
 echo ""
-echo -e "${ORANGE}${BOLD}"
-echo "  ██████╗ ██╗██╗  ██╗ ██████╗ ██████╗  █████╗ "
-echo "  ██╔══██╗██║╚██╗██╔╝██╔═══██╗██╔══██╗██╔══██╗"
-echo "  ██████╔╝██║ ╚███╔╝ ██║   ██║██████╔╝███████║"
-echo "  ██╔═══╝ ██║ ██╔██╗ ██║   ██║██╔══██╗██╔══██║"
-echo "  ██║     ██║██╔╝ ██╗╚██████╔╝██║  ██║██║  ██║"
-echo "  ╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝"
-echo -e "${NC}"
-echo -e "  ${BOLD}${LBL_BY}${NC}"
-echo ""
 
 # ── Check Ubuntu/Debian ──
 if ! command -v apt &> /dev/null; then
@@ -69,7 +59,26 @@ if ! command -v apt &> /dev/null; then
     exit 1
 fi
 
-# ── Minimale deps ──
+# Fallback ASCII art for wanneer chafa er niet is / geen net / etc.
+print_ascii_logo() {
+    echo -e "${ORANGE}${BOLD}"
+    echo "  ██████╗ ██╗██╗  ██╗ ██████╗ ██████╗  █████╗ "
+    echo "  ██╔══██╗██║╚██╗██╔╝██╔═══██╗██╔══██╗██╔══██╗"
+    echo "  ██████╔╝██║ ╚███╔╝ ██║   ██║██████╔╝███████║"
+    echo "  ██╔═══╝ ██║ ██╔██╗ ██║   ██║██╔══██╗██╔══██║"
+    echo "  ██║     ██║██╔╝ ██╗╚██████╔╝██║  ██║██║  ██║"
+    echo "  ╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝"
+    echo -e "${NC}"
+}
+
+# Eerst ASCII art tonen zodat de user direct feedback heeft. Na deps-
+# install kunnen we 'm vervangen door het échte SVG-logo via chafa.
+print_ascii_logo
+echo -e "  ${BOLD}${LBL_BY}${NC}"
+echo ""
+
+# ── Minimale deps ── (chafa meegenomen zodat we straks het echte logo
+# kunnen renderen)
 echo -e "  ${ORANGE}${LBL_PREP}${NC}"
 sudo apt-get install -y -qq \
     python3 \
@@ -80,7 +89,37 @@ sudo apt-get install -y -qq \
     gir1.2-gudev-1.0 \
     git \
     gettext \
+    chafa \
+    curl \
     2>/dev/null
+
+# Echte logo rendering. curl haalt de SVG op (install.sh via one-liner
+# loopt vóór de git-clone, dus nog geen local file), chafa zet hem om
+# naar Unicode+ANSI color-blocks.
+render_real_logo() {
+    if ! command -v chafa &>/dev/null; then return 1; fi
+    if ! command -v curl   &>/dev/null; then return 1; fi
+    local tmp
+    tmp=$(mktemp --suffix=.svg 2>/dev/null) || return 1
+    local logo_url="https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/assets/logos/pixora-logo-light.svg"
+    if ! curl -fsSL "$logo_url" -o "$tmp" 2>/dev/null || [ ! -s "$tmp" ]; then
+        rm -f "$tmp"
+        return 1
+    fi
+    local out
+    out=$(chafa --size 44x13 "$tmp" 2>/dev/null)
+    rm -f "$tmp"
+    if [ -z "$out" ]; then return 1; fi
+    clear
+    echo ""
+    echo "$out"
+    echo ""
+    echo -e "  ${BOLD}${LBL_BY}${NC}"
+    echo ""
+    return 0
+}
+
+render_real_logo || true
 
 # WebKitGTK typelib — probeer nieuwste (6.0) eerst, valt terug op 4.1
 sudo apt-get install -y -qq gir1.2-webkit-6.0 2>/dev/null || \
