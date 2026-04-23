@@ -38,6 +38,7 @@ import json
 import math
 import subprocess
 import threading
+import urllib.request
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -120,6 +121,13 @@ class SetupWizard(Adw.Window):
         self._chosen_lang = _lang  # starts at detected/settings language
         self._chosen_thumb_size = 200
         self._chosen_structure = "year_month"
+        # Latest released version from GitHub; fetched async so wizard opens
+        # fast. Left empty on network failure — license page falls back to
+        # just "Pixora" without a number.
+        self._released_version = ""
+        threading.Thread(
+            target=self._fetch_released_version, daemon=True
+        ).start()
         self._chosen_backup_mode = "backup"  # vs "sync"
         self._chosen_backup_dedup = True
         self._chosen_backup_silent = False
@@ -840,24 +848,10 @@ class SetupWizard(Adw.Window):
         heading.set_halign(Gtk.Align.START)
         page.append(heading)
 
-        year_now = datetime.datetime.now().year
-        try:
-            version_file = os.path.abspath(os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "..", "version.txt",
-            ))
-            with open(version_file, "r", encoding="utf-8") as _vf:
-                version = _vf.read().strip()
-        except Exception:
-            version = ""
-        product = f"Pixora {version}" if version else "Pixora"
-        if year_now > 2024:
-            cr_text = f"© 2024 – {year_now} {product} · LinuxGinger"
-        else:
-            cr_text = f"© 2024 {product} · LinuxGinger"
-        cr_lbl = Gtk.Label(label=cr_text)
-        cr_lbl.add_css_class("dim-label")
-        cr_lbl.set_halign(Gtk.Align.START)
-        page.append(cr_lbl)
+        self._copyright_label = Gtk.Label(label=self._copyright_text())
+        self._copyright_label.add_css_class("dim-label")
+        self._copyright_label.set_halign(Gtk.Align.START)
+        page.append(self._copyright_label)
 
         summary = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL, spacing=12,
@@ -923,6 +917,41 @@ class SetupWizard(Adw.Window):
         page.append(scroll)
 
         return page
+
+    def _copyright_text(self):
+        year_now = datetime.datetime.now().year
+        version = getattr(self, "_released_version", "")
+        product = f"Pixora {version}" if version else "Pixora"
+        if year_now > 2024:
+            return f"© 2024 – {year_now} {product} · LinuxGinger"
+        return f"© 2024 {product} · LinuxGinger"
+
+    def _fetch_released_version(self):
+        """Background: ask GitHub Releases API for the tag of the latest
+        release. Short timeout + silent failure — first-time users may have
+        no network yet and we don't want to stall the UI."""
+        try:
+            req = urllib.request.Request(
+                "https://api.github.com/repos/Linux-Ginger/Pixora/releases/latest",
+                headers={"User-Agent": "Pixora-Setup/1.0"},
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read())
+            tag = (data.get("tag_name") or "").lstrip("v").strip()
+            if tag:
+                GLib.idle_add(self._apply_released_version, tag)
+        except Exception:
+            pass
+
+    def _apply_released_version(self, version):
+        self._released_version = version
+        # Refresh the visible copyright label if the license page is built.
+        if hasattr(self, "_copyright_label") and self._copyright_label is not None:
+            try:
+                self._copyright_label.set_text(self._copyright_text())
+            except Exception:
+                pass
+        return False
 
     def _license_summary_col(self, title, icon_char, css_class, items):
         """Same layout as main_window._license_summary_col — Unicode badge
