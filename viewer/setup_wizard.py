@@ -97,6 +97,7 @@ class SetupWizard(Adw.Window):
         self.selected_backup_path = None
         self._chosen_lang = _lang  # starts at detected/settings language
         self._chosen_thumb_size = 200
+        self._chosen_structure = "year_month"
 
         self.set_title(_("Pixora — Setup"))
         self.set_default_size(600, 580)
@@ -112,9 +113,11 @@ class SetupWizard(Adw.Window):
 
         self.stack.add_named(self._scrolled(self._build_welcome()),   "welcome")
         self.stack.add_named(self._scrolled(self._build_folder()),    "folder")
+        self.stack.add_named(self._scrolled(self._build_structure()), "structure")
         self.stack.add_named(self._scrolled(self._build_backup()),    "backup")
         self.stack.add_named(self._scrolled(self._build_duplicate()), "duplicate")
         self.stack.add_named(self._scrolled(self._build_thumbnail()), "thumbnail")
+        self.stack.add_named(self._scrolled(self._build_license()),   "license")
 
         # Overlay the stack with a spinner-card we show during live language
         # switches so the rebuild flash isn't visible.
@@ -176,7 +179,8 @@ class SetupWizard(Adw.Window):
         main_box.set_size_request(560, 520)
         self.set_content(main_box)
 
-        self.pages = ["welcome", "folder", "backup", "duplicate", "thumbnail"]
+        self.pages = ["welcome", "folder", "structure", "backup",
+                      "duplicate", "thumbnail", "license"]
         self.current = 0
 
     def _scrolled(self, child):
@@ -288,6 +292,78 @@ class SetupWizard(Adw.Window):
         page.append(row_box)
 
         return page
+
+    # ── Pagina: Mappen-structuur ─────────────────────────────────────
+
+    def _build_structure(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        page.set_margin_top(32)
+        page.set_margin_bottom(24)
+        page.set_margin_start(40)
+        page.set_margin_end(40)
+        page.set_valign(Gtk.Align.START)
+
+        title = Gtk.Label(label=_("Folder structure"))
+        title.add_css_class("title-2")
+        title.set_halign(Gtk.Align.START)
+        page.append(title)
+
+        subtitle = Gtk.Label(
+            label=_("Controls how Pixora saves imported photos in your library.")
+        )
+        subtitle.add_css_class("body")
+        subtitle.set_halign(Gtk.Align.START)
+        page.append(subtitle)
+
+        group = Adw.PreferencesGroup()
+
+        self.radio_flat = Gtk.CheckButton()
+        self.radio_flat.set_active(self._chosen_structure == "flat")
+        self.radio_flat.connect("toggled",
+            lambda b: self._on_structure_radio("flat", b))
+        flat_row = Adw.ActionRow(
+            title=_("All together"),
+            subtitle=_("All photos go into a single folder — no subfolders."),
+        )
+        flat_row.add_prefix(Gtk.Image.new_from_icon_name("folder-symbolic"))
+        flat_row.add_prefix(self.radio_flat)
+        flat_row.set_activatable_widget(self.radio_flat)
+        group.add(flat_row)
+
+        self.radio_year = Gtk.CheckButton()
+        self.radio_year.set_group(self.radio_flat)
+        self.radio_year.set_active(self._chosen_structure == "year")
+        self.radio_year.connect("toggled",
+            lambda b: self._on_structure_radio("year", b))
+        year_row = Adw.ActionRow(
+            title=_("By year"),
+            subtitle=_("Separate folder per year — e.g. 2024/, 2025/."),
+        )
+        year_row.add_prefix(Gtk.Image.new_from_icon_name("folder-open-symbolic"))
+        year_row.add_prefix(self.radio_year)
+        year_row.set_activatable_widget(self.radio_year)
+        group.add(year_row)
+
+        self.radio_month = Gtk.CheckButton()
+        self.radio_month.set_group(self.radio_flat)
+        self.radio_month.set_active(self._chosen_structure == "year_month")
+        self.radio_month.connect("toggled",
+            lambda b: self._on_structure_radio("year_month", b))
+        month_row = Adw.ActionRow(
+            title=_("By year and month"),
+            subtitle=_("Year folder with month subfolders — e.g. 2024/2024-03/."),
+        )
+        month_row.add_prefix(Gtk.Image.new_from_icon_name("view-list-symbolic"))
+        month_row.add_prefix(self.radio_month)
+        month_row.set_activatable_widget(self.radio_month)
+        group.add(month_row)
+
+        page.append(group)
+        return page
+
+    def _on_structure_radio(self, value, btn):
+        if btn.get_active():
+            self._chosen_structure = value
 
     # ── Pagina: Backup ───────────────────────────────────────────────
 
@@ -510,6 +586,103 @@ class SetupWizard(Adw.Window):
         except Exception:
             pass
 
+    # ── Pagina: Licentie ─────────────────────────────────────────────
+
+    def _build_license(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        page.set_margin_top(32)
+        page.set_margin_bottom(24)
+        page.set_margin_start(40)
+        page.set_margin_end(40)
+        page.set_valign(Gtk.Align.START)
+
+        title = Gtk.Label(label=_("License"))
+        title.add_css_class("title-2")
+        title.set_halign(Gtk.Align.START)
+        page.append(title)
+
+        subtitle = Gtk.Label(
+            label=_("Pixora is free software under GPL-3.0. You may use, modify and share it — as long as you respect those same rights for others.")
+        )
+        subtitle.add_css_class("body")
+        subtitle.set_halign(Gtk.Align.START)
+        subtitle.set_wrap(True)
+        subtitle.set_xalign(0)
+        page.append(subtitle)
+
+        group = Adw.PreferencesGroup()
+        lic_row = Adw.ActionRow(
+            title=_("GNU General Public License v3.0"),
+            subtitle=_("Open the full license text"),
+        )
+        lic_row.add_prefix(Gtk.Image.new_from_icon_name("text-x-generic-symbolic"))
+        view_btn = Gtk.Button(label=_("View"))
+        view_btn.add_css_class("flat")
+        view_btn.set_valign(Gtk.Align.CENTER)
+        view_btn.connect("clicked", self._on_view_license)
+        lic_row.add_suffix(view_btn)
+        lic_row.set_activatable_widget(view_btn)
+        group.add(lic_row)
+        page.append(group)
+
+        hint = Gtk.Label(label=_("Click Finish below to start Pixora."))
+        hint.add_css_class("dim-label")
+        hint.set_halign(Gtk.Align.START)
+        hint.set_margin_top(8)
+        page.append(hint)
+
+        return page
+
+    def _on_view_license(self, btn):
+        """Full GPL-3.0 text in a scrolled viewer — mirrors main_window's
+        license dialog but without the permissions/conditions summary."""
+        win = Adw.Window()
+        win.set_title(_("License"))
+        win.set_transient_for(self)
+        win.set_modal(True)
+        win.set_default_size(720, 640)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        outer.append(Adw.HeaderBar())
+
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        body.set_margin_top(16)
+        body.set_margin_bottom(16)
+        body.set_margin_start(18)
+        body.set_margin_end(18)
+
+        heading = Gtk.Label(label=_("GNU General Public License v3.0"))
+        heading.add_css_class("title-2")
+        heading.set_halign(Gtk.Align.START)
+        body.append(heading)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        tv = Gtk.TextView()
+        tv.set_editable(False)
+        tv.set_cursor_visible(False)
+        tv.set_monospace(True)
+        tv.set_wrap_mode(Gtk.WrapMode.WORD)
+        tv.set_left_margin(12)
+        tv.set_right_margin(12)
+        tv.set_top_margin(12)
+        tv.set_bottom_margin(12)
+        license_path = os.path.abspath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "LICENSE"
+        ))
+        try:
+            with open(license_path, "r", encoding="utf-8") as f:
+                lic_text = f.read()
+        except Exception as e:
+            lic_text = _("Could not load license: {err}").format(err=e)
+        tv.get_buffer().set_text(lic_text)
+        scroll.set_child(tv)
+        body.append(scroll)
+
+        outer.append(body)
+        win.set_content(outer)
+        win.present()
+
     # ── Live language switch ────────────────────────────────────────────
 
     def _on_lang_selected(self, combo, _pspec):
@@ -544,9 +717,11 @@ class SetupWizard(Adw.Window):
 
         self.stack.add_named(self._scrolled(self._build_welcome()),   "welcome")
         self.stack.add_named(self._scrolled(self._build_folder()),    "folder")
+        self.stack.add_named(self._scrolled(self._build_structure()), "structure")
         self.stack.add_named(self._scrolled(self._build_backup()),    "backup")
         self.stack.add_named(self._scrolled(self._build_duplicate()), "duplicate")
         self.stack.add_named(self._scrolled(self._build_thumbnail()), "thumbnail")
+        self.stack.add_named(self._scrolled(self._build_license()),   "license")
         self.stack.set_visible_child_name(current_name)
 
         self._apply_wizard_state()
@@ -766,7 +941,7 @@ class SetupWizard(Adw.Window):
     def _save_and_finish(self):
         settings = {
             "photo_path":          self.folder_entry.get_text(),
-            "structure":           "year_month",
+            "structure":           self._chosen_structure,
             "backup_enabled":      self.backup_switch.get_active(),
             "backup_uuid":         self._get_backup_uuid(),
             "backup_path":         self.selected_backup_path,

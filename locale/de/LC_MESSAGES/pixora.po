@@ -2310,3 +2310,9 @@ msgstr "Sprache:"
 
 msgid "Switching language…"
 msgstr "Sprache wechseln…"
+
+msgid "Open the full license text"
+msgstr "Vollständigen Lizenztext öffnen"
+
+msgid "Click Finish below to start Pixora."
+msgstr "Klicke unten auf Fertig stellen, um Pixora zu starten."

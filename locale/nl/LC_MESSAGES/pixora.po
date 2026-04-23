@@ -2298,3 +2298,9 @@ msgstr "Taal:"
 
 msgid "Switching language…"
 msgstr "Taal wisselen…"
+
+msgid "Open the full license text"
+msgstr "Open de volledige licentie-tekst"
+
+msgid "Click Finish below to start Pixora."
+msgstr "Klik op Voltooien hieronder om Pixora te starten."
