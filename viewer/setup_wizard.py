@@ -841,10 +841,19 @@ class SetupWizard(Adw.Window):
         page.append(heading)
 
         year_now = datetime.datetime.now().year
+        try:
+            version_file = os.path.abspath(os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "..", "version.txt",
+            ))
+            with open(version_file, "r", encoding="utf-8") as _vf:
+                version = _vf.read().strip()
+        except Exception:
+            version = ""
+        product = f"Pixora {version}" if version else "Pixora"
         if year_now > 2024:
-            cr_text = f"© 2024 – {year_now} Pixora · LinuxGinger"
+            cr_text = f"© 2024 – {year_now} {product} · LinuxGinger"
         else:
-            cr_text = "© 2024 Pixora · LinuxGinger"
+            cr_text = f"© 2024 {product} · LinuxGinger"
         cr_lbl = Gtk.Label(label=cr_text)
         cr_lbl.add_css_class("dim-label")
         cr_lbl.set_halign(Gtk.Align.START)
