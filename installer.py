@@ -547,8 +547,25 @@ class InstallerWindow(Adw.ApplicationWindow):
                 installed_version_file.parent.mkdir(parents=True, exist_ok=True)
                 installed_version_file.write_text(version_src.read_text())
 
-            main_py = INSTALL_DIR / "viewer" / "main.py"
-            subprocess.Popen([sys.executable, str(main_py)])
+            # Prefer the installed launcher when it exists; otherwise run
+            # main.py directly.
+            pixora_bin = Path.home() / ".local" / "bin" / "pixora"
+            if pixora_bin.exists():
+                cmd = [str(pixora_bin)]
+            else:
+                main_py = INSTALL_DIR / "viewer" / "main.py"
+                cmd = [sys.executable, str(main_py)]
+            # Detach from the installer's process group and redirect IO —
+            # without start_new_session + DEVNULL pipes, the installer's
+            # own quit() (1.5s later) sends SIGHUP to the child Pixora
+            # before it finishes its splash, and Pixora dies silently.
+            subprocess.Popen(
+                cmd,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+            )
             GLib.timeout_add(1500, self.get_application().quit)
             return True, ""
         except Exception as e:
