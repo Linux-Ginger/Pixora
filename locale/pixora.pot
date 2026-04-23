@@ -1448,6 +1448,9 @@ msgstr ""
 msgid "200–500 pixels"
 msgstr ""
 
+msgid "200–500 pixels · default 200"
+msgstr ""
+
 msgid "Language:"
 msgstr ""
 

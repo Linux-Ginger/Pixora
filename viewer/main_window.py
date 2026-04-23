@@ -3128,12 +3128,17 @@ class MainWindow(Adw.ApplicationWindow):
         self._selected.clear()
         if self._select_mode:
             self.select_btn.set_label(_("Cancel"))
+            # .flat keeps the bg transparent; combined with .suggested-action
+            # that paints text white, text becomes white-on-transparent.
+            # Drop .flat while suggested is active.
+            self.select_btn.remove_css_class("flat")
             self.select_btn.add_css_class("suggested-action")
             self.bottom_stack.set_visible_child_name("select")
             self.select_count_label.set_text(ngettext("%d selected", "%d selected", 0) % 0)
         else:
             self.select_btn.set_label(_("Select"))
             self.select_btn.remove_css_class("suggested-action")
+            self.select_btn.add_css_class("flat")
             self.bottom_stack.set_visible_child_name("normal")
             self._update_all_selection_visuals()
 

@@ -33,7 +33,6 @@ _t = _gt.translation(
 )
 _ = _t.gettext
 
-import datetime
 import json
 import math
 import subprocess
@@ -100,9 +99,8 @@ class SetupWizard(Adw.Window):
         self._chosen_thumb_size = 200
         self._chosen_structure = "year_month"
         self._chosen_backup_mode = "backup"  # vs "sync"
-        self._chosen_backup_dedup = False
+        self._chosen_backup_dedup = True
         self._chosen_backup_silent = False
-        self._chosen_reorganize_silent = False
 
         self.set_title(_("Pixora — Setup"))
         self.set_default_size(720, 660)
@@ -369,35 +367,12 @@ class SetupWizard(Adw.Window):
         month_row.set_activatable_widget(self.radio_month)
         group.add(month_row)
 
-        # Auto-confirm toggle (matches the Settings reorganize_silent flag).
-        self.reorganize_silent_switch = Gtk.Switch()
-        self.reorganize_silent_switch.set_valign(Gtk.Align.CENTER)
-        self.reorganize_silent_switch.set_active(self._chosen_reorganize_silent)
-        self.reorganize_silent_switch.connect(
-            "notify::active", self._on_reorganize_silent_toggle
-        )
-        rs_row = Adw.ActionRow(
-            title=_("Auto-confirm"),
-            subtitle=_("Starts right away when there's work to do, without interrupting."),
-        )
-        rs_row.add_prefix(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-        rs_row.add_suffix(self.reorganize_silent_switch)
-        rs_row.set_activatable_widget(self.reorganize_silent_switch)
-        try:
-            rs_row.set_subtitle_lines(3)
-        except Exception:
-            pass
-        group.add(rs_row)
-
         page.append(group)
         return page
 
     def _on_structure_radio(self, value, btn):
         if btn.get_active():
             self._chosen_structure = value
-
-    def _on_reorganize_silent_toggle(self, switch, _pspec):
-        self._chosen_reorganize_silent = switch.get_active()
 
     # ── Pagina: Backup ───────────────────────────────────────────────
 
@@ -640,7 +615,10 @@ class SetupWizard(Adw.Window):
 
         group = Adw.PreferencesGroup()
 
-        scale_row = Adw.ActionRow(title=_("Size"), subtitle=_("200–500 pixels"))
+        scale_row = Adw.ActionRow(
+            title=_("Size"),
+            subtitle=_("200–500 pixels · default 200"),
+        )
         scale_row.add_prefix(Gtk.Image.new_from_icon_name("view-grid-symbolic"))
 
         self.thumb_scale = Gtk.Scale.new_with_range(
@@ -653,6 +631,19 @@ class SetupWizard(Adw.Window):
         self.thumb_scale.set_valign(Gtk.Align.CENTER)
         self.thumb_scale.connect("value-changed", self._on_thumb_scale_changed)
         scale_row.add_suffix(self.thumb_scale)
+
+        # Reset-to-default button (same icon as Settings).
+        self.thumb_reset_btn = Gtk.Button(icon_name="edit-undo-symbolic")
+        self.thumb_reset_btn.add_css_class("flat")
+        self.thumb_reset_btn.add_css_class("circular")
+        self.thumb_reset_btn.set_valign(Gtk.Align.CENTER)
+        self.thumb_reset_btn.set_tooltip_text(_("Back to default (200 px)"))
+        self.thumb_reset_btn.set_sensitive(self._chosen_thumb_size != 200)
+        self.thumb_reset_btn.connect(
+            "clicked", lambda b: self.thumb_scale.set_value(200.0)
+        )
+        scale_row.add_suffix(self.thumb_reset_btn)
+
         group.add(scale_row)
 
         self._thumb_preview = Gtk.DrawingArea()
@@ -676,6 +667,11 @@ class SetupWizard(Adw.Window):
         if hasattr(self, "_thumb_preview") and self._thumb_preview is not None:
             try:
                 self._thumb_preview.queue_draw()
+            except Exception:
+                pass
+        if hasattr(self, "thumb_reset_btn"):
+            try:
+                self.thumb_reset_btn.set_sensitive(self._chosen_thumb_size != 200)
             except Exception:
                 pass
 
@@ -795,34 +791,20 @@ class SetupWizard(Adw.Window):
     # ── Pagina: Licentie ─────────────────────────────────────────────
 
     def _build_license(self):
-        """Mirror of main_window._on_view_license: ✓/!/✗ summary, dynamic
-        copyright line, and the full LICENSE text embedded inline (no need
-        to click through)."""
+        """Mirror of main_window._on_view_license: ✓/!/✗ summary plus the
+        full LICENSE text embedded inline."""
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         page.set_margin_top(20)
         page.set_margin_bottom(20)
         page.set_margin_start(28)
         page.set_margin_end(28)
-        page.set_valign(Gtk.Align.START)
+        page.set_hexpand(True)
+        page.set_vexpand(True)
 
         heading = Gtk.Label(label=_("GNU General Public License v3.0"))
         heading.add_css_class("title-2")
         heading.set_halign(Gtk.Align.START)
         page.append(heading)
-
-        year_now = datetime.datetime.now().year
-        if year_now > 2024:
-            copyright_text = f"© 2024–{year_now} LinuxGinger"
-        else:
-            copyright_text = "© 2024 LinuxGinger"
-        copyright_lbl = Gtk.Label(
-            label=copyright_text + " — " + _("Pixora is free software.")
-        )
-        copyright_lbl.add_css_class("dim-label")
-        copyright_lbl.set_halign(Gtk.Align.START)
-        copyright_lbl.set_wrap(True)
-        copyright_lbl.set_xalign(0)
-        page.append(copyright_lbl)
 
         summary = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL, spacing=12,
@@ -865,7 +847,7 @@ class SetupWizard(Adw.Window):
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
         scroll.set_hexpand(True)
-        scroll.set_min_content_height(180)
+        scroll.set_min_content_height(320)
         tv = Gtk.TextView()
         tv.set_editable(False)
         tv.set_cursor_visible(False)
@@ -1180,7 +1162,6 @@ class SetupWizard(Adw.Window):
         settings = {
             "photo_path":          self.folder_entry.get_text(),
             "structure":           self._chosen_structure,
-            "reorganize_silent":   self._chosen_reorganize_silent,
             "backup_enabled":      self.backup_switch.get_active(),
             "backup_uuid":         self._get_backup_uuid(),
             "backup_path":         self.selected_backup_path,

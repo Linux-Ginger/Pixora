@@ -2290,6 +2290,9 @@ msgstr "Grootte"
 msgid "200–500 pixels"
 msgstr "200–500 pixels"
 
+msgid "200–500 pixels · default 200"
+msgstr "200–500 pixels · standaard 200"
+
 msgid "Language:"
 msgstr "Taal:"
 
