@@ -93,27 +93,50 @@ sudo apt-get install -y -qq \
     curl \
     2>/dev/null
 
-# Echte logo rendering. curl haalt de SVG op (install.sh via one-liner
-# loopt vóór de git-clone, dus nog geen local file), chafa zet hem om
-# naar Unicode+ANSI color-blocks.
+# Echte logo rendering. Alleen het aperture-icoon (kleurige bloem)
+# via chafa; de "PIXORA" tekst blijft als block-ASCII eronder want
+# wordmark-render wordt op terminal-grootte onleesbaar.
 render_real_logo() {
     if ! command -v chafa &>/dev/null; then return 1; fi
     if ! command -v curl   &>/dev/null; then return 1; fi
     local tmp
     tmp=$(mktemp --suffix=.svg 2>/dev/null) || return 1
-    local logo_url="https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/assets/logos/pixora-logo-light.svg"
+    local logo_url="https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/assets/logos/pixora-icon.svg"
     if ! curl -fsSL "$logo_url" -o "$tmp" 2>/dev/null || [ ! -s "$tmp" ]; then
         rm -f "$tmp"
         return 1
     fi
     local out
-    out=$(chafa --size 44x13 "$tmp" 2>/dev/null)
+    # Icon is viewBox 0 0 120 120 (1:1). Chafa gebruikt half-blocks
+    # verticaal, dus 18x9 cellen → visueel ~18x18 pixel-resolutie.
+    out=$(chafa --size 18x9 "$tmp" 2>/dev/null)
     rm -f "$tmp"
     if [ -z "$out" ]; then return 1; fi
     clear
     echo ""
-    echo "$out"
-    echo ""
+    # Links: kleurige aperture-flower. Rechts: tekst-banner.
+    # Paste ze side-by-side met paste(1).
+    local text_file flower_file combined
+    text_file=$(mktemp) || { echo "$out"; return 0; }
+    flower_file=$(mktemp) || { rm -f "$text_file"; echo "$out"; return 0; }
+    printf '%s\n' "$out" > "$flower_file"
+    {
+        echo ""
+        echo -e "${ORANGE}${BOLD}██████╗ ██╗██╗  ██╗ ██████╗ ██████╗  █████╗${NC}"
+        echo -e "${ORANGE}${BOLD}██╔══██╗██║╚██╗██╔╝██╔═══██╗██╔══██╗██╔══██╗${NC}"
+        echo -e "${ORANGE}${BOLD}██████╔╝██║ ╚███╔╝ ██║   ██║██████╔╝███████║${NC}"
+        echo -e "${ORANGE}${BOLD}██╔═══╝ ██║ ██╔██╗ ██║   ██║██╔══██╗██╔══██║${NC}"
+        echo -e "${ORANGE}${BOLD}██║     ██║██╔╝ ██╗╚██████╔╝██║  ██║██║  ██║${NC}"
+        echo -e "${ORANGE}${BOLD}╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝${NC}"
+        echo ""
+    } > "$text_file"
+    # paste werkt met TAB-separator; -d ' ' scheidt met een spatie.
+    # pad flower naar gelijk aantal regels via printf-herhaling, maar
+    # simpeler: gewoon onder elkaar. Geeft minder brede banner maar
+    # blijft leesbaar.
+    cat "$flower_file"
+    cat "$text_file"
+    rm -f "$flower_file" "$text_file"
     echo -e "  ${BOLD}${LBL_BY}${NC}"
     echo ""
     return 0
