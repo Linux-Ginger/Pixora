@@ -5518,12 +5518,18 @@ class MainWindow(Adw.ApplicationWindow):
             # "checked" state bumps -gtk-icon-size so the SVG re-renders
             # bigger and stays sharp. Tighter padding keeps the header
             # from growing taller than the default, so window controls
-            # stay flush in the corner.
+            # stay flush in the corner. The :checked-background is
+            # suppressed — a separate sliding indicator handles that.
             self._settings_tabs_css.load_from_string(
                 ".pixora-settings-tab {"
                 "  padding: 2px 14px;"
                 "  border-radius: 10px;"
                 "  min-width: 84px;"
+                "  background: transparent;"
+                "}"
+                ".pixora-settings-tab:checked {"
+                "  background: transparent;"
+                "  box-shadow: none;"
                 "}"
                 ".pixora-settings-tab image {"
                 "  transition: transform 200ms cubic-bezier(.2,.9,.3,1.2),"
@@ -5546,6 +5552,12 @@ class MainWindow(Adw.ApplicationWindow):
                 "}"
                 ".pixora-settings-tab:checked label {"
                 "  opacity: 1.0;"
+                "}"
+                ".pixora-tab-indicator {"
+                "  background: alpha(@accent_bg_color, 0.18);"
+                "  border-radius: 10px;"
+                "  margin-top: 3px;"
+                "  margin-bottom: 3px;"
                 "}"
             )
 
@@ -5592,9 +5604,35 @@ class MainWindow(Adw.ApplicationWindow):
             for btn, _n in tabs[1:]:
                 btn.set_group(tabs[0][0])
 
+        # Sliding indicator — drawn BEHIND the tab row. Gtk.Overlay paints
+        # the main child first, then overlays on top, so make the indicator
+        # the main child and the tab row the overlay. set_measure_overlay
+        # sizes the overlay to the tab row's natural width.
+        indicator = Gtk.Box()
+        indicator.add_css_class("pixora-tab-indicator")
+        indicator.get_style_context().add_provider(
+            self._settings_tabs_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
+        indicator.set_halign(Gtk.Align.START)
+        indicator.set_valign(Gtk.Align.FILL)
+        indicator.set_can_target(False)
+
+        overlay = Gtk.Overlay()
+        overlay.set_halign(Gtk.Align.CENTER)
+        overlay.set_child(indicator)
+        overlay.add_overlay(bar)
+        try:
+            overlay.set_measure_overlay(bar, True)
+        except Exception:
+            pass
+        self._settings_tab_indicator = indicator
+        self._settings_tab_indicator_anim_id = None
+
         def _on_toggled(btn, name):
-            if btn.get_active():
-                stack.set_visible_child_name(name)
+            if not btn.get_active():
+                return
+            stack.set_visible_child_name(name)
+            self._animate_settings_indicator_to(btn)
 
         for btn, name in tabs:
             btn.connect("toggled", _on_toggled, name)
@@ -5603,7 +5641,73 @@ class MainWindow(Adw.ApplicationWindow):
             tabs[0][0].set_active(True)
             if first_name:
                 stack.set_visible_child_name(first_name)
-        return bar
+            # First allocation arrives on the next idle tick; position the
+            # indicator under the first tab then.
+            GLib.idle_add(self._place_settings_indicator_under, tabs[0][0])
+        return overlay
+
+    def _place_settings_indicator_under(self, btn):
+        try:
+            alloc = btn.get_allocation()
+        except Exception:
+            alloc = None
+        if alloc is None or alloc.width <= 0:
+            # Widget not laid out yet — retry once.
+            GLib.timeout_add(40, self._place_settings_indicator_under, btn)
+            return False
+        self._settings_tab_indicator.set_margin_start(alloc.x)
+        self._settings_tab_indicator.set_size_request(alloc.width, -1)
+        return False
+
+    def _animate_settings_indicator_to(self, btn):
+        alloc = btn.get_allocation()
+        if alloc.width <= 0:
+            # Not allocated yet; just snap on next tick.
+            GLib.idle_add(self._place_settings_indicator_under, btn)
+            return
+        anim_on = bool(self.settings.get("animations_enabled", True))
+        target_x = alloc.x
+        target_w = alloc.width
+        if not anim_on:
+            self._settings_tab_indicator.set_margin_start(target_x)
+            self._settings_tab_indicator.set_size_request(target_w, -1)
+            return
+        # Cancel any in-flight animation.
+        if self._settings_tab_indicator_anim_id is not None:
+            try:
+                GLib.source_remove(self._settings_tab_indicator_anim_id)
+            except Exception:
+                pass
+            self._settings_tab_indicator_anim_id = None
+        start_x = self._settings_tab_indicator.get_margin_start()
+        cur_w, _ = self._settings_tab_indicator.get_size_request()
+        start_w = cur_w if cur_w > 0 else target_w
+        self._settings_tab_indicator_anim_start = (start_x, start_w)
+        self._settings_tab_indicator_anim_target = (target_x, target_w)
+        self._settings_tab_indicator_anim_step = 0
+        self._settings_tab_indicator_anim_total = 22  # 22 × 10ms = 220ms
+        self._settings_tab_indicator_anim_id = GLib.timeout_add(
+            10, self._settings_tab_indicator_tick,
+        )
+
+    def _settings_tab_indicator_tick(self):
+        self._settings_tab_indicator_anim_step += 1
+        total = self._settings_tab_indicator_anim_total
+        t = self._settings_tab_indicator_anim_step / total
+        # Ease-out cubic — snappy start, gentle land.
+        eased = 1 - (1 - t) ** 3
+        sx, sw = self._settings_tab_indicator_anim_start
+        tx, tw = self._settings_tab_indicator_anim_target
+        x = int(sx + (tx - sx) * eased)
+        w = int(sw + (tw - sw) * eased)
+        self._settings_tab_indicator.set_margin_start(x)
+        self._settings_tab_indicator.set_size_request(w, -1)
+        if self._settings_tab_indicator_anim_step >= total:
+            self._settings_tab_indicator.set_margin_start(tx)
+            self._settings_tab_indicator.set_size_request(tw, -1)
+            self._settings_tab_indicator_anim_id = None
+            return False
+        return True
 
     def _settings_new_page_container(self):
         """Mimic Adw.PreferencesPage (ScrolledWindow + Adw.Clamp + VBox) so
