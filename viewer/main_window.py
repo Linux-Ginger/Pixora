@@ -4404,7 +4404,8 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _scroll_filmstrip_to_current(self):
         """Center current photo in filmstrip; the clamp keeps first/last at
-        the edges instead of forcing them to center."""
+        the edges instead of forcing them to center. Animated slide when
+        animations are enabled, instant otherwise."""
         cell = FILM_THUMB + 4
         adj  = self.filmstrip_scroll.get_hadjustment()
         page = adj.get_page_size()
@@ -4418,8 +4419,41 @@ class MainWindow(Adw.ApplicationWindow):
             vp = 0
         center_of_current = vp * cell + cell / 2
         target = center_of_current - page / 2
-        adj.set_value(max(0, min(target, adj.get_upper() - page)))
+        target = max(0, min(target, adj.get_upper() - page))
+
+        if not bool(self.settings.get("animations_enabled", True)):
+            adj.set_value(target)
+            return False
+
+        # Cancel any in-flight animation and start a fresh one.
+        if getattr(self, "_filmstrip_anim_id", None) is not None:
+            try:
+                GLib.source_remove(self._filmstrip_anim_id)
+            except Exception:
+                pass
+            self._filmstrip_anim_id = None
+        self._filmstrip_anim_start = adj.get_value()
+        self._filmstrip_anim_target = target
+        self._filmstrip_anim_step = 0
+        self._filmstrip_anim_total = 15  # 15 × 10ms = 150ms
+        self._filmstrip_anim_id = GLib.timeout_add(10, self._filmstrip_anim_tick)
         return False
+
+    def _filmstrip_anim_tick(self):
+        self._filmstrip_anim_step += 1
+        total = self._filmstrip_anim_total
+        t = self._filmstrip_anim_step / total
+        # Ease-out cubic so it decelerates into the target position.
+        eased = 1 - (1 - t) ** 3
+        start = self._filmstrip_anim_start
+        target = self._filmstrip_anim_target
+        adj = self.filmstrip_scroll.get_hadjustment()
+        adj.set_value(start + (target - start) * eased)
+        if self._filmstrip_anim_step >= total:
+            adj.set_value(target)
+            self._filmstrip_anim_id = None
+            return False
+        return True
 
     def _show_video(self, path, location="", searching=False):
         self._stop_video()
