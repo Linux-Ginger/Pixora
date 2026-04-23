@@ -6166,31 +6166,34 @@ class MainWindow(Adw.ApplicationWindow):
         license_group.add(license_row)
         about_box.append(license_group)
 
-        stack = Adw.ViewStack()
+        # Adw.ViewStack has no transitions; we need Gtk.Stack for that.
+        # Gtk.StackSwitcher picks up page-level "icon-name" + "title".
+        stack = Gtk.Stack()
         anim_on = bool(self.settings.get("animations_enabled", True))
         stack.set_transition_duration(350 if anim_on else 0)
+        stack.set_transition_type(
+            Gtk.StackTransitionType.SLIDE_LEFT_RIGHT if anim_on
+            else Gtk.StackTransitionType.NONE
+        )
         stack.set_vexpand(True)
         stack.set_hexpand(True)
-        stack.add_titled_with_icon(
-            display_outer, "display", _("Display"),
-            "preferences-desktop-display-symbolic",
-        )
-        stack.add_titled_with_icon(
-            import_outer, "import", _("Import"),
-            "document-send-symbolic",
-        )
-        stack.add_titled_with_icon(
-            advanced_outer, "advanced", _("Advanced"),
-            "applications-engineering-symbolic",
-        )
-        stack.add_titled_with_icon(
-            about_outer, "about", _("About"),
-            "help-about-symbolic",
-        )
 
-        switcher = Adw.ViewSwitcher()
+        for child, name, title, icon in (
+            (display_outer,  "display",  _("Display"),
+                "preferences-desktop-display-symbolic"),
+            (import_outer,   "import",   _("Import"),
+                "document-send-symbolic"),
+            (advanced_outer, "advanced", _("Advanced"),
+                "applications-engineering-symbolic"),
+            (about_outer,    "about",    _("About"),
+                "help-about-symbolic"),
+        ):
+            stack.add_titled(child, name, title)
+            page = stack.get_page(child)
+            page.set_icon_name(icon)
+
+        switcher = Gtk.StackSwitcher()
         switcher.set_stack(stack)
-        switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
 
         header = Adw.HeaderBar()
         header.set_title_widget(switcher)
