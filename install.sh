@@ -244,5 +244,15 @@ sleep 0.3
 echo -e "  ${GREEN}${LBL_DONE}${NC}"
 echo ""
 
-# ── Installer starten vanuit de repo (geen CDN caching) ──
-python3 "$INSTALL_DIR/installer.py"
+# ── Installer starten via .desktop zodat GNOME Shell het icoon
+# direct koppelt aan het window, zonder eerst even het tandwiel te
+# tonen. gtk-launch / gio launch gaan door de AppInfo.launch-flow
+# die AppInfoMonitor triggert vóór het window map't. Fallback op
+# directe python-start als beide niet aanwezig zijn.
+if command -v gtk-launch >/dev/null 2>&1; then
+    exec gtk-launch com.linuxginger.pixora.installer
+elif command -v gio >/dev/null 2>&1; then
+    exec gio launch "$APPS_DIR/com.linuxginger.pixora.installer.desktop"
+else
+    exec python3 "$INSTALL_DIR/installer.py"
+fi
