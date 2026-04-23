@@ -2325,3 +2325,6 @@ msgstr "Herken foto's die je al hebt."
 
 msgid "How big photos appear in the grid."
 msgstr "Hoe groot foto's in het overzicht tonen."
+
+msgid "⚠️  The selected drive is not mounted"
+msgstr "⚠️  De gekozen schijf is niet gekoppeld"

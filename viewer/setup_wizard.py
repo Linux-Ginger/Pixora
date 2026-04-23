@@ -33,6 +33,7 @@ _t = _gt.translation(
 )
 _ = _t.gettext
 
+import datetime
 import json
 import math
 import subprocess
@@ -218,16 +219,16 @@ class SetupWizard(Adw.Window):
         page.set_valign(Gtk.Align.CENTER)
         page.set_valign(Gtk.Align.START)
 
-        # Bigger, centered logo: wrap in a centering hbox so halign truly
-        # centers even if the Picture's allocation chooses to be wider.
+        # SVG rendered at native size (340x120) so there's no downscale blur.
         logo_center = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         logo_center.set_halign(Gtk.Align.CENTER)
         self.welcome_logo = Gtk.Picture()
         logo_path = self._logo_path()
         if logo_path:
             self.welcome_logo.set_filename(logo_path)
-        self.welcome_logo.set_size_request(360, 82)
+        self.welcome_logo.set_size_request(340, 120)
         self.welcome_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self.welcome_logo.set_can_shrink(False)
         self.welcome_logo.set_hexpand(False)
         logo_center.append(self.welcome_logo)
         page.append(logo_center)
@@ -617,7 +618,7 @@ class SetupWizard(Adw.Window):
 
         scale_row = Adw.ActionRow(
             title=_("Size"),
-            subtitle=_("200–500 pixels · default 200"),
+            subtitle=_("200–500 pixels"),
         )
         scale_row.add_prefix(Gtk.Image.new_from_icon_name("view-grid-symbolic"))
 
@@ -805,6 +806,16 @@ class SetupWizard(Adw.Window):
         heading.add_css_class("title-2")
         heading.set_halign(Gtk.Align.START)
         page.append(heading)
+
+        year_now = datetime.datetime.now().year
+        if year_now > 2024:
+            cr_text = f"© 2024 – {year_now} Pixora · LinuxGinger"
+        else:
+            cr_text = "© 2024 Pixora · LinuxGinger"
+        cr_lbl = Gtk.Label(label=cr_text)
+        cr_lbl.add_css_class("dim-label")
+        cr_lbl.set_halign(Gtk.Align.START)
+        page.append(cr_lbl)
 
         summary = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL, spacing=12,
@@ -1034,12 +1045,17 @@ class SetupWizard(Adw.Window):
 
     def _on_backup_toggle(self, switch, _pspec):
         active = switch.get_active()
-        # Grey out every backup-related row when the toggle is off; they
-        # don't apply and the visual cue matches the Settings dialog.
         self.drive_row.set_sensitive(active)
         self.drive_combo.set_sensitive(active and bool(self.drives))
+        # Folder-row stays off until a drive is actually selected; without
+        # a drive there's nothing valid to browse. _on_drive_selected
+        # enables it.
+        has_drive = (
+            bool(self.drives)
+            and self.drive_combo.get_selected() < len(self.drives)
+        )
         if hasattr(self, "backup_folder_row"):
-            self.backup_folder_row.set_sensitive(active)
+            self.backup_folder_row.set_sensitive(active and has_drive)
         for row_attr in ("_mode_backup_row", "_mode_sync_row",
                          "_dedup_row", "_silent_row"):
             row = getattr(self, row_attr, None)
@@ -1051,23 +1067,39 @@ class SetupWizard(Adw.Window):
     def _on_drive_selected(self, combo, _pspec):
         selected = combo.get_selected()
         if self.drives and selected < len(self.drives):
-            self.backup_folder_row.set_sensitive(True)
+            # Only unlock the folder row if backup-mode itself is enabled.
+            self.backup_folder_row.set_sensitive(self.backup_switch.get_active())
             self.backup_folder_row.set_subtitle(_("No folder chosen yet"))
             self.selected_backup_path = None
             self.backup_error.set_visible(False)
 
     def _on_browse_backup_folder(self, btn):
-        dialog = Gtk.FileDialog()
-        dialog.set_title(_("Choose folder on backup drive"))
-
+        """Use the same custom picker as the Settings dialog instead of the
+        GNOME file chooser — it's confined to the USB root, has inline
+        'create subfolder', and sidesteps the GNOME dialog's quirks."""
         selected = self.drive_combo.get_selected()
-        if self.drives and selected < len(self.drives):
-            uuid = self.drives[selected][0]
-            mountpoint = self._get_mountpoint_for_uuid(uuid)
-            if mountpoint:
-                dialog.set_initial_folder(Gio.File.new_for_path(mountpoint))
+        if not (self.drives and selected < len(self.drives)):
+            return
+        uuid = self.drives[selected][0]
+        mountpoint = self._get_mountpoint_for_uuid(uuid)
+        if not mountpoint:
+            self.backup_error.set_label(
+                _("⚠️  The selected drive is not mounted")
+            )
+            self.backup_error.set_visible(True)
+            return
+        from main_window import BackupFolderPicker
+        picker = BackupFolderPicker(
+            mountpoint=mountpoint,
+            current_path=self.selected_backup_path,
+            on_selected=self._apply_backup_folder_choice,
+        )
+        picker.present(self)
 
-        dialog.select_folder(self, None, self._on_backup_folder_selected)
+    def _apply_backup_folder_choice(self, chosen):
+        self.selected_backup_path = chosen
+        self.backup_folder_row.set_subtitle(chosen)
+        self.backup_error.set_visible(False)
 
     def _get_mountpoint_for_uuid(self, uuid):
         try:
@@ -1083,28 +1115,6 @@ class SetupWizard(Adw.Window):
         except Exception:
             pass
         return None
-
-    def _on_backup_folder_selected(self, dialog, result):
-        try:
-            folder = dialog.select_folder_finish(result)
-            if folder:
-                chosen_path = folder.get_path()
-                selected = self.drive_combo.get_selected()
-                if self.drives and selected < len(self.drives):
-                    uuid = self.drives[selected][0]
-                    mountpoint = self._get_mountpoint_for_uuid(uuid)
-                    if mountpoint and not chosen_path.startswith(mountpoint):
-                        self.backup_error.set_label(_("⚠️  Choose a folder on the backup drive, not on your computer"))
-                        self.backup_error.set_visible(True)
-                        self.selected_backup_path = None
-                        self.backup_folder_row.set_subtitle(_("No folder chosen yet"))
-                        return
-
-                self.selected_backup_path = chosen_path
-                self.backup_folder_row.set_subtitle(chosen_path)
-                self.backup_error.set_visible(False)
-        except Exception:
-            pass
 
     def _on_refresh_drives(self, btn):
         self.refresh_btn.set_sensitive(False)
@@ -1132,7 +1142,12 @@ class SetupWizard(Adw.Window):
                 self.drive_model.append(label)
         else:
             self.drive_model.append(_("No external drives found"))
-        self.drive_combo.set_sensitive(backup_on)
+        self.drive_combo.set_sensitive(backup_on and bool(drives))
+        # Folder-row follows the drive-selected state. A fresh drives list
+        # re-selects index 0, which may or may not fire notify::selected —
+        # update here explicitly so the row doesn't stay locked out.
+        if hasattr(self, "backup_folder_row"):
+            self.backup_folder_row.set_sensitive(backup_on and bool(drives))
 
         return False
 

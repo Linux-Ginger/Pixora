@@ -2337,3 +2337,6 @@ msgstr "Fotos erkennen, die du bereits hast."
 
 msgid "How big photos appear in the grid."
 msgstr "Wie groß Fotos in der Übersicht angezeigt werden."
+
+msgid "⚠️  The selected drive is not mounted"
+msgstr "⚠️  Das gewählte Laufwerk ist nicht eingehängt"

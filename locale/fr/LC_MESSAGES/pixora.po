@@ -2353,3 +2353,6 @@ msgstr "Reconnaître les photos que vous avez déjà."
 
 msgid "How big photos appear in the grid."
 msgstr "Taille des photos dans la vue en grille."
+
+msgid "⚠️  The selected drive is not mounted"
+msgstr "⚠️  Le lecteur sélectionné n'est pas monté"

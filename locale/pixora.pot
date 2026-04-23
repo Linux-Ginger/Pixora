@@ -1483,3 +1483,6 @@ msgstr ""
 
 msgid "How big photos appear in the grid."
 msgstr ""
+
+msgid "⚠️  The selected drive is not mounted"
+msgstr ""
