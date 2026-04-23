@@ -2934,11 +2934,33 @@ class MainWindow(Adw.ApplicationWindow):
         bg.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         viewer_area.set_child(bg)
 
-        self.photo_picture = Gtk.Picture()
-        self.photo_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
-        self.photo_picture.set_vexpand(True)
-        self.photo_picture.set_hexpand(True)
-        viewer_area.add_overlay(self.photo_picture)
+        # Two Picture widgets inside a Gtk.Stack so next/prev navigation
+        # can slide the old photo out and the new one in. self.photo_picture
+        # always aliases the currently-visible slot; _show_full_photo swaps
+        # the pointer when it flips the stack's visible child.
+        self._viewer_pic_a = Gtk.Picture()
+        self._viewer_pic_a.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self._viewer_pic_a.set_vexpand(True)
+        self._viewer_pic_a.set_hexpand(True)
+
+        self._viewer_pic_b = Gtk.Picture()
+        self._viewer_pic_b.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self._viewer_pic_b.set_vexpand(True)
+        self._viewer_pic_b.set_hexpand(True)
+
+        self._viewer_stack = Gtk.Stack()
+        self._viewer_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self._viewer_stack.set_transition_duration(250)
+        self._viewer_stack.set_vexpand(True)
+        self._viewer_stack.set_hexpand(True)
+        self._viewer_stack.add_named(self._viewer_pic_a, "a")
+        self._viewer_stack.add_named(self._viewer_pic_b, "b")
+        self._viewer_stack.set_visible_child_name("a")
+
+        self.photo_picture = self._viewer_pic_a
+        self._active_viewer_slot = "a"
+        self._nav_direction = None  # "next" / "prev" / None (first-open)
+        viewer_area.add_overlay(self._viewer_stack)
 
         self.video_display = Gtk.Picture()
         self.video_display.set_content_fit(Gtk.ContentFit.CONTAIN)
@@ -3914,6 +3936,8 @@ class MainWindow(Adw.ApplicationWindow):
         kind = _("video") if is_video(path) else _("photo")
         log_info(_("open_photo: {kind} idx={i} path={p}").format(kind=kind, i=index, p=path))
         self.current_index = index
+        # First-open = no nav direction → crossfade, not slide.
+        self._nav_direction = None
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
         self._set_toolbars_revealed(False)
@@ -4032,7 +4056,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._show_viewer_ui()   # reset opacity/visibility from any prior fade
         self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
-        self.photo_picture.set_visible(True)
+        # Put the new pixbuf in the INACTIVE slot, then flip the stack so
+        # the old photo slides out and the new one slides in from the
+        # matching side.
+        incoming_slot = "b" if self._active_viewer_slot == "a" else "a"
+        incoming_pic = (self._viewer_pic_b if incoming_slot == "b"
+                        else self._viewer_pic_a)
+        incoming_pic.set_visible(True)
         self.edit_btn.set_visible(True)
         self._update_favorite_btn()
         self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 16)
@@ -4040,7 +4070,29 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_offset = [0.0, 0.0]
         self._viewer_pixbuf = pixbuf
         if pixbuf:
-            self.photo_picture.set_pixbuf(pixbuf)
+            incoming_pic.set_pixbuf(pixbuf)
+        # Pick transition type from nav direction + the animations toggle.
+        anim_on = bool(self.settings.get("animations_enabled", True))
+        if not anim_on:
+            self._viewer_stack.set_transition_duration(0)
+            self._viewer_stack.set_transition_type(Gtk.StackTransitionType.NONE)
+        else:
+            self._viewer_stack.set_transition_duration(250)
+            nav = getattr(self, "_nav_direction", None)
+            if nav == "next":
+                self._viewer_stack.set_transition_type(
+                    Gtk.StackTransitionType.SLIDE_LEFT)
+            elif nav == "prev":
+                self._viewer_stack.set_transition_type(
+                    Gtk.StackTransitionType.SLIDE_RIGHT)
+            else:
+                self._viewer_stack.set_transition_type(
+                    Gtk.StackTransitionType.CROSSFADE)
+        self._viewer_stack.set_visible_child_name(incoming_slot)
+        self._active_viewer_slot = incoming_slot
+        self.photo_picture = incoming_pic
+        self._nav_direction = None
+        if pixbuf:
             self._apply_viewer_transform()
         ts = get_photo_date(path)
         datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
@@ -4062,6 +4114,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self.current_index > 0:
             self._stop_video()
             self.current_index -= 1
+            self._nav_direction = "prev"
             new_path = self.photos[self.current_index] if self.photos else "?"
             log_info(_("Previous photo: idx={i} → {name}").format(
                 i=self.current_index, name=os.path.basename(new_path)
@@ -4072,6 +4125,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self.current_index < len(self.photos) - 1:
             self._stop_video()
             self.current_index += 1
+            self._nav_direction = "next"
             new_path = self.photos[self.current_index] if self.photos else "?"
             log_info(_("Next photo: idx={i} → {name}").format(
                 i=self.current_index, name=os.path.basename(new_path)
