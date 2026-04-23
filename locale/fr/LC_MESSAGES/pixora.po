@@ -2308,3 +2308,21 @@ msgstr "Tri des photos…"
 
 msgid "Installing dependencies"
 msgstr "Installation des dépendances"
+
+msgid "Thumbnail size"
+msgstr "Taille des miniatures"
+
+msgid "Larger thumbnails are easier to see but use more memory.\nThe default (200 px) works well on most machines."
+msgstr "Les miniatures plus grandes sont plus faciles à voir mais utilisent plus de mémoire.\nLa valeur par défaut (200 px) fonctionne bien sur la plupart des machines."
+
+msgid "Size"
+msgstr "Taille"
+
+msgid "200–500 pixels"
+msgstr "200–500 pixels"
+
+msgid "Language:"
+msgstr "Langue :"
+
+msgid "Switching language…"
+msgstr "Changement de langue…"

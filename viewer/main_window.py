@@ -24,11 +24,22 @@ import gettext as _gettext_mod
 _LOCALE_DIR = os.path.abspath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "locale"
 ))
+def _detect_system_lang():
+    """Map env locale to one of nl/en/de/fr. Fallback: en."""
+    for _var in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
+        _val = os.environ.get(_var, "")
+        if _val:
+            _code = _val.split(":")[0].split(".")[0].split("_")[0].lower()
+            if _code in ("nl", "en", "de", "fr"):
+                return _code
+    return "en"
+
+_SYS_LANG = _detect_system_lang()
 try:
     with open(os.path.expanduser("~/.config/pixora/settings.json"), "r") as _sf:
-        _lang = json.load(_sf).get("language", "nl")
+        _lang = json.load(_sf).get("language", _SYS_LANG)
 except Exception:
-    _lang = "nl"
+    _lang = _SYS_LANG
 _translation = _gettext_mod.translation(
     "pixora", localedir=_LOCALE_DIR, languages=[_lang], fallback=True
 )
@@ -260,7 +271,7 @@ MONTHS_NL = [
 
 
 def get_logo_path(dark_mode):
-    return os.path.join(ASSETS_DIR, f"pixora-logo-{'dark' if dark_mode else 'light'}.png")
+    return os.path.join(ASSETS_DIR, f"pixora-logo-{'dark' if dark_mode else 'light'}.svg")
 
 def save_settings(settings):
     # Atomic write + 0600: survives crash mid-write and is privacy-sensitive

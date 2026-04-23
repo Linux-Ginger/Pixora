@@ -10,10 +10,22 @@ import os
 # ── i18n ─────────────────────────────────────────────────────────────
 import gettext as _gt
 import json as _json_i18n
+
+def _detect_system_lang():
+    """Map env locale to one of nl/en/de/fr. Fallback: en."""
+    for _var in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
+        _val = os.environ.get(_var, "")
+        if _val:
+            _code = _val.split(":")[0].split(".")[0].split("_")[0].lower()
+            if _code in ("nl", "en", "de", "fr"):
+                return _code
+    return "en"
+
+_SYS_LANG = _detect_system_lang()
 try:
-    _lang = _json_i18n.load(open(os.path.expanduser("~/.config/pixora/settings.json"))).get("language", "nl")
+    _lang = _json_i18n.load(open(os.path.expanduser("~/.config/pixora/settings.json"))).get("language", _SYS_LANG)
 except Exception:
-    _lang = "nl"
+    _lang = _SYS_LANG
 _t = _gt.translation(
     "pixora",
     localedir=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "locale")),
@@ -82,6 +94,8 @@ class SetupWizard(Adw.Window):
         self.app = app
         self.drives = []
         self.selected_backup_path = None
+        self._chosen_lang = _lang  # starts at detected/settings language
+        self._chosen_thumb_size = 200
 
         self.set_title(_("Pixora — Setup"))
         self.set_default_size(480, 400)
@@ -99,6 +113,29 @@ class SetupWizard(Adw.Window):
         self.stack.add_named(self._scrolled(self._build_folder()),    "folder")
         self.stack.add_named(self._scrolled(self._build_backup()),    "backup")
         self.stack.add_named(self._scrolled(self._build_duplicate()), "duplicate")
+        self.stack.add_named(self._scrolled(self._build_thumbnail()), "thumbnail")
+
+        # Overlay the stack with a spinner-card we show during live language
+        # switches so the rebuild flash isn't visible.
+        self.stack_overlay = Gtk.Overlay()
+        self.stack_overlay.set_child(self.stack)
+        self.lang_spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.lang_spinner_box.set_halign(Gtk.Align.CENTER)
+        self.lang_spinner_box.set_valign(Gtk.Align.CENTER)
+        self.lang_spinner_box.add_css_class("card")
+        self.lang_spinner_box.set_margin_start(40)
+        self.lang_spinner_box.set_margin_end(40)
+        self.lang_spinner_box.set_margin_top(40)
+        self.lang_spinner_box.set_margin_bottom(40)
+        _spinner = Gtk.Spinner()
+        _spinner.set_spinning(True)
+        _spinner.set_size_request(32, 32)
+        self.lang_spinner_box.append(_spinner)
+        self.lang_spinner_label = Gtk.Label(label=_("Switching language…"))
+        self.lang_spinner_label.add_css_class("title-3")
+        self.lang_spinner_box.append(self.lang_spinner_label)
+        self.lang_spinner_box.set_visible(False)
+        self.stack_overlay.add_overlay(self.lang_spinner_box)
 
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
@@ -106,7 +143,7 @@ class SetupWizard(Adw.Window):
         header.add_css_class("flat")
         main_box.append(header)
 
-        main_box.append(self.stack)
+        main_box.append(self.stack_overlay)
 
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         main_box.append(sep)
@@ -134,7 +171,7 @@ class SetupWizard(Adw.Window):
         main_box.append(btn_bar)
         self.set_content(main_box)
 
-        self.pages = ["welcome", "folder", "backup", "duplicate"]
+        self.pages = ["welcome", "folder", "backup", "duplicate", "thumbnail"]
         self.current = 0
 
     def _scrolled(self, child):
@@ -145,7 +182,15 @@ class SetupWizard(Adw.Window):
         return sw
 
     def _on_dark_mode_changed(self, manager, _pspec):
-        pass  # SVG icon works in both themes
+        # Welcome page uses the light/dark wordmark — refresh when theme flips.
+        if hasattr(self, "welcome_logo"):
+            path = self._logo_path()
+            if path:
+                self.welcome_logo.set_filename(path)
+
+    # Native display names, NOT translated — always shown in their own tongue.
+    _LANG_CODES  = ["nl", "en", "de", "fr"]
+    _LANG_LABELS = ["Nederlands", "English", "Deutsch", "Français"]
 
     def _build_welcome(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -161,7 +206,7 @@ class SetupWizard(Adw.Window):
         logo_path = self._logo_path()
         if logo_path:
             self.welcome_logo.set_filename(logo_path)
-        self.welcome_logo.set_size_request(64, 64)
+        self.welcome_logo.set_size_request(260, 60)
         self.welcome_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
         self.welcome_logo.set_halign(Gtk.Align.CENTER)
         page.append(self.welcome_logo)
@@ -178,6 +223,24 @@ class SetupWizard(Adw.Window):
         subtitle.set_halign(Gtk.Align.CENTER)
         subtitle.set_justify(Gtk.Justification.CENTER)
         page.append(subtitle)
+
+        lang_row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        lang_row_box.set_halign(Gtk.Align.CENTER)
+        lang_row_box.set_margin_top(8)
+        lang_label = Gtk.Label(label=_("Language:"))
+        lang_label.set_valign(Gtk.Align.CENTER)
+        lang_row_box.append(lang_label)
+        lang_model = Gtk.StringList()
+        for item in self._LANG_LABELS:
+            lang_model.append(item)
+        self.lang_combo = Gtk.DropDown(model=lang_model)
+        try:
+            self.lang_combo.set_selected(self._LANG_CODES.index(self._chosen_lang))
+        except ValueError:
+            self.lang_combo.set_selected(self._LANG_CODES.index("en"))
+        self.lang_combo.connect("notify::selected", self._on_lang_selected)
+        lang_row_box.append(self.lang_combo)
+        page.append(lang_row_box)
 
         return page
 
@@ -344,6 +407,128 @@ class SetupWizard(Adw.Window):
         page.append(group)
         return page
 
+    def _build_thumbnail(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        page.set_margin_top(32)
+        page.set_margin_bottom(24)
+        page.set_margin_start(40)
+        page.set_margin_end(40)
+        page.set_valign(Gtk.Align.START)
+
+        title = Gtk.Label(label=_("Thumbnail size"))
+        title.add_css_class("title-2")
+        title.set_halign(Gtk.Align.START)
+        page.append(title)
+
+        subtitle = Gtk.Label(
+            label=_("Larger thumbnails are easier to see but use more memory.\nThe default (200 px) works well on most machines.")
+        )
+        subtitle.add_css_class("body")
+        subtitle.set_halign(Gtk.Align.START)
+        page.append(subtitle)
+
+        group = Adw.PreferencesGroup()
+
+        scale_row = Adw.ActionRow(title=_("Size"), subtitle=_("200–500 pixels"))
+        scale_row.add_prefix(Gtk.Image.new_from_icon_name("view-grid-symbolic"))
+
+        self.thumb_scale = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL, 200, 500, 25
+        )
+        self.thumb_scale.set_value(self._chosen_thumb_size)
+        self.thumb_scale.set_draw_value(True)
+        self.thumb_scale.set_value_pos(Gtk.PositionType.RIGHT)
+        self.thumb_scale.set_size_request(220, -1)
+        self.thumb_scale.set_valign(Gtk.Align.CENTER)
+        self.thumb_scale.connect("value-changed", self._on_thumb_scale_changed)
+        scale_row.add_suffix(self.thumb_scale)
+        group.add(scale_row)
+
+        page.append(group)
+        return page
+
+    def _on_thumb_scale_changed(self, scale):
+        # Round to 25-px steps to match the scale's increment.
+        self._chosen_thumb_size = int(round(scale.get_value() / 25) * 25)
+
+    # ── Live language switch ────────────────────────────────────────────
+
+    def _on_lang_selected(self, combo, _pspec):
+        idx = combo.get_selected()
+        if idx >= len(self._LANG_CODES):
+            return
+        new_lang = self._LANG_CODES[idx]
+        if new_lang == self._chosen_lang:
+            return
+        # Show the spinner *before* the heavy rebuild so the user sees feedback;
+        # the short timeout lets GTK actually paint the overlay.
+        self.lang_spinner_box.set_visible(True)
+        GLib.timeout_add(80, self._apply_language_switch, new_lang)
+
+    def _apply_language_switch(self, new_lang):
+        global _, _t
+        _t = _gt.translation(
+            "pixora",
+            localedir=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "locale")),
+            languages=[new_lang], fallback=True,
+        )
+        _ = _t.gettext
+        self._chosen_lang = new_lang
+
+        self._capture_wizard_state()
+        current_name = self.pages[self.current]
+
+        child = self.stack.get_first_child()
+        while child is not None:
+            self.stack.remove(child)
+            child = self.stack.get_first_child()
+
+        self.stack.add_named(self._scrolled(self._build_welcome()),   "welcome")
+        self.stack.add_named(self._scrolled(self._build_folder()),    "folder")
+        self.stack.add_named(self._scrolled(self._build_backup()),    "backup")
+        self.stack.add_named(self._scrolled(self._build_duplicate()), "duplicate")
+        self.stack.add_named(self._scrolled(self._build_thumbnail()), "thumbnail")
+        self.stack.set_visible_child_name(current_name)
+
+        self._apply_wizard_state()
+
+        # Re-translate the things that live outside the stack.
+        self.set_title(_("Pixora — Setup"))
+        self.back_btn.set_label(_("Back"))
+        self.next_btn.set_label(
+            _("Finish") if self.current == len(self.pages) - 1 else _("Next")
+        )
+        self.lang_spinner_label.set_text(_("Switching language…"))
+
+        self.lang_spinner_box.set_visible(False)
+        return False  # don't repeat
+
+    def _capture_wizard_state(self):
+        if hasattr(self, "folder_entry"):
+            self._chosen_folder = self.folder_entry.get_text()
+        if hasattr(self, "backup_switch"):
+            self._chosen_backup_enabled = self.backup_switch.get_active()
+        if hasattr(self, "drive_combo"):
+            self._chosen_drive_idx = self.drive_combo.get_selected()
+        if hasattr(self, "dup_switch"):
+            self._chosen_dup = self.dup_switch.get_active()
+        # _chosen_thumb_size + _chosen_lang + selected_backup_path already live
+        # on self and survive the rebuild on their own.
+
+    def _apply_wizard_state(self):
+        if hasattr(self, "folder_entry") and hasattr(self, "_chosen_folder"):
+            self.folder_entry.set_text(self._chosen_folder)
+        if hasattr(self, "backup_switch") and hasattr(self, "_chosen_backup_enabled"):
+            self.backup_switch.set_active(self._chosen_backup_enabled)
+        if hasattr(self, "drive_combo") and hasattr(self, "_chosen_drive_idx"):
+            try:
+                if self._chosen_drive_idx < len(self.drives):
+                    self.drive_combo.set_selected(self._chosen_drive_idx)
+            except Exception:
+                pass
+        if hasattr(self, "dup_switch") and hasattr(self, "_chosen_dup"):
+            self.dup_switch.set_active(self._chosen_dup)
+
     def go_next(self, btn):
         page = self.pages[self.current]
 
@@ -498,9 +683,11 @@ class SetupWizard(Adw.Window):
         return False
 
     def _logo_path(self):
+        dark = self.style_manager.get_dark() if hasattr(self, "style_manager") else False
+        variant = "dark" if dark else "light"
         base = os.path.dirname(os.path.abspath(__file__))
-        for rel in ("../assets/logos/pixora-icon.svg",
-                    "assets/logos/pixora-icon.svg"):
+        for rel in (f"../assets/logos/pixora-logo-{variant}.svg",
+                    f"assets/logos/pixora-logo-{variant}.svg"):
             path = os.path.normpath(os.path.join(base, rel))
             if os.path.exists(path):
                 return path
@@ -521,16 +708,33 @@ class SetupWizard(Adw.Window):
         settings = {
             "photo_path":          self.folder_entry.get_text(),
             "structure":           "year_month",
+            "backup_enabled":      self.backup_switch.get_active(),
             "backup_uuid":         self._get_backup_uuid(),
             "backup_path":         self.selected_backup_path,
             "duplicate_threshold": self._get_threshold(),
         }
+        if hasattr(self, "_chosen_lang"):
+            settings["language"] = self._chosen_lang
+        if hasattr(self, "_chosen_thumb_size"):
+            settings["thumbnail_size"] = self._chosen_thumb_size
 
+        # Atomic write + 0600: same pattern as save_settings in main_window.
+        # Crash mid-write leaves the previous file intact (or no file, which
+        # cleanly re-triggers the wizard) instead of a corrupt half-JSON.
         os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-        with open(CONFIG_PATH, "w") as f:
+        tmp = CONFIG_PATH + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
             json.dump(settings, f, indent=2)
+        os.replace(tmp, CONFIG_PATH)
 
         from main_window import MainWindow
         win = MainWindow(self.app, settings)
-        win.present()
-        self.close()
+        # set_visible (not present): present() on GNOME Shell fires a
+        # "Pixora is ready" notification and, combined with immediately
+        # closing the wizard, can leave MainWindow registered-but-never-mapped
+        # so the whole app stays alive invisibly.
+        win.set_visible(True)
+        # Defer our own close so the new window is fully mapped before the
+        # wizard disappears from the compositor's window list.
+        GLib.idle_add(self.close)

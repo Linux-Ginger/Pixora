@@ -2262,3 +2262,21 @@ msgstr "Sorting photos…"
 
 msgid "Installing dependencies"
 msgstr "Installing dependencies"
+
+msgid "Thumbnail size"
+msgstr "Thumbnail size"
+
+msgid "Larger thumbnails are easier to see but use more memory.\nThe default (200 px) works well on most machines."
+msgstr "Larger thumbnails are easier to see but use more memory.\nThe default (200 px) works well on most machines."
+
+msgid "Size"
+msgstr "Size"
+
+msgid "200–500 pixels"
+msgstr "200–500 pixels"
+
+msgid "Language:"
+msgstr "Language:"
+
+msgid "Switching language…"
+msgstr "Switching language…"
