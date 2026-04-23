@@ -229,6 +229,21 @@ StartupWMClass=com.linuxginger.pixora.installer
 StartupNotify=true
 Categories=System;
 EOF
+# Ook de updater z'n .desktop nu al schrijven — tegen de tijd dat de
+# user op "Update" klikt, zit hij al in Shell's cache en is er geen
+# tandwiel-flash bij het updater-window-open.
+cat > "$APPS_DIR/com.linuxginger.pixora.updater.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Pixora Updater
+Icon=$ICON_SRC
+Exec=python3 $INSTALL_DIR/viewer/updater.py
+Terminal=false
+StartupWMClass=com.linuxginger.pixora.updater
+StartupNotify=true
+Categories=System;
+EOF
+cp -f "$ICON_SRC" "$ICONS_DIR/com.linuxginger.pixora.updater.svg" 2>/dev/null || true
 # Shell's AppInfoMonitor luistert naar mtime-wijzigingen op de apps-dir
 # zelf — touchen geeft een extra trigger naast het schrijven zelf.
 touch "$APPS_DIR" 2>/dev/null || true

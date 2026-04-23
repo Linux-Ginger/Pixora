@@ -22,6 +22,7 @@ _t = _gt.translation(
 _ = _t.gettext
 
 import re
+import shutil
 import sys
 import threading
 import subprocess
@@ -36,6 +37,49 @@ from gi.repository import Gtk, Adw, GLib, Gio
 INSTALL_DIR = Path.home() / ".local" / "share" / "pixora"
 ICON_PATH = INSTALL_DIR / "assets" / "logos" / "pixora-icon.svg"
 UPDATE_URL = "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/updater.sh"
+
+
+def _ensure_icon_installed():
+    """Mirror of installer.py's helper: zorg dat .desktop + icon-file
+    bestaan zodat GNOME Shell het window koppelt aan ons logo i.p.v.
+    het default tandwiel. install.sh schrijft dit al bij eerste
+    install; deze fallback vangt losse python-starts af."""
+    try:
+        if ICON_PATH.exists():
+            icons_dir = (Path.home() / ".local" / "share" / "icons"
+                         / "hicolor" / "scalable" / "apps")
+            icons_dir.mkdir(parents=True, exist_ok=True)
+            for name in ("pixora-icon.svg",
+                         "com.linuxginger.pixora.updater.svg"):
+                dest = icons_dir / name
+                if (not dest.exists()
+                        or dest.stat().st_mtime < ICON_PATH.stat().st_mtime):
+                    shutil.copy(ICON_PATH, dest)
+    except Exception:
+        pass
+    try:
+        desktop_dir = Path.home() / ".local" / "share" / "applications"
+        desktop_dir.mkdir(parents=True, exist_ok=True)
+        desktop_file = desktop_dir / "com.linuxginger.pixora.updater.desktop"
+        content = (
+            "[Desktop Entry]\n"
+            "Type=Application\n"
+            "Name=Pixora Updater\n"
+            f"Icon={ICON_PATH}\n"
+            f"Exec=python3 {Path(__file__).resolve()}\n"
+            "Terminal=false\n"
+            "StartupWMClass=com.linuxginger.pixora.updater\n"
+            "StartupNotify=true\n"
+            "Categories=System;\n"
+        )
+        if (not desktop_file.exists()
+                or desktop_file.read_text() != content):
+            desktop_file.write_text(content)
+    except Exception:
+        pass
+
+
+_ensure_icon_installed()
 
 # Phases emitted by updater.sh as "STEP:<key>:<label>" lines.
 PHASES = [
@@ -55,6 +99,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title(_("Pixora Updater"))
+        self.set_icon_name("com.linuxginger.pixora.updater")
         self.set_default_size(460, 420)
         self.set_resizable(False)
 
