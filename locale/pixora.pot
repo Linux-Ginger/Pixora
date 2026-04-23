@@ -1516,3 +1516,24 @@ msgstr ""
 
 msgid "Failed to save perf_warning_dismissed: {e}"
 msgstr ""
+
+msgid "Automatic"
+msgstr ""
+
+msgid "GPU (GL)"
+msgstr ""
+
+msgid "Software (Cairo)"
+msgstr ""
+
+msgid "Rendering backend"
+msgstr ""
+
+msgid "Only change if Pixora is slow or crashes. Requires a restart."
+msgstr ""
+
+msgid "Failed to save gsk_renderer: {e}"
+msgstr ""
+
+msgid "Restarting Pixora…"
+msgstr ""

@@ -60,6 +60,23 @@ def _compile_stale_mo_files():
 _compile_stale_mo_files()
 
 
+def _apply_gsk_renderer_env():
+    """Read settings.json BEFORE GTK initializes and honor the user's
+    renderer choice. Values: 'auto' (no-op), 'gl', 'cairo'. Must run
+    before any gi.require_version('Gtk', …) call — env var is sampled
+    by GTK on display open, which happens on the first import."""
+    try:
+        with open(CONFIG_PATH, "r") as _rf:
+            choice = json.load(_rf).get("gsk_renderer", "auto")
+    except Exception:
+        choice = "auto"
+    if choice in ("gl", "cairo", "ngl"):
+        os.environ["GSK_RENDERER"] = choice
+
+
+_apply_gsk_renderer_env()
+
+
 def load_settings():
     if not os.path.exists(CONFIG_PATH):
         return None

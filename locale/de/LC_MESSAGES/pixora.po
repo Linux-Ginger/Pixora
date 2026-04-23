@@ -2370,3 +2370,24 @@ msgstr "Einstellungen öffnen"
 
 msgid "Failed to save perf_warning_dismissed: {e}"
 msgstr "perf_warning_dismissed konnte nicht gespeichert werden: {e}"
+
+msgid "Automatic"
+msgstr "Automatisch"
+
+msgid "GPU (GL)"
+msgstr "GPU (GL)"
+
+msgid "Software (Cairo)"
+msgstr "Software (Cairo)"
+
+msgid "Rendering backend"
+msgstr "Rendering-Backend"
+
+msgid "Only change if Pixora is slow or crashes. Requires a restart."
+msgstr "Nur ändern, wenn Pixora langsam ist oder abstürzt. Neustart erforderlich."
+
+msgid "Failed to save gsk_renderer: {e}"
+msgstr "gsk_renderer konnte nicht gespeichert werden: {e}"
+
+msgid "Restarting Pixora…"
+msgstr "Pixora wird neu gestartet…"

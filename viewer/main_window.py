@@ -5520,6 +5520,34 @@ class MainWindow(Adw.ApplicationWindow):
         anim_row.add_suffix(self._anim_switch)
         anim_row.set_activatable_widget(self._anim_switch)
         perf_group.add(anim_row)
+
+        # Renderer dropdown — applies via GSK_RENDERER env var, so it only
+        # takes effect after a restart. Sentinel pattern matches language.
+        self._gsk_codes  = ["auto", "gl", "cairo"]
+        self._gsk_labels = [_("Automatic"), _("GPU (GL)"), _("Software (Cairo)")]
+        gsk_model = Gtk.StringList()
+        for lbl in self._gsk_labels:
+            gsk_model.append(lbl)
+        self._gsk_combo = Gtk.DropDown(model=gsk_model)
+        self._gsk_combo.set_valign(Gtk.Align.CENTER)
+        current_gsk = self.settings.get("gsk_renderer", "auto")
+        try:
+            self._gsk_combo.set_selected(self._gsk_codes.index(current_gsk))
+        except ValueError:
+            self._gsk_combo.set_selected(0)
+        self._gsk_combo.connect("notify::selected", self._on_gsk_renderer_changed)
+        gsk_row = Adw.ActionRow(
+            title=_("Rendering backend"),
+            subtitle=_("Only change if Pixora is slow or crashes. Requires a restart."),
+        )
+        gsk_row.add_prefix(Gtk.Image.new_from_icon_name("video-display-symbolic"))
+        gsk_row.add_suffix(self._gsk_combo)
+        try:
+            gsk_row.set_subtitle_lines(2)
+        except Exception:
+            pass
+        perf_group.add(gsk_row)
+
         advanced_page.add(perf_group)
 
         dev_group = Adw.PreferencesGroup()
@@ -6310,6 +6338,56 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_error(_("Failed to save animations_enabled: {e}").format(e=e))
         self._apply_animations_state()
+
+    def _on_gsk_renderer_changed(self, combo, _pspec):
+        idx = combo.get_selected()
+        if not (0 <= idx < len(self._gsk_codes)):
+            return
+        new_choice = self._gsk_codes[idx]
+        current = self.settings.get("gsk_renderer", "auto")
+        if new_choice == current:
+            return
+        self.settings["gsk_renderer"] = new_choice
+        try:
+            save_settings(self.settings)
+        except Exception as e:
+            log_error(_("Failed to save gsk_renderer: {e}").format(e=e))
+            return
+        # Same sentinel-restart pattern as _on_language_changed — avoids
+        # D-Bus race of a separate process.
+        try:
+            sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
+            os.makedirs(os.path.dirname(sentinel), exist_ok=True)
+            with open(sentinel, "w") as f:
+                f.write("1")
+        except Exception as e:
+            log_error(_("Restart sentinel write failed: {err}").format(err=e))
+        # Overlay so the user gets feedback before the app blinks away.
+        overlay = Gtk.Window()
+        overlay.set_modal(True)
+        overlay.set_transient_for(self)
+        overlay.set_title("Pixora")
+        overlay.set_default_size(320, 140)
+        overlay.set_resizable(False)
+        overlay.set_deletable(False)
+        overlay.connect("close-request", lambda *_: True)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        box.set_margin_top(24)
+        box.set_margin_bottom(24)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+        box.set_halign(Gtk.Align.CENTER)
+        box.set_valign(Gtk.Align.CENTER)
+        spinner = Gtk.Spinner()
+        spinner.set_size_request(36, 36)
+        spinner.start()
+        box.append(spinner)
+        lbl = Gtk.Label(label=_("Restarting Pixora…"))
+        lbl.add_css_class("title-3")
+        box.append(lbl)
+        overlay.set_child(box)
+        overlay.present()
+        GLib.timeout_add(600, lambda: (self.get_application().quit(), False)[1])
 
     def _on_toggle_dev_mode(self, btn, row):
         currently_active = bool(self.settings.get("dev_mode", False))
