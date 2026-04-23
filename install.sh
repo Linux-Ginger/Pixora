@@ -227,6 +227,7 @@ Exec=python3 $INSTALL_DIR/installer.py
 Terminal=false
 StartupWMClass=com.linuxginger.pixora.installer
 StartupNotify=true
+NoDisplay=true
 Categories=System;
 EOF
 # Ook de updater z'n .desktop nu al schrijven — tegen de tijd dat de
@@ -241,6 +242,7 @@ Exec=python3 $INSTALL_DIR/viewer/updater.py
 Terminal=false
 StartupWMClass=com.linuxginger.pixora.updater
 StartupNotify=true
+NoDisplay=true
 Categories=System;
 EOF
 cp -f "$ICON_SRC" "$ICONS_DIR/com.linuxginger.pixora.updater.svg" 2>/dev/null || true

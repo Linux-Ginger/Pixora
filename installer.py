@@ -84,6 +84,7 @@ def _ensure_icon_installed():
             "Terminal=false\n"
             "StartupWMClass=com.linuxginger.pixora.installer\n"
             "StartupNotify=true\n"
+            "NoDisplay=true\n"
             "Categories=System;\n"
         )
         if (not desktop_file.exists()

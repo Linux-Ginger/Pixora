@@ -70,6 +70,7 @@ def _ensure_icon_installed():
             "Terminal=false\n"
             "StartupWMClass=com.linuxginger.pixora.updater\n"
             "StartupNotify=true\n"
+            "NoDisplay=true\n"
             "Categories=System;\n"
         )
         if (not desktop_file.exists()
@@ -337,17 +338,32 @@ class UpdaterWindow(Adw.ApplicationWindow):
         # already inside a dev-terminal and won't spawn one.
         child_env = {k: v for k, v in os.environ.items()
                      if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")}
+        # Redirect to a log-file i.p.v. /dev/null zodat we kunnen zien
+        # als main.py gelijk crasht. User kan deze zelf lezen als
+        # Pixora niet opstart.
+        log_path = os.path.expanduser("~/.cache/pixora/relaunch.log")
+        try:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            log_f = open(log_path, "w")
+            log_f.write(f"Relaunch cmd: {cmd}\n")
+            log_f.flush()
+        except Exception:
+            log_f = None
         try:
             subprocess.Popen(
                 cmd,
                 start_new_session=True,
                 env=child_env,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=log_f if log_f else subprocess.DEVNULL,
+                stderr=subprocess.STDOUT if log_f else subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            if log_f:
+                try:
+                    log_f.write(f"Popen failed: {e}\n")
+                except Exception:
+                    pass
         # Delay quit so the child is fully detached before we send close signals.
         def _delayed_quit():
             self.get_application().quit()
