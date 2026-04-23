@@ -238,18 +238,42 @@ def _consume_restart_sentinel():
     sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
     if not os.path.exists(sentinel):
         return
+    # Loop-guard: count restarts via env var. If something keeps re-creating
+    # the sentinel or remove keeps failing, bail out after 2 respawns so we
+    # don't spin forever (observed on an edge case that cascaded into a GSK
+    # crash).
+    restart_count = int(os.environ.get("PIXORA_RESTART_COUNT", "0") or "0")
+    if restart_count >= 2:
+        print(
+            f"Pixora: restart guard hit ({restart_count}× already); "
+            f"aborting to avoid loop. Delete {sentinel} manually if stuck.",
+            flush=True,
+        )
+        try:
+            os.remove(sentinel)
+        except Exception:
+            pass
+        return
     try:
         os.remove(sentinel)
-    except Exception:
-        pass
+    except Exception as e:
+        # If we can't even remove the file, exec'ing would loop forever.
+        print(
+            f"Pixora: could not remove restart sentinel ({e}); aborting "
+            f"to avoid a loop. Delete {sentinel} manually.",
+            flush=True,
+        )
+        return
     print("Pixora: restart sentinel detected, exec'ing…", flush=True)
+    new_env = dict(os.environ)
+    new_env["PIXORA_RESTART_COUNT"] = str(restart_count + 1)
     pixora_bin = os.path.expanduser("~/.local/bin/pixora")
     try:
         if os.path.exists(pixora_bin):
-            os.execvp(pixora_bin, [pixora_bin])
+            os.execvpe(pixora_bin, [pixora_bin], new_env)
         else:
             script = os.path.abspath(__file__)
-            os.execvp(sys.executable, [sys.executable, script])
+            os.execvpe(sys.executable, [sys.executable, script], new_env)
     except Exception as e:
         print(f"Pixora restart failed: {e}", flush=True)
 
