@@ -617,9 +617,16 @@ class InstallerWindow(Adw.ApplicationWindow):
             # without start_new_session + DEVNULL pipes, the installer's
             # own quit() (1.5s later) sends SIGHUP to the child Pixora
             # before it finishes its splash, and Pixora dies silently.
+            # PIXORA_IN_DEV_TERM=1 voorkomt dat main.py een gnome-terminal
+            # probeert te spawnen als dev_mode aanstaat (die spawn faalt
+            # vaak in virtualized setups → Pixora opent dan nooit).
+            child_env = dict(os.environ)
+            child_env["PIXORA_IN_DEV_TERM"] = "1"
+            child_env.pop("PIXORA_DEV_LOG_OPENED", None)
             subprocess.Popen(
                 cmd,
                 start_new_session=True,
+                env=child_env,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,

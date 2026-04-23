@@ -334,10 +334,15 @@ class UpdaterWindow(Adw.ApplicationWindow):
             cmd = [pixora_bin]
         else:
             cmd = [sys.executable, str(INSTALL_DIR / "viewer" / "main.py")]
-        # Strip PIXORA_IN_DEV_TERM — otherwise the new main.py thinks it's
-        # already inside a dev-terminal and won't spawn one.
-        child_env = {k: v for k, v in os.environ.items()
-                     if k not in ("PIXORA_IN_DEV_TERM", "PIXORA_DEV_LOG_OPENED")}
+        # Zet PIXORA_IN_DEV_TERM=1 zodat main.py géén nieuwe gnome-terminal
+        # probeert te spawnen bij dev_mode. Die spawn faalt vaak in
+        # virtualized setups ("Failed to get screen from object path ...")
+        # waardoor Pixora nooit opent. stdout/stderr gaat nu naar de
+        # relaunch-log in plaats van een terminal — prima voor een
+        # post-update start.
+        child_env = dict(os.environ)
+        child_env["PIXORA_IN_DEV_TERM"] = "1"
+        child_env.pop("PIXORA_DEV_LOG_OPENED", None)
         # Redirect to a log-file i.p.v. /dev/null zodat we kunnen zien
         # als main.py gelijk crasht. User kan deze zelf lezen als
         # Pixora niet opstart.
