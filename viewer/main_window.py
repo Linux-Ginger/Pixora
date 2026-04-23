@@ -5649,32 +5649,41 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._place_settings_indicator_under, tabs[0][0])
         return overlay
 
-    def _place_settings_indicator_under(self, btn, tries=0):
+    def _tab_x_in_overlay(self, btn):
+        """Button's allocation-x is relative to its parent (tab_row),
+        while the indicator's margin-start lives in the overlay's coord
+        system. Walk up one level so we position under the actual tab."""
         try:
-            alloc = btn.get_allocation()
+            bar = btn.get_parent()
+            btn_alloc = btn.get_allocation()
+            bar_alloc = bar.get_allocation() if bar is not None else None
         except Exception:
-            alloc = None
-        if (alloc is None or alloc.width <= 0) and tries < 25:
+            return (0, 0)
+        if btn_alloc.width <= 0 or bar_alloc is None or bar_alloc.width <= 0:
+            return (0, 0)
+        return (bar_alloc.x + btn_alloc.x, btn_alloc.width)
+
+    def _place_settings_indicator_under(self, btn, tries=0):
+        x, w = self._tab_x_in_overlay(btn)
+        if w <= 0 and tries < 25:
             # Layout not done yet — keep retrying up to ~625ms before
             # giving up. On first open the overlay needs a couple of
             # ticks before the button has real x/width.
             GLib.timeout_add(25, self._place_settings_indicator_under,
                              btn, tries + 1)
             return False
-        if alloc is not None and alloc.width > 0:
-            self._settings_tab_indicator.set_margin_start(alloc.x)
-            self._settings_tab_indicator.set_size_request(alloc.width, -1)
+        if w > 0:
+            self._settings_tab_indicator.set_margin_start(x)
+            self._settings_tab_indicator.set_size_request(w, -1)
         return False
 
     def _animate_settings_indicator_to(self, btn):
-        alloc = btn.get_allocation()
-        if alloc.width <= 0:
+        target_x, target_w = self._tab_x_in_overlay(btn)
+        if target_w <= 0:
             # Not allocated yet; just snap on next tick.
             GLib.idle_add(self._place_settings_indicator_under, btn)
             return
         anim_on = bool(self.settings.get("animations_enabled", True))
-        target_x = alloc.x
-        target_w = alloc.width
         if not anim_on:
             self._settings_tab_indicator.set_margin_start(target_x)
             self._settings_tab_indicator.set_size_request(target_w, -1)
