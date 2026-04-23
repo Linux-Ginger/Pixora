@@ -35,7 +35,7 @@ import threading
 import tempfile
 import time
 import re
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import datetime
 
@@ -434,7 +434,7 @@ def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
         done = 0
         total = len(all_files)
         cached = total - len(to_hash)
-        with ThreadPoolExecutor(max_workers=4) as pool:
+        with ThreadPoolExecutor(max_workers=8) as pool:
             for fp, ph in zip(to_hash, pool.map(perceptual_hash, to_hash)):
                 done += 1
                 if progress_cb:
@@ -1162,14 +1162,26 @@ class ImporterPage(Gtk.Box):
             files.sort(key=get_photo_date, reverse=True)
             GLib.idle_add(self._update_progress, 1.0, _("Sorting done ({n})").format(n=total), "")
         else:
+            # as_completed keeps per-item progress updates working while the
+            # fetches run in parallel — pool.map would only give us a single
+            # tick at the end, which feels like a frozen progress bar on FUSE.
             date_cache = {}
-            for i, f in enumerate(files):
-                date_cache[f] = get_photo_date(f)
-                frac = (i + 1) / total
-                GLib.idle_add(
-                    self._update_progress, frac,
-                    _("Sorting: {i} / {total}").format(i=i + 1, total=total), f.name
-                )
+            done = 0
+            with ThreadPoolExecutor(max_workers=6) as pool:
+                futures = {pool.submit(get_photo_date, f): f for f in files}
+                for fut in as_completed(futures):
+                    f = futures[fut]
+                    try:
+                        date_cache[f] = fut.result()
+                    except Exception:
+                        date_cache[f] = 0
+                    done += 1
+                    frac = done / total
+                    GLib.idle_add(
+                        self._update_progress, frac,
+                        _("Sorting: {i} / {total}").format(i=done, total=total),
+                        f.name,
+                    )
             files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
         GLib.idle_add(self._on_scan_done, files)
 
