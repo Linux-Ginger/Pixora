@@ -1489,80 +1489,6 @@ class MainWindow(Adw.ApplicationWindow):
             return True  # keep repeating
         GLib.timeout_add_seconds(300, _periodic_save_cache)
 
-    def _tune_settings_stack(self, dialog):
-        """Walk Adw.PreferencesWindow's internal widget tree to find any
-        widget with a transition-duration property. Adw's internal page
-        switcher varies by version — could be Gtk.Stack, Adw.ViewStack,
-        Adw.Leaflet, or Adw.NavigationView. Defensive: all in try/except."""
-        try:
-            anim_on = bool(self.settings.get("animations_enabled", True))
-            duration = 400 if anim_on else 0
-            stack_of_widgets = [dialog]
-            seen = 0
-            tuned = 0
-            types_tuned = {}
-            while stack_of_widgets:
-                w = stack_of_widgets.pop()
-                try:
-                    child = w.get_first_child()
-                except Exception:
-                    child = None
-                while child is not None:
-                    seen += 1
-                    type_name = type(child).__name__
-                    hit = False
-                    # Gtk.Stack: set transition type AND duration.
-                    if isinstance(child, Gtk.Stack):
-                        try:
-                            child.set_transition_duration(duration)
-                            if anim_on:
-                                child.set_transition_type(
-                                    Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
-                            else:
-                                child.set_transition_type(
-                                    Gtk.StackTransitionType.NONE)
-                            hit = True
-                        except Exception:
-                            pass
-                    # Anything with a transition-duration property (ViewStack,
-                    # Leaflet, NavigationSplitView, etc.).
-                    if not hit and hasattr(child, "set_transition_duration"):
-                        try:
-                            child.set_transition_duration(duration)
-                            hit = True
-                        except Exception:
-                            pass
-                    # Adw.Leaflet has set_mode_transition_duration +
-                    # set_child_transition_duration — longer of the two is
-                    # used for page swaps.
-                    for setter in ("set_mode_transition_duration",
-                                   "set_child_transition_duration"):
-                        if hasattr(child, setter):
-                            try:
-                                getattr(child, setter)(duration)
-                                hit = True
-                            except Exception:
-                                pass
-                    if hasattr(child, "set_enable_transitions"):
-                        try:
-                            child.set_enable_transitions(anim_on)
-                        except Exception:
-                            pass
-                    if hit:
-                        tuned += 1
-                        types_tuned[type_name] = types_tuned.get(type_name, 0) + 1
-                    stack_of_widgets.append(child)
-                    try:
-                        child = child.get_next_sibling()
-                    except Exception:
-                        child = None
-            log_info(_("Settings stacks tuned: {t}/{s} widgets; types: {types}").format(
-                t=tuned, s=seen, types=", ".join(f"{k}×{v}" for k, v in sorted(types_tuned.items()))
-            ))
-        except Exception as e:
-            log_error(_("Settings stack tune failed: {e}").format(e=e))
-        return False
-
     def _clear_gsk_pending(self):
         """Signals main.py's crash-recovery that the current gsk_renderer
         choice booted successfully. Missing file → next run assumes crash
@@ -5576,20 +5502,41 @@ class MainWindow(Adw.ApplicationWindow):
         self.toggle_select_mode()
         self.load_photos()
 
+    def _settings_new_page_container(self):
+        """Mimic Adw.PreferencesPage (ScrolledWindow + Adw.Clamp + VBox) so
+        we can drop existing PreferencesGroup widgets in without changes.
+        Returns (outer, inner_box): outer goes into the ViewStack; groups
+        append to inner_box."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
+        box.set_margin_top(24)
+        box.set_margin_bottom(24)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(580)
+        clamp.set_tightening_threshold(400)
+        clamp.set_child(box)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_hexpand(True)
+        scroll.set_child(clamp)
+        return scroll, box
+
     def on_settings_clicked(self, btn):
         if self._settings_dialog is not None:
             self._settings_dialog.present()
             return
         log_info(_("Settings opened"))
-        # PreferencesWindow (own toplevel) instead of PreferencesDialog —
-        # on Adw 1.5+ the latter blocks the main window's close-request, so
-        # GNOME "Close N windows" can't kill Pixora while settings is open.
-        dialog = Adw.PreferencesWindow()
+        # Custom Adw.Window + ToolbarView + ViewStack layout (replaces
+        # Adw.PreferencesWindow). Gives us full control over page-switch
+        # transitions — libadwaita's PreferencesWindow internally uses
+        # set_visible_child_full(…, NONE) so our transition settings on
+        # its inner stack were ignored.
+        dialog = Adw.Window()
         dialog.set_title(_("Settings"))
         dialog.set_transient_for(self)
         dialog.set_modal(False)
-        dialog.set_default_size(640, 720)
-        dialog.set_search_enabled(False)
+        dialog.set_default_size(720, 720)
         self._settings_dialog = dialog
         if hasattr(self, "settings_btn"):
             self.settings_btn.set_sensitive(False)
@@ -5602,21 +5549,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         dialog.connect("close-request", _on_settings_closed)
 
-        display_page = Adw.PreferencesPage()
-        display_page.set_title(_("Display"))
-        display_page.set_icon_name("preferences-desktop-display-symbolic")
-
-        import_page = Adw.PreferencesPage()
-        import_page.set_title(_("Import"))
-        import_page.set_icon_name("document-send-symbolic")
-
-        advanced_page = Adw.PreferencesPage()
-        advanced_page.set_title(_("Advanced"))
-        advanced_page.set_icon_name("applications-engineering-symbolic")
-
-        about_page = Adw.PreferencesPage()
-        about_page.set_title(_("About"))
-        about_page.set_icon_name("help-about-symbolic")
+        display_outer, display_box = self._settings_new_page_container()
+        import_outer,  import_box  = self._settings_new_page_container()
+        advanced_outer, advanced_box = self._settings_new_page_container()
+        about_outer,   about_box   = self._settings_new_page_container()
 
         folder_group = Adw.PreferencesGroup()
         folder_group.set_title(_("Photo folder"))
@@ -5632,7 +5568,7 @@ class MainWindow(Adw.ApplicationWindow):
         change_folder_btn.connect("clicked", lambda b: self.change_folder(dialog))
         self.folder_row.add_suffix(change_folder_btn)
         folder_group.add(self.folder_row)
-        display_page.add(folder_group)
+        display_box.append(folder_group)
 
         display_group = Adw.PreferencesGroup()
         display_group.set_title(_("Display"))
@@ -5717,7 +5653,7 @@ class MainWindow(Adw.ApplicationWindow):
         lang_row.add_suffix(lang_combo)
         display_group.add(lang_row)
 
-        display_page.add(display_group)
+        display_box.append(display_group)
 
         perf_group = Adw.PreferencesGroup()
         perf_group.set_title(_("Performance"))
@@ -5766,7 +5702,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         perf_group.add(gsk_row)
 
-        advanced_page.add(perf_group)
+        advanced_box.append(perf_group)
 
         dev_group = Adw.PreferencesGroup()
         dev_group.set_title(_("Advanced"))
@@ -5787,7 +5723,7 @@ class MainWindow(Adw.ApplicationWindow):
         dev_row.add_suffix(dev_btn)
         self._dev_btn = dev_btn
         dev_group.add(dev_row)
-        advanced_page.add(dev_group)
+        advanced_box.append(dev_group)
 
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title(_("Folder structure"))
@@ -5871,7 +5807,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         structure_group.add(silent_row)
 
-        import_page.add(structure_group)
+        import_box.append(structure_group)
 
         dup_group = Adw.PreferencesGroup()
         dup_group.set_title(_("Duplicate detection"))
@@ -5901,7 +5837,7 @@ class MainWindow(Adw.ApplicationWindow):
         dup_row.set_activatable_widget(self.settings_dup_switch)
         dup_group.add(dup_row)
 
-        import_page.add(dup_group)
+        import_box.append(dup_group)
 
         backup_group = Adw.PreferencesGroup()
         backup_group.set_title(_("Automatic backup"))
@@ -6110,7 +6046,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.settings_backup_group = backup_group
 
-        import_page.add(backup_group)
+        import_box.append(backup_group)
 
         about_group = Adw.PreferencesGroup()
         about_group.set_title(_("About"))
@@ -6193,7 +6129,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._update_check_row.add_suffix(self._update_check_btn)
 
         about_group.add(self._update_check_row)
-        about_page.add(about_group)
+        about_box.append(about_group)
 
         # Auto-startup-check already found an update → button pulses now.
         if self._pending_update_version:
@@ -6212,7 +6148,7 @@ class MainWindow(Adw.ApplicationWindow):
             + _("© {year} Pixora — LinuxGinger").format(
                 year=datetime.datetime.now().year)
         )
-        about_page.add(credit_group)
+        about_box.append(credit_group)
 
         license_group = Adw.PreferencesGroup()
         license_row = Adw.ActionRow(
@@ -6228,19 +6164,43 @@ class MainWindow(Adw.ApplicationWindow):
         license_row.add_suffix(license_btn)
         license_row.set_activatable_widget(license_btn)
         license_group.add(license_row)
-        about_page.add(license_group)
+        about_box.append(license_group)
 
-        dialog.add(display_page)
-        dialog.add(import_page)
-        dialog.add(advanced_page)
-        dialog.add(about_page)
+        stack = Adw.ViewStack()
+        anim_on = bool(self.settings.get("animations_enabled", True))
+        stack.set_transition_duration(350 if anim_on else 0)
+        stack.set_vexpand(True)
+        stack.set_hexpand(True)
+        stack.add_titled_with_icon(
+            display_outer, "display", _("Display"),
+            "preferences-desktop-display-symbolic",
+        )
+        stack.add_titled_with_icon(
+            import_outer, "import", _("Import"),
+            "document-send-symbolic",
+        )
+        stack.add_titled_with_icon(
+            advanced_outer, "advanced", _("Advanced"),
+            "applications-engineering-symbolic",
+        )
+        stack.add_titled_with_icon(
+            about_outer, "about", _("About"),
+            "help-about-symbolic",
+        )
+
+        switcher = Adw.ViewSwitcher()
+        switcher.set_stack(stack)
+        switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
+
+        header = Adw.HeaderBar()
+        header.set_title_widget(switcher)
+
+        toolbar = Adw.ToolbarView()
+        toolbar.add_top_bar(header)
+        toolbar.set_content(stack)
+
+        dialog.set_content(toolbar)
         dialog.present()
-        # Adw.PreferencesWindow hides its internal Gtk.Stack; tune it after
-        # present() so page-switch crossfades are visible (longer duration)
-        # and honor the animations-toggle. Walker is defensive — wrapped in
-        # try/except so a future libadwaita restructure doesn't crash the
-        # dialog.
-        GLib.idle_add(self._tune_settings_stack, dialog)
 
     def _on_thumb_size_changed(self, scale, row):
         new_size = int(scale.get_value())
