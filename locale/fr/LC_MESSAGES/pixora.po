@@ -2407,3 +2407,18 @@ msgstr "Échec de l'enregistrement de gsk_renderer : {e}"
 
 msgid "Restarting Pixora…"
 msgstr "Redémarrage de Pixora…"
+
+msgid "Pixora recovered from a crash"
+msgstr "Pixora s'est rétabli d'un plantage"
+
+msgid "The last startup crashed while using the '{r}' rendering backend. Pixora reverted to 'Automatic' so it can start again. You'll find this setting under Settings → Advanced → Performance → Rendering backend."
+msgstr "Le dernier démarrage a planté avec le moteur de rendu '{r}'. Pixora est revenu à 'Automatique' pour redémarrer. Vous trouverez ce paramètre dans Paramètres → Avancé → Performances → Moteur de rendu."
+
+msgid "Try '{r}' again?"
+msgstr "Réessayer '{r}' ?"
+
+msgid "A previous attempt with this backend crashed Pixora and we had to revert. It may crash again. If it does, Pixora will switch back to 'Automatic' on the next start."
+msgstr "Une tentative précédente avec ce moteur a planté Pixora et nous avons dû revenir en arrière. Cela peut se reproduire. Dans ce cas, Pixora reviendra à 'Automatique' au prochain démarrage."
+
+msgid "Try anyway"
+msgstr "Essayer quand même"

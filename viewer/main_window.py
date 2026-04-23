@@ -1469,6 +1469,10 @@ class MainWindow(Adw.ApplicationWindow):
         # Same 5s mark as "startup survived" — clears main.py's crash-
         # recovery marker so a non-auto gsk_renderer keeps being applied.
         GLib.timeout_add_seconds(5, self._clear_gsk_pending)
+        # If main.py just reverted a crashing renderer, tell the user
+        # (once) and clear the flag.
+        if self.settings.get("gsk_recent_crash"):
+            GLib.idle_add(self._show_gsk_recovery_popup)
         self._ios_device_present = False
         self._recovery_prompt_active = False
         self._recovery_cooldown_until = 0.0
@@ -1488,13 +1492,52 @@ class MainWindow(Adw.ApplicationWindow):
     def _clear_gsk_pending(self):
         """Signals main.py's crash-recovery that the current gsk_renderer
         choice booted successfully. Missing file → next run assumes crash
-        and reverts to 'auto'."""
+        and reverts to 'auto'.
+
+        Also un-blacklist the current renderer — if it survived 5s it's
+        working right now, so the dropdown should stop warning."""
         try:
             path = os.path.expanduser("~/.cache/pixora/.gsk_pending")
             if os.path.exists(path):
                 os.remove(path)
         except Exception:
             pass
+        current = self.settings.get("gsk_renderer", "auto")
+        bl = self.settings.get("gsk_renderer_crashed") or []
+        if current in bl:
+            bl = [x for x in bl if x != current]
+            self.settings["gsk_renderer_crashed"] = bl
+            try:
+                save_settings(self.settings)
+            except Exception:
+                pass
+        return False
+
+    def _show_gsk_recovery_popup(self):
+        renderer = self.settings.get("gsk_recent_crash", "")
+        # Clear the flag immediately so a refresh/re-open doesn't re-show.
+        self.settings["gsk_recent_crash"] = ""
+        try:
+            save_settings(self.settings)
+        except Exception:
+            pass
+        nice = {"gl": "GPU (GL)", "cairo": "Software (Cairo)", "ngl": "NGL"}.get(
+            renderer, renderer or "?"
+        )
+        dlg = Adw.AlertDialog(
+            heading=_("Pixora recovered from a crash"),
+            body=_("The last startup crashed while using the '{r}' rendering backend. Pixora reverted to 'Automatic' so it can start again. You'll find this setting under Settings → Advanced → Performance → Rendering backend.").format(r=nice),
+        )
+        dlg.add_response("ok", _("OK"))
+        dlg.set_default_response("ok")
+        dlg.set_close_response("ok")
+        try:
+            self._present_dialog(dlg)
+        except Exception:
+            try:
+                dlg.present(self)
+            except Exception:
+                pass
         return False
 
     def _set_toolbars_revealed(self, visible):
@@ -6360,6 +6403,51 @@ class MainWindow(Adw.ApplicationWindow):
         current = self.settings.get("gsk_renderer", "auto")
         if new_choice == current:
             return
+        # Blacklist-warning: a previous attempt with this renderer crashed
+        # Pixora. Ask the user before we commit + restart.
+        bl = self.settings.get("gsk_renderer_crashed") or []
+        if new_choice in bl:
+            self._gsk_prompt_blacklisted(new_choice, current)
+            return
+        self._apply_gsk_renderer_choice(new_choice)
+
+    def _gsk_prompt_blacklisted(self, new_choice, current):
+        nice = {"gl": "GPU (GL)", "cairo": "Software (Cairo)", "ngl": "NGL"}.get(
+            new_choice, new_choice
+        )
+        dlg = Adw.AlertDialog(
+            heading=_("Try '{r}' again?").format(r=nice),
+            body=_("A previous attempt with this backend crashed Pixora and we had to revert. It may crash again. If it does, Pixora will switch back to 'Automatic' on the next start."),
+        )
+        dlg.add_response("cancel", _("Cancel"))
+        dlg.add_response("apply", _("Try anyway"))
+        dlg.set_response_appearance("apply", Adw.ResponseAppearance.DESTRUCTIVE)
+        dlg.set_default_response("cancel")
+        dlg.set_close_response("cancel")
+        dlg.connect(
+            "response", self._on_gsk_blacklist_response, new_choice, current
+        )
+        try:
+            self._present_dialog(dlg)
+        except Exception:
+            try:
+                dlg.present(self)
+            except Exception:
+                pass
+
+    def _on_gsk_blacklist_response(self, dlg, response, new_choice, current):
+        if response != "apply":
+            # Revert dropdown to what was stored — undo the visual change.
+            try:
+                self._gsk_combo.handler_block_by_func(self._on_gsk_renderer_changed)
+                self._gsk_combo.set_selected(self._gsk_codes.index(current))
+                self._gsk_combo.handler_unblock_by_func(self._on_gsk_renderer_changed)
+            except Exception:
+                pass
+            return
+        self._apply_gsk_renderer_choice(new_choice)
+
+    def _apply_gsk_renderer_choice(self, new_choice):
         self.settings["gsk_renderer"] = new_choice
         try:
             save_settings(self.settings)

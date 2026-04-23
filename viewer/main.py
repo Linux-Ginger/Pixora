@@ -94,6 +94,14 @@ def _check_gsk_crash_recovery():
     if settings.get("gsk_renderer") != pending:
         return  # user changed it again in the meantime, don't clobber
     settings["gsk_renderer"] = "auto"
+    # Mark this renderer as known-bad so the Settings dropdown can warn
+    # the user if they try it again. MainWindow shows a popup once via
+    # the 'gsk_recent_crash' field below.
+    blacklist = settings.get("gsk_renderer_crashed") or []
+    if isinstance(blacklist, list) and pending not in blacklist:
+        blacklist.append(pending)
+        settings["gsk_renderer_crashed"] = blacklist
+    settings["gsk_recent_crash"] = pending
     try:
         os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
         tmp = CONFIG_PATH + ".tmp"
