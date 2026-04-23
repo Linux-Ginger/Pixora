@@ -70,11 +70,14 @@ def _ensure_icon_installed():
         desktop_dir = Path.home() / ".local" / "share" / "applications"
         desktop_dir.mkdir(parents=True, exist_ok=True)
         desktop_file = desktop_dir / "com.linuxginger.pixora.installer.desktop"
+        # Absolute Icon-path is betrouwbaarder dan theme-name lookup —
+        # GNOME Shell leest het bestand direct, onafhankelijk van de
+        # hicolor-cache state.
         content = (
             "[Desktop Entry]\n"
             "Type=Application\n"
             "Name=Pixora Installer\n"
-            "Icon=com.linuxginger.pixora.installer\n"
+            f"Icon={ICON_PATH}\n"
             f"Exec=python3 {Path(__file__).resolve()}\n"
             "NoDisplay=true\n"
             "StartupWMClass=com.linuxginger.pixora.installer\n"

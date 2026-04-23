@@ -222,7 +222,7 @@ cat > "$APPS_DIR/com.linuxginger.pixora.installer.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Pixora Installer
-Icon=com.linuxginger.pixora.installer
+Icon=$ICON_SRC
 Exec=python3 $INSTALL_DIR/installer.py
 NoDisplay=true
 StartupWMClass=com.linuxginger.pixora.installer
