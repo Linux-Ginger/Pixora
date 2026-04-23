@@ -236,9 +236,10 @@ command -v gtk4-update-icon-cache >/dev/null 2>&1 && \
     gtk4-update-icon-cache -q -t -f "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 command -v update-desktop-database >/dev/null 2>&1 && \
     update-desktop-database -q "$APPS_DIR" 2>/dev/null || true
-# 1.5s geeft Shell genoeg tijd om de nieuwe .desktop te indexeren
-# voor het installer-window opent en het icoon wordt bepaald.
-sleep 1.5
+# Korte pauze zodat Shell's inotify het .desktop-schrijven kan
+# verwerken. Shell swapt het icoon ook nog als het window al open is,
+# dus 0.3s volstaat; geen zichtbare gear-flash meer.
+sleep 0.3
 
 echo -e "  ${GREEN}${LBL_DONE}${NC}"
 echo ""
