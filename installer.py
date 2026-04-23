@@ -44,19 +44,45 @@ RELEASES_API = "https://api.github.com/repos/Linux-Ginger/Pixora/releases"
 
 
 def _ensure_icon_installed():
-    """Copy pixora-icon.svg into the user's hicolor theme so that any
-    Gtk.Window.set_icon_name('pixora-icon') call resolves to our logo
-    instead of the default gear. Idempotent; safe to call every launch."""
+    """Install the Pixora icon AND a minimal .desktop for the installer
+    so GNOME Shell can match the running window to our logo instead of
+    the default gear. On Wayland set_icon_name() alone doesn't work —
+    Shell resolves the icon by application-id via a .desktop file."""
     try:
         if not ICON_PATH.exists():
             return
-        user_icon = (Path.home() / ".local" / "share" / "icons"
-                     / "hicolor" / "scalable" / "apps" / "pixora-icon.svg")
-        user_icon.parent.mkdir(parents=True, exist_ok=True)
-        # Copy only if missing or stale (source newer).
-        if (not user_icon.exists()
-                or user_icon.stat().st_mtime < ICON_PATH.stat().st_mtime):
-            shutil.copy(ICON_PATH, user_icon)
+        icons_dir = (Path.home() / ".local" / "share" / "icons"
+                     / "hicolor" / "scalable" / "apps")
+        icons_dir.mkdir(parents=True, exist_ok=True)
+        # Two icon names: pixora-icon (generic) + app-id name (GNOME Shell
+        # matches this against StartupWMClass of the running window).
+        for name in ("pixora-icon.svg",
+                     "com.linuxginger.pixora.installer.svg"):
+            dest = icons_dir / name
+            if (not dest.exists()
+                    or dest.stat().st_mtime < ICON_PATH.stat().st_mtime):
+                shutil.copy(ICON_PATH, dest)
+    except Exception:
+        pass
+    # Minimal .desktop — NoDisplay hides it from the app-grid; Shell only
+    # uses it for window→icon mapping.
+    try:
+        desktop_dir = Path.home() / ".local" / "share" / "applications"
+        desktop_dir.mkdir(parents=True, exist_ok=True)
+        desktop_file = desktop_dir / "com.linuxginger.pixora.installer.desktop"
+        content = (
+            "[Desktop Entry]\n"
+            "Type=Application\n"
+            "Name=Pixora Installer\n"
+            "Icon=com.linuxginger.pixora.installer\n"
+            f"Exec=python3 {Path(__file__).resolve()}\n"
+            "NoDisplay=true\n"
+            "StartupWMClass=com.linuxginger.pixora.installer\n"
+            "Categories=System;\n"
+        )
+        if (not desktop_file.exists()
+                or desktop_file.read_text() != content):
+            desktop_file.write_text(content)
     except Exception:
         pass
 
@@ -85,7 +111,9 @@ class InstallerWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title(_("Pixora Installer"))
-        self.set_icon_name("pixora-icon")
+        # Match the application-id so the installed .desktop resolves
+        # this window to our icon (Shell uses app-id for lookup).
+        self.set_icon_name("com.linuxginger.pixora.installer")
         self.set_default_size(460, 360)
         self.set_resizable(False)
 
