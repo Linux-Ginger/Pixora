@@ -34,6 +34,7 @@ _t = _gt.translation(
 _ = _t.gettext
 
 import json
+import math
 import subprocess
 import threading
 
@@ -98,7 +99,7 @@ class SetupWizard(Adw.Window):
         self._chosen_thumb_size = 200
 
         self.set_title(_("Pixora — Setup"))
-        self.set_default_size(480, 400)
+        self.set_default_size(600, 580)
         self.set_resizable(False)
 
         self.style_manager = Adw.StyleManager.get_default()
@@ -169,6 +170,10 @@ class SetupWizard(Adw.Window):
         btn_bar.append(self.next_btn)
 
         main_box.append(btn_bar)
+        # Pin the overall content size so the window doesn't resize whenever
+        # a live language switch changes the natural width of the pages
+        # (German strings run longer than English, etc.).
+        main_box.set_size_request(560, 520)
         self.set_content(main_box)
 
         self.pages = ["welcome", "folder", "backup", "duplicate", "thumbnail"]
@@ -209,6 +214,9 @@ class SetupWizard(Adw.Window):
         self.welcome_logo.set_size_request(260, 60)
         self.welcome_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
         self.welcome_logo.set_halign(Gtk.Align.CENTER)
+        # Without hexpand=False the Picture eats the full page width and
+        # halign=CENTER is ignored, so the logo drifts left.
+        self.welcome_logo.set_hexpand(False)
         page.append(self.welcome_logo)
 
         title = Gtk.Label(label=_("Welcome to Pixora!"))
@@ -444,12 +452,63 @@ class SetupWizard(Adw.Window):
         scale_row.add_suffix(self.thumb_scale)
         group.add(scale_row)
 
+        self._thumb_preview = Gtk.DrawingArea()
+        self._thumb_preview.set_content_width(140)
+        self._thumb_preview.set_content_height(140)
+        self._thumb_preview.set_draw_func(self._draw_wizard_thumb_preview)
+        preview_row = Adw.ActionRow(
+            title=_("Preview"),
+            subtitle=_("How large your thumbnails will be at this setting"),
+        )
+        preview_row.add_suffix(self._thumb_preview)
+        preview_row.set_activatable(False)
+        group.add(preview_row)
+
         page.append(group)
         return page
 
     def _on_thumb_scale_changed(self, scale):
         # Round to 25-px steps to match the scale's increment.
         self._chosen_thumb_size = int(round(scale.get_value() / 25) * 25)
+        if hasattr(self, "_thumb_preview") and self._thumb_preview is not None:
+            try:
+                self._thumb_preview.queue_draw()
+            except Exception:
+                pass
+
+    def _draw_wizard_thumb_preview(self, area, cr, w, h):
+        """Rounded square that scales 200→500 px source to ~48→120 px canvas."""
+        try:
+            size = getattr(self, "_chosen_thumb_size", 200)
+            # Canvas bg: subtle gray card.
+            outer_r = 10.0
+            cr.new_sub_path()
+            cr.arc(w - outer_r, outer_r, outer_r, -math.pi / 2, 0)
+            cr.arc(w - outer_r, h - outer_r, outer_r, 0, math.pi / 2)
+            cr.arc(outer_r, h - outer_r, outer_r, math.pi / 2, math.pi)
+            cr.arc(outer_r, outer_r, outer_r, math.pi, 3 * math.pi / 2)
+            cr.close_path()
+            cr.clip()
+            cr.set_source_rgba(0.5, 0.5, 0.5, 0.08)
+            cr.rectangle(0, 0, w, h)
+            cr.fill()
+
+            # 0.24 factor → 200 px renders at 48 px, 500 px at 120 px.
+            tile = size * 0.24
+            tile = max(24.0, min(tile, h - 16.0))
+            x = (w - tile) / 2.0
+            y = (h - tile) / 2.0
+            tile_r = 6.0
+            cr.new_sub_path()
+            cr.arc(x + tile - tile_r, y + tile_r, tile_r, -math.pi / 2, 0)
+            cr.arc(x + tile - tile_r, y + tile - tile_r, tile_r, 0, math.pi / 2)
+            cr.arc(x + tile_r, y + tile - tile_r, tile_r, math.pi / 2, math.pi)
+            cr.arc(x + tile_r, y + tile_r, tile_r, math.pi, 3 * math.pi / 2)
+            cr.close_path()
+            cr.set_source_rgba(0.35, 0.55, 0.85, 0.55)
+            cr.fill()
+        except Exception:
+            pass
 
     # ── Live language switch ────────────────────────────────────────────
 
