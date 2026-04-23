@@ -6374,9 +6374,13 @@ class MainWindow(Adw.ApplicationWindow):
         about_box.append(credit_group)
 
         license_group = Adw.PreferencesGroup()
+        license_group.set_title(_("License"))
+        license_group.set_description(
+            _("Pixora is free software under GPL-3.0. You may use, modify and share it — as long as you respect those same rights for others.")
+        )
         license_row = Adw.ActionRow(
-            title=_("License"),
-            subtitle=_("GNU General Public License v3.0"),
+            title=_("GNU General Public License v3.0"),
+            subtitle=_("Open the full license text"),
         )
         license_row.add_prefix(
             Gtk.Image.new_from_icon_name("text-x-generic-symbolic"))
