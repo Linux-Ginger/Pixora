@@ -1340,6 +1340,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._video_paused_by_popup = False
         self._settings_dialog = None
         self._settings_stack = None
+        self._settings_tabs_bar = None
         # Structure-scan state: detects folders outside the chosen structure,
         # works without a backup drive. Donut turns dark-blue (no backup ctx).
         self._structure_scanning = False
@@ -1579,6 +1580,17 @@ class MainWindow(Adw.ApplicationWindow):
                     Gtk.StackTransitionType.SLIDE_LEFT_RIGHT if enabled
                     else Gtk.StackTransitionType.NONE
                 )
+            except Exception:
+                pass
+        # Toggle the CSS class that disables hover/active transforms on
+        # the settings-tab bar.
+        bar = getattr(self, "_settings_tabs_bar", None)
+        if bar is not None:
+            try:
+                if enabled:
+                    bar.remove_css_class("no-anim")
+                else:
+                    bar.add_css_class("no-anim")
             except Exception:
                 pass
         # The viewer_stack (between photos) reads animations_enabled in
@@ -5577,6 +5589,20 @@ class MainWindow(Adw.ApplicationWindow):
                 "  background: alpha(currentColor, 0.10);"
                 "  border-radius: 10px;"
                 "}"
+                # When the bar has .no-anim (user toggled Reduce Animations),
+                # kill hover/active transforms + transitions so nothing
+                # visually animates.
+                ".pixora-settings-tabs.no-anim .pixora-settings-tab image {"
+                "  transition: none;"
+                "  transform: none;"
+                "}"
+                ".pixora-settings-tabs.no-anim .pixora-settings-tab:hover image,"
+                ".pixora-settings-tabs.no-anim .pixora-settings-tab:active image {"
+                "  transform: none;"
+                "}"
+                ".pixora-settings-tabs.no-anim .pixora-settings-tab label {"
+                "  transition: none;"
+                "}"
             )
 
         tabs = []
@@ -5645,6 +5671,9 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         self._settings_tab_indicator = indicator
         self._settings_tab_indicator_anim_id = None
+        self._settings_tabs_bar = bar
+        if not bool(self.settings.get("animations_enabled", True)):
+            bar.add_css_class("no-anim")
 
         def _on_toggled(btn, name):
             if not btn.get_active():
@@ -5782,6 +5811,7 @@ class MainWindow(Adw.ApplicationWindow):
         def _on_settings_closed(_d):
             self._settings_dialog = None
             self._settings_stack = None
+            self._settings_tabs_bar = None
             if hasattr(self, "settings_btn"):
                 self.settings_btn.set_sensitive(True)
             return False
