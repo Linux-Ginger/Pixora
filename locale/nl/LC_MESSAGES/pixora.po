@@ -375,8 +375,8 @@ msgstr "Pixora wordt afgesloten — opruimen…"
 msgid "Pixora is starting…"
 msgstr "Pixora wordt gestart…"
 
-msgid "Pixora — Setup"
-msgstr "Pixora — Instellen"
+msgid "Pixora Setup"
+msgstr "Pixora Setup"
 
 msgid "Flat"
 msgstr "Plat"

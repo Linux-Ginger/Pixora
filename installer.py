@@ -29,6 +29,7 @@ _ = _t.gettext
 
 import sys
 import json
+import shutil
 import subprocess
 import threading
 import urllib.request
@@ -40,6 +41,27 @@ BIN_DIR      = Path.home() / ".local" / "bin"
 DESKTOP_DIR  = Path.home() / ".local" / "share" / "applications"
 REPO_URL     = "https://github.com/Linux-Ginger/Pixora.git"
 RELEASES_API = "https://api.github.com/repos/Linux-Ginger/Pixora/releases"
+
+
+def _ensure_icon_installed():
+    """Copy pixora-icon.svg into the user's hicolor theme so that any
+    Gtk.Window.set_icon_name('pixora-icon') call resolves to our logo
+    instead of the default gear. Idempotent; safe to call every launch."""
+    try:
+        if not ICON_PATH.exists():
+            return
+        user_icon = (Path.home() / ".local" / "share" / "icons"
+                     / "hicolor" / "scalable" / "apps" / "pixora-icon.svg")
+        user_icon.parent.mkdir(parents=True, exist_ok=True)
+        # Copy only if missing or stale (source newer).
+        if (not user_icon.exists()
+                or user_icon.stat().st_mtime < ICON_PATH.stat().st_mtime):
+            shutil.copy(ICON_PATH, user_icon)
+    except Exception:
+        pass
+
+
+_ensure_icon_installed()
 
 PHASES = [
     (_("Downloading"), [
@@ -63,6 +85,7 @@ class InstallerWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title(_("Pixora Installer"))
+        self.set_icon_name("pixora-icon")
         self.set_default_size(460, 360)
         self.set_resizable(False)
 

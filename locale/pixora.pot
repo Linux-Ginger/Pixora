@@ -371,7 +371,7 @@ msgstr ""
 msgid "Pixora is starting…"
 msgstr ""
 
-msgid "Pixora — Setup"
+msgid "Pixora Setup"
 msgstr ""
 
 msgid "Flat"

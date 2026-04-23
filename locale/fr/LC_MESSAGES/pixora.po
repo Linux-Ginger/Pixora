@@ -688,8 +688,8 @@ msgstr "Pixora démarre…"
 msgid "Pixora {v} is available. Update now?"
 msgstr "Pixora {v} est disponible. Mettre à jour maintenant ?"
 
-msgid "Pixora — Setup"
-msgstr "Pixora — Configuration"
+msgid "Pixora Setup"
+msgstr "Pixora Setup"
 
 msgid "Flat"
 msgstr "Plat"

@@ -132,7 +132,8 @@ class SetupWizard(Adw.Window):
         self._chosen_backup_dedup = True
         self._chosen_backup_silent = False
 
-        self.set_title(_("Pixora — Setup"))
+        self.set_title(_("Pixora Setup"))
+        self.set_icon_name("pixora-icon")
         self.set_default_size(720, 660)
         self.set_resizable(False)
 
@@ -1020,7 +1021,7 @@ class SetupWizard(Adw.Window):
         self._apply_wizard_state()
 
         # Re-translate the things that live outside the stack.
-        self.set_title(_("Pixora — Setup"))
+        self.set_title(_("Pixora Setup"))
         self.back_btn.set_label(_("Back"))
         self.next_btn.set_label(
             _("Finish") if self.current == len(self.pages) - 1 else _("Next")
