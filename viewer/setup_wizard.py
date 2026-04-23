@@ -44,6 +44,13 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, Gio
 
+try:
+    gi.require_version("GUdev", "1.0")
+    from gi.repository import GUdev
+    _GUDEV_AVAILABLE = True
+except (ValueError, ImportError):
+    _GUDEV_AVAILABLE = False
+
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
 
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
@@ -203,6 +210,18 @@ class SetupWizard(Adw.Window):
         self.pages = ["welcome", "folder", "structure", "backup",
                       "duplicate", "thumbnail", "license"]
         self.current = 0
+
+        # Live drive-detection: fire a refresh ~1s after any block event so
+        # newly plugged USBs show up without having to click refresh.
+        self._udev_client = None
+        self._udev_refresh_id = None
+        if _GUDEV_AVAILABLE:
+            try:
+                self._udev_client = GUdev.Client(subsystems=["block"])
+                self._udev_client.connect("uevent", self._on_block_event)
+            except Exception:
+                self._udev_client = None
+        self.connect("close-request", self._on_wizard_close)
 
     def _scrolled(self, child):
         sw = Gtk.ScrolledWindow()
@@ -1142,6 +1161,38 @@ class SetupWizard(Adw.Window):
             GLib.idle_add(self._update_drives, drives)
 
         threading.Thread(target=do_refresh, daemon=True).start()
+
+    def _on_block_event(self, client, action, device):
+        # 'add' = new device registered; 'change' = partition table rescanned
+        # (e.g. after auto-mount assigns a mountpoint). Debounce a refresh
+        # a second later — lsblk needs a beat after udev before UUID/fstype
+        # are filled in.
+        if action not in ("add", "change"):
+            return
+        if self._udev_refresh_id is not None:
+            try:
+                GLib.source_remove(self._udev_refresh_id)
+            except Exception:
+                pass
+        self._udev_refresh_id = GLib.timeout_add(1000, self._udev_trigger_refresh)
+
+    def _udev_trigger_refresh(self):
+        self._udev_refresh_id = None
+        # Only refresh if the backup page has been built — otherwise
+        # there's nothing to update.
+        if hasattr(self, "refresh_btn"):
+            self._on_refresh_drives(None)
+        return False
+
+    def _on_wizard_close(self, *_a):
+        if self._udev_refresh_id is not None:
+            try:
+                GLib.source_remove(self._udev_refresh_id)
+            except Exception:
+                pass
+            self._udev_refresh_id = None
+        self._udev_client = None
+        return False  # allow close
 
     def _update_drives(self, drives):
         self.refresh_btn.set_icon_name("view-refresh-symbolic")
