@@ -3211,11 +3211,24 @@ class MainWindow(Adw.ApplicationWindow):
             log_warn(_("load_photos: photo_path empty or missing — empty state"))
             self.show_empty_state()
             return False
-        photos = []
-        for root, dirs, files in os.walk(photo_path):
-            for file in files:
-                if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
-                    photos.append(os.path.join(root, file))
+        # os.walk over 2000+ files freezes the splash spinner if it runs on
+        # the main loop — push it to a thread and finish on idle_add.
+        self.content_stack.set_visible_child_name("loading")
+        self.spinner.start()
+        self.spinner_label.set_text(_("Sorting photos…"))
+
+        def _scan_bg():
+            photos = []
+            for root, dirs, files in os.walk(photo_path):
+                for file in files:
+                    if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
+                        photos.append(os.path.join(root, file))
+            GLib.idle_add(self._on_photos_scanned, photos, photo_path)
+
+        threading.Thread(target=_scan_bg, daemon=True).start()
+        return False
+
+    def _on_photos_scanned(self, photos, photo_path):
         log_info(_("load_photos: {n} files found").format(n=len(photos)))
         if self._favorites_only:
             photos = [p for p in photos if p in self._favorites]
@@ -3234,30 +3247,18 @@ class MainWindow(Adw.ApplicationWindow):
             count_text = _("{count} (favorites)").format(count=count_text)
         self.photo_count_label.set_text(count_text)
         self.start_watcher(photo_path)
-        # Sort + render async — first-time EXIF date-fetch takes seconds
-        # for 2000 photos, so parallelize and keep the UI responsive.
-        self.content_stack.set_visible_child_name("loading")
-        self.spinner.start()
-        self.spinner_label.set_text(_("Sorting photos…"))
-        threading.Thread(
-            target=self._sort_then_load, daemon=True
-        ).start()
+        threading.Thread(target=self._sort_then_load, daemon=True).start()
         return False
 
     def _sort_then_load(self):
         sort_idx = (self.sort_combo.get_selected()
                     if hasattr(self, "sort_combo") else 0)
         photos = list(self.photos)
-        if sort_idx in (0, 1) and photos:
+        if photos:
             with ThreadPoolExecutor(max_workers=4) as pool:
                 dates = list(pool.map(get_photo_date, photos))
             date_map = dict(zip(photos, dates))
             photos.sort(key=date_map.get, reverse=(sort_idx == 0))
-        elif sort_idx == 2:
-            photos.sort(key=lambda p: os.path.basename(p).lower())
-        elif sort_idx == 3:
-            photos.sort(key=lambda p: os.path.basename(p).lower(),
-                        reverse=True)
         self.photos = photos
         self._filmstrip_order_cache = None
         GLib.idle_add(self.start_load)
