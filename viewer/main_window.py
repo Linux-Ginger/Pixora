@@ -1282,6 +1282,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._filmstrip_thumbs      = {}     # visual_pos -> pixbuf
         self._filmstrip_view_order  = []     # list van self.photos-indices, nieuwste-eerst
         self._filmstrip_load_id     = 0
+        self._filmstrip_order_cache = None   # (id(photos), len(photos), [sorted_indices])
         self._video_media           = None
         self._video_poll_id         = None
         self._video_scrubbing_lock  = False
@@ -2212,6 +2213,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Release big structures so RAM frees promptly.
         try:
             self.photos = []
+            self._filmstrip_order_cache = None
             self.thumb_widgets = {}
             self.date_widgets = {}
             self._filmstrip_thumbs = {}
@@ -2634,6 +2636,7 @@ class MainWindow(Adw.ApplicationWindow):
             # Cluster click: filter grid to those photos.
             self._photos_before_cluster = self.photos
             self.photos = valid
+            self._filmstrip_order_cache = None
             # Compute date range for the info banner.
             date_range = ""
             try:
@@ -2711,6 +2714,7 @@ class MainWindow(Adw.ApplicationWindow):
             return
         log_info(_("Cluster filter off → all photos"))
         self.photos = self._photos_before_cluster
+        self._filmstrip_order_cache = None
         self._photos_before_cluster = None
         self._cluster_location_label = None
         n = len(self.photos)
@@ -3223,6 +3227,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.start_watcher(photo_path)
             return False
         self.photos = photos
+        self._filmstrip_order_cache = None
         n = len(self.photos)
         count_text = ngettext("%d photo", "%d photos", n) % n
         if self._favorites_only:
@@ -3254,6 +3259,7 @@ class MainWindow(Adw.ApplicationWindow):
             photos.sort(key=lambda p: os.path.basename(p).lower(),
                         reverse=True)
         self.photos = photos
+        self._filmstrip_order_cache = None
         GLib.idle_add(self.start_load)
 
     def _show_empty_favorites(self):
@@ -3718,6 +3724,7 @@ class MainWindow(Adw.ApplicationWindow):
             date_map = dict(zip(photos, dates))
             photos.sort(key=date_map.get, reverse=(sort_index == 0))
         self.photos = photos
+        self._filmstrip_order_cache = None
         GLib.idle_add(self.start_load)
 
     def open_photo(self, index):
@@ -4013,10 +4020,19 @@ class MainWindow(Adw.ApplicationWindow):
         n = len(self.photos)
         w = n * (FILM_THUMB + 4)
         self.filmstrip_area.set_size_request(max(w, FILM_THUMB + 4), FILM_THUMB + 8)
-        date_map = {p: get_photo_date(p) for p in self.photos}
-        self._filmstrip_view_order = sorted(
-            range(n), key=lambda i: date_map[self.photos[i]], reverse=True
-        )
+        # Memoized view-order: avoid O(n log n) re-sort on every open_photo click.
+        # Cache key = (id(self.photos), len(self.photos)); invalidated to None on
+        # any self.photos replacement (see invalidation sites).
+        cache = self._filmstrip_order_cache
+        if cache is not None and cache[0] == id(self.photos) and cache[1] == n:
+            self._filmstrip_view_order = cache[2]
+        else:
+            date_map = {p: get_photo_date(p) for p in self.photos}
+            new_view_order = sorted(
+                range(n), key=lambda i: date_map[self.photos[i]], reverse=True
+            )
+            self._filmstrip_view_order = new_view_order
+            self._filmstrip_order_cache = (id(self.photos), n, new_view_order)
         self._filmstrip_load_id += 1
         load_id = self._filmstrip_load_id
         threading.Thread(
@@ -5148,6 +5164,7 @@ class MainWindow(Adw.ApplicationWindow):
         # List-comprehension (not .remove()) so watcher-reload races never
         # raise when path isn't in the list. Log count to surface bugs.
         self.photos = [p for p in self.photos if p != path]
+        self._filmstrip_order_cache = None
         n_after = len(self.photos)
         log_info(_("photos list: {before} → {after}").format(before=n_before, after=n_after))
         if not self.photos:
@@ -7559,6 +7576,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self.folder_row.set_subtitle(new_path)
                 os.makedirs(new_path, exist_ok=True)
                 self.photos = []
+                self._filmstrip_order_cache = None
                 self.load_photos()
         except Exception:
             pass
