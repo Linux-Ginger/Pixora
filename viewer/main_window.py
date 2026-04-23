@@ -1490,17 +1490,17 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add_seconds(300, _periodic_save_cache)
 
     def _tune_settings_stack(self, dialog):
-        """Walk Adw.PreferencesWindow's internal widget tree to find stacks
-        and make the page-switch transitions long enough to actually be
-        seen. The pages are wrapped in Adw.ViewStack or Gtk.Stack depending
-        on libadwaita version, so we handle both. Defensive: all wrapped
-        in try/except since the internal layout isn't public API."""
+        """Walk Adw.PreferencesWindow's internal widget tree to find any
+        widget with a transition-duration property. Adw's internal page
+        switcher varies by version — could be Gtk.Stack, Adw.ViewStack,
+        Adw.Leaflet, or Adw.NavigationView. Defensive: all in try/except."""
         try:
             anim_on = bool(self.settings.get("animations_enabled", True))
             duration = 400 if anim_on else 0
             stack_of_widgets = [dialog]
             seen = 0
             tuned = 0
+            types_tuned = {}
             while stack_of_widgets:
                 w = stack_of_widgets.pop()
                 try:
@@ -1509,8 +1509,9 @@ class MainWindow(Adw.ApplicationWindow):
                     child = None
                 while child is not None:
                     seen += 1
-                    # Try Gtk.Stack first, then Adw.ViewStack.
-                    handled = False
+                    type_name = type(child).__name__
+                    hit = False
+                    # Gtk.Stack: set transition type AND duration.
                     if isinstance(child, Gtk.Stack):
                         try:
                             child.set_transition_duration(duration)
@@ -1520,27 +1521,44 @@ class MainWindow(Adw.ApplicationWindow):
                             else:
                                 child.set_transition_type(
                                     Gtk.StackTransitionType.NONE)
-                            handled = True
-                            tuned += 1
+                            hit = True
                         except Exception:
                             pass
-                    if not handled:
+                    # Anything with a transition-duration property (ViewStack,
+                    # Leaflet, NavigationSplitView, etc.).
+                    if not hit and hasattr(child, "set_transition_duration"):
                         try:
-                            # Adw.ViewStack has set_transition_duration and
-                            # enable-transitions properties.
-                            if hasattr(child, "set_transition_duration"):
-                                child.set_transition_duration(duration)
-                                tuned += 1
-                            if hasattr(child, "set_enable_transitions"):
-                                child.set_enable_transitions(anim_on)
+                            child.set_transition_duration(duration)
+                            hit = True
                         except Exception:
                             pass
+                    # Adw.Leaflet has set_mode_transition_duration +
+                    # set_child_transition_duration — longer of the two is
+                    # used for page swaps.
+                    for setter in ("set_mode_transition_duration",
+                                   "set_child_transition_duration"):
+                        if hasattr(child, setter):
+                            try:
+                                getattr(child, setter)(duration)
+                                hit = True
+                            except Exception:
+                                pass
+                    if hasattr(child, "set_enable_transitions"):
+                        try:
+                            child.set_enable_transitions(anim_on)
+                        except Exception:
+                            pass
+                    if hit:
+                        tuned += 1
+                        types_tuned[type_name] = types_tuned.get(type_name, 0) + 1
                     stack_of_widgets.append(child)
                     try:
                         child = child.get_next_sibling()
                     except Exception:
                         child = None
-            log_info(_("Settings stacks tuned: {t}/{s} widgets").format(t=tuned, s=seen))
+            log_info(_("Settings stacks tuned: {t}/{s} widgets; types: {types}").format(
+                t=tuned, s=seen, types=", ".join(f"{k}×{v}" for k, v in sorted(types_tuned.items()))
+            ))
         except Exception as e:
             log_error(_("Settings stack tune failed: {e}").format(e=e))
         return False
