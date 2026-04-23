@@ -224,19 +224,21 @@ Type=Application
 Name=Pixora Installer
 Icon=$ICON_SRC
 Exec=python3 $INSTALL_DIR/installer.py
-NoDisplay=true
+Terminal=false
 StartupWMClass=com.linuxginger.pixora.installer
+StartupNotify=true
 Categories=System;
 EOF
-# Cache-update kan Shell sneller laten herkennen; beide commando's
-# zijn optioneel, silent falen.
+# Shell's AppInfoMonitor luistert naar mtime-wijzigingen op de apps-dir
+# zelf — touchen geeft een extra trigger naast het schrijven zelf.
+touch "$APPS_DIR" 2>/dev/null || true
 command -v gtk4-update-icon-cache >/dev/null 2>&1 && \
     gtk4-update-icon-cache -q -t -f "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 command -v update-desktop-database >/dev/null 2>&1 && \
     update-desktop-database -q "$APPS_DIR" 2>/dev/null || true
-# Korte pauze zodat Shell's file-monitor het nieuwe .desktop pickt
-# voor we het window openen.
-sleep 0.3
+# 1.5s geeft Shell genoeg tijd om de nieuwe .desktop te indexeren
+# voor het installer-window opent en het icoon wordt bepaald.
+sleep 1.5
 
 echo -e "  ${GREEN}${LBL_DONE}${NC}"
 echo ""
