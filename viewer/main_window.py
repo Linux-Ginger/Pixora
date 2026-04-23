@@ -5513,19 +5513,25 @@ class MainWindow(Adw.ApplicationWindow):
 
         if not hasattr(self, "_settings_tabs_css"):
             self._settings_tabs_css = Gtk.CssProvider()
+            # Hover uses translateY (crispy — just moves) instead of
+            # scale(), which would pixel-blur the rendered icon. The
+            # "checked" state bumps -gtk-icon-size so the SVG re-renders
+            # bigger and stays sharp. Tighter padding keeps the header
+            # from growing taller than the default, so window controls
+            # stay flush in the corner.
             self._settings_tabs_css.load_from_string(
                 ".pixora-settings-tab {"
-                "  padding: 6px 16px;"
+                "  padding: 2px 14px;"
                 "  border-radius: 10px;"
                 "  min-width: 84px;"
                 "}"
                 ".pixora-settings-tab image {"
-                "  transition: transform 180ms cubic-bezier(.2,.9,.3,1.2),"
-                "              -gtk-icon-size 180ms;"
-                "  -gtk-icon-size: 22px;"
+                "  transition: transform 200ms cubic-bezier(.2,.9,.3,1.2),"
+                "              -gtk-icon-size 200ms;"
+                "  -gtk-icon-size: 20px;"
                 "}"
                 ".pixora-settings-tab:hover image {"
-                "  transform: scale(1.15);"
+                "  transform: translateY(-2px);"
                 "}"
                 ".pixora-settings-tab:active image {"
                 "  transform: scale(0.92);"
@@ -5534,9 +5540,9 @@ class MainWindow(Adw.ApplicationWindow):
                 "  -gtk-icon-size: 24px;"
                 "}"
                 ".pixora-settings-tab label {"
-                "  font-size: 11px;"
-                "  opacity: 0.75;"
-                "  transition: opacity 180ms;"
+                "  font-size: 10px;"
+                "  opacity: 0.7;"
+                "  transition: opacity 200ms;"
                 "}"
                 ".pixora-settings-tab:checked label {"
                 "  opacity: 1.0;"
@@ -6267,7 +6273,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Gtk.StackSwitcher picks up page-level "icon-name" + "title".
         stack = Gtk.Stack()
         anim_on = bool(self.settings.get("animations_enabled", True))
-        stack.set_transition_duration(350 if anim_on else 0)
+        stack.set_transition_duration(450 if anim_on else 0)
         stack.set_transition_type(
             Gtk.StackTransitionType.SLIDE_LEFT_RIGHT if anim_on
             else Gtk.StackTransitionType.NONE
