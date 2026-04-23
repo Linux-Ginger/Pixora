@@ -205,6 +205,39 @@ else
     echo "  ⚠ msgfmt not installed — translations will fall back to source strings"
 fi
 
+# ── Icon + .desktop VÓÓR de installer opent ──
+# GNOME Shell besluit het window-icoon op het moment dat het window
+# open gaat. Als we de .desktop pas IN de installer-python schrijven,
+# is Shell al te laat: hij laat het default tandwiel staan. Dus eerst
+# hier.
+ICONS_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+APPS_DIR="$HOME/.local/share/applications"
+mkdir -p "$ICONS_DIR" "$APPS_DIR"
+ICON_SRC="$INSTALL_DIR/assets/logos/pixora-icon.svg"
+if [ -f "$ICON_SRC" ]; then
+    cp -f "$ICON_SRC" "$ICONS_DIR/pixora-icon.svg"
+    cp -f "$ICON_SRC" "$ICONS_DIR/com.linuxginger.pixora.installer.svg"
+fi
+cat > "$APPS_DIR/com.linuxginger.pixora.installer.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Pixora Installer
+Icon=com.linuxginger.pixora.installer
+Exec=python3 $INSTALL_DIR/installer.py
+NoDisplay=true
+StartupWMClass=com.linuxginger.pixora.installer
+Categories=System;
+EOF
+# Cache-update kan Shell sneller laten herkennen; beide commando's
+# zijn optioneel, silent falen.
+command -v gtk4-update-icon-cache >/dev/null 2>&1 && \
+    gtk4-update-icon-cache -q -t -f "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+command -v update-desktop-database >/dev/null 2>&1 && \
+    update-desktop-database -q "$APPS_DIR" 2>/dev/null || true
+# Korte pauze zodat Shell's file-monitor het nieuwe .desktop pickt
+# voor we het window openen.
+sleep 0.3
+
 echo -e "  ${GREEN}${LBL_DONE}${NC}"
 echo ""
 
