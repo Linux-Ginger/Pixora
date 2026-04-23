@@ -50,36 +50,50 @@ BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "
 
 
 def get_available_drives():
+    """Return drives suitable as backup target. Mirrors main_window's
+    detector: accepts any of hotplug / removable / TRAN=usb / mount under
+    /media|/run/media|/mnt, so plain-hotplug-false USBs in virtualized
+    environments also show up."""
     drives = []
+    SYS_MOUNTS = {"/", "/boot", "/boot/efi", "/home", "/var", "/usr", "/etc"}
+    EXTERNAL_PREFIXES = ("/media/", "/run/media/", "/mnt/")
+    seen_uuids = set()
     try:
         result = subprocess.run(
-            ["lsblk", "-o", "NAME,UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT,HOTPLUG", "-J"],
-            capture_output=True, text=True
+            ["lsblk", "-o", "NAME,UUID,LABEL,SIZE,FSTYPE,MOUNTPOINT,HOTPLUG,RM,TRAN", "-J"],
+            capture_output=True, text=True, timeout=5,
         )
         data = json.loads(result.stdout)
 
-        def process_device(device):
-            hotplug = device.get("hotplug", False)
-            if not hotplug:
-                return
-            uuid       = device.get("uuid")
-            fstype     = (device.get("fstype") or "").lower()
-            label      = (device.get("label") or "").strip()
-            size       = device.get("size") or ""
+        def _is_external(mountpoint, hotplug, rm, tran):
+            if hotplug or rm:
+                return True
+            if tran in ("usb", "ieee1394"):
+                return True
+            if mountpoint and any(mountpoint.startswith(p) for p in EXTERNAL_PREFIXES):
+                return True
+            return False
+
+        def process_device(device, parent_hotplug=False, parent_rm=False, parent_tran=""):
+            hotplug = bool(device.get("hotplug", False)) or parent_hotplug
+            rm = bool(device.get("rm", False)) or parent_rm
+            tran = (device.get("tran") or parent_tran or "").lower()
+            uuid = device.get("uuid")
+            fstype = (device.get("fstype") or "").lower()
+            label = (device.get("label") or "").strip()
+            size = device.get("size") or ""
             mountpoint = (device.get("mountpoint") or "").strip()
-
-            if uuid and fstype in BACKUP_FSTYPES:
-                if label:
-                    display = f"💾  {label}  ({size})"
-                elif mountpoint:
-                    display = f"💾  {mountpoint}  ({size})"
-                else:
-                    display = f"💾  {_('External drive')}  ({size})"
-                drives.append((uuid, display))
-
+            if mountpoint in SYS_MOUNTS:
+                pass  # skip system partition but still recurse into children
+            elif uuid and fstype in BACKUP_FSTYPES:
+                if _is_external(mountpoint, hotplug, rm, tran) and uuid not in seen_uuids:
+                    seen_uuids.add(uuid)
+                    display = (f"💾  {label}  ({size})" if label else
+                               f"💾  {mountpoint}  ({size})" if mountpoint else
+                               f"💾  {_('External drive')}  ({size})")
+                    drives.append((uuid, display))
             for child in device.get("children", []):
-                child["hotplug"] = hotplug
-                process_device(child)
+                process_device(child, hotplug, rm, tran)
 
         for device in data.get("blockdevices", []):
             process_device(device)
@@ -1121,7 +1135,10 @@ class SetupWizard(Adw.Window):
         self.refresh_btn.set_icon_name("content-loading-symbolic")
 
         def do_refresh():
-            drives = get_available_drives()
+            try:
+                drives = get_available_drives()
+            except Exception:
+                drives = []
             GLib.idle_add(self._update_drives, drives)
 
         threading.Thread(target=do_refresh, daemon=True).start()
