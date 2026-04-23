@@ -5502,6 +5502,103 @@ class MainWindow(Adw.ApplicationWindow):
         self.toggle_select_mode()
         self.load_photos()
 
+    def _build_settings_switcher(self, stack):
+        """Custom tab-row for the Settings dialog: icon-above-label pill
+        buttons driving a Gtk.Stack. Looks like Adw.ViewSwitcher (wide)
+        but keeps the transitions of Gtk.Stack underneath. CSS gives icons
+        a hover/active bounce."""
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        bar.add_css_class("pixora-settings-tabs")
+        bar.set_halign(Gtk.Align.CENTER)
+
+        if not hasattr(self, "_settings_tabs_css"):
+            self._settings_tabs_css = Gtk.CssProvider()
+            self._settings_tabs_css.load_from_string(
+                ".pixora-settings-tab {"
+                "  padding: 6px 16px;"
+                "  border-radius: 10px;"
+                "  min-width: 84px;"
+                "}"
+                ".pixora-settings-tab image {"
+                "  transition: transform 180ms cubic-bezier(.2,.9,.3,1.2),"
+                "              -gtk-icon-size 180ms;"
+                "  -gtk-icon-size: 22px;"
+                "}"
+                ".pixora-settings-tab:hover image {"
+                "  transform: scale(1.15);"
+                "}"
+                ".pixora-settings-tab:active image {"
+                "  transform: scale(0.92);"
+                "}"
+                ".pixora-settings-tab:checked image {"
+                "  -gtk-icon-size: 24px;"
+                "}"
+                ".pixora-settings-tab label {"
+                "  font-size: 11px;"
+                "  opacity: 0.75;"
+                "  transition: opacity 180ms;"
+                "}"
+                ".pixora-settings-tab:checked label {"
+                "  opacity: 1.0;"
+                "}"
+            )
+
+        tabs = []
+        first_name = None
+        page_order = ["display", "import", "advanced", "about"]
+        for page_name in page_order:
+            child = stack.get_child_by_name(page_name)
+            if child is None:
+                continue
+            page = stack.get_page(child)
+            icon = page.get_icon_name() or ""
+            title = page.get_title() or page_name.title()
+
+            btn = Gtk.ToggleButton()
+            btn.add_css_class("flat")
+            btn.add_css_class("pixora-settings-tab")
+            btn.get_style_context().add_provider(
+                self._settings_tabs_css,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+            vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            vbox.set_halign(Gtk.Align.CENTER)
+            img = Gtk.Image.new_from_icon_name(icon)
+            img.get_style_context().add_provider(
+                self._settings_tabs_css,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+            vbox.append(img)
+            lbl = Gtk.Label(label=title)
+            lbl.get_style_context().add_provider(
+                self._settings_tabs_css,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+            vbox.append(lbl)
+            btn.set_child(vbox)
+            tabs.append((btn, page_name))
+            bar.append(btn)
+            if first_name is None:
+                first_name = page_name
+
+        # Group toggle-buttons so only one is active at a time.
+        if tabs:
+            for btn, _n in tabs[1:]:
+                btn.set_group(tabs[0][0])
+
+        def _on_toggled(btn, name):
+            if btn.get_active():
+                stack.set_visible_child_name(name)
+
+        for btn, name in tabs:
+            btn.connect("toggled", _on_toggled, name)
+
+        if tabs:
+            tabs[0][0].set_active(True)
+            if first_name:
+                stack.set_visible_child_name(first_name)
+        return bar
+
     def _settings_new_page_container(self):
         """Mimic Adw.PreferencesPage (ScrolledWindow + Adw.Clamp + VBox) so
         we can drop existing PreferencesGroup widgets in without changes.
@@ -6192,8 +6289,7 @@ class MainWindow(Adw.ApplicationWindow):
             page = stack.get_page(child)
             page.set_icon_name(icon)
 
-        switcher = Gtk.StackSwitcher()
-        switcher.set_stack(stack)
+        switcher = self._build_settings_switcher(stack)
 
         header = Adw.HeaderBar()
         header.set_title_widget(switcher)
