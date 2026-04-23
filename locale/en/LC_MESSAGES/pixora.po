@@ -2289,3 +2289,18 @@ msgstr "Pixora is free software."
 
 msgid "View full license text"
 msgstr "View full license text"
+
+msgid "Pick a folder where your photos will be kept."
+msgstr "Pick a folder where your photos will be kept."
+
+msgid "Choose how Pixora sorts your photos into folders."
+msgstr "Choose how Pixora sorts your photos into folders."
+
+msgid "Automatically save a copy to an external drive."
+msgstr "Automatically save a copy to an external drive."
+
+msgid "Recognize photos you already have."
+msgstr "Recognize photos you already have."
+
+msgid "How big photos appear in the grid."
+msgstr "How big photos appear in the grid."

@@ -33,6 +33,7 @@ _t = _gt.translation(
 )
 _ = _t.gettext
 
+import datetime
 import json
 import math
 import subprocess
@@ -282,7 +283,7 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label=_("Choose a folder on your computer where Pixora\ncopies your photos and videos.")
+            label=_("Pick a folder where your photos will be kept.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -319,7 +320,7 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label=_("Controls how Pixora saves imported photos in your library.")
+            label=_("Choose how Pixora sorts your photos into folders.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -414,7 +415,7 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label=_("Pixora can automatically back up to an external USB drive\nor HDD after each import.")
+            label=_("Automatically save a copy to an external drive.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -472,18 +473,19 @@ class SetupWizard(Adw.Window):
         self.radio_mode_backup.connect(
             "toggled", lambda b: self._on_backup_mode_radio("backup", b)
         )
-        mode_backup_row = Adw.ActionRow(
+        self._mode_backup_row = Adw.ActionRow(
             title=_("Backup"),
             subtitle=_("One-way copy: additions only. Photos you delete in Pixora stay on the USB as an archive."),
         )
-        mode_backup_row.add_prefix(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic"))
-        mode_backup_row.add_prefix(self.radio_mode_backup)
-        mode_backup_row.set_activatable_widget(self.radio_mode_backup)
+        self._mode_backup_row.add_prefix(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic"))
+        self._mode_backup_row.add_prefix(self.radio_mode_backup)
+        self._mode_backup_row.set_activatable_widget(self.radio_mode_backup)
         try:
-            mode_backup_row.set_subtitle_lines(3)
+            self._mode_backup_row.set_subtitle_lines(3)
         except Exception:
             pass
-        group.add(mode_backup_row)
+        self._mode_backup_row.set_sensitive(False)
+        group.add(self._mode_backup_row)
 
         self.radio_mode_sync = Gtk.CheckButton()
         self.radio_mode_sync.set_group(self.radio_mode_backup)
@@ -491,18 +493,19 @@ class SetupWizard(Adw.Window):
         self.radio_mode_sync.connect(
             "toggled", lambda b: self._on_backup_mode_radio("sync", b)
         )
-        mode_sync_row = Adw.ActionRow(
+        self._mode_sync_row = Adw.ActionRow(
             title=_("Sync"),
             subtitle=_("Exact mirror of your Pixora library. Photos you delete in Pixora are also removed from the USB on the next backup."),
         )
-        mode_sync_row.add_prefix(Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic"))
-        mode_sync_row.add_prefix(self.radio_mode_sync)
-        mode_sync_row.set_activatable_widget(self.radio_mode_sync)
+        self._mode_sync_row.add_prefix(Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic"))
+        self._mode_sync_row.add_prefix(self.radio_mode_sync)
+        self._mode_sync_row.set_activatable_widget(self.radio_mode_sync)
         try:
-            mode_sync_row.set_subtitle_lines(3)
+            self._mode_sync_row.set_subtitle_lines(3)
         except Exception:
             pass
-        group.add(mode_sync_row)
+        self._mode_sync_row.set_sensitive(False)
+        group.add(self._mode_sync_row)
 
         # Backup-dedup toggle (only effective once main duplicate-check is on,
         # but we let the user set it here; MainWindow enforces at runtime).
@@ -512,18 +515,19 @@ class SetupWizard(Adw.Window):
         self.backup_dedup_switch.connect(
             "notify::active", self._on_backup_dedup_toggle
         )
-        dedup_row = Adw.ActionRow(
+        self._dedup_row = Adw.ActionRow(
             title=_("Backup duplicate detector"),
             subtitle=_("Skips photos already on the USB, even if they are stored there under a different name or folder. Requires duplicate detection above to be enabled."),
         )
-        dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
-        dedup_row.add_suffix(self.backup_dedup_switch)
-        dedup_row.set_activatable_widget(self.backup_dedup_switch)
+        self._dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
+        self._dedup_row.add_suffix(self.backup_dedup_switch)
+        self._dedup_row.set_activatable_widget(self.backup_dedup_switch)
         try:
-            dedup_row.set_subtitle_lines(3)
+            self._dedup_row.set_subtitle_lines(3)
         except Exception:
             pass
-        group.add(dedup_row)
+        self._dedup_row.set_sensitive(False)
+        group.add(self._dedup_row)
 
         # Auto-confirm (silent) toggle.
         self.backup_silent_switch = Gtk.Switch()
@@ -532,18 +536,19 @@ class SetupWizard(Adw.Window):
         self.backup_silent_switch.connect(
             "notify::active", self._on_backup_silent_toggle
         )
-        silent_row = Adw.ActionRow(
+        self._silent_row = Adw.ActionRow(
             title=_("Auto-confirm"),
             subtitle=_("Starts right away when there's work to do, without interrupting."),
         )
-        silent_row.add_prefix(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-        silent_row.add_suffix(self.backup_silent_switch)
-        silent_row.set_activatable_widget(self.backup_silent_switch)
+        self._silent_row.add_prefix(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+        self._silent_row.add_suffix(self.backup_silent_switch)
+        self._silent_row.set_activatable_widget(self.backup_silent_switch)
         try:
-            silent_row.set_subtitle_lines(3)
+            self._silent_row.set_subtitle_lines(3)
         except Exception:
             pass
-        group.add(silent_row)
+        self._silent_row.set_sensitive(False)
+        group.add(self._silent_row)
 
         self.backup_error = Gtk.Label(label=_("⚠️  Choose a backup drive to continue"))
         self.backup_error.add_css_class("error")
@@ -578,7 +583,7 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label=_("Pixora visually compares new photos with your library\nand flags visual copies so you can skip them.")
+            label=_("Recognize photos you already have.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -627,7 +632,7 @@ class SetupWizard(Adw.Window):
         page.append(title)
 
         subtitle = Gtk.Label(
-            label=_("Larger thumbnails are easier to see but use more memory.\nThe default (200 px) works well on most machines.")
+            label=_("How big photos appear in the grid.")
         )
         subtitle.add_css_class("body")
         subtitle.set_halign(Gtk.Align.START)
@@ -790,14 +795,14 @@ class SetupWizard(Adw.Window):
     # ── Pagina: Licentie ─────────────────────────────────────────────
 
     def _build_license(self):
-        """Mirror of main_window._on_view_license, inlined on the final wizard
-        page so the user sees the same ✓/!/✗ breakdown as in Settings, plus
-        the Pixora copyright notice."""
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        page.set_margin_top(24)
-        page.set_margin_bottom(24)
-        page.set_margin_start(32)
-        page.set_margin_end(32)
+        """Mirror of main_window._on_view_license: ✓/!/✗ summary, dynamic
+        copyright line, and the full LICENSE text embedded inline (no need
+        to click through)."""
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        page.set_margin_top(20)
+        page.set_margin_bottom(20)
+        page.set_margin_start(28)
+        page.set_margin_end(28)
         page.set_valign(Gtk.Align.START)
 
         heading = Gtk.Label(label=_("GNU General Public License v3.0"))
@@ -805,23 +810,19 @@ class SetupWizard(Adw.Window):
         heading.set_halign(Gtk.Align.START)
         page.append(heading)
 
+        year_now = datetime.datetime.now().year
+        if year_now > 2024:
+            copyright_text = f"© 2024–{year_now} LinuxGinger"
+        else:
+            copyright_text = "© 2024 LinuxGinger"
         copyright_lbl = Gtk.Label(
-            label="© 2024–2026 LinuxGinger — " + _("Pixora is free software.")
+            label=copyright_text + " — " + _("Pixora is free software.")
         )
         copyright_lbl.add_css_class("dim-label")
         copyright_lbl.set_halign(Gtk.Align.START)
         copyright_lbl.set_wrap(True)
         copyright_lbl.set_xalign(0)
         page.append(copyright_lbl)
-
-        intro = Gtk.Label(
-            label=_("Pixora is free software under GPL-3.0. You may use, modify and share it — as long as you respect those same rights for others.")
-        )
-        intro.add_css_class("body")
-        intro.set_halign(Gtk.Align.START)
-        intro.set_wrap(True)
-        intro.set_xalign(0)
-        page.append(intro)
 
         summary = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL, spacing=12,
@@ -855,18 +856,36 @@ class SetupWizard(Adw.Window):
         ))
         page.append(summary)
 
-        full_btn = Gtk.Button(label=_("View full license text"))
-        full_btn.add_css_class("flat")
-        full_btn.set_halign(Gtk.Align.START)
-        full_btn.set_margin_top(4)
-        full_btn.connect("clicked", self._on_view_license)
-        page.append(full_btn)
+        full_hdr = Gtk.Label(label=_("Full license text"))
+        full_hdr.add_css_class("heading")
+        full_hdr.set_halign(Gtk.Align.START)
+        full_hdr.set_margin_top(6)
+        page.append(full_hdr)
 
-        hint = Gtk.Label(label=_("Click Finish below to start Pixora."))
-        hint.add_css_class("dim-label")
-        hint.set_halign(Gtk.Align.START)
-        hint.set_margin_top(4)
-        page.append(hint)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_hexpand(True)
+        scroll.set_min_content_height(180)
+        tv = Gtk.TextView()
+        tv.set_editable(False)
+        tv.set_cursor_visible(False)
+        tv.set_monospace(True)
+        tv.set_wrap_mode(Gtk.WrapMode.WORD)
+        tv.set_left_margin(10)
+        tv.set_right_margin(10)
+        tv.set_top_margin(8)
+        tv.set_bottom_margin(8)
+        license_path = os.path.abspath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "LICENSE"
+        ))
+        try:
+            with open(license_path, "r", encoding="utf-8") as f:
+                lic_text = f.read()
+        except Exception as e:
+            lic_text = _("Could not load license: {err}").format(err=e)
+        tv.get_buffer().set_text(lic_text)
+        scroll.set_child(tv)
+        page.append(scroll)
 
         return page
 
@@ -892,56 +911,6 @@ class SetupWizard(Adw.Window):
             lbl.add_css_class("caption")
             box.append(lbl)
         return box
-
-    def _on_view_license(self, btn):
-        """Full GPL-3.0 text in a scrolled viewer — mirrors main_window's
-        license dialog but without the permissions/conditions summary."""
-        win = Adw.Window()
-        win.set_title(_("License"))
-        win.set_transient_for(self)
-        win.set_modal(True)
-        win.set_default_size(720, 640)
-
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        outer.append(Adw.HeaderBar())
-
-        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        body.set_margin_top(16)
-        body.set_margin_bottom(16)
-        body.set_margin_start(18)
-        body.set_margin_end(18)
-
-        heading = Gtk.Label(label=_("GNU General Public License v3.0"))
-        heading.add_css_class("title-2")
-        heading.set_halign(Gtk.Align.START)
-        body.append(heading)
-
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_vexpand(True)
-        tv = Gtk.TextView()
-        tv.set_editable(False)
-        tv.set_cursor_visible(False)
-        tv.set_monospace(True)
-        tv.set_wrap_mode(Gtk.WrapMode.WORD)
-        tv.set_left_margin(12)
-        tv.set_right_margin(12)
-        tv.set_top_margin(12)
-        tv.set_bottom_margin(12)
-        license_path = os.path.abspath(os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", "LICENSE"
-        ))
-        try:
-            with open(license_path, "r", encoding="utf-8") as f:
-                lic_text = f.read()
-        except Exception as e:
-            lic_text = _("Could not load license: {err}").format(err=e)
-        tv.get_buffer().set_text(lic_text)
-        scroll.set_child(tv)
-        body.append(scroll)
-
-        outer.append(body)
-        win.set_content(outer)
-        win.present()
 
     # ── Live language switch ────────────────────────────────────────────
 
@@ -1083,8 +1052,17 @@ class SetupWizard(Adw.Window):
 
     def _on_backup_toggle(self, switch, _pspec):
         active = switch.get_active()
+        # Grey out every backup-related row when the toggle is off; they
+        # don't apply and the visual cue matches the Settings dialog.
         self.drive_row.set_sensitive(active)
         self.drive_combo.set_sensitive(active and bool(self.drives))
+        if hasattr(self, "backup_folder_row"):
+            self.backup_folder_row.set_sensitive(active)
+        for row_attr in ("_mode_backup_row", "_mode_sync_row",
+                         "_dedup_row", "_silent_row"):
+            row = getattr(self, row_attr, None)
+            if row is not None:
+                row.set_sensitive(active)
         if active and not self.drives:
             self._on_refresh_drives(None)
 

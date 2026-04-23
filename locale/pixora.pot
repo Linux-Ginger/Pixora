@@ -1465,3 +1465,18 @@ msgstr ""
 
 msgid "View full license text"
 msgstr ""
+
+msgid "Pick a folder where your photos will be kept."
+msgstr ""
+
+msgid "Choose how Pixora sorts your photos into folders."
+msgstr ""
+
+msgid "Automatically save a copy to an external drive."
+msgstr ""
+
+msgid "Recognize photos you already have."
+msgstr ""
+
+msgid "How big photos appear in the grid."
+msgstr ""
