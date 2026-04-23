@@ -2332,3 +2332,9 @@ msgstr "Ouvrir le texte complet de la licence"
 
 msgid "Click Finish below to start Pixora."
 msgstr "Cliquez sur Terminer ci-dessous pour démarrer Pixora."
+
+msgid "Pixora is free software."
+msgstr "Pixora est un logiciel libre."
+
+msgid "View full license text"
+msgstr "Voir le texte complet de la licence"

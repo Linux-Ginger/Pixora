@@ -98,9 +98,13 @@ class SetupWizard(Adw.Window):
         self._chosen_lang = _lang  # starts at detected/settings language
         self._chosen_thumb_size = 200
         self._chosen_structure = "year_month"
+        self._chosen_backup_mode = "backup"  # vs "sync"
+        self._chosen_backup_dedup = False
+        self._chosen_backup_silent = False
+        self._chosen_reorganize_silent = False
 
         self.set_title(_("Pixora — Setup"))
-        self.set_default_size(600, 580)
+        self.set_default_size(720, 660)
         self.set_resizable(False)
 
         self.style_manager = Adw.StyleManager.get_default()
@@ -119,9 +123,13 @@ class SetupWizard(Adw.Window):
         self.stack.add_named(self._scrolled(self._build_thumbnail()), "thumbnail")
         self.stack.add_named(self._scrolled(self._build_license()),   "license")
 
+        self.stack.set_hexpand(True)
+        self.stack.set_vexpand(True)
         # Overlay the stack with a spinner-card we show during live language
         # switches so the rebuild flash isn't visible.
         self.stack_overlay = Gtk.Overlay()
+        self.stack_overlay.set_hexpand(True)
+        self.stack_overlay.set_vexpand(True)
         self.stack_overlay.set_child(self.stack)
         self.lang_spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.lang_spinner_box.set_halign(Gtk.Align.CENTER)
@@ -173,10 +181,9 @@ class SetupWizard(Adw.Window):
         btn_bar.append(self.next_btn)
 
         main_box.append(btn_bar)
-        # Pin the overall content size so the window doesn't resize whenever
-        # a live language switch changes the natural width of the pages
-        # (German strings run longer than English, etc.).
-        main_box.set_size_request(560, 520)
+        # Pin a generous min content size so the window doesn't resize when
+        # language switches change the natural width of the pages.
+        main_box.set_size_request(680, 600)
         self.set_content(main_box)
 
         self.pages = ["welcome", "folder", "structure", "backup",
@@ -198,8 +205,9 @@ class SetupWizard(Adw.Window):
                 self.welcome_logo.set_filename(path)
 
     # Native display names, NOT translated — always shown in their own tongue.
+    # Flag emojis match the settings dialog (main_window.py:5340).
     _LANG_CODES  = ["nl", "en", "de", "fr"]
-    _LANG_LABELS = ["Nederlands", "English", "Deutsch", "Français"]
+    _LANG_LABELS = ["🇳🇱  Nederlands", "🇬🇧  English", "🇩🇪  Deutsch", "🇫🇷  Français"]
 
     def _build_welcome(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -211,17 +219,19 @@ class SetupWizard(Adw.Window):
         page.set_valign(Gtk.Align.CENTER)
         page.set_valign(Gtk.Align.START)
 
+        # Bigger, centered logo: wrap in a centering hbox so halign truly
+        # centers even if the Picture's allocation chooses to be wider.
+        logo_center = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        logo_center.set_halign(Gtk.Align.CENTER)
         self.welcome_logo = Gtk.Picture()
         logo_path = self._logo_path()
         if logo_path:
             self.welcome_logo.set_filename(logo_path)
-        self.welcome_logo.set_size_request(260, 60)
+        self.welcome_logo.set_size_request(360, 82)
         self.welcome_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
-        self.welcome_logo.set_halign(Gtk.Align.CENTER)
-        # Without hexpand=False the Picture eats the full page width and
-        # halign=CENTER is ignored, so the logo drifts left.
         self.welcome_logo.set_hexpand(False)
-        page.append(self.welcome_logo)
+        logo_center.append(self.welcome_logo)
+        page.append(logo_center)
 
         title = Gtk.Label(label=_("Welcome to Pixora!"))
         title.add_css_class("title-1")
@@ -358,12 +368,35 @@ class SetupWizard(Adw.Window):
         month_row.set_activatable_widget(self.radio_month)
         group.add(month_row)
 
+        # Auto-confirm toggle (matches the Settings reorganize_silent flag).
+        self.reorganize_silent_switch = Gtk.Switch()
+        self.reorganize_silent_switch.set_valign(Gtk.Align.CENTER)
+        self.reorganize_silent_switch.set_active(self._chosen_reorganize_silent)
+        self.reorganize_silent_switch.connect(
+            "notify::active", self._on_reorganize_silent_toggle
+        )
+        rs_row = Adw.ActionRow(
+            title=_("Auto-confirm"),
+            subtitle=_("Starts right away when there's work to do, without interrupting."),
+        )
+        rs_row.add_prefix(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+        rs_row.add_suffix(self.reorganize_silent_switch)
+        rs_row.set_activatable_widget(self.reorganize_silent_switch)
+        try:
+            rs_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        group.add(rs_row)
+
         page.append(group)
         return page
 
     def _on_structure_radio(self, value, btn):
         if btn.get_active():
             self._chosen_structure = value
+
+    def _on_reorganize_silent_toggle(self, switch, _pspec):
+        self._chosen_reorganize_silent = switch.get_active()
 
     # ── Pagina: Backup ───────────────────────────────────────────────
 
@@ -433,6 +466,85 @@ class SetupWizard(Adw.Window):
         self.backup_folder_row.set_sensitive(False)
         group.add(self.backup_folder_row)
 
+        # Backup-mode radios (same copy as the Settings dialog).
+        self.radio_mode_backup = Gtk.CheckButton()
+        self.radio_mode_backup.set_active(self._chosen_backup_mode == "backup")
+        self.radio_mode_backup.connect(
+            "toggled", lambda b: self._on_backup_mode_radio("backup", b)
+        )
+        mode_backup_row = Adw.ActionRow(
+            title=_("Backup"),
+            subtitle=_("One-way copy: additions only. Photos you delete in Pixora stay on the USB as an archive."),
+        )
+        mode_backup_row.add_prefix(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic"))
+        mode_backup_row.add_prefix(self.radio_mode_backup)
+        mode_backup_row.set_activatable_widget(self.radio_mode_backup)
+        try:
+            mode_backup_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        group.add(mode_backup_row)
+
+        self.radio_mode_sync = Gtk.CheckButton()
+        self.radio_mode_sync.set_group(self.radio_mode_backup)
+        self.radio_mode_sync.set_active(self._chosen_backup_mode == "sync")
+        self.radio_mode_sync.connect(
+            "toggled", lambda b: self._on_backup_mode_radio("sync", b)
+        )
+        mode_sync_row = Adw.ActionRow(
+            title=_("Sync"),
+            subtitle=_("Exact mirror of your Pixora library. Photos you delete in Pixora are also removed from the USB on the next backup."),
+        )
+        mode_sync_row.add_prefix(Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic"))
+        mode_sync_row.add_prefix(self.radio_mode_sync)
+        mode_sync_row.set_activatable_widget(self.radio_mode_sync)
+        try:
+            mode_sync_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        group.add(mode_sync_row)
+
+        # Backup-dedup toggle (only effective once main duplicate-check is on,
+        # but we let the user set it here; MainWindow enforces at runtime).
+        self.backup_dedup_switch = Gtk.Switch()
+        self.backup_dedup_switch.set_valign(Gtk.Align.CENTER)
+        self.backup_dedup_switch.set_active(self._chosen_backup_dedup)
+        self.backup_dedup_switch.connect(
+            "notify::active", self._on_backup_dedup_toggle
+        )
+        dedup_row = Adw.ActionRow(
+            title=_("Backup duplicate detector"),
+            subtitle=_("Skips photos already on the USB, even if they are stored there under a different name or folder. Requires duplicate detection above to be enabled."),
+        )
+        dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
+        dedup_row.add_suffix(self.backup_dedup_switch)
+        dedup_row.set_activatable_widget(self.backup_dedup_switch)
+        try:
+            dedup_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        group.add(dedup_row)
+
+        # Auto-confirm (silent) toggle.
+        self.backup_silent_switch = Gtk.Switch()
+        self.backup_silent_switch.set_valign(Gtk.Align.CENTER)
+        self.backup_silent_switch.set_active(self._chosen_backup_silent)
+        self.backup_silent_switch.connect(
+            "notify::active", self._on_backup_silent_toggle
+        )
+        silent_row = Adw.ActionRow(
+            title=_("Auto-confirm"),
+            subtitle=_("Starts right away when there's work to do, without interrupting."),
+        )
+        silent_row.add_prefix(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+        silent_row.add_suffix(self.backup_silent_switch)
+        silent_row.set_activatable_widget(self.backup_silent_switch)
+        try:
+            silent_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        group.add(silent_row)
+
         self.backup_error = Gtk.Label(label=_("⚠️  Choose a backup drive to continue"))
         self.backup_error.add_css_class("error")
         self.backup_error.set_halign(Gtk.Align.START)
@@ -441,6 +553,16 @@ class SetupWizard(Adw.Window):
         page.append(group)
         page.append(self.backup_error)
         return page
+
+    def _on_backup_mode_radio(self, value, btn):
+        if btn.get_active():
+            self._chosen_backup_mode = value
+
+    def _on_backup_dedup_toggle(self, switch, _pspec):
+        self._chosen_backup_dedup = switch.get_active()
+
+    def _on_backup_silent_toggle(self, switch, _pspec):
+        self._chosen_backup_silent = switch.get_active()
 
     def _build_duplicate(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -553,10 +675,12 @@ class SetupWizard(Adw.Window):
                 pass
 
     def _draw_wizard_thumb_preview(self, area, cr, w, h):
-        """Rounded square that scales 200→500 px source to ~48→120 px canvas."""
+        """Mirror of main_window's _draw_thumb_preview: mock home-grid with
+        header strip and Pixora icon so the wizard and Settings show the
+        same visualization."""
         try:
             size = getattr(self, "_chosen_thumb_size", 200)
-            # Canvas bg: subtle gray card.
+            # Clip to rounded card.
             outer_r = 10.0
             cr.new_sub_path()
             cr.arc(w - outer_r, outer_r, outer_r, -math.pi / 2, 0)
@@ -569,69 +693,205 @@ class SetupWizard(Adw.Window):
             cr.rectangle(0, 0, w, h)
             cr.fill()
 
-            # 0.24 factor → 200 px renders at 48 px, 500 px at 120 px.
-            tile = size * 0.24
-            tile = max(24.0, min(tile, h - 16.0))
-            x = (w - tile) / 2.0
-            y = (h - tile) / 2.0
-            tile_r = 6.0
-            cr.new_sub_path()
-            cr.arc(x + tile - tile_r, y + tile_r, tile_r, -math.pi / 2, 0)
-            cr.arc(x + tile - tile_r, y + tile - tile_r, tile_r, 0, math.pi / 2)
-            cr.arc(x + tile_r, y + tile - tile_r, tile_r, math.pi / 2, math.pi)
-            cr.arc(x + tile_r, y + tile_r, tile_r, math.pi, 3 * math.pi / 2)
-            cr.close_path()
-            cr.set_source_rgba(0.35, 0.55, 0.85, 0.55)
+            header_h = 14.0
+            cr.set_source_rgba(0.5, 0.5, 0.5, 0.14)
+            cr.rectangle(0, 0, w, header_h)
             cr.fill()
+            if not hasattr(self, "_thumb_preview_logo"):
+                try:
+                    from gi.repository import GdkPixbuf
+                    icon_path = os.path.abspath(os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        "..", "assets", "logos", "pixora-icon.svg",
+                    ))
+                    if os.path.exists(icon_path):
+                        self._thumb_preview_logo = (
+                            GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                                icon_path, 10, 10, True
+                            )
+                        )
+                    else:
+                        self._thumb_preview_logo = None
+                except Exception:
+                    self._thumb_preview_logo = None
+            if self._thumb_preview_logo is not None:
+                try:
+                    from gi.repository import Gdk
+                    Gdk.cairo_set_source_pixbuf(
+                        cr, self._thumb_preview_logo, 4, (header_h - 10) / 2
+                    )
+                    cr.paint()
+                except Exception:
+                    pass
+            cr.set_source_rgba(0.5, 0.5, 0.5, 0.35)
+            cr.rectangle(18, header_h / 2 - 1, 28, 2)
+            cr.fill()
+
+            # 12% scale reads well in the 140-wide canvas (true range 200→500 px).
+            scale = 0.12
+            base = size * scale
+            gap = max(3.0, base * 0.08)
+            pad_x = 6.0
+            pad_top = header_h + 6.0
+            radius = max(3.0, base * 0.06)
+
+            pattern = [
+                (1.3, 1.0), (0.75, 1.0), (1.0, 1.0),
+                (0.75, 1.0), (1.3, 1.0), (1.0, 1.0),
+            ]
+
+            inner_w = w - 2 * pad_x
+            inner_h = h - pad_top - pad_x
+            rows_layout = []
+            current_row = []
+            current_w = 0.0
+            idx = 0
+            row_h = base
+            while True:
+                fw, _fh = pattern[idx % len(pattern)]
+                tile_w = base * fw
+                needed = current_w + tile_w + (gap if current_row else 0)
+                if needed > inner_w:
+                    if current_row:
+                        rows_layout.append((current_row, current_w))
+                    current_row, current_w = [], 0.0
+                    if (len(rows_layout)) * (row_h + gap) >= inner_h:
+                        break
+                    continue
+                current_row.append((tile_w, row_h))
+                current_w += (gap if len(current_row) > 1 else 0) + tile_w
+                idx += 1
+                if idx > 60:
+                    break
+            if current_row and \
+               (len(rows_layout) + 1) * (row_h + gap) - gap <= inner_h:
+                rows_layout.append((current_row, current_w))
+
+            def rounded_rect(x, y, tw, th, r):
+                cr.new_sub_path()
+                cr.arc(x + tw - r, y + r, r, -math.pi / 2, 0)
+                cr.arc(x + tw - r, y + th - r, r, 0, math.pi / 2)
+                cr.arc(x + r, y + th - r, r, math.pi / 2, math.pi)
+                cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+                cr.close_path()
+
+            y = pad_top
+            for tiles, total_w in rows_layout:
+                x = pad_x + (inner_w - total_w) / 2
+                for tw, th in tiles:
+                    cr.set_source_rgba(0.5, 0.5, 0.5, 0.35)
+                    rounded_rect(x, y, tw, th, radius)
+                    cr.fill()
+                    x += tw + gap
+                y += row_h + gap
         except Exception:
             pass
 
     # ── Pagina: Licentie ─────────────────────────────────────────────
 
     def _build_license(self):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        page.set_margin_top(32)
+        """Mirror of main_window._on_view_license, inlined on the final wizard
+        page so the user sees the same ✓/!/✗ breakdown as in Settings, plus
+        the Pixora copyright notice."""
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        page.set_margin_top(24)
         page.set_margin_bottom(24)
-        page.set_margin_start(40)
-        page.set_margin_end(40)
+        page.set_margin_start(32)
+        page.set_margin_end(32)
         page.set_valign(Gtk.Align.START)
 
-        title = Gtk.Label(label=_("License"))
-        title.add_css_class("title-2")
-        title.set_halign(Gtk.Align.START)
-        page.append(title)
+        heading = Gtk.Label(label=_("GNU General Public License v3.0"))
+        heading.add_css_class("title-2")
+        heading.set_halign(Gtk.Align.START)
+        page.append(heading)
 
-        subtitle = Gtk.Label(
+        copyright_lbl = Gtk.Label(
+            label="© 2024–2026 LinuxGinger — " + _("Pixora is free software.")
+        )
+        copyright_lbl.add_css_class("dim-label")
+        copyright_lbl.set_halign(Gtk.Align.START)
+        copyright_lbl.set_wrap(True)
+        copyright_lbl.set_xalign(0)
+        page.append(copyright_lbl)
+
+        intro = Gtk.Label(
             label=_("Pixora is free software under GPL-3.0. You may use, modify and share it — as long as you respect those same rights for others.")
         )
-        subtitle.add_css_class("body")
-        subtitle.set_halign(Gtk.Align.START)
-        subtitle.set_wrap(True)
-        subtitle.set_xalign(0)
-        page.append(subtitle)
+        intro.add_css_class("body")
+        intro.set_halign(Gtk.Align.START)
+        intro.set_wrap(True)
+        intro.set_xalign(0)
+        page.append(intro)
 
-        group = Adw.PreferencesGroup()
-        lic_row = Adw.ActionRow(
-            title=_("GNU General Public License v3.0"),
-            subtitle=_("Open the full license text"),
+        summary = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL, spacing=12,
+            homogeneous=True,
         )
-        lic_row.add_prefix(Gtk.Image.new_from_icon_name("text-x-generic-symbolic"))
-        view_btn = Gtk.Button(label=_("View"))
-        view_btn.add_css_class("flat")
-        view_btn.set_valign(Gtk.Align.CENTER)
-        view_btn.connect("clicked", self._on_view_license)
-        lic_row.add_suffix(view_btn)
-        lic_row.set_activatable_widget(view_btn)
-        group.add(lic_row)
-        page.append(group)
+        summary.append(self._license_summary_col(
+            _("Permitted"), "✓", "success",
+            [
+                _("Private and commercial use"),
+                _("Modify the code"),
+                _("Distribute (original or modified)"),
+                _("Patent licenses from contributors"),
+            ],
+        ))
+        summary.append(self._license_summary_col(
+            _("Required"), "!", "warning",
+            [
+                _("Include source code when distributing"),
+                _("Use the same GPL-3 license"),
+                _("Mark modifications clearly"),
+                _("Keep the copyright notice"),
+            ],
+        ))
+        summary.append(self._license_summary_col(
+            _("Not permitted"), "✗", "error",
+            [
+                _("Include in proprietary software"),
+                _("Claim warranty (there is none)"),
+                _("Hold authors liable"),
+            ],
+        ))
+        page.append(summary)
+
+        full_btn = Gtk.Button(label=_("View full license text"))
+        full_btn.add_css_class("flat")
+        full_btn.set_halign(Gtk.Align.START)
+        full_btn.set_margin_top(4)
+        full_btn.connect("clicked", self._on_view_license)
+        page.append(full_btn)
 
         hint = Gtk.Label(label=_("Click Finish below to start Pixora."))
         hint.add_css_class("dim-label")
         hint.set_halign(Gtk.Align.START)
-        hint.set_margin_top(8)
+        hint.set_margin_top(4)
         page.append(hint)
 
         return page
+
+    def _license_summary_col(self, title, icon_char, css_class, items):
+        """Same layout as main_window._license_summary_col — Unicode badge
+        (✓ / ! / ✗) so we don't depend on an icon theme."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        badge = Gtk.Label(label=icon_char)
+        badge.add_css_class("heading")
+        badge.add_css_class(css_class)
+        header.append(badge)
+        hlbl = Gtk.Label(label=title)
+        hlbl.add_css_class("heading")
+        hlbl.set_halign(Gtk.Align.START)
+        header.append(hlbl)
+        box.append(header)
+        for item in items:
+            lbl = Gtk.Label(label="• " + item)
+            lbl.set_halign(Gtk.Align.START)
+            lbl.set_wrap(True)
+            lbl.set_xalign(0)
+            lbl.add_css_class("caption")
+            box.append(lbl)
+        return box
 
     def _on_view_license(self, btn):
         """Full GPL-3.0 text in a scrolled viewer — mirrors main_window's
@@ -942,15 +1202,17 @@ class SetupWizard(Adw.Window):
         settings = {
             "photo_path":          self.folder_entry.get_text(),
             "structure":           self._chosen_structure,
+            "reorganize_silent":   self._chosen_reorganize_silent,
             "backup_enabled":      self.backup_switch.get_active(),
             "backup_uuid":         self._get_backup_uuid(),
             "backup_path":         self.selected_backup_path,
+            "backup_mode":         self._chosen_backup_mode,
+            "backup_dedup":        self._chosen_backup_dedup,
+            "backup_silent":       self._chosen_backup_silent,
             "duplicate_threshold": self._get_threshold(),
+            "language":            self._chosen_lang,
+            "thumbnail_size":      self._chosen_thumb_size,
         }
-        if hasattr(self, "_chosen_lang"):
-            settings["language"] = self._chosen_lang
-        if hasattr(self, "_chosen_thumb_size"):
-            settings["thumbnail_size"] = self._chosen_thumb_size
 
         # Atomic write + 0600: same pattern as save_settings in main_window.
         # Crash mid-write leaves the previous file intact (or no file, which
