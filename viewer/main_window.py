@@ -3832,8 +3832,8 @@ class MainWindow(Adw.ApplicationWindow):
         if pixbuf:
             self.photo_picture.set_pixbuf(pixbuf)
             self._apply_viewer_transform()
-        mtime = os.path.getmtime(path)
-        datum = format_viewer_date(datetime.datetime.fromtimestamp(mtime))
+        ts = get_photo_date(path)
+        datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
         if searching:
             self._set_viewer_location("searching")
@@ -4177,8 +4177,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_vol_scale.set_value(1.0)
         self.video_scrubber.set_value(0.0)
         self.video_time_label.set_text("0:00 / 0:00")
-        mtime = os.path.getmtime(path)
-        datum = format_viewer_date(datetime.datetime.fromtimestamp(mtime))
+        ts = get_photo_date(path)
+        datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
         if searching:
             self._set_viewer_location("searching")
