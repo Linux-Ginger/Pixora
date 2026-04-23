@@ -12,7 +12,7 @@ ORANGE='\033[0;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-# Taal-detectie
+# Language detection
 case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
     nl*|NL*)
         LBL_BY="door LinuxGinger"

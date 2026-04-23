@@ -4,7 +4,7 @@
 #  Pixora — install.sh
 #  by LinuxGinger
 #
-#  Gebruik:
+#  Usage:
 #    curl -fsSL https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/install.sh | bash
 # ─────────────────────────────────────────────
 
@@ -15,13 +15,11 @@ INSTALL_DIR="$HOME/.local/share/pixora"
 
 GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
-# Voor de PIXORA-banner: puur bold, geen kleurcode. Inherit de terminal-
-# default foreground (wit op dark, zwart op light). \033[1;97m gaf op
-# sommige terminals een bruin/geel-achtige render.
+# Bold only, no color: \033[1;97m rendered brownish on some terminals.
 BOLD='\033[1m'
 NC='\033[0m'
 
-# Taal-detectie — volg $LANG / $LC_ALL / $LC_MESSAGES
+# Language detection via $LANG / $LC_ALL / $LC_MESSAGES
 case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
     nl*|NL*)
         LBL_BY="door LinuxGinger"
@@ -62,8 +60,7 @@ if ! command -v apt &> /dev/null; then
     exit 1
 fi
 
-# Block-letter "PIXORA" text in wit. Wordt zowel in de fallback als
-# naast het chafa-icoon gebruikt.
+# Block-letter "PIXORA" text, used in both fallback and next to chafa icon.
 PIXORA_TEXT=(
 "██████╗ ██╗██╗  ██╗ ██████╗ ██████╗  █████╗ "
 "██╔══██╗██║╚██╗██╔╝██╔═══██╗██╔══██╗██╔══██╗"
@@ -73,7 +70,7 @@ PIXORA_TEXT=(
 "╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝"
 )
 
-# Fallback voor wanneer chafa/curl/internet er niet is.
+# Fallback when chafa/curl/internet is unavailable.
 print_ascii_logo() {
     local line
     for line in "${PIXORA_TEXT[@]}"; do
@@ -81,9 +78,7 @@ print_ascii_logo() {
     done
 }
 
-# Echte logo rendering. Chafa tekent alleen het aperture-icoon
-# (kleurige bloem); daarnaast zetten we de "PIXORA" block-ASCII,
-# line-by-line verticaal gecentreerd tegen het icoon.
+# Real logo render: chafa draws the aperture icon, block-ASCII alongside.
 render_real_logo() {
     if ! command -v chafa &>/dev/null; then return 1; fi
     if ! command -v curl   &>/dev/null; then return 1; fi
@@ -95,8 +90,7 @@ render_real_logo() {
         return 1
     fi
     local out
-    # Icon viewBox 0 0 120 120 (1:1). 18x9 cellen = ~18×18 logische
-    # pixels bij half-block rendering — genoeg detail voor de bloem.
+    # Icon viewBox 0 0 120 120; 18x9 cells = ~18x18 via half-block render.
     out=$(chafa --size 18x9 "$tmp" 2>/dev/null)
     rm -f "$tmp"
     if [ -z "$out" ]; then return 1; fi
@@ -106,8 +100,7 @@ render_real_logo() {
     local icon_rows=${#icon_arr[@]}
     local text_rows=${#PIXORA_TEXT[@]}
 
-    # Terminal-breedte check: icoon ~18 + gap 2 + tekst ~45 + margin 2 ≈ 67.
-    # Onder die grens printen we stacked — side-by-side zou wrappen.
+    # Width <70: stack vertically, else side-by-side would wrap.
     local term_w
     term_w=$(tput cols 2>/dev/null || echo 80)
     clear
@@ -120,8 +113,7 @@ render_real_logo() {
         echo ""
         print_ascii_logo
     else
-        # Verticaal centreren: vpad lege regels boven de tekst zodat hij
-        # visueel in het midden van het icoon staat.
+        # Vertical centering: vpad blank lines above text.
         local vpad=$(( (icon_rows - text_rows) / 2 ))
         local max=$icon_rows
         [ "$text_rows" -gt "$max" ] && max=$text_rows
@@ -143,27 +135,21 @@ render_real_logo() {
     return 0
 }
 
-# Bootstrap: als chafa of curl nog niet op het systeem staan, eerst
-# even die twee kleine pakketten installeren (één sudo-prompt) zodat
-# we daarna het kleurlogo kunnen renderen VOOR de zware deps-install.
-# sudo cachet de credential, dus de grote apt-stap daarna prompt niet
-# nog een keer.
+# Bootstrap chafa+curl first so we can render color logo before heavy
+# deps install; sudo caches credential so main apt step won't reprompt.
 if ! command -v chafa &>/dev/null || ! command -v curl &>/dev/null; then
     echo -e "  ${ORANGE}${LBL_PREP}${NC}"
     sudo apt-get install -y -qq chafa curl 2>/dev/null || true
 fi
 
-# Nu renderen — op eerste install na de bootstrap chafa aanwezig, op
-# latere installs direct. ASCII-fallback alleen als chafa/curl echt
-# niet te krijgen zijn (geen net, locked apt, etc.).
+# Render now; ASCII-fallback only if chafa/curl truly unavailable.
 if ! render_real_logo; then
     print_ascii_logo
     echo -e "  ${BOLD}${LBL_BY}${NC}"
     echo ""
 fi
 
-# ── Hoofd-deps ── (geen tweede password-prompt — sudo credential
-# gecachet door de bootstrap-stap hierboven)
+# ── Main deps ── (sudo credential cached by bootstrap, no reprompt)
 echo -e "  ${ORANGE}${LBL_PREP}${NC}"
 sudo apt-get install -y -qq \
     python3 \
@@ -176,11 +162,11 @@ sudo apt-get install -y -qq \
     gettext \
     2>/dev/null
 
-# WebKitGTK typelib — probeer nieuwste (6.0) eerst, valt terug op 4.1
+# WebKitGTK typelib: try 6.0 first, fall back to 4.1
 sudo apt-get install -y -qq gir1.2-webkit-6.0 2>/dev/null || \
 sudo apt-get install -y -qq gir1.2-webkit2-4.1 2>/dev/null || true
 
-# ── Repo ophalen (altijd vers, geen cache) ──
+# ── Fetch repo (always fresh, no cache) ──
 echo -e "  ${ORANGE}${LBL_FETCH}${NC}"
 if [ -d "$INSTALL_DIR/.git" ]; then
     git -C "$INSTALL_DIR" fetch -q origin
@@ -190,8 +176,7 @@ else
     git clone -q "$REPO_URL" "$INSTALL_DIR"
 fi
 
-# Compileer .po → .mo voor alle vertalingen.
-# Oude .mo eerst verwijderen + errors zichtbaar houden (geen 2>/dev/null)
+# Compile .po -> .mo; remove old .mo first so stale files don't linger.
 if command -v msgfmt >/dev/null 2>&1; then
     for po in "$INSTALL_DIR"/locale/*/LC_MESSAGES/pixora.po; do
         [ -f "$po" ] || continue
@@ -205,11 +190,9 @@ else
     echo "  ⚠ msgfmt not installed — translations will fall back to source strings"
 fi
 
-# ── Icon + .desktop VÓÓR de installer opent ──
-# GNOME Shell besluit het window-icoon op het moment dat het window
-# open gaat. Als we de .desktop pas IN de installer-python schrijven,
-# is Shell al te laat: hij laat het default tandwiel staan. Dus eerst
-# hier.
+# ── Icon + .desktop BEFORE installer opens ──
+# Shell decides window-icon at map time; writing .desktop from inside
+# installer.py is too late and leaves the default gear.
 ICONS_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
 APPS_DIR="$HOME/.local/share/applications"
 mkdir -p "$ICONS_DIR" "$APPS_DIR"
@@ -230,9 +213,7 @@ StartupNotify=true
 NoDisplay=true
 Categories=System;
 EOF
-# Ook de updater z'n .desktop nu al schrijven — tegen de tijd dat de
-# user op "Update" klikt, zit hij al in Shell's cache en is er geen
-# tandwiel-flash bij het updater-window-open.
+# Pre-write updater .desktop too so no gear-flash when user clicks Update.
 cat > "$APPS_DIR/com.linuxginger.pixora.updater.desktop" <<EOF
 [Desktop Entry]
 Type=Application
@@ -246,26 +227,20 @@ NoDisplay=true
 Categories=System;
 EOF
 cp -f "$ICON_SRC" "$ICONS_DIR/com.linuxginger.pixora.updater.svg" 2>/dev/null || true
-# Shell's AppInfoMonitor luistert naar mtime-wijzigingen op de apps-dir
-# zelf — touchen geeft een extra trigger naast het schrijven zelf.
+# Shell's AppInfoMonitor watches apps-dir mtime; extra touch triggers it.
 touch "$APPS_DIR" 2>/dev/null || true
 command -v gtk4-update-icon-cache >/dev/null 2>&1 && \
     gtk4-update-icon-cache -q -t -f "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 command -v update-desktop-database >/dev/null 2>&1 && \
     update-desktop-database -q "$APPS_DIR" 2>/dev/null || true
-# Korte pauze zodat Shell's inotify het .desktop-schrijven kan
-# verwerken. Shell swapt het icoon ook nog als het window al open is,
-# dus 0.3s volstaat; geen zichtbare gear-flash meer.
+# Brief pause so Shell's inotify processes the .desktop write; 0.3s avoids gear-flash.
 sleep 0.3
 
 echo -e "  ${GREEN}${LBL_DONE}${NC}"
 echo ""
 
-# ── Installer starten via .desktop zodat GNOME Shell het icoon
-# direct koppelt aan het window, zonder eerst even het tandwiel te
-# tonen. gtk-launch / gio launch gaan door de AppInfo.launch-flow
-# die AppInfoMonitor triggert vóór het window map't. Fallback op
-# directe python-start als beide niet aanwezig zijn.
+# Launch via .desktop so Shell binds icon pre-map (AppInfo.launch flow);
+# fall back to direct python if gtk-launch/gio unavailable.
 if command -v gtk-launch >/dev/null 2>&1; then
     exec gtk-launch com.linuxginger.pixora.installer
 elif command -v gio >/dev/null 2>&1; then

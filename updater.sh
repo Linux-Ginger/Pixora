@@ -10,7 +10,7 @@ set -e
 
 REPO_URL="https://github.com/Linux-Ginger/Pixora.git"
 
-# User-home detecteren (omdat we als root draaien via pkexec)
+# Detect user-home (we run as root via pkexec)
 if [ -n "$PKEXEC_UID" ]; then
     RUN_UID="$PKEXEC_UID"
 elif [ -n "$SUDO_UID" ]; then
@@ -22,8 +22,7 @@ TARGET_USER="$(getent passwd "$RUN_UID" | cut -d: -f1)"
 TARGET_HOME="$(getent passwd "$RUN_UID" | cut -d: -f6)"
 TARGET_GID="$(getent passwd "$RUN_UID" | cut -d: -f4)"
 
-# Sanity-check: weiger te werken als we geen echte home krijgen. Anders zou
-# een latere `rm -rf "$INSTALL_DIR"` op een root-dir kunnen draaien.
+# Sanity-check: refuse if no real home, else rm -rf could hit a root-dir.
 if [ -z "$TARGET_HOME" ] || [ "$TARGET_HOME" = "/" ] || [ ! -d "$TARGET_HOME" ]; then
     echo "Fout: kan home-directory niet bepalen voor UID=$RUN_UID" >&2
     exit 1
@@ -78,10 +77,8 @@ step finalize "Configuration and services"
 mkdir -p "$(dirname "$VERSION_FILE")"
 cp -f "$INSTALL_DIR/version.txt" "$VERSION_FILE"
 
-# Compileer .po → .mo voor alle vertalingen.
-# Belangrijk: OUDE .mo eerst verwijderen zodat we niet stil terugvallen op
-# een stale compilatie als msgfmt faalt. Errors naar stdout zodat ze in de
-# updater-UI-log zichtbaar zijn (niet meer verborgen met 2>/dev/null).
+# Compile .po -> .mo; remove old .mo first so we don't silently fall back
+# to a stale compilation when msgfmt fails. Errors on stdout for UI-log.
 if command -v msgfmt >/dev/null 2>&1; then
     for po in "$INSTALL_DIR"/locale/*/LC_MESSAGES/pixora.po; do
         [ -f "$po" ] || continue
@@ -100,8 +97,7 @@ fi
 
 chown -R "$RUN_UID:$TARGET_GID" "$INSTALL_DIR" "$(dirname "$VERSION_FILE")"
 
-# .desktop-file regenereren zodat Icon=-pad meeloopt met code-rename van
-# assets/ (historisch: docs → assets → assets/logo's → assets/logos).
+# Regenerate .desktop so Icon= path tracks asset-dir renames over time.
 DESKTOP_DIR="$TARGET_HOME/.local/share/applications"
 DESKTOP_FILE="$DESKTOP_DIR/pixora.desktop"
 LAUNCHER="$TARGET_HOME/.local/bin/pixora"
@@ -127,7 +123,7 @@ Categories=Graphics;Photography;
 StartupWMClass=com.linuxginger.pixora
 DESKTOP_EOF
     chown "$RUN_UID:$TARGET_GID" "$DESKTOP_FILE"
-    # Cache bijwerken zodat GNOME het nieuwe icon oppakt zonder logout
+    # Refresh cache so GNOME picks up new icon without logout
     runuser -u "$TARGET_USER" -- update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
 fi
 

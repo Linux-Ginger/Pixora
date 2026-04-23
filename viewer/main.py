@@ -22,8 +22,7 @@ _PIXORA_APP = None
 
 
 def _compile_stale_mo_files():
-    """Rebuild .mo files per language when the .po is newer (git pull flows
-    leave stale .mo's, causing new msgids to fall back to Dutch)."""
+    """Rebuild .mo files when .po is newer (git pull leaves stale .mo)."""
     try:
         if not shutil.which("msgfmt"):
             return
@@ -64,10 +63,7 @@ _GSK_PENDING_PATH = os.path.expanduser("~/.cache/pixora/.gsk_pending")
 
 
 def _check_gsk_crash_recovery():
-    """If the last run was using a non-default renderer and didn't survive
-    the startup window (MainWindow clears the marker after 5s), assume
-    that renderer crashed Pixora and revert to 'auto' so the user isn't
-    locked out of the app."""
+    """Revert to 'auto' renderer if prior run crashed during startup."""
     if not os.path.exists(_GSK_PENDING_PATH):
         return
     try:
@@ -94,9 +90,7 @@ def _check_gsk_crash_recovery():
     if settings.get("gsk_renderer") != pending:
         return  # user changed it again in the meantime, don't clobber
     settings["gsk_renderer"] = "auto"
-    # Mark this renderer as known-bad so the Settings dropdown can warn
-    # the user if they try it again. MainWindow shows a popup once via
-    # the 'gsk_recent_crash' field below.
+    # Mark renderer as known-bad so Settings can warn on re-selection.
     blacklist = settings.get("gsk_renderer_crashed") or []
     if isinstance(blacklist, list) and pending not in blacklist:
         blacklist.append(pending)
@@ -113,10 +107,7 @@ def _check_gsk_crash_recovery():
 
 
 def _apply_gsk_renderer_env():
-    """Read settings.json BEFORE GTK initializes and honor the user's
-    renderer choice. Values: 'auto' (no-op), 'gl', 'cairo'. Must run
-    before any gi.require_version('Gtk', …) call — env var is sampled
-    by GTK on display open, which happens on the first import."""
+    """Apply GSK_RENDERER from settings before GTK imports (env sampled once)."""
     try:
         with open(CONFIG_PATH, "r") as _rf:
             choice = json.load(_rf).get("gsk_renderer", "auto")
@@ -124,8 +115,7 @@ def _apply_gsk_renderer_env():
         choice = "auto"
     if choice in ("gl", "cairo", "ngl"):
         os.environ["GSK_RENDERER"] = choice
-        # Record the attempt so the next start knows whether this one
-        # survived. MainWindow removes this file 5s after the window is up.
+        # Sentinel; MainWindow removes it 5s after window is up.
         try:
             os.makedirs(os.path.dirname(_GSK_PENDING_PATH), exist_ok=True)
             with open(_GSK_PENDING_PATH, "w") as f:
@@ -155,9 +145,7 @@ def load_settings():
 
 
 def _launch_dev_terminal():
-    """Dev-mode: spawn terminal that runs Pixora; original process exits so
-    Pixora's stdout/stderr goes to that terminal. Terminal close → SIGHUP
-    propagates to Python → clean GTK exit."""
+    """Dev-mode: re-spawn Pixora inside a terminal; SIGHUP on close quits cleanly."""
     global PIXORA_DEV_MODE
     settings = load_settings()
     if not settings or not settings.get("dev_mode"):
@@ -186,8 +174,7 @@ def _launch_dev_terminal():
         header = "─── Pixora (dev mode) ───"
         hint = "Close this window to quit Pixora."
 
-    # Set PIXORA_IN_DEV_TERM inside the bash command — gnome-terminal-server
-    # drops Popen env when handing off to its child shell.
+    # Set env in bash cmd; gnome-terminal-server drops Popen env.
     bash_cmd = (
         "export PIXORA_IN_DEV_TERM=1; "
         f"echo '{header}'; "
@@ -232,12 +219,11 @@ def _quit_pixora_app():
 
 
 def kill_dev_terminal():
-    """Compat-stub kept because main_window.on_close still calls it."""
+    """Compat-stub; main_window.on_close still calls it."""
     return
 
 
-# SIGHUP handler in the dev-terminal child so closing the terminal exits
-# Pixora cleanly instead of a hard crash.
+# SIGHUP handler: closing the dev-terminal quits Pixora cleanly.
 def _install_dev_term_signal_handler():
     if not os.environ.get("PIXORA_IN_DEV_TERM"):
         return
@@ -256,8 +242,7 @@ def _install_dev_term_signal_handler():
 _install_dev_term_signal_handler()
 
 
-# Only spawn the dev-terminal on real CLI startup; `from main import ...`
-# re-executes this module as "main" and must skip the spawn.
+# Only spawn dev-terminal on real CLI startup, not on re-import as "main".
 if __name__ == "__main__":
     _launch_dev_terminal()
 
@@ -286,23 +271,16 @@ class PixoraApp(Adw.Application):
             from main_window import MainWindow
             win = MainWindow(app, settings)
 
-        # set_visible instead of present(): GNOME Shell fires a "Pixora is
-        # ready" notification on every startup when the window isn't focused
-        # if we use present().
+        # set_visible avoids the GNOME Shell "ready" notification on every start.
         win.set_visible(True)
 
 
 def _consume_restart_sentinel():
-    """If a language/mode change left a sentinel, exec ourselves in-place.
-    Preserves env (incl. PIXORA_IN_DEV_TERM) — we stay in the same terminal,
-    main.py will see we're already in the dev-terminal and skip re-spawning."""
+    """Exec in-place on sentinel; preserves env so dev-terminal isn't re-spawned."""
     sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
     if not os.path.exists(sentinel):
         return
-    # Loop-guard: count restarts via env var. If something keeps re-creating
-    # the sentinel or remove keeps failing, bail out after 2 respawns so we
-    # don't spin forever (observed on an edge case that cascaded into a GSK
-    # crash).
+    # Loop-guard: bail out after 2 respawns to avoid infinite cycle.
     restart_count = int(os.environ.get("PIXORA_RESTART_COUNT", "0") or "0")
     if restart_count >= 2:
         print(
@@ -318,7 +296,7 @@ def _consume_restart_sentinel():
     try:
         os.remove(sentinel)
     except Exception as e:
-        # If we can't even remove the file, exec'ing would loop forever.
+        # If we can't remove the file, exec would loop forever.
         print(
             f"Pixora: could not remove restart sentinel ({e}); aborting "
             f"to avoid a loop. Delete {sentinel} manually.",

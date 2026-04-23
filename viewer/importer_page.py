@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-# ─────────────────────────────────────────────
-#  Pixora — importer_page.py
-#  by LinuxGinger
-# ─────────────────────────────────────────────
+# Pixora — importer_page.py — by LinuxGinger
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -11,7 +8,7 @@ from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk, Pango
 
 import os
 
-# ── i18n ─────────────────────────────────────────────────────────────
+# i18n
 import gettext as _gt
 import json as _json_i18n
 try:
@@ -55,7 +52,7 @@ except ImportError:
 CONFIG_PATH  = Path.home() / ".config" / "pixora" / "settings.json"
 CACHE_DIR    = Path.home() / ".cache"  / "pixora"
 HASH_CACHE   = CACHE_DIR / "hashes.json"
-# Per-user mount-point so concurrent Pixora instances / stale mounts don't clash.
+# Per-user mountpoint to avoid clashes with stale mounts or parallel instances.
 MOUNT_POINT  = Path(tempfile.gettempdir()) / f"pixora_iphone_{os.getuid()}"
 
 BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
@@ -63,11 +60,11 @@ SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".dng", ".mp4", ".m
 EXCLUDED_EXT   = {".aae"}
 SKIP_DIRS      = {".Trash", "Recently Deleted", "Onlangs verwijderd", ".recently-deleted"}
 
-# Duplicate threshold → max hash distance. 0 disables the check.
+# Duplicate threshold -> max hash distance; 0 disables the check.
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
 
 IMPORT_THUMB_DIR = Path.home() / ".cache" / "pixora" / "import_thumbs"
-SELECT_THUMB     = 160  # square pixels
+SELECT_THUMB     = 160  # px
 
 
 STATE_WAITING   = "waiting"
@@ -108,7 +105,7 @@ def dest_path(base: Path, structure: str, filename: str, mtime: datetime) -> Pat
     elif structure == "year_month":
         month_dir = f"{mtime.year}-{mtime.month:02d}"
         return base / str(mtime.year) / month_dir / filename
-    else:  # flat
+    else:
         return base / filename
 
 
@@ -156,14 +153,13 @@ def get_device_name(udid: str) -> str:
 
 
 def mount_iphone(udid: str, mountpoint: Path) -> bool:
-    # Lazy unmount first — handles broken previous mounts so ifuse doesn't
-    # fail later with "mountpoint is not empty".
+    # Lazy unmount first: clears stale mounts so ifuse won't error "not empty".
     try:
         subprocess.run(["fusermount", "-uz", str(mountpoint)],
                        capture_output=True, timeout=5)
     except Exception:
         pass
-    # Only rmtree when NOT mounted — rmtree-on-mount can hang on FUSE.
+    # Only rmtree when NOT mounted; rmtree on an active FUSE mount can hang.
     try:
         still_mounted = False
         try:
@@ -195,11 +191,11 @@ def unmount_iphone(mountpoint: Path):
         pass
 
 
-_EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, DateTimeDigitized, DateTime
+_EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, Digitized, DateTime
 _VIDEO_EXT = {".mp4", ".mov", ".m4v", ".3gp"}
 
 def _get_video_date(path: Path) -> float | None:
-    """Return creation_time from video metadata via ffprobe."""
+    """Return video creation_time via ffprobe."""
     try:
         result = subprocess.run(
             ["ffprobe", "-v", "quiet", "-print_format", "json",
@@ -217,7 +213,7 @@ def _get_video_date(path: Path) -> float | None:
     return None
 
 def _get_video_duration(path: Path) -> str | None:
-    """Return video duration as 'm:ss' string via ffprobe."""
+    """Return video duration as 'm:ss' via ffprobe."""
     try:
         result = subprocess.run(
             ["ffprobe", "-v", "quiet", "-print_format", "json",
@@ -237,7 +233,7 @@ def _get_video_duration(path: Path) -> str | None:
 
 
 def get_photo_date(path: Path) -> float:
-    """Return a sort key: EXIF/ffprobe timestamp, else filename counter, else mtime."""
+    """Sort key: EXIF/ffprobe timestamp, else filename counter, else mtime."""
     ext = path.suffix.lower()
     if ext in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng", ".tiff", ".tif"):
         try:
@@ -255,8 +251,7 @@ def get_photo_date(path: Path) -> float:
         ts = _get_video_date(path)
         if ts:
             return ts
-    # Fallback: iPhone filenames (IMG_1234) are chronological — use the counter
-    # as sort key so we don't depend on (often wrong) mtime.
+    # Fallback: iPhone names (IMG_1234) are chronological; counter beats mtime.
     m = re.search(r'(\d{4,})', path.stem)
     if m:
         return float(m.group(1))
@@ -264,7 +259,7 @@ def get_photo_date(path: Path) -> float:
 
 
 def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
-    """Apply crop/rotation from an AAE file to the imported photo."""
+    """Apply AAE crop/rotation edits to the imported photo."""
     try:
         import plistlib
         import zlib
@@ -276,11 +271,11 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
         if not raw:
             return False
 
-        # adjustmentData: plistlib base64-decodes but content is zlib-compressed.
+        # plistlib already base64-decodes; inner payload is zlib-compressed.
         try:
             json_str = zlib.decompress(raw)
         except zlib.error:
-            json_str = raw  # some AAE files are uncompressed
+            json_str = raw  # some AAE files ship uncompressed
 
         data = json.loads(json_str)
         adjustments = data.get("adjustments", [])
@@ -327,7 +322,7 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
             if ext in (".jpg", ".jpeg"):
                 img.save(image_path, "JPEG", quality=95, exif=img.info.get("exif", b""))
             elif ext in (".heic", ".heif"):
-                # Pillow can't write HEIC → save as JPEG next to the original.
+                # Pillow can't write HEIC; save as JPEG next to the original.
                 jpeg_path = image_path.with_suffix(".jpg")
                 img.save(jpeg_path, "JPEG", quality=95)
                 image_path.unlink()
@@ -346,7 +341,7 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
 
 
 def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
-    """Recursively scan DCIM. Skips SKIP_DIRS (Recently Deleted etc.) and AAE."""
+    """Recursively scan DCIM; skip SKIP_DIRS and AAE files."""
     dcim = mountpoint / "DCIM"
     if not dcim.exists():
         return []
@@ -403,8 +398,7 @@ def save_hash_cache(cache: dict):
 
 
 def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
-    """Build pHash index of the archive. Uncached photos are hashed in parallel
-    (pool=4) — PIL releases the GIL during decode so threads help here."""
+    """Build pHash index of archive; uncached photos hashed in parallel (PIL drops GIL)."""
     cache = load_hash_cache()
     hashes = {}
 
@@ -509,7 +503,7 @@ def _crop_to_square(pixbuf) -> "GdkPixbuf.Pixbuf":
 
 
 def load_select_thumb(photo_path: Path):
-    """Square SELECT_THUMB thumbnail for the selection page, disk-cached."""
+    """Square SELECT_THUMB thumbnail for the selection page; disk-cached."""
     IMPORT_THUMB_DIR.mkdir(parents=True, exist_ok=True)
     cache = _import_cache_path(photo_path)
 
@@ -524,7 +518,7 @@ def load_select_thumb(photo_path: Path):
         if ext in {".mp4", ".mov", ".m4v"}:
             if not _cmd_available("ffmpeg"):
                 return None
-            # No seek — first-frame-only is more reliable on FUSE/USB.
+            # No seek: first-frame-only is more reliable on FUSE/USB.
             tmp = cache.with_suffix(".tmp.jpg")
             result = subprocess.run(
                 ["ffmpeg", "-i", str(photo_path),
@@ -538,7 +532,7 @@ def load_select_thumb(photo_path: Path):
             )
             tmp.unlink(missing_ok=True)
         else:
-            # Load at 2× for better quality after downscale.
+            # Load at 2x for better quality after downscale.
             raw = GdkPixbuf.Pixbuf.new_from_file_at_scale(
                 str(photo_path), SELECT_THUMB * 2, SELECT_THUMB * 2, True
             )
@@ -575,7 +569,7 @@ class ImporterPage(Gtk.Box):
 
         self._poll_timer_id: int | None = None
         self._disconnect_dialog_open = False
-        self._thumb_load_gen = 0  # bumped on state-switch to invalidate stale callbacks
+        self._thumb_load_gen = 0  # bumped on state-switch to drop stale callbacks
 
         self._build_ui()
 
@@ -624,8 +618,7 @@ class ImporterPage(Gtk.Box):
             except Exception:
                 pass
             self._poll_timer_id = None
-        # Invalidate in-flight thumb loaders so their idle callbacks don't
-        # target now-destroyed widgets.
+        # Invalidate in-flight thumb loaders so idle callbacks skip dead widgets.
         self._thumb_load_gen += 1
         unmount_iphone(MOUNT_POINT)
 
@@ -847,7 +840,7 @@ class ImporterPage(Gtk.Box):
 
         self.select_flow = Gtk.FlowBox()
         self.select_flow.set_homogeneous(True)
-        self.select_flow.set_sort_func(lambda a, b, *_: 0)  # preserve insertion-order
+        self.select_flow.set_sort_func(lambda a, b, *_: 0)  # preserve insertion order
         self.select_flow.set_max_children_per_line(6)
         self.select_flow.set_min_children_per_line(2)
         self.select_flow.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -1118,7 +1111,7 @@ class ImporterPage(Gtk.Box):
         threading.Thread(target=self._do_scan, daemon=True).start()
 
     def _start_progress_pulse(self):
-        """Indeterminate progress bar while total is unknown."""
+        """Indeterminate progress bar while total unknown."""
         self._stop_progress_pulse()
         self.progress_bar.set_show_text(False)
         self.progress_bar.set_pulse_step(0.08)
@@ -1156,15 +1149,14 @@ class ImporterPage(Gtk.Box):
                 total,
             ) % total,
         )
-        # Chunked progress during sort so the UI stays responsive.
+        # Chunked progress during sort keeps the UI responsive.
         GLib.idle_add(self._begin_sort_progress, total)
         if total <= 500:
             files.sort(key=get_photo_date, reverse=True)
             GLib.idle_add(self._update_progress, 1.0, _("Sorting done ({n})").format(n=total), "")
         else:
-            # as_completed keeps per-item progress updates working while the
-            # fetches run in parallel — pool.map would only give us a single
-            # tick at the end, which feels like a frozen progress bar on FUSE.
+            # as_completed gives per-item progress; pool.map would tick only
+            # at the end, looking frozen on FUSE.
             date_cache = {}
             done = 0
             with ThreadPoolExecutor(max_workers=6) as pool:
@@ -1209,7 +1201,7 @@ class ImporterPage(Gtk.Box):
     def _do_hashing(self, iphone_files: list[Path]):
         photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
         threshold_key = self.settings.get("duplicate_threshold", 2)
-        # threshold 0 = detection off → treat everything as new.
+        # threshold 0 = detection off; treat everything as new.
         if threshold_key == 0:
             GLib.idle_add(self._on_hashing_done, [], list(iphone_files))
             return
@@ -1262,7 +1254,7 @@ class ImporterPage(Gtk.Box):
         self.selected_files = {str(f) for f in files}
         self._update_select_count()
 
-        # Bump gen so prior thumb-loaders don't drop callbacks on new widgets.
+        # Bump gen so prior thumb-loaders skip the new widgets.
         self._thumb_load_gen += 1
 
         while child := self.select_flow.get_first_child():
@@ -1296,7 +1288,7 @@ class ImporterPage(Gtk.Box):
         click.connect("pressed", lambda g, n, x, y, ip=str(fp): self._on_card_click(ip))
         overlay.add_controller(click)
 
-        # Check icon is visual-only; clicks are handled by GestureClick above.
+        # Check icon is visual-only; click handled by GestureClick above.
         check = Gtk.CheckButton()
         check.set_active(True)
         check.set_halign(Gtk.Align.START)
@@ -1321,7 +1313,7 @@ class ImporterPage(Gtk.Box):
         return overlay, check, overlay
 
     def _load_select_thumbs(self, files: list[Path]):
-        """Load thumbnails sequentially — faster than parallel on USB/FUSE."""
+        """Sequential thumb load; faster than parallel on USB/FUSE."""
         my_gen = self._thumb_load_gen
         for fp in files:
             if my_gen != self._thumb_load_gen:
@@ -1589,8 +1581,7 @@ class ImporterPage(Gtk.Box):
 
     def _on_import_done(self):
         unmount_iphone(MOUNT_POINT)
-        # Backup flow is in main_window now; on_done_cb sets last_import_time
-        # and triggers the backup. Importer only shows the done page.
+        # Backup flow lives in main_window; on_done_cb triggers it here.
         self._finish()
 
     def _finish(self, note: str | None = None):

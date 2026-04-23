@@ -40,10 +40,7 @@ UPDATE_URL = "https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/updater
 
 
 def _ensure_icon_installed():
-    """Mirror of installer.py's helper: zorg dat .desktop + icon-file
-    bestaan zodat GNOME Shell het window koppelt aan ons logo i.p.v.
-    het default tandwiel. install.sh schrijft dit al bij eerste
-    install; deze fallback vangt losse python-starts af."""
+    """Install .desktop + icon so GNOME Shell maps the window to our logo."""
     try:
         if ICON_PATH.exists():
             icons_dir = (Path.home() / ".local" / "share" / "icons"
@@ -249,8 +246,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
             self._pulse_timer = GLib.timeout_add(120, self._pulse_tick)
 
     def _run_update(self):
-        # Download script locally first so the pkexec prompt shows a short
-        # command ("pkexec bash /tmp/pixora-updater.sh") instead of a curl-pipe.
+        # Download locally so pkexec prompt shows short cmd, not curl-pipe.
         import tempfile
         script_path = None
         try:
@@ -334,18 +330,11 @@ class UpdaterWindow(Adw.ApplicationWindow):
             cmd = [pixora_bin]
         else:
             cmd = [sys.executable, str(INSTALL_DIR / "viewer" / "main.py")]
-        # Zet PIXORA_IN_DEV_TERM=1 zodat main.py géén nieuwe gnome-terminal
-        # probeert te spawnen bij dev_mode. Die spawn faalt vaak in
-        # virtualized setups ("Failed to get screen from object path ...")
-        # waardoor Pixora nooit opent. stdout/stderr gaat nu naar de
-        # relaunch-log in plaats van een terminal — prima voor een
-        # post-update start.
+        # PIXORA_IN_DEV_TERM=1: skip dev-terminal spawn (fails in VMs).
         child_env = dict(os.environ)
         child_env["PIXORA_IN_DEV_TERM"] = "1"
         child_env.pop("PIXORA_DEV_LOG_OPENED", None)
-        # Redirect to a log-file i.p.v. /dev/null zodat we kunnen zien
-        # als main.py gelijk crasht. User kan deze zelf lezen als
-        # Pixora niet opstart.
+        # Log to file so users can diagnose if main.py crashes on start.
         log_path = os.path.expanduser("~/.cache/pixora/relaunch.log")
         try:
             os.makedirs(os.path.dirname(log_path), exist_ok=True)
@@ -369,7 +358,7 @@ class UpdaterWindow(Adw.ApplicationWindow):
                     log_f.write(f"Popen failed: {e}\n")
                 except Exception:
                     pass
-        # Delay quit so the child is fully detached before we send close signals.
+        # Delay quit so the child detaches before close signals fire.
         def _delayed_quit():
             self.get_application().quit()
             return False

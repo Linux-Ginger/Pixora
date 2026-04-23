@@ -68,8 +68,7 @@ for _cand in _LC_TIME_CANDIDATES.get(_lang, []):
     except _locale_mod.Error:
         continue
 
-# Read dev_mode directly from settings.json — importing from main.py would
-# re-run its module-level code and spawn a second terminal.
+# Read dev_mode directly: importing main.py would re-run its module code.
 _CFG = os.path.expanduser("~/.config/pixora/settings.json")
 try:
     with open(_CFG, "r") as _f:
@@ -92,7 +91,7 @@ def _ensure_log_file():
 
 def _log(level, color_code, msg):
     if not _DEV_MODE:
-        return  # no-op in normal mode
+        return
     frame = inspect.currentframe().f_back.f_back
     loc = f"{os.path.basename(frame.f_code.co_filename)}:{frame.f_lineno}"
     ts = datetime.datetime.now().strftime("%H:%M:%S")
@@ -117,8 +116,7 @@ def log_info(msg):  _log("INFO",  "36", msg)
 def log_warn(msg):  _log("WARN",  "33", msg)
 def log_error(msg): _log("ERROR", "1;31", msg)
 
-# Dev-mode: enable faulthandler so hangs/crashes produce thread stackdumps.
-# `kill -USR1 <pid>` dumps thread stacks on demand.
+# Dev-mode: faulthandler → thread stackdumps on hang. `kill -USR1 <pid>` dumps.
 if _DEV_MODE:
     import faulthandler
     try:
@@ -134,7 +132,7 @@ if _DEV_MODE:
     except Exception:
         faulthandler.enable(all_threads=True)
 
-# Catch uncaught exceptions so they surface with file:line + traceback.
+# Surface uncaught exceptions with file:line + traceback.
 if _DEV_MODE:
     import traceback
     def _excepthook(exc_type, exc_val, exc_tb):
@@ -186,17 +184,15 @@ WEBKIT_AVAILABLE = False
 WebKit2 = None
 _webkit_load_error = None
 
-# Ubuntu 24.04 AppArmor blocks unprivileged user namespaces → WebKit's
-# bwrap sandbox fails with "Permission denied". Disable before import.
+# Ubuntu 24.04 AppArmor blocks bwrap sandbox → disable before import.
 os.environ.setdefault("WEBKIT_DISABLE_SANDBOX", "1")
 os.environ.setdefault("WEBKIT_FORCE_SANDBOX", "0")
-# Force GPU compositing — in some VMs WebKit otherwise falls back to software.
+# Force GPU compositing — VMs otherwise fall back to software.
 os.environ.setdefault("WEBKIT_FORCE_COMPOSITING_MODE", "1")
 # EGL/DMA-BUF beats GLX in VMs (VMware SVGA3D).
 os.environ.setdefault("WEBKIT_USE_EGL", "1")
 os.environ.setdefault("GDK_GL", "gles")
-# JavaScriptCore uses SIGUSR1 (=10) for GC by default, which clobbers our
-# dev-mode faulthandler for `kill -USR1 <pid>`. Route JSC to SIGUSR2.
+# JSC uses SIGUSR1 for GC by default, clobbering our dev-mode faulthandler.
 os.environ.setdefault("JSC_SIGNAL_FOR_GC", "12")
 
 # Prefer WebKit 6.0 (GTK4-native), then WebKit2 4.1 / 4.0.
@@ -268,8 +264,7 @@ def get_logo_path(dark_mode):
     return os.path.join(ASSETS_DIR, f"pixora-logo-{'dark' if dark_mode else 'light'}.svg")
 
 def save_settings(settings):
-    # Atomic write + 0600: survives crash mid-write and is privacy-sensitive
-    # on multi-user machines (contains photo_path).
+    # Atomic 0600 write: crash-safe + private on multi-user boxes.
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     tmp = CONFIG_PATH + ".tmp"
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -288,8 +283,7 @@ def load_favorites():
     except FileNotFoundError:
         return set()
     except Exception:
-        # Corrupt file: back it up and start fresh instead of re-hitting the
-        # parse error on every launch.
+        # Corrupt file: back it up and start fresh.
         try:
             os.rename(FAVORITES_PATH, FAVORITES_PATH + ".corrupt")
         except Exception:
@@ -309,14 +303,9 @@ def save_favorites(favorites):
     except Exception:
         pass
 
-# Module-level lsblk cache. Both get_available_drives() and
-# get_mountpoint_for_uuid() hit the same JSON, so caching it once avoids
-# back-to-back 5-sec subprocess calls when Settings opens (both helpers
-# run during dialog construction).
+# Module-level lsblk cache: avoids back-to-back 5s subprocess calls on Settings open.
 _LSBLK_CACHE = {"ts": 0.0, "data": None}
-# 10s TTL covers burst-calls during Settings open and usually survives
-# between 8s drive-polls without a second subprocess. Polling forces a
-# refresh anyway, so the cache doesn't lie about attach/detach.
+# 10s TTL covers Settings burst; 8s drive-poll forces a refresh anyway.
 _LSBLK_CACHE_TTL = 10.0
 
 def _lsblk_fetch():
@@ -349,9 +338,7 @@ def _warm_lsblk_cache_async():
     threading.Thread(target=_lsblk_data, daemon=True).start()
 
 def get_available_drives():
-    """Return drives suitable as backup target: supported fstype, external
-    (hotplug/removable/USB/mounted under /media/, /run/media/, /mnt/), and
-    never a system partition (/, /boot, /home, /boot/efi, …)."""
+    """Return external drives suitable as backup target (never system partitions)."""
     drives = []
     SYS_MOUNTS = {"/", "/boot", "/boot/efi", "/home", "/var", "/usr", "/etc"}
     EXTERNAL_PREFIXES = ("/media/", "/run/media/", "/mnt/")
@@ -379,7 +366,7 @@ def get_available_drives():
         size       = device.get("size") or ""
         mountpoint = (device.get("mountpoint") or "").strip()
         if mountpoint in SYS_MOUNTS:
-            pass  # skip system partition but still recurse into children
+            pass  # skip but still recurse into children
         elif uuid and fstype in BACKUP_FSTYPES:
             if _is_external(mountpoint, hotplug, rm, tran) and uuid not in seen_uuids:
                 seen_uuids.add(uuid)
@@ -417,8 +404,7 @@ def format_date_header(dt):
     return f"{dt.day} {_(_MONTH_KEYS[dt.month])} {dt.year}"
 
 def format_viewer_date(dt):
-    # Use gettext for date formatting — strftime-locale requires en_US.UTF-8
-    # etc. to be installed system-wide. Bogus dates (<2000) → "unknown date".
+    # Use gettext, not strftime-locale (requires system-wide locales).
     if dt is None or dt.year < 2000:
         return _("Unknown date")
     return _("{month} {day}, {year}  {time}").format(
@@ -429,7 +415,7 @@ def format_viewer_date(dt):
     )
 
 
-# Metadata cache — avoids repeat EXIF/ffprobe calls on grid reload / map open.
+# Metadata cache: avoids repeat EXIF/ffprobe on reload/map-open.
 _METADATA_CACHE_PATH = os.path.expanduser("~/.cache/pixora/metadata.json")
 _metadata_cache = {
     "video_duration": {},
@@ -453,14 +439,13 @@ def _load_metadata_cache():
             v = data.get(k)
             if isinstance(v, dict):
                 _metadata_cache[k] = v
-        # Drop legacy geocode entries (empty values or pre-language key format).
+        # Drop legacy geocode entries (empty values or pre-lang key format).
         geo = _metadata_cache.get("geocode", {})
         pruned = {k: v for k, v in geo.items() if v and ":" in k}
         if len(pruned) != len(geo):
             _metadata_cache["geocode"] = pruned
             _metadata_dirty = True
-        # Prune stale file-based entries so the cache doesn't grow forever
-        # after deletes. Startup-only: O(N) stat calls, but once.
+        # Prune stale entries so the cache doesn't grow forever after deletes.
         for bucket in ("photo_date", "video_duration", "gps_coords"):
             entries = _metadata_cache.get(bucket, {})
             stale = [p for p in entries if not os.path.exists(p)]
@@ -468,8 +453,7 @@ def _load_metadata_cache():
                 entries.pop(p, None)
             if stale:
                 _metadata_dirty = True
-        # Geocode bucket: trim if too large. No access-timing available, so
-        # pseudo-LRU via dict insertion order (Py3.7+).
+        # Geocode bucket: pseudo-LRU trim via dict insertion order (Py3.7+).
         geo = _metadata_cache.get("geocode", {})
         if len(geo) > _METADATA_MAX_GEOCODE:
             keep = dict(list(geo.items())[-_METADATA_MAX_GEOCODE:])
@@ -503,8 +487,7 @@ def _cache_fresh(bucket, path):
         mtime = os.path.getmtime(path)
     except Exception:
         return None
-    # Exact mtime match — a 0.5s tolerance once gave stale data right after
-    # an edit, so we compare exactly.
+    # Exact mtime match — 0.5s tolerance once gave stale data post-edit.
     if entry.get("m") == mtime:
         return entry.get("v")
     return None
@@ -566,15 +549,13 @@ _geocode_failed_at = {}
 
 
 def reverse_geocode(lat, lon):
-    # Cache key includes language — same coords get different labels per lang
-    # ("Paris, France" / "Parijs, Frankrijk" / "Paris, Frankreich").
+    # Cache key includes language — same coords get different labels per lang.
     global _metadata_dirty
     key = f"{_lang}:{lat:.4f},{lon:.4f}"
     cached = _metadata_cache["geocode"].get(key)
     if cached:
         return cached
-    # Rate-limit retries after a failed lookup (30 min) so we don't burn
-    # 5s timeouts on every viewer open when offline.
+    # Rate-limit failed lookups (30 min) — avoids 5s timeouts when offline.
     last_fail = _geocode_failed_at.get(key, 0)
     if time.time() - last_fail < 1800:
         return ""
@@ -591,7 +572,7 @@ def reverse_geocode(lat, lon):
 def _reverse_geocode_raw(lat, lon):
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-        # Accept-Language returns city/country labels in the chosen Pixora lang.
+        # Accept-Language picks localized city/country labels.
         req = urllib.request.Request(url, headers={
             "User-Agent": "Pixora/1.0 (+https://github.com/Linux-Ginger/Pixora)",
             "Accept-Language": _lang,
@@ -713,7 +694,7 @@ def load_thumbnail(photo_path, thumb_size=None):
     os.makedirs(CACHE_DIR, exist_ok=True)
     if is_video(photo_path):
         try:
-            # Fixed height, width keeps aspect (-2 = divisible by 2).
+            # Fixed height; -2 = width divisible by 2.
             subprocess.run(
                 ["ffmpeg", "-i", photo_path, "-ss", "00:00:01", "-vframes", "1",
                  "-vf", f"scale=-2:{thumb_size}",
@@ -726,7 +707,7 @@ def load_thumbnail(photo_path, thumb_size=None):
     try:
         from PIL import Image, ImageOps
         with Image.open(photo_path) as img:
-            img = ImageOps.exif_transpose(img)  # honor EXIF orientation
+            img = ImageOps.exif_transpose(img)
             if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGB")
             w, h = img.size
@@ -769,16 +750,14 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
 
 class TimelineBar(Gtk.DrawingArea):
-    """Right-side timeline bar. Entries are (label, y_px, is_year); y_px is
-    the header's actual Y pixel in grid_box, mapped to the bar via max_scroll
-    (= adj.upper - adj.page_size) so positions stay in sync with scrolling."""
+    """Right-side timeline bar. Entries (label, y_px, is_year) stay in sync via max_scroll."""
     _ORANGE = (0.914, 0.329, 0.125)
 
     def __init__(self, scroll_cb, style_manager=None):
         super().__init__()
         self._scroll_cb    = scroll_cb
         self.style_manager = style_manager
-        self._entries      = []   # [(label, y_px, is_year), ...]  sorted by y_px
+        self._entries      = []   # [(label, y_px, is_year), ...] sorted by y_px
         self._active       = 0
         self._scroll_val   = 0.0
         self._max_scroll   = 1.0
@@ -906,9 +885,7 @@ class MapWidget(Gtk.Box):
         self.append(lbl)
 
     def _init_webview(self):
-        # Disable WebKit's bwrap sandbox before WebView creation — Ubuntu 24.04
-        # blocks unprivileged user namespaces, so bwrap crashes the process.
-        # AppArmor still protects the rest of the system.
+        # Disable bwrap sandbox before WebView creation (Ubuntu 24.04 AppArmor).
         network_session = None
         try:
             # WebKit 6.0 API
@@ -1234,12 +1211,10 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app, settings):
         super().__init__(application=app)
         self.settings        = settings
-        # Migration: pre-v1.16 installs had no backup_enabled flag; presence
-        # of backup_uuid implied backup-on.
+        # Pre-v1.16 migration: backup_uuid implied backup_enabled.
         if "backup_enabled" not in self.settings and self.settings.get("backup_uuid"):
             self.settings["backup_enabled"] = True
-        # Users who only `git pull` in .local/share/pixora never run updater.sh,
-        # so their .desktop still points at an old broken icon. Repair on startup.
+        # Repair .desktop on every start (git-pull users skip updater.sh).
         self._repair_desktop_entry()
         global THUMB_SIZE
         try:
@@ -1280,7 +1255,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_handle           = None   # 'tl','tr','bl','br','move'
         self._crop_rect_origin      = None   # rect state at drag start
         self._filmstrip_thumbs      = {}     # visual_pos -> pixbuf
-        self._filmstrip_view_order  = []     # list van self.photos-indices, nieuwste-eerst
+        self._filmstrip_view_order  = []     # self.photos indices, newest-first
         self._filmstrip_load_id     = 0
         self._filmstrip_order_cache = None   # (id(photos), len(photos), [sorted_indices])
         self._video_media           = None
@@ -1311,22 +1286,20 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_deduping  = False
         self._orphan_reviewing = False
         self._backup_scan_phase = 0.0
-        # Orphan state from the last scan: files on USB that aren't in Pixora.
-        # Used to warn after silent backup (e.g. user copied a dup folder).
+        # Orphan state: files on USB not in Pixora. Warn after silent backup.
         self._last_scan_orphan_count = 0
         self._last_scan_orphan_rels = []
         self._last_scan_backup_dest = None
         self._backup_scan_anim_id = None
         self._backup_scan_dialog_open = False
         self._manual_scan_requested = False
-        # Reorganize gate: blocks backup/sync while the popup/reorg runs and
-        # for 10s after. _reorganize_moving drives the progress donut.
+        # Reorganize gate: blocks backup/sync during + 10s after reorg.
         self._reorganize_active = False
         self._reorganize_block_until = 0.0
         self._reorganize_moving = False
         self._reorganize_fraction = 0.0
         self._reorganize_anim_id = None
-        # Fullscreen reorganize page: thread writes, timer renders.
+        # Fullscreen reorg page: thread writes, timer renders.
         self._reorganize_total_count = 0
         self._reorganize_done_count = 0
         self._reorganize_total_bytes = 0
@@ -1334,15 +1307,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_start_time = 0.0
         self._reorganize_current_name = ""
         self._reorganize_total_label = ""
-        # Silent-mode: auto-popup runs reorganize with no dialog and no
-        # fullscreen. Reset per-run so manual "Opruimen" always shows it.
+        # Silent-mode: auto-reorg with no dialog/fullscreen. Reset per-run.
         self._reorganize_silent_run = False
         self._video_paused_by_popup = False
         self._settings_dialog = None
         self._settings_stack = None
         self._settings_tabs_bar = None
-        # Structure-scan state: detects folders outside the chosen structure,
-        # works without a backup drive. Donut turns dark-blue (no backup ctx).
+        # Structure-scan: detects mis-placed folders. Donut → dark-blue.
         self._structure_scanning = False
         self._structure_startup_scanned = False
         self._structure_popup_dismissed = False
@@ -1457,22 +1428,15 @@ class MainWindow(Adw.ApplicationWindow):
         self.connect("close-request", self.on_close)
         GLib.idle_add(self._check_for_update)
         threading.Thread(target=self._start_services, daemon=True).start()
-        # Pre-warm drive cache so the first Settings/backup click doesn't
-        # pay a ~5s synchronous lsblk. Cheap on its own thread.
+        # Pre-warm drive cache so first Settings/backup click skips the 5s lsblk.
         _warm_lsblk_cache_async()
-        # Apply animation preference to every Gtk.Stack we just built. When
-        # animations are off, transition_duration(0) makes view switches
-        # snap instantly — helps on slow/VM renderers.
+        # Apply animation pref to every Gtk.Stack (0ms when disabled).
         self._apply_animations_state()
-        # Wait 5s so the startup-load burst doesn't poison the sample, then
-        # check renderer + frame-timing. Shows a one-time popup if the app
-        # appears slow.
+        # 5s delay: skip startup-load burst, then check renderer + frame-timing.
         GLib.timeout_add_seconds(5, self._start_perf_check)
-        # Same 5s mark as "startup survived" — clears main.py's crash-
-        # recovery marker so a non-auto gsk_renderer keeps being applied.
+        # 5s = "startup survived" → clears main.py's crash-recovery marker.
         GLib.timeout_add_seconds(5, self._clear_gsk_pending)
-        # If main.py just reverted a crashing renderer, tell the user
-        # (once) and clear the flag.
+        # If main.py reverted a crashing renderer, notify user once.
         if self.settings.get("gsk_recent_crash"):
             GLib.idle_add(self._show_gsk_recovery_popup)
         self._ios_device_present = False
@@ -1485,19 +1449,14 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add_seconds(8, self._poll_backup_drive)
         GLib.idle_add(self._check_pending_backup)
         GLib.timeout_add_seconds(300, self._periodic_scan)
-        # Periodic save — otherwise a crash loses all cache work since startup.
+        # Periodic save — otherwise a crash loses all cache work.
         def _periodic_save_cache():
             save_metadata_cache()
-            return True  # keep repeating
+            return True
         GLib.timeout_add_seconds(300, _periodic_save_cache)
 
     def _clear_gsk_pending(self):
-        """Signals main.py's crash-recovery that the current gsk_renderer
-        choice booted successfully. Missing file → next run assumes crash
-        and reverts to 'auto'.
-
-        Also un-blacklist the current renderer — if it survived 5s it's
-        working right now, so the dropdown should stop warning."""
+        """Signal main.py that the current gsk_renderer booted OK and un-blacklist it."""
         try:
             path = os.path.expanduser("~/.cache/pixora/.gsk_pending")
             if os.path.exists(path):
@@ -1517,7 +1476,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_gsk_recovery_popup(self):
         renderer = self.settings.get("gsk_recent_crash", "")
-        # Clear the flag immediately so a refresh/re-open doesn't re-show.
+        # Clear flag immediately so a refresh doesn't re-show it.
         self.settings["gsk_recent_crash"] = ""
         try:
             save_settings(self.settings)
@@ -1543,10 +1502,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _set_toolbars_revealed(self, visible):
-        """Adw.ToolbarView has no reveal-duration API, so when animations
-        are off we skip set_reveal_*_bars entirely — the caller has already
-        hidden the header/bottom individually, which collapses the bars
-        to zero height instantly."""
+        """Skip reveal API when animations off; caller already hid header/bottom."""
         enabled = bool(self.settings.get("animations_enabled", True))
         if not enabled:
             return
@@ -1557,13 +1513,9 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _apply_animations_state(self):
-        """Gate the Adwaita transition-durations on the user's preference.
-        When animations are off we set every stack to 0ms so view-swaps
-        are instant — big difference on VM/software-rendered GTK."""
+        """Gate Adwaita transition-durations on user preference; 0ms when off."""
         enabled = bool(self.settings.get("animations_enabled", True))
-        # GTK-wide switch — when False, ALL default CSS transitions are
-        # disabled (button hover outline, focus ring fades, etc.). Our
-        # explicit per-stack durations are still honored when True.
+        # GTK-wide switch kills ALL default CSS transitions when False.
         try:
             gtk_settings = Gtk.Settings.get_default()
             if gtk_settings is not None:
@@ -1579,8 +1531,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.content_stack.set_transition_duration(content_d)
         if hasattr(self, "bottom_stack"):
             self.bottom_stack.set_transition_duration(bottom_d)
-        # If Settings is open right now, its tab-switch stack needs a live
-        # update too — toggling the switch should take effect immediately.
+        # If Settings is open, live-update its tab-switch stack too.
         stack = getattr(self, "_settings_stack", None)
         if stack is not None:
             try:
@@ -1591,8 +1542,7 @@ class MainWindow(Adw.ApplicationWindow):
                 )
             except Exception:
                 pass
-        # Toggle the CSS class that disables hover/active transforms on
-        # the settings-tab bar.
+        # Toggle the CSS class disabling hover/active transforms on the tab bar.
         bar = getattr(self, "_settings_tabs_bar", None)
         if bar is not None:
             try:
@@ -1602,14 +1552,10 @@ class MainWindow(Adw.ApplicationWindow):
                     bar.add_css_class("no-anim")
             except Exception:
                 pass
-        # The viewer_stack (between photos) reads animations_enabled in
-        # _show_full_photo each time, so it doesn't need a live push.
+        # viewer_stack re-reads animations_enabled each swap — no live push needed.
 
     def _start_perf_check(self):
-        """Two detection passes that share one popup:
-          1) GSK renderer = Cairo (pure software fallback) — instant flag.
-          2) Passive frame-timing over 30s — catches VMware-LLVMpipe-etc.
-        Either hit → popup unless user already dismissed."""
+        """Detect slow render: Cairo renderer OR slow frame-timing over 30s."""
         if self.settings.get("perf_warning_dismissed"):
             return False
         try:
@@ -1633,7 +1579,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _perf_sample(self, widget, frame_clock):
         if self.settings.get("perf_warning_dismissed"):
-            return False  # stop; user already said no-thanks
+            return False
         try:
             t = frame_clock.get_frame_time()
         except Exception:
@@ -1646,13 +1592,13 @@ class MainWindow(Adw.ApplicationWindow):
                 self._perf_frame_times[i] - self._perf_frame_times[i - 1]
                 for i in range(1, len(self._perf_frame_times))
             ]
-            # 33_000 µs = 33ms = below 30fps. Count those as "slow frames".
+            # >33ms = below 30fps = "slow frame".
             slow = sum(1 for d in durations if d > 33_000)
             if slow / len(durations) > 0.6:
                 self._show_perf_warning_popup()
                 self._stop_perf_sampling()
                 return False
-        return True  # keep sampling
+        return True
 
     def _stop_perf_sampling(self):
         tid = getattr(self, "_perf_tick_id", None)
@@ -1747,7 +1693,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _iphone_recovery_flow(self):
-        """Fully automatic recovery: first check, then reset usbmuxd on fail."""
+        """Auto recovery: check first, reset usbmuxd on fail."""
         has_device = self._idevice_check()
         if has_device:
             log_info(_("iPhone directly recognised by usbmuxd"))
@@ -1818,8 +1764,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _poll_import_device(self):
-        # Don't poll while importer is open — interferes with libimobiledevice
-        # pair/mount.
+        # Skip while importer open (conflicts with libimobiledevice pair/mount).
         try:
             if self.main_stack.get_visible_child_name() == "importer":
                 return True
@@ -1864,7 +1809,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _prewarm_gstreamer(self):
-        """Initialize GStreamer in background so first video opens fast."""
+        """Init GStreamer in background so first video opens fast."""
         try:
             import gi
             gi.require_version("Gst", "1.0")
@@ -1888,16 +1833,16 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _update_splash(self):
         elapsed = time.time() - self._splash_start
-        min_time = 2.0   # always show at least 2 seconds
-        max_time = 30.0  # hard cap
+        min_time = 2.0
+        max_time = 30.0
         if self._splash_prewarm_done:
-            # fill up progress bar quickly then close
+            # Fill bar quickly then close.
             self._splash_bar.set_fraction(min(elapsed / min_time, 1.0))
             if elapsed >= min_time:
                 self._splash.set_visible(False)
                 return False
         else:
-            # pulse toward ~80%, reserve last 20% for when prewarm completes
+            # Pulse toward ~80%; last 20% reserved for prewarm completion.
             self._splash_bar.set_fraction(min(elapsed / max_time * 0.8, 0.8))
             if elapsed >= max_time:
                 self._splash.set_visible(False)
@@ -1917,8 +1862,7 @@ class MainWindow(Adw.ApplicationWindow):
                 return
             with open(local_version_file) as f:
                 local_version = f.read().strip()
-            # Cache-bust: raw.githubusercontent.com is Fastly-cached ~5 min
-            # → unique query-string forces a fresh fetch.
+            # Cache-bust: raw.githubusercontent.com is Fastly-cached ~5 min.
             req = urllib.request.Request(
                 f"https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt?t={int(time.time())}",
                 headers={
@@ -1936,7 +1880,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _maybe_show_update_popup(self):
-        """Defer update popup until home page has been visible ≥2s, else retry."""
+        """Defer until home page has been visible ≥2s."""
         if self._update_dialog_shown or not self._pending_update_version:
             return False
         ready_at = getattr(self, "_home_ready_at", None)
@@ -1970,8 +1914,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._open_installer()
 
     def _repair_desktop_entry(self):
-        """Rewrite ~/.local/share/applications/pixora.desktop if its Icon=
-        path is stale. Silent — a failure here must never block startup."""
+        """Rewrite pixora.desktop if stale. Silent — never blocks startup."""
         try:
             install_dir = os.path.expanduser("~/.local/share/pixora")
             icon = os.path.join(install_dir, "assets", "logos", "pixora-icon.svg")
@@ -1979,7 +1922,7 @@ class MainWindow(Adw.ApplicationWindow):
             desktop_dir = os.path.expanduser("~/.local/share/applications")
             desktop = os.path.join(desktop_dir, "pixora.desktop")
             if not os.path.exists(icon) or not os.path.exists(launcher):
-                return  # running from dev-tree or not installed
+                return  # dev-tree or not installed
             needs_write = True
             if os.path.exists(desktop):
                 try:
@@ -1987,8 +1930,7 @@ class MainWindow(Adw.ApplicationWindow):
                         content_existing = _df.read()
                     icon_ok = f"Icon={icon}" in content_existing and os.path.exists(icon)
                     wm_ok = "StartupWMClass=com.linuxginger.pixora" in content_existing
-                    # StartupNotify=true triggers GNOME "Pixora is ready"
-                    # notifications on every present(); must be absent.
+                    # StartupNotify=true triggers GNOME "ready" notifications; must be absent.
                     startup_notify_ok = "StartupNotify=true" not in content_existing
                     if icon_ok and wm_ok and startup_notify_ok:
                         needs_write = False
@@ -2039,15 +1981,11 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_error(_("GUI updater failed to start: {err}").format(err=e))
             return
-        # Use on_close (with its 2s force-exit fallback) instead of app.quit()
-        # — the latter leaves non-daemon threads + WebKit subprocess hanging,
-        # keeping Pixora as a zombie that blocks future launches.
+        # Use on_close, not app.quit(): quit leaks WebKit subprocess into a zombie.
         GLib.idle_add(self.close)
 
     def _on_open_github(self, btn):
-        # subprocess.Popen + DEVNULL + start_new_session — browsers spam
-        # GTK warnings to stderr otherwise, and we don't want the browser
-        # tied to Pixora's lifetime.
+        # DEVNULL + start_new_session: silence browser stderr and detach lifetime.
         try:
             subprocess.Popen(
                 ["xdg-open", "https://github.com/Linux-Ginger/Pixora"],
@@ -2155,8 +2093,7 @@ class MainWindow(Adw.ApplicationWindow):
         win.present()
 
     def _license_summary_col(self, title, icon_char, css_class, items):
-        """icon_char is Unicode (✓ / ! / ✗) so it doesn't depend on icon-themes
-        and still renders in monospace fallback."""
+        """Unicode icon_char avoids icon-theme dependency."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         badge = Gtk.Label(label=icon_char)
@@ -2226,7 +2163,7 @@ class MainWindow(Adw.ApplicationWindow):
                     _("New version available — click to update")
                 )
                 self._update_btn_stack.set_visible_child_name("available")
-                # Pulse: alternate icon/label every 1.5s.
+                # Pulse icon/label every 1.5s.
                 self._update_pulse_on = True
                 self._update_check_pulse_id = GLib.timeout_add(
                     1500, self._update_pulse_tick
@@ -2244,8 +2181,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self._update_check_state != "available":
             self._update_check_pulse_id = None
             return False
-        # Stop once settings dialog closed — calling set_visible_child_name on
-        # a widget without a root raises Gtk-CRITICAL.
+        # Stop once settings closed (set_visible_child_name on rootless widget → Gtk-CRITICAL).
         try:
             if self._update_check_btn.get_root() is None:
                 self._update_check_pulse_id = None
@@ -2289,7 +2225,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._settings_update_result, local_version, remote_version)
 
     def _settings_update_result(self, local_version, remote_version):
-        # Dialog may have closed meanwhile → widgets disposed.
+        # Dialog may have closed → widgets disposed.
         try:
             if remote_version is None:
                 self._update_check_row.set_subtitle(_("Check failed"))
@@ -2353,14 +2289,13 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def on_close(self, window):
-        # An open settings dialog blocks the main window's close-request
-        # ("Close N windows" from GNOME Shell) — close it first.
+        # Open settings blocks close-request from GNOME Shell; close it first.
         if self._settings_dialog is not None:
             try:
                 self._settings_dialog.close()
             except Exception:
                 pass
-        # Guard against closing during backup/reorganize — ask to confirm.
+        # Confirm close during backup/reorganize.
         if not getattr(self, "_close_confirmed", False):
             if self._backup_running:
                 body = _("Pixora is backing up to your USB drive. Closing now will interrupt the backup.")
@@ -2381,9 +2316,9 @@ class MainWindow(Adw.ApplicationWindow):
                 dlg.set_default_response("cancel")
                 dlg.connect("response", self._on_close_guard_response)
                 self._present_dialog(dlg)
-                return True  # cancel close; dialog decides
+                return True  # dialog decides
         log_info(_("Pixora shutting down — cleaning up…"))
-        # Kill rsync cleanly so the backup actually stops instead of hanging.
+        # Kill rsync cleanly so backup stops instead of hanging.
         if self._backup_running and self._backup_proc is not None:
             try:
                 self._backup_proc.kill()
@@ -2395,8 +2330,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._filmstrip_load_id += 1
         except Exception:
             pass
-        # Cancel ALL GLib timers BEFORE tearing down state — otherwise a timer
-        # firing mid-cleanup crashes on a None / missing attribute.
+        # Cancel ALL GLib timers BEFORE teardown — stray fire would crash.
         for attr in ("_favorites_save_id", "_sort_timer", "_fade_timer_id",
                      "_fade_anim_id", "_preview_debounce_id",
                      "_video_seek_pending_id", "_video_poll_id",
@@ -2422,7 +2356,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._udev_client = None
         except Exception:
             pass
-        # Stop video + MediaFile explicitly so GStreamer threads release.
+        # Stop video + MediaFile so GStreamer threads release.
         try:
             self._stop_video()
             if getattr(self, "_video_media", None):
@@ -2433,7 +2367,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self._video_media = None
         except Exception:
             pass
-        # Release big structures so RAM frees promptly.
+        # Release big structures so RAM frees.
         try:
             self.photos = []
             self._filmstrip_order_cache = None
@@ -2461,7 +2395,7 @@ class MainWindow(Adw.ApplicationWindow):
             _main_mod.kill_dev_terminal()
         except Exception:
             pass
-        # Truncate dev log so the next session starts fresh.
+        # Truncate dev log for fresh next session.
         global _LOG_FILE
         try:
             if _LOG_FILE:
@@ -2474,8 +2408,7 @@ class MainWindow(Adw.ApplicationWindow):
                 open(_LOG_PATH, "w").close()
         except Exception:
             pass
-        # Force exit after 2s — lingering non-daemon threads (GStreamer, PIL,
-        # gvfs-workers) otherwise keep the process in memory.
+        # Force-exit 2s: GStreamer/PIL/gvfs threads otherwise keep the proc alive.
         def _force_exit():
             try:
                 print(_("Pixora process forcing exit (lingering threads)"), flush=True)
@@ -2553,8 +2486,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_btn.connect("clicked", self.on_settings_clicked)
         self.header.pack_end(self.settings_btn)
 
-        # Backup-progress donut — hidden until backup is active. Wrapped in
-        # a Gtk.Button so hover/click works and opens the details popover.
+        # Backup-progress donut; wrapped in a Button so hover/click opens popover.
         self._backup_donut = Gtk.DrawingArea()
         self._backup_donut.set_size_request(24, 24)
         self._backup_donut.set_valign(Gtk.Align.CENTER)
@@ -2575,7 +2507,7 @@ class MainWindow(Adw.ApplicationWindow):
         outer.set_vexpand(True)
         outer.set_hexpand(True)
 
-        # Filter-info banner (visible when a cluster filter is active)
+        # Filter-info banner (visible on active cluster filter).
         self.filter_info_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         self.filter_info_bar.add_css_class("toolbar")
         self.filter_info_bar.set_margin_top(8)
@@ -2749,8 +2681,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         markers = []
         seen_paths = set()
-        # Live Photos are HEIC+MOV pairs with identical GPS — dedup on
-        # (lat, lon, stem) so one "photo moment" doesn't count twice.
+        # Live Photos are HEIC+MOV pairs → dedup on (lat, lon, stem).
         grouped = {}  # key → (lat, lon, filename, datum, [paths])
         with ThreadPoolExecutor(max_workers=8) as pool:
             for result in pool.map(scan_one, self.photos):
@@ -2761,7 +2692,7 @@ class MainWindow(Adw.ApplicationWindow):
                     continue
                 seen_paths.add(path)
                 stem = os.path.splitext(filename)[0].lower()
-                # 6-decimal round (~10cm) matches Live Photo pairs exactly.
+                # 6-decimal (~10cm) matches Live Photo pairs exactly.
                 key = (round(lat, 6), round(lon, 6), stem)
                 if key in grouped:
                     grouped[key][4].append(path)
@@ -2792,7 +2723,7 @@ class MainWindow(Adw.ApplicationWindow):
             status_cb=self._on_map_status
         )
         self.map_content.append(self._map_widget)
-        # Wait for map-ready status callback; 12s fallback prevents hang.
+        # Wait for map-ready; 12s fallback prevents hang.
         self._map_ready_fallback_id = GLib.timeout_add_seconds(
             12, self._on_map_ready_timeout
         )
@@ -2815,8 +2746,7 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 pass
         elif status == "offline":
-            # Show the map anyway — map.html's JS banner explains the tile
-            # failure, and markers remain visible.
+            # Show map anyway; map.html's JS banner explains tile failure.
             if getattr(self, "_map_ready_fallback_id", None):
                 try:
                     GLib.source_remove(self._map_ready_fallback_id)
@@ -2852,18 +2782,18 @@ class MainWindow(Adw.ApplicationWindow):
             index = self.photos.index(valid[0])
             GLib.idle_add(self.open_photo, index)
         else:
-            # Cluster click: filter grid to those photos.
+            # Cluster click → filter grid.
             self._photos_before_cluster = self.photos
             self.photos = valid
             self._filmstrip_order_cache = None
-            # Compute date range for the info banner.
+            # Date range for the info banner.
             date_range = ""
             try:
                 dates = []
                 for p in valid:
                     try:
                         mt = os.path.getmtime(p)
-                        # Filter epoch-0 / pre-2000 mtimes to avoid "1 Jan 1970".
+                        # Filter pre-2000 mtimes to avoid "1 Jan 1970".
                         if mt > 0 and mt >= 946684800:
                             dates.append(mt)
                     except Exception:
@@ -2883,8 +2813,7 @@ class MainWindow(Adw.ApplicationWindow):
 
             loc = self._photo_location.get(valid[0], "")
             if not loc:
-                # Not yet cached → trigger async lookup so the banner may
-                # get the resolved location later.
+                # Not cached → async lookup may resolve later.
                 threading.Thread(
                     target=self._fetch_cluster_location,
                     args=(valid[0],),
@@ -2903,7 +2832,7 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self.start_load)
 
     def _fetch_cluster_location(self, sample_path):
-        """Async reverse-geocode for the cluster filter label."""
+        """Async geocode for cluster-filter label."""
         try:
             if is_video(sample_path):
                 coords = get_video_gps_coords(sample_path)
@@ -2919,7 +2848,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _apply_cluster_location(self, loc):
-        # Only apply while the filter bar is still visible (user may have ✕'d).
+        # Only apply while filter bar visible (user may have ✕'d).
         try:
             if self.filter_info_bar.get_visible():
                 self.filter_title_lbl.set_text(loc)
@@ -2970,10 +2899,8 @@ class MainWindow(Adw.ApplicationWindow):
         bg.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         viewer_area.set_child(bg)
 
-        # Two Picture widgets inside a Gtk.Stack so next/prev navigation
-        # can slide the old photo out and the new one in. self.photo_picture
-        # always aliases the currently-visible slot; _show_full_photo swaps
-        # the pointer when it flips the stack's visible child.
+        # Two Pictures in a Stack so next/prev can slide. photo_picture
+        # aliases the visible slot; _show_full_photo swaps the pointer.
         self._viewer_pic_a = Gtk.Picture()
         self._viewer_pic_a.set_content_fit(Gtk.ContentFit.CONTAIN)
         self._viewer_pic_a.set_vexpand(True)
@@ -3041,9 +2968,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.edit_btn.connect("clicked", self.on_edit_current)
         viewer_area.add_overlay(self.edit_btn)
 
-        # Viewer-overlay donut mirrors the header donut so backup progress is
-        # visible while viewing photos (header is hidden then). Shares
-        # _draw_backup_donut and state so both stay in sync.
+        # Viewer-overlay donut mirrors header donut; shares state.
         self._viewer_donut = Gtk.DrawingArea()
         self._viewer_donut.set_size_request(24, 24)
         self._viewer_donut.set_draw_func(self._draw_backup_donut)
@@ -3053,7 +2978,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_donut_btn.set_child(self._viewer_donut)
         self._viewer_donut_btn.set_halign(Gtk.Align.END)
         self._viewer_donut_btn.set_valign(Gtk.Align.START)
-        # Positioned below the delete button (margin_end=68, top=16+40+8).
+        # Below the delete button (margin_end=68, top=16+40+8).
         self._viewer_donut_btn.set_margin_top(64)
         self._viewer_donut_btn.set_margin_end(68)
         self._viewer_donut_btn.set_size_request(40, 40)
@@ -3080,7 +3005,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         viewer_area.add_overlay(self.favorite_btn)
 
-        # Editor toolbar (hidden until editor mode).
+        # Editor toolbar (hidden until editor mode opens).
         self.editor_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.editor_bar.set_halign(Gtk.Align.CENTER)
         self.editor_bar.set_valign(Gtk.Align.END)
@@ -3331,8 +3256,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.filmstrip_area = Gtk.DrawingArea()
         self.filmstrip_area.set_draw_func(self._draw_filmstrip)
         self.filmstrip_area.set_size_request(FILM_THUMB + 4, FILM_THUMB + 8)
-        # halign=START so a narrow filmstrip (small library) doesn't center
-        # inside the viewport — thumb 1 stays pinned to the left edge.
+        # halign=START: narrow filmstrip stays left-pinned.
         self.filmstrip_area.set_halign(Gtk.Align.START)
 
         film_click = Gtk.GestureClick()
@@ -3387,9 +3311,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._selected.clear()
         if self._select_mode:
             self.select_btn.set_label(_("Cancel"))
-            # .flat keeps the bg transparent; combined with .suggested-action
-            # that paints text white, text becomes white-on-transparent.
-            # Drop .flat while suggested is active.
+            # Drop .flat so .suggested-action can paint its colored bg.
             self.select_btn.remove_css_class("flat")
             self.select_btn.add_css_class("suggested-action")
             self.bottom_stack.set_visible_child_name("select")
@@ -3414,7 +3336,7 @@ class MainWindow(Adw.ApplicationWindow):
             tc = self._thumb_css
             overlay = btn.get_child()
             if not isinstance(overlay, Gtk.Overlay):
-                # Wrap the picture in an overlay so we can add check_box.
+                # Wrap picture in overlay to host check_box.
                 picture = btn.get_child()
                 btn.set_child(None)
                 overlay = Gtk.Overlay()
@@ -3448,8 +3370,7 @@ class MainWindow(Adw.ApplicationWindow):
             log_warn(_("load_photos: photo_path empty or missing — empty state"))
             self.show_empty_state()
             return False
-        # os.walk over 2000+ files freezes the splash spinner if it runs on
-        # the main loop — push it to a thread and finish on idle_add.
+        # os.walk on 2000+ files blocks splash spinner — push to thread.
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
         self.spinner_label.set_text(_("Sorting photos…"))
@@ -3534,13 +3455,11 @@ class MainWindow(Adw.ApplicationWindow):
     def _group_by_date(self, photos):
         groups = defaultdict(list)
         UNKNOWN = datetime.date.min  # sentinel for bogus dates
-        # Must use the same date source as apply_sort / filmstrip (EXIF then
-        # mtime). Mismatch would desync grid position with self.photos index,
-        # breaking the viewer counter.
+        # Must use same date source as filmstrip — mismatch would desync indices.
         for i, path in enumerate(photos):
             try:
                 ts = get_photo_date(path)
-                if ts <= 0 or ts < 946684800:  # < Jan 1 2000 = bogus
+                if ts <= 0 or ts < 946684800:  # pre-2000 = bogus
                     dt = UNKNOWN
                 else:
                     dt = datetime.datetime.fromtimestamp(ts).date()
@@ -3629,7 +3548,7 @@ class MainWindow(Adw.ApplicationWindow):
                 w = 0
         if w <= 0:
             w = 1280
-        # marge + scrollbar-reserve
+        # margin + scrollbar reserve
         return max(200, w - 40)
 
     def _append_thumb_to_row(self, btn, thumb_width):
@@ -3673,8 +3592,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not hasattr(self, "_hydrated_indices"):
             self._hydrated_indices = set()
         want = set()
-        # thumb_widgets insertion-order matches grid top-to-bottom, so we can
-        # bail out after the visible range instead of checking all 2000 thumbs.
+        # Insertion-order = grid top-to-bottom; bail after visible range.
         seen_visible = False
         for index, (btn, _check) in self.thumb_widgets.items():
             if not hasattr(btn, "_pixora_cache_path"):
@@ -3775,7 +3693,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.spinner_label.set_text(
             _("Loading photos… {loaded} / {total}").format(loaded=loaded, total=total)
         )
-        # Shared CSS providers — created once, reused per thumbnail.
+        # Shared CSS providers: created once, reused per thumb.
         if not hasattr(self, '_thumb_css'):
             tc = {}
             p = Gtk.CssProvider()
@@ -3882,7 +3800,7 @@ class MainWindow(Adw.ApplicationWindow):
             btn._fav_badge = fav_badge
             self._append_thumb_to_row(btn, width_at_thumb)
             # check_box lazily created when selection mode enters.
-            self.thumb_widgets[index] = (btn, None)
+            self.thumb_widgets[index] = (btn, None)  # check_box lazy
         self._schedule_viewport_hydrate()
         return False
 
@@ -3939,8 +3857,7 @@ class MainWindow(Adw.ApplicationWindow):
             log_info(_("Failed to save sort_index: {e}").format(e=e))
         if not self.photos:
             return
-        # Show the loading state instantly so the user never stares at a
-        # frozen grid during the debounce + background sort.
+        # Show loading state so the grid doesn't look frozen during sort.
         self.content_stack.set_visible_child_name("loading")
         self.spinner.start()
         self.spinner_label.set_text(_("Sorting..."))
@@ -3972,7 +3889,7 @@ class MainWindow(Adw.ApplicationWindow):
         kind = _("video") if is_video(path) else _("photo")
         log_info(_("open_photo: {kind} idx={i} path={p}").format(kind=kind, i=index, p=path))
         self.current_index = index
-        # First-open = no nav direction → crossfade, not slide.
+        # First-open: no nav direction → crossfade.
         self._nav_direction = None
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
@@ -3993,11 +3910,7 @@ class MainWindow(Adw.ApplicationWindow):
         ).start()
 
     def _determine_initial_location(self, path):
-        """Returns (label, coords_for_geocode):
-          cached → (city, None): show immediately, no spinner.
-          EXIF   → ("", coords): show spinner, async lookup.
-          none   → ("", None): nothing to show.
-        Caches "" for GPS-less photos older than 30s to skip re-parsing EXIF."""
+        """Return (label, coords_for_geocode); caches "" for GPS-less photos."""
         cached = self._photo_location.get(path)
         if cached:
             return cached, None
@@ -4015,7 +3928,7 @@ class MainWindow(Adw.ApplicationWindow):
         return "", None
 
     def _set_viewer_location(self, state, text=""):
-        """state ∈ {'empty', 'searching', 'done'}."""
+        """state: empty|searching|done."""
         try:
             if state == "searching":
                 self.viewer_location_spinner.start()
@@ -4036,8 +3949,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _start_geocode_upgrade(self, path, coords, load_id):
-        """Async reverse-geocode; falls back to raw coords so the spinner
-        never gets stuck on failure (offline/timeout)."""
+        """Async geocode; falls back to raw coords on failure."""
         def _bg():
             city = reverse_geocode(coords[0], coords[1])
             if city:
@@ -4045,7 +3957,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self._photo_location[path] = city
             else:
                 resolved = f"📍 {coords[0]:.4f}, {coords[1]:.4f}"
-                # Don't cache — retry once internet comes back.
+                # Don't cache — retry when online.
             if load_id == self._viewer_load_id:
                 GLib.idle_add(self._update_viewer_location, resolved, load_id)
         threading.Thread(target=_bg, daemon=True).start()
@@ -4081,7 +3993,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._start_geocode_upgrade(path, coords, load_id)
 
     def _update_viewer_location(self, text, load_id):
-        # Guard against stale callbacks when user has already navigated.
+        # Guard against stale callbacks after nav.
         if load_id != self._viewer_load_id:
             return False
         self._set_viewer_location("done", text)
@@ -4089,12 +4001,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_full_photo(self, pixbuf, path, location="", searching=False):
         self._stop_video()
-        self._show_viewer_ui()   # reset opacity/visibility from any prior fade
+        self._show_viewer_ui()   # reset fade state
         self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
-        # Put the new pixbuf in the INACTIVE slot, then flip the stack so
-        # the old photo slides out and the new one slides in from the
-        # matching side.
+        # Put new pixbuf in inactive slot, then flip stack for slide.
         incoming_slot = "b" if self._active_viewer_slot == "a" else "a"
         incoming_pic = (self._viewer_pic_b if incoming_slot == "b"
                         else self._viewer_pic_a)
@@ -4107,7 +4017,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_pixbuf = pixbuf
         if pixbuf:
             incoming_pic.set_pixbuf(pixbuf)
-        # Pick transition type from nav direction + the animations toggle.
+        # Transition type from nav direction + animations toggle.
         anim_on = bool(self.settings.get("animations_enabled", True))
         if not anim_on:
             self._viewer_stack.set_transition_duration(0)
@@ -4169,11 +4079,10 @@ class MainWindow(Adw.ApplicationWindow):
             self._schedule_photo_load()
 
     def _schedule_photo_load(self):
-        """Cache hit → show immediately; miss → thumbnail placeholder + async."""
+        """Cache hit → instant; miss → thumbnail placeholder + async."""
         self._viewer_load_id += 1
         load_id = self._viewer_load_id
-        # Update counter / prev-next immediately so arrow-key-held navigation
-        # shows "X / N" in real time even when photo loads lag behind.
+        # Update counter immediately so held-arrow shows X/N in real time.
         try:
             self.viewer_counter.set_text(
                 f"{self.current_index + 1} / {len(self.photos)}"
@@ -4196,13 +4105,12 @@ class MainWindow(Adw.ApplicationWindow):
             return
         path = self.photos[self.current_index]
 
-        # Cache hit (preloaded) → show instantly, no debounce.
+        # Cache hit → show instantly, no debounce.
         if not is_video(path):
             cached = self._viewer_pixbuf_cache.get(path)
             if cached is not None:
                 self._viewer_pixbuf_cache.move_to_end(path)
-                # Still resolve location here — without it, the location
-                # label disappeared when prev/next'ing through preloaded photos.
+                # Resolve location — else label vanishes on prev/next through cached photos.
                 initial, coords = self._determine_initial_location(path)
                 self._show_full_photo(cached, path, initial, searching=bool(coords))
                 if coords:
@@ -4210,7 +4118,7 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._preload_adjacent_photos)
                 return
 
-        # Cache miss: show the thumbnail as instant placeholder.
+        # Cache miss: show thumbnail as placeholder.
         try:
             thumb_path = get_cache_path(path, THUMB_SIZE)
             if os.path.exists(thumb_path):
@@ -4262,8 +4170,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
         self._set_toolbars_revealed(True)
-        # Don't clear the cluster filter here — user is still in a filtered
-        # grid; the ✕ on the info-banner is how they exit it.
+        # Don't clear cluster filter — the banner ✕ is how user exits.
         self.main_stack.set_visible_child_name("grid")
         GLib.idle_add(self._close_viewer_cleanup)
 
@@ -4277,14 +4184,11 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _update_filmstrip(self):
-        """Filmstrip always shows newest-left → oldest-right, independent of
-        grid sort — left = newer / right = older is more intuitive in viewer."""
+        """Filmstrip is always newest-left → oldest-right, regardless of grid sort."""
         n = len(self.photos)
         w = n * (FILM_THUMB + 4)
         self.filmstrip_area.set_size_request(max(w, FILM_THUMB + 4), FILM_THUMB + 8)
-        # Memoized view-order: avoid O(n log n) re-sort on every open_photo click.
-        # Cache key = (id(self.photos), len(self.photos)); invalidated to None on
-        # any self.photos replacement (see invalidation sites).
+        # Memoized view-order; invalidated when self.photos is replaced.
         cache = self._filmstrip_order_cache
         if cache is not None and cache[0] == id(self.photos) and cache[1] == n:
             self._filmstrip_view_order = cache[2]
@@ -4309,7 +4213,7 @@ class MainWindow(Adw.ApplicationWindow):
         n = len(view_order)
         if n == 0:
             return
-        # Load outward from the visible position (current_index in view_order).
+        # Load outward from current visible position.
         try:
             center = view_order.index(self.current_index)
         except ValueError:
@@ -4370,7 +4274,7 @@ class MainWindow(Adw.ApplicationWindow):
         cr.set_source_rgba(0, 0, 0, 0.65)
         cr.rectangle(0, 0, width, height)
         cr.fill()
-        # Only draw visible items.
+        # Draw visible items only.
         adj = self.filmstrip_scroll.get_hadjustment()
         scroll_x = adj.get_value() if adj else 0
         visible_w = adj.get_page_size() if adj else width
@@ -4400,7 +4304,7 @@ class MainWindow(Adw.ApplicationWindow):
                 cr.set_source_rgba(0.3, 0.3, 0.3, 1.0)
                 self._film_rounded_rect(cr, x, y, FILM_THUMB, FILM_THUMB, 6)
                 cr.fill()
-            # video: draw play triangle
+            # Video: play triangle overlay.
             if 0 <= photo_idx < len(self.photos) and is_video(self.photos[photo_idx]):
                 cx = x + FILM_THUMB // 2
                 cy = y + FILM_THUMB // 2
@@ -4413,7 +4317,7 @@ class MainWindow(Adw.ApplicationWindow):
                 cr.line_to(cx + 9, cy)
                 cr.close_path()
                 cr.fill()
-            # highlight current with orange rounded border
+            # Highlight current with orange rounded border.
             if vp == current_visual:
                 cr.set_source_rgba(0.914, 0.329, 0.125, 1.0)
                 cr.set_line_width(3)
@@ -4439,9 +4343,7 @@ class MainWindow(Adw.ApplicationWindow):
                 ).start()
 
     def _scroll_filmstrip_to_current(self):
-        """Center current photo in filmstrip; the clamp keeps first/last at
-        the edges instead of forcing them to center. Animated slide when
-        animations are enabled, instant otherwise."""
+        """Center current photo; clamp keeps first/last at edges."""
         cell = FILM_THUMB + 4
         adj  = self.filmstrip_scroll.get_hadjustment()
         page = adj.get_page_size()
@@ -4461,7 +4363,7 @@ class MainWindow(Adw.ApplicationWindow):
             adj.set_value(target)
             return False
 
-        # Cancel any in-flight animation and start a fresh one.
+        # Cancel in-flight animation; start fresh.
         if getattr(self, "_filmstrip_anim_id", None) is not None:
             try:
                 GLib.source_remove(self._filmstrip_anim_id)
@@ -4479,7 +4381,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._filmstrip_anim_step += 1
         total = self._filmstrip_anim_total
         t = self._filmstrip_anim_step / total
-        # Ease-out cubic so it decelerates into the target position.
+        # Ease-out cubic.
         eased = 1 - (1 - t) ** 3
         start = self._filmstrip_anim_start
         target = self._filmstrip_anim_target
@@ -4496,7 +4398,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._preview_cache = OrderedDict()
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
-        self._show_viewer_ui()   # reset opacity/visibility from any prior fade
+        self._show_viewer_ui()   # reset fade state
         self.photo_picture.set_visible(False)
         self.edit_btn.set_visible(False)
         self._update_favorite_btn()
@@ -4657,10 +4559,9 @@ class MainWindow(Adw.ApplicationWindow):
             w.set_visible(True)
             w.set_opacity(1.0)
             w.set_can_target(True)
-        # video_controls only shown in video mode
         if self._video_media is None:
             self.video_controls.set_visible(False)
-        # restore zoom-driven visibility
+        # Restore zoom-driven visibility.
         zoomed = getattr(self, '_viewer_zoom', 1.0) > 1.0
         if zoomed:
             self.prev_btn.set_visible(False)
@@ -4713,11 +4614,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _fade_tick(self):
         self._fade_step += 1
-        opacity = max(0.0, 1.0 - self._fade_step / 8)  # ~400ms
+        opacity = max(0.0, 1.0 - self._fade_step / 8)  # ~400ms total
         widgets = self._video_fade_widgets()
         for w in widgets:
             w.set_opacity(opacity)
-        # Backup donut never fades — it's active status, not decorative OSD.
+        # Backup donut never fades — it's status, not decoration.
         if hasattr(self, "_viewer_donut_btn"):
             self._viewer_donut_btn.set_opacity(1.0)
         if opacity <= 0.0:
@@ -4734,7 +4635,7 @@ class MainWindow(Adw.ApplicationWindow):
         dur = self._video_media.get_duration()
         if dur <= 0:
             return
-        ts_s = (int(fraction * dur / 1_000_000) // 2) * 2  # round to 2s
+        ts_s = (int(fraction * dur / 1_000_000) // 2) * 2  # 2s bins
         self._preview_time_lbl.set_text(format_duration(ts_s))
         w = self.video_scrubber.get_width()
         if w > 0:
@@ -4779,8 +4680,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._preview_cache[ts_s] = None  # mark loading
         self._preview_extracting = True
         path = self.photos[self.current_index]
-        # Bind extraction to the current viewer-load-id: if user navigates
-        # away before ffmpeg finishes, the late callback discards its frame.
+        # Bind to viewer-load-id so late ffmpeg output is discarded after nav.
         load_id = self._viewer_load_id
         threading.Thread(
             target=self._extract_preview_frame,
@@ -4800,7 +4700,6 @@ class MainWindow(Adw.ApplicationWindow):
                 capture_output=True, timeout=8
             )
             if load_id != self._viewer_load_id:
-                # User already navigated away; discard.
                 os.unlink(tmp)
                 return
             pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(tmp, 160, 90, True)
@@ -4881,7 +4780,7 @@ class MainWindow(Adw.ApplicationWindow):
     def on_viewer_key(self, controller, keyval, keycode, state):
         if self.main_stack.get_visible_child_name() != "viewer":
             return False
-        if keyval == 65307:  # Escape
+        if keyval == 65307:  # Esc
             if self._editor_active:
                 self.on_editor_cancel()
             else:
@@ -4938,7 +4837,7 @@ class MainWindow(Adw.ApplicationWindow):
             log_info(_("Favorite added: {p}").format(p=path))
         self._schedule_save_favorites()
         self._update_favorite_btn()
-        # refresh thumbnail badge if visible
+        # Refresh thumb badge if visible.
         widget = self.thumb_widgets.get(self.current_index)
         if widget:
             self._refresh_thumb_favorite(self.current_index)
@@ -5048,7 +4947,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.crop_overlay_area.queue_draw()
 
     def _get_image_display_rect(self, widget_w, widget_h):
-        """Return (x, y, w, h) of the letterboxed image inside the widget."""
+        """(x, y, w, h) of the letterboxed image inside the widget."""
         pixbuf = self._editor_display_pixbuf or self._viewer_pixbuf
         if not pixbuf:
             return (0, 0, widget_w, widget_h)
@@ -5080,7 +4979,7 @@ class MainWindow(Adw.ApplicationWindow):
         cr.rectangle(x1, y1, rw, rh)
         cr.stroke()
 
-        # Rule-of-thirds gridlines
+        # Rule-of-thirds gridlines.
         cr.set_source_rgba(1, 1, 1, 0.35)
         cr.set_line_width(1)
         for i in (1, 2):
@@ -5200,7 +5099,7 @@ class MainWindow(Adw.ApplicationWindow):
 
                 exif = img.getexif() if is_jpeg else None
 
-                # Normalize EXIF orientation so PIL and GdkPixbuf agree.
+                # Normalize EXIF orientation (align PIL and GdkPixbuf).
                 img = ImageOps.exif_transpose(img)
 
                 if rotation != 0:
@@ -5209,7 +5108,7 @@ class MainWindow(Adw.ApplicationWindow):
                     img = img.crop(crop_box)
 
                 if is_jpeg:
-                    # Reset orientation tag to normal (1) — pixels are now physically correct.
+                    # Reset orientation to 1 — pixels are now physically correct.
                     if exif is not None:
                         exif[0x0112] = 1
                     img.save(path, "JPEG", quality=95,
@@ -5275,10 +5174,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._play_shred_animation(path, on_done=self._finish_delete_after_shred)
 
     def _play_shred_animation(self, path, on_done):
-        """Paper-shredder effect: split the photo into vertical strips that
-        fall + fade with staggered delay, then call on_done(path). For videos
-        we fall back to the cached thumbnail — otherwise delete would happen
-        without animation."""
+        """Shredder effect → on_done(path). Videos use cached thumbnail."""
         pixbuf = getattr(self, "_viewer_pixbuf", None)
         if pixbuf is None and is_video(path):
             try:
@@ -5291,14 +5187,12 @@ class MainWindow(Adw.ApplicationWindow):
             on_done(path)
             return
 
-        # Render the pixbuf ONCE into a cairo ImageSurface. Otherwise each
-        # strip × frame would re-upload the full pixbuf to the GPU (~14×60 =
-        # 840 uploads/sec, killing fps).
+        # Render pixbuf ONCE to ImageSurface — else 14 strips × 60fps kills GPU.
         try:
             anim_pb = pixbuf
             orig_w = anim_pb.get_width()
             orig_h = anim_pb.get_height()
-            # Scale to 1280px max for faster rendering.
+            # Cap at 1280px for speed.
             MAX_DIM = 1280
             if max(orig_w, orig_h) > MAX_DIM:
                 scale = MAX_DIM / max(orig_w, orig_h)
@@ -5323,8 +5217,7 @@ class MainWindow(Adw.ApplicationWindow):
         draw_area.set_hexpand(True)
         draw_area.set_can_target(False)
         self.viewer_area.add_overlay(draw_area)
-        # Hide picture/video under the overlay. For videos, pause and detach
-        # first — otherwise it keeps playing and flickers under the animation.
+        # Hide + pause video before overlay so it doesn't flicker underneath.
         is_vid = is_video(path)
         if is_vid:
             try:
@@ -5354,7 +5247,7 @@ class MainWindow(Adw.ApplicationWindow):
                     delay = (i / N_STRIPS) * 0.35
                     denom = max(0.001, 1.0 - delay)
                     sp = max(0.0, min(1.0, (progress - delay) / denom))
-                    ease = sp * sp * sp  # cubic ease-in for gravity feel
+                    ease = sp * sp * sp  # cubic ease-in ≈ gravity
                     y_off = ease * h * 1.4
                     opacity = max(0.0, 1.0 - sp * 1.05)
                     rot = (sp * 0.4) * (1 if i % 2 else -1)
@@ -5393,18 +5286,14 @@ class MainWindow(Adw.ApplicationWindow):
                     self.viewer_area.remove_overlay(draw_area)
                 except Exception:
                     pass
-                # Clear the old pixbuf before setting visible — otherwise
-                # photo_picture would briefly show the deleted photo before
-                # on_done loads the next one.
+                # Clear old pixbuf before show, else deleted photo flashes briefly.
                 try:
                     self.photo_picture.set_pixbuf(None)
                     self.viewer_title.set_text("")
                     self._set_viewer_location("empty")
                 except Exception:
                     pass
-                # Re-show both photo_picture and video_display — on_done
-                # navigates to the next file (photo or video) and
-                # show_full_photo/_show_video picks which stays visible.
+                # Re-show both; on_done's next load picks which stays visible.
                 self.photo_picture.set_visible(True)
                 if is_vid:
                     try:
@@ -5418,8 +5307,7 @@ class MainWindow(Adw.ApplicationWindow):
         draw_area.add_tick_callback(_tick)
 
     def _cleanup_empty_parent_dirs(self, path):
-        """Remove empty parent dirs up to photo_path root (which is never
-        removed). Stops at the first non-empty dir."""
+        """Remove empty parent dirs up to (not including) photo_path root."""
         photo_root = self.settings.get("photo_path")
         if not photo_root:
             return
@@ -5428,20 +5316,20 @@ class MainWindow(Adw.ApplicationWindow):
         while (parent != photo_root
                and parent.startswith(photo_root + os.sep)):
             try:
-                os.rmdir(parent)  # only succeeds when empty
+                os.rmdir(parent)  # succeeds only when empty
                 log_info(_("Empty folder removed: {p}").format(p=parent))
             except OSError:
                 break
             parent = os.path.dirname(parent)
 
     def _finish_delete_after_shred(self, path):
-        """Post-animation: actually delete + navigate."""
+        """Post-animation: delete + navigate."""
         n_before = len(self.photos)
         try:
             os.remove(path)
             log_info(_("Photo deleted: {p}").format(p=path))
         except FileNotFoundError:
-            # Already gone (prior delete / external tool / watcher race).
+            # Already gone (external tool / watcher race).
             log_warn(_("File already gone from disk: {p}").format(p=path))
         except Exception as e:
             log_error(_("Delete failed: {err}").format(err=e))
@@ -5457,8 +5345,7 @@ class MainWindow(Adw.ApplicationWindow):
         if path in self._favorites:
             self._favorites.discard(path)
             self._schedule_save_favorites()
-        # List-comprehension (not .remove()) so watcher-reload races never
-        # raise when path isn't in the list. Log count to surface bugs.
+        # List-comp avoids .remove() raising on watcher races.
         self.photos = [p for p in self.photos if p != path]
         self._filmstrip_order_cache = None
         n_after = len(self.photos)
@@ -5471,7 +5358,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self.current_index >= len(self.photos):
             self.current_index = len(self.photos) - 1
         next_path = self.photos[self.current_index]
-        # Rebuild filmstrip thumbs + redraw so the deleted photo vanishes.
+        # Rebuild filmstrip thumbs so the deleted photo vanishes.
         self._filmstrip_thumbs = {}
         try:
             self.filmstrip_area.queue_draw()
@@ -5530,7 +5417,7 @@ class MainWindow(Adw.ApplicationWindow):
             if path in self._favorites:
                 self._favorites.discard(path)
                 fav_changed = True
-        # Clean up empty dirs AFTER all files are gone so we don't stop early.
+        # Clean up empty dirs after all files are gone.
         for path in paths_to_delete:
             self._cleanup_empty_parent_dirs(path)
         if fav_changed:
@@ -5539,23 +5426,15 @@ class MainWindow(Adw.ApplicationWindow):
         self.load_photos()
 
     def _build_settings_switcher(self, stack):
-        """Custom tab-row for the Settings dialog: icon-above-label pill
-        buttons driving a Gtk.Stack. Looks like Adw.ViewSwitcher (wide)
-        but keeps the transitions of Gtk.Stack underneath. CSS gives icons
-        a hover/active bounce."""
+        """Custom icon-above-label tab-row driving a Gtk.Stack (keeps stack transitions)."""
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         bar.add_css_class("pixora-settings-tabs")
         bar.set_halign(Gtk.Align.CENTER)
 
         if not hasattr(self, "_settings_tabs_css"):
             self._settings_tabs_css = Gtk.CssProvider()
-            # Hover uses translateY (crispy — just moves) instead of
-            # scale(), which would pixel-blur the rendered icon. The
-            # "checked" state bumps -gtk-icon-size so the SVG re-renders
-            # bigger and stays sharp. Tighter padding keeps the header
-            # from growing taller than the default, so window controls
-            # stay flush in the corner. The :checked-background is
-            # suppressed — a separate sliding indicator handles that.
+            # Hover uses translateY (no scale-blur); checked bumps -gtk-icon-size.
+            # Separate sliding indicator handles the :checked background.
             self._settings_tabs_css.load_from_string(
                 ".pixora-settings-tab {"
                 "  padding: 2px 14px;"
@@ -5590,17 +5469,11 @@ class MainWindow(Adw.ApplicationWindow):
                 "  opacity: 1.0;"
                 "}"
                 ".pixora-tab-indicator {"
-                # Match the default Adwaita :checked pill — a neutral
-                # 10% tint of the current fg color rather than a blue
-                # accent. Same rounding as a button, margins 0 so the
-                # pill is full-height (was 3px top/bottom → looked
-                # slightly shorter than before).
+                # 10% fg tint (neutral, like Adwaita :checked pill); full-height.
                 "  background: alpha(currentColor, 0.10);"
                 "  border-radius: 10px;"
                 "}"
-                # When the bar has .no-anim (user toggled Reduce Animations),
-                # kill hover/active transforms + transitions so nothing
-                # visually animates.
+                # .no-anim (Reduce Animations) kills hover/active transforms.
                 ".pixora-settings-tabs.no-anim .pixora-settings-tab image {"
                 "  transition: none;"
                 "  transform: none;"
@@ -5652,15 +5525,13 @@ class MainWindow(Adw.ApplicationWindow):
             if first_name is None:
                 first_name = page_name
 
-        # Group toggle-buttons so only one is active at a time.
+        # Group so only one is active.
         if tabs:
             for btn, _n in tabs[1:]:
                 btn.set_group(tabs[0][0])
 
-        # Sliding indicator — drawn BEHIND the tab row. Gtk.Overlay paints
-        # the main child first, then overlays on top, so make the indicator
-        # the main child and the tab row the overlay. set_measure_overlay
-        # sizes the overlay to the tab row's natural width.
+        # Sliding indicator drawn BEHIND tab row (main child), tab row as overlay.
+        # set_measure_overlay sizes to tab row's natural width.
         indicator = Gtk.Box()
         indicator.add_css_class("pixora-tab-indicator")
         indicator.get_style_context().add_provider(
@@ -5697,15 +5568,12 @@ class MainWindow(Adw.ApplicationWindow):
             tabs[0][0].set_active(True)
             if first_name:
                 stack.set_visible_child_name(first_name)
-            # First allocation arrives on the next idle tick; position the
-            # indicator under the first tab then.
+            # First allocation arrives next idle — position indicator then.
             GLib.idle_add(self._place_settings_indicator_under, tabs[0][0])
         return overlay
 
     def _tab_x_in_overlay(self, btn):
-        """Button's allocation-x is relative to its parent (tab_row),
-        while the indicator's margin-start lives in the overlay's coord
-        system. Walk up one level so we position under the actual tab."""
+        """Translate btn's parent-relative x into overlay coords."""
         try:
             bar = btn.get_parent()
             btn_alloc = btn.get_allocation()
@@ -5719,9 +5587,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _place_settings_indicator_under(self, btn, tries=0):
         x, w = self._tab_x_in_overlay(btn)
         if w <= 0 and tries < 25:
-            # Layout not done yet — keep retrying up to ~625ms before
-            # giving up. On first open the overlay needs a couple of
-            # ticks before the button has real x/width.
+            # Layout not ready — retry up to ~625ms.
             GLib.timeout_add(25, self._place_settings_indicator_under,
                              btn, tries + 1)
             return False
@@ -5733,7 +5599,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _animate_settings_indicator_to(self, btn):
         target_x, target_w = self._tab_x_in_overlay(btn)
         if target_w <= 0:
-            # Not allocated yet; just snap on next tick.
+            # Not allocated yet; snap next tick.
             GLib.idle_add(self._place_settings_indicator_under, btn)
             return
         anim_on = bool(self.settings.get("animations_enabled", True))
@@ -5741,7 +5607,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._settings_tab_indicator.set_margin_start(target_x)
             self._settings_tab_indicator.set_size_request(target_w, -1)
             return
-        # Cancel any in-flight animation.
+        # Cancel in-flight animation.
         if self._settings_tab_indicator_anim_id is not None:
             try:
                 GLib.source_remove(self._settings_tab_indicator_anim_id)
@@ -5763,7 +5629,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._settings_tab_indicator_anim_step += 1
         total = self._settings_tab_indicator_anim_total
         t = self._settings_tab_indicator_anim_step / total
-        # Ease-out cubic — snappy start, gentle land.
+        # Ease-out cubic.
         eased = 1 - (1 - t) ** 3
         sx, sw = self._settings_tab_indicator_anim_start
         tx, tw = self._settings_tab_indicator_anim_target
@@ -5779,10 +5645,7 @@ class MainWindow(Adw.ApplicationWindow):
         return True
 
     def _settings_new_page_container(self):
-        """Mimic Adw.PreferencesPage (ScrolledWindow + Adw.Clamp + VBox) so
-        we can drop existing PreferencesGroup widgets in without changes.
-        Returns (outer, inner_box): outer goes into the ViewStack; groups
-        append to inner_box."""
+        """Mimic Adw.PreferencesPage; returns (outer_for_stack, inner_box_for_groups)."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
         box.set_margin_top(24)
         box.set_margin_bottom(24)
@@ -5803,11 +5666,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._settings_dialog.present()
             return
         log_info(_("Settings opened"))
-        # Custom Adw.Window + ToolbarView + ViewStack layout (replaces
-        # Adw.PreferencesWindow). Gives us full control over page-switch
-        # transitions — libadwaita's PreferencesWindow internally uses
-        # set_visible_child_full(…, NONE) so our transition settings on
-        # its inner stack were ignored.
+        # Custom Adw.Window + ViewStack: Adw.PreferencesWindow forces NONE transitions.
         dialog = Adw.Window()
         dialog.set_title(_("Settings"))
         dialog.set_transient_for(self)
@@ -5884,8 +5743,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         thumb_row.add_suffix(thumb_reset_btn)
 
-        # Apply button — grid is only regenerated on click, so sliding
-        # doesn't freeze the UI.
+        # Apply button: grid regen only on click, so sliding stays fluid.
         self._thumb_apply_btn = Gtk.Button(icon_name="emblem-ok-symbolic")
         self._thumb_apply_btn.add_css_class("flat")
         self._thumb_apply_btn.add_css_class("circular")
@@ -5897,7 +5755,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         display_group.add(thumb_row)
 
-        # Preview updates live while sliding without touching real thumbnails.
+        # Live preview while sliding (doesn't touch real thumbs).
         self._thumb_preview = Gtk.DrawingArea()
         self._thumb_preview.set_content_width(140)
         self._thumb_preview.set_content_height(140)
@@ -5953,8 +5811,7 @@ class MainWindow(Adw.ApplicationWindow):
         anim_row.set_activatable_widget(self._anim_switch)
         perf_group.add(anim_row)
 
-        # Renderer dropdown — applies via GSK_RENDERER env var, so it only
-        # takes effect after a restart. Sentinel pattern matches language.
+        # Renderer dropdown applies via GSK_RENDERER — requires restart (sentinel).
         self._gsk_codes  = ["auto", "gl", "cairo"]
         self._gsk_labels = [_("Automatic"), _("GPU (GL)"), _("Software (Cairo)")]
         gsk_model = Gtk.StringList()
@@ -6090,7 +5947,7 @@ class MainWindow(Adw.ApplicationWindow):
         dup_group = Adw.PreferencesGroup()
         dup_group.set_title(_("Duplicate detection"))
         dup_group.set_description(_("Check for existing photos during import"))
-        # Threshold 0 = off, ≥1 = on. "On" always uses strict (=1) for accuracy.
+        # Threshold 0 = off, ≥1 = on. "On" always uses strict (=1).
         dup_on = self.settings.get("duplicate_threshold", 2) != 0
 
         dup_info_row = Adw.ActionRow(
@@ -6239,7 +6096,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.settings_dedup_switch = Gtk.Switch()
         self.settings_dedup_switch.set_valign(Gtk.Align.CENTER)
-        # USB-dedup reuses the pHash engine; force off when main detection is off.
+        # USB-dedup reuses pHash; force off when main detection off.
         if not dup_on:
             self.settings_dedup_switch.set_active(False)
             if self.settings.get("backup_dedup"):
@@ -6263,7 +6120,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dedup_row = dedup_row
         backup_group.add(dedup_row)
 
-        # Silent-mode: skip scan-dialog and auto-start backup. Errors still popup.
+        # Silent-mode: auto-start backup, skip scan dialog. Errors still popup.
         self.settings_silent_switch = Gtk.Switch()
         self.settings_silent_switch.set_valign(Gtk.Align.CENTER)
         self.settings_silent_switch.set_active(bool(self.settings.get("backup_silent")))
@@ -6288,7 +6145,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_manual_scan_btn.set_valign(Gtk.Align.CENTER)
         self.settings_manual_scan_btn.set_size_request(120, 32)
         self.settings_manual_scan_btn.connect("clicked", self.on_settings_manual_scan)
-        # States: idle (label), checking (spinner), uptodate (✓ 5s fade).
+        # States: idle | checking | uptodate (✓ 5s fade).
         self._scan_btn_stack = Gtk.Stack()
         self._scan_btn_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self._scan_btn_stack.set_transition_duration(250)
@@ -6306,8 +6163,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._scan_btn_stack.add_named(_scan_ok, "uptodate")
         self.settings_manual_scan_btn.set_child(self._scan_btn_stack)
         self._scan_btn_fade_id = None
-        # If a scan/backup is already running when settings opens, show the
-        # spinner immediately so the user doesn't click in vain.
+        # If scan/backup already running, spinner on open so click isn't wasted.
         if self._backup_scanning or self._backup_running:
             self._scan_btn_stack.set_visible_child_name("checking")
             self._scan_check_spinner.start()
@@ -6364,8 +6220,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._update_check_row = Adw.ActionRow(title=_("Check for updates"))
 
-        # Button has 4 states in a Gtk.Stack: idle / checking / uptodate /
-        # available (the pulsing variant).
+        # Button has 4 states: idle / checking / uptodate / available (pulsing).
         self._update_check_state = "idle"
         self._update_check_pulse_id = None
         self._update_check_fade_id = None
@@ -6409,7 +6264,7 @@ class MainWindow(Adw.ApplicationWindow):
         about_group.add(self._update_check_row)
         about_box.append(about_group)
 
-        # Auto-startup-check already found an update → button pulses now.
+        # Startup check already found update → pulse now.
         if self._pending_update_version:
             self._update_remote_version = self._pending_update_version
             self._update_check_row.set_subtitle(
@@ -6417,8 +6272,7 @@ class MainWindow(Adw.ApplicationWindow):
             )
             self._set_update_state("available")
 
-        # Credit line below the About box. An Adw.PreferencesGroup with only
-        # a description (no rows) renders as a free-standing dim-label.
+        # Credit line: PreferencesGroup with only a description renders as dim-label.
         credit_group = Adw.PreferencesGroup()
         credit_group.set_description(
             _("GitHub® and the Invertocat logo are trademarks of GitHub, Inc.")
@@ -6448,8 +6302,7 @@ class MainWindow(Adw.ApplicationWindow):
         license_group.add(license_row)
         about_box.append(license_group)
 
-        # Adw.ViewStack has no transitions; we need Gtk.Stack for that.
-        # Gtk.StackSwitcher picks up page-level "icon-name" + "title".
+        # Adw.ViewStack has no transitions → use Gtk.Stack.
         stack = Gtk.Stack()
         self._settings_stack = stack  # so _apply_animations_state can tune it live
         anim_on = bool(self.settings.get("animations_enabled", True))
@@ -6489,7 +6342,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_thumb_size_changed(self, scale, row):
         new_size = int(scale.get_value())
-        # Snap to steps of 20.
+        # Snap to steps of 20 px.
         new_size = (new_size // 20) * 20
         row.set_subtitle(f"{new_size} px")
         self._pending_thumb_size = new_size
@@ -6502,10 +6355,10 @@ class MainWindow(Adw.ApplicationWindow):
             self._thumb_apply_btn.set_sensitive(new_size != THUMB_SIZE)
 
     def _draw_thumb_preview(self, area, cr, w, h):
-        """Mock home-grid (portrait+landscape mix) with mini Pixora icon."""
+        """Mock home-grid with mini Pixora icon."""
         try:
             size = getattr(self, "_pending_thumb_size", THUMB_SIZE)
-            # Clip whole canvas to a rounded rect so bg/header/tiles stay inside.
+            # Clip canvas to rounded rect.
             outer_r = 10.0
             cr.new_sub_path()
             cr.arc(w - outer_r, outer_r, outer_r, -math.pi / 2, 0)
@@ -6543,12 +6396,12 @@ class MainWindow(Adw.ApplicationWindow):
                     cr.paint()
                 except Exception:
                     pass
-            # Title-stripes next to the logo for app-feel.
+            # Title-stripes next to logo.
             cr.set_source_rgba(0.5, 0.5, 0.5, 0.35)
             cr.rectangle(18, header_h / 2 - 1, 28, 2)
             cr.fill()
 
-            # 12% scale reads well in the 140-wide canvas (true range 200→500 px).
+            # 12% scale reads well in 140-wide canvas (true 200→500 px).
             scale = 0.12
             base = size * scale
             gap = max(3.0, base * 0.08)
@@ -6556,7 +6409,7 @@ class MainWindow(Adw.ApplicationWindow):
             pad_top = header_h + 6.0
             radius = max(3.0, base * 0.06)
 
-            # Mix of landscape / portrait / square, repeating across rows.
+            # Landscape/portrait/square mix across rows.
             pattern = [
                 (1.3, 1.0), (0.75, 1.0), (1.0, 1.0),
                 (0.75, 1.0), (1.3, 1.0), (1.0, 1.0),
@@ -6752,7 +6605,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         log_info(_("Language changed to: {lang} — Pixora restarting").format(lang=new_lang))
 
-        # Overlay-tekst in de NIEUWE taal zodat de user de switch al ziet.
+        # Overlay text in the NEW language so user sees the switch already.
         try:
             new_trans = _gettext_mod.translation(
                 "pixora", localedir=_LOCALE_DIR,
@@ -6787,8 +6640,7 @@ class MainWindow(Adw.ApplicationWindow):
         overlay.set_child(box)
         overlay.present()
 
-        # Sentinel + in-place exec na app.run() returnt. Betrouwbaarder dan
-        # een bash-subprocess die 1.5s wacht: geen D-Bus-race, zelfde proces.
+        # Sentinel + in-place exec after app.run() returns (no D-Bus race).
         try:
             sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
             os.makedirs(os.path.dirname(sentinel), exist_ok=True)
@@ -6799,7 +6651,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add(600, lambda: (self.get_application().quit(), False)[1])
 
     def _on_anim_toggle(self, switch, _pspec):
-        # Switch is "Reduce animations" — ACTIVE means reduce → animations_enabled=False.
+        # "Reduce animations" ACTIVE → animations_enabled=False.
         reduce = switch.get_active()
         self.settings["animations_enabled"] = not reduce
         try:
@@ -6816,8 +6668,7 @@ class MainWindow(Adw.ApplicationWindow):
         current = self.settings.get("gsk_renderer", "auto")
         if new_choice == current:
             return
-        # Blacklist-warning: a previous attempt with this renderer crashed
-        # Pixora. Ask the user before we commit + restart.
+        # Blacklisted renderer previously crashed Pixora — confirm before restart.
         bl = self.settings.get("gsk_renderer_crashed") or []
         if new_choice in bl:
             self._gsk_prompt_blacklisted(new_choice, current)
@@ -6850,7 +6701,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_gsk_blacklist_response(self, dlg, response, new_choice, current):
         if response != "apply":
-            # Revert dropdown to what was stored — undo the visual change.
+            # Revert dropdown to stored value.
             try:
                 self._gsk_combo.handler_block_by_func(self._on_gsk_renderer_changed)
                 self._gsk_combo.set_selected(self._gsk_codes.index(current))
@@ -6867,8 +6718,7 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_error(_("Failed to save gsk_renderer: {e}").format(e=e))
             return
-        # Same sentinel-restart pattern as _on_language_changed — avoids
-        # D-Bus race of a separate process.
+        # Sentinel-restart pattern (same as _on_language_changed).
         try:
             sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
             os.makedirs(os.path.dirname(sentinel), exist_ok=True)
@@ -6876,7 +6726,7 @@ class MainWindow(Adw.ApplicationWindow):
                 f.write("1")
         except Exception as e:
             log_error(_("Restart sentinel write failed: {err}").format(err=e))
-        # Overlay so the user gets feedback before the app blinks away.
+        # Overlay gives user feedback before restart.
         overlay = Gtk.Window()
         overlay.set_modal(True)
         overlay.set_transient_for(self)
@@ -6935,14 +6785,12 @@ class MainWindow(Adw.ApplicationWindow):
         ))
         row.set_subtitle(_("Active") if target else _("Inactive"))
         btn.set_label(_("Deactivate") if target else _("Activate"))
-        # Herstart de app
+        # Restart the app.
         GLib.timeout_add(300, self._restart_app)
 
     def _restart_app(self):
-        # Sentinel + in-place exec na app.run() returnt. main.py checkt de
-        # sentinel en roept os.execvp zichzelf aan — geen D-Bus-race, geen
-        # bash-subprocess, en de dev-terminal-handoff blijft werken omdat
-        # main.py in het nieuwe proces helemaal opnieuw begint.
+        # Sentinel + in-place exec; main.py re-runs itself via os.execvp.
+        # Dev-terminal handoff keeps working because main.py starts fresh.
         try:
             sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
             os.makedirs(os.path.dirname(sentinel), exist_ok=True)
@@ -6964,7 +6812,7 @@ class MainWindow(Adw.ApplicationWindow):
         save_settings(self.settings)
 
     def _count_media(self, paths):
-        """Return (photos, videos). Accepts bare Paths or (src, dst) tuples."""
+        """(photos, videos). Accepts Paths or (src, dst) tuples."""
         photos = 0
         videos = 0
         for item in paths:
@@ -6976,7 +6824,7 @@ class MainWindow(Adw.ApplicationWindow):
         return photos, videos
 
     def _format_media_counts(self, photos, videos):
-        """Localized "3 photos and 1 video" (ngettext)."""
+        """Localized "3 photos and 1 video"."""
         parts = []
         if photos:
             parts.append(ngettext(
@@ -6992,8 +6840,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _photo_date_for_structure(self, src, st, exif_tags, video_exts,
                                   video_date_fn):
-        """EXIF/ffprobe first, mtime fallback. Skips get_photo_date's iPhone-
-        filename heuristic deliberately — that returns a sort key, not a date."""
+        """EXIF/ffprobe first, mtime fallback. Skips iPhone-filename heuristic."""
         ext = src.suffix.lower()
         if ext in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng",
                    ".tiff", ".tif"):
@@ -7001,10 +6848,8 @@ class MainWindow(Adw.ApplicationWindow):
                 from PIL import Image
                 with Image.open(str(src)) as img:
                     exif = img.getexif()
-                # DateTimeOriginal (36867) + DateTimeDigitized (36868) live in
-                # the ExifIFD sub (pointer tag 0x8769), not the main IFD.
-                # Without the sub-IFD we'd only find tag 306 (ModifyDate),
-                # which updates on every edit.
+                # DateTimeOriginal/Digitized live in ExifIFD sub (0x8769).
+                # Main IFD only has 306 (ModifyDate) — updates on every edit.
                 try:
                     exif_sub = exif.get_ifd(0x8769)
                 except Exception:
@@ -7035,8 +6880,7 @@ class MainWindow(Adw.ApplicationWindow):
         return datetime.datetime.fromtimestamp(st.st_mtime)
 
     def _scan_structure_mismatch(self):
-        """Return (moves, dups). moves = [(src, dst), ...] for files at a
-        wrong path; dups = bit-identical duplicates at non-target paths."""
+        """(moves, dups): moves=[(src,dst)] wrong paths; dups=bit-identical duplicates."""
         from pathlib import Path as _P
         from importer_page import (
             dest_path as _dest_path, SUPPORTED_EXT,
@@ -7065,7 +6909,7 @@ class MainWindow(Adw.ApplicationWindow):
                 if src.resolve() == dst.resolve():
                     reserved_targets.add(str(dst.resolve()))
                     continue
-                # Target exists or already reserved by another src.
+                # Target exists or reserved by another src.
                 dst_str = str(dst.resolve() if dst.exists() else dst)
                 if dst.exists() or dst_str in reserved_targets:
                     try:
@@ -7077,7 +6921,7 @@ class MainWindow(Adw.ApplicationWindow):
                                 continue
                     except OSError:
                         pass
-                    # Not identical → find a unique suffix.
+                    # Not identical → unique suffix.
                     stem = dst.stem
                     ext = dst.suffix
                     counter = 1
@@ -7093,8 +6937,7 @@ class MainWindow(Adw.ApplicationWindow):
         return moves, dups
 
     def _prompt_reorganize(self, from_startup=False):
-        """Show confirm dialog with counts. Silent when from_startup and
-        nothing to do; always shows feedback otherwise."""
+        """Confirm dialog with counts. Silent if from_startup + nothing to do."""
         self._reorganize_active = True
         def _scan():
             moves, dups = self._scan_structure_mismatch()
@@ -7114,8 +6957,7 @@ class MainWindow(Adw.ApplicationWindow):
                 dlg.set_close_response("ok")
                 self._present_dialog(dlg)
             return False
-        # Silent mode: no popup, no fullscreen, run immediately. Applies to
-        # both auto-detection and a manual "Opruimen" click.
+        # Silent mode: no popup/fullscreen. Applies to auto + manual click.
         if self.settings.get("reorganize_silent", False):
             self._reorganize_silent_run = True
             log_info(_("Silent reorganize started: {m} moves, {d} dups").format(
@@ -7157,7 +6999,7 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         dlg.connect("response", self._on_reorganize_response, moves, dups)
-        # Pause any playing viewer video while the popup is up.
+        # Pause playing video while popup is up.
         self._pause_video_for_popup()
         self._present_dialog(dlg)
         return False
@@ -7195,16 +7037,13 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_reorganize_response(self, dlg, response, moves, dups):
         if response != "go":
             self._reorganize_active = False
-            # "Later" → no more auto-popup this session; manual still works.
+            # "Later" → no more auto-popup this session.
             self._structure_popup_dismissed = True
             self._resume_video_after_popup()
             return
         if self._reorganize_moving:
-            # Defensive: prevent double thread-start on repeated signal.
-            return
-        # Leave the settings dialog open — force_close/close on Adw
-        # PreferencesDialog from a signal handler crashes with SIGSEGV.
-        # The fullscreen page still swaps in main_stack underneath.
+            return  # prevent double thread-start
+        # Leave settings open — force_close on Adw dialog from signal → SIGSEGV.
         threading.Thread(
             target=self._do_reorganize, args=(moves, dups), daemon=True,
         ).start()
@@ -7213,9 +7052,7 @@ class MainWindow(Adw.ApplicationWindow):
         import shutil as _sh
         from pathlib import Path as _P
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
-        # Disable the file-watcher — every move would trigger reload_photos
-        # and _load_thread would crash on FileNotFoundError mid-move.
-        # Re-enabled in _reorganize_done.
+        # Disable watcher — mid-move FileNotFoundError crashes _load_thread.
         try:
             self.stop_watcher()
         except Exception:
@@ -7224,8 +7061,7 @@ class MainWindow(Adw.ApplicationWindow):
         removed = 0
         errors = []
         total = max(1, len(moves) + len(dups))
-        # Precompute total bytes for the GB counter. Src size is what we
-        # actually "process" (move or delete).
+        # Precompute total bytes for GB counter (src size = what we process).
         total_bytes = 0
         sizes_moves = []
         sizes_dups = []
@@ -7256,7 +7092,7 @@ class MainWindow(Adw.ApplicationWindow):
         tot_ph += sum(1 for d in dups if not is_video(str(d)))
         tot_vi += sum(1 for d in dups if is_video(str(d)))
         self._reorganize_total_label = self._format_media_counts(tot_ph, tot_vi)
-        # Silent mode: donut-only progress (no fullscreen).
+        # Silent mode: donut only, no fullscreen.
         if self._reorganize_silent_run:
             GLib.idle_add(self._on_reorganize_silent_start)
         else:
@@ -7308,7 +7144,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._reorganize_done_count = done
             self._reorganize_done_bytes += sz
             self._reorganize_fraction = done / total
-        # Prune empty dirs bottom-up (never the root itself).
+        # Prune empty dirs bottom-up (never the root).
         for root, _dirs, _files in os.walk(str(photo_path), topdown=False):
             if root == str(photo_path):
                 continue
@@ -7334,13 +7170,12 @@ class MainWindow(Adw.ApplicationWindow):
         if not self._backup_scanning and not self._backup_running:
             self._set_donuts_visible(False)
         self._redraw_donuts()
-        # Re-enable file-watcher before reload_photos so future external
-        # changes are picked up again.
+        # Re-enable watcher before reload_photos.
         try:
             self.start_watcher(self.settings.get("photo_path"))
         except Exception:
             pass
-        # Silent mode: reload + cooldown, no UI.
+        # Silent: reload + cooldown, no UI.
         if self._reorganize_silent_run:
             self._reorganize_silent_run = False
             self.reload_photos()
@@ -7349,8 +7184,7 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.timeout_add_seconds(
                 10, self._maybe_trigger_backup_after_reorganize)
             return False
-        # Non-silent: fullscreen stays up with stats + Close button; cleanup
-        # (back-to-grid + cooldown + backup trigger) runs on close click.
+        # Non-silent: fullscreen with Close; cleanup runs on close click.
         parts = []
         if moved:
             parts.append(_("{c} moved").format(
@@ -7384,8 +7218,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_reorganize_close_clicked(self, _btn):
-        """Close the fullscreen reorganize page: back to grid + cooldown +
-        backup trigger."""
+        """Close fullscreen reorg: back-to-grid + cooldown + backup trigger."""
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
         return_to = getattr(self, "_reorganize_return_page", "grid") or "grid"
@@ -7401,7 +7234,7 @@ class MainWindow(Adw.ApplicationWindow):
             10, self._maybe_trigger_backup_after_reorganize)
 
     def _build_reorganize_page(self):
-        """Fullscreen progress page, same layout as ImporterPage."""
+        """Fullscreen progress page (mirrors ImporterPage)."""
         clamp = Adw.Clamp()
         clamp.set_maximum_size(480)
         clamp.set_valign(Gtk.Align.CENTER)
@@ -7455,8 +7288,7 @@ class MainWindow(Adw.ApplicationWindow):
         return clamp
 
     def _on_reorganize_progress_start(self):
-        """Main-thread: swap to fullscreen reorganize page and start the
-        progress tick that periodically refreshes the labels."""
+        """Main-thread: swap to fullscreen + start label-refresh tick."""
         self._reorganize_return_page = \
             self.main_stack.get_visible_child_name() or "grid"
         self.header.set_visible(False)
@@ -7476,7 +7308,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.reorganize_subtitle.set_text("")
         if hasattr(self, "reorganize_detail"):
             self.reorganize_detail.set_text("")
-        # Hide donut while fullscreen page is visible.
+        # Hide donut while fullscreen page visible.
         if not self._backup_scanning and not self._backup_running:
             self._set_donuts_visible(False)
         if self._reorganize_anim_id is None:
@@ -7485,8 +7317,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_reorganize_silent_start(self):
-        """Silent mode: show only the donut (no fullscreen swap); the tick
-        periodically redraws it so the arc fills."""
+        """Silent: show only donut; tick redraws it."""
         tip = _("Updating folder structure…")
         self._set_donuts_visible(True)
         if hasattr(self, "_backup_donut_btn"):
@@ -7503,7 +7334,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not self._reorganize_moving:
             self._reorganize_anim_id = None
             return False
-        # Fill donut (silent) and update fullscreen labels when present.
+        # Fill donut; update fullscreen labels when present.
         self._redraw_donuts()
         if not hasattr(self, "reorganize_bar") \
                 or self.main_stack.get_visible_child_name() != "reorganize":
@@ -7540,7 +7371,7 @@ class MainWindow(Adw.ApplicationWindow):
         return ngettext("{n} minute", "{n} minutes", mins).format(n=mins)
 
     def _maybe_trigger_backup_after_reorganize(self):
-        """One-shot 10s after _reorganize_done: start backup-scan if idle."""
+        """One-shot 10s after _reorganize_done: start backup-scan."""
         try:
             if self._backup_running or self._backup_scanning:
                 return False
@@ -7557,8 +7388,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _maybe_check_structure_on_startup(self):
-        """Home-grid +2s: kick off the first structure+backup scan via
-        _periodic_scan; the 60s tick handles the rest."""
+        """Home-grid +2s: first structure+backup scan; 60s tick takes over."""
         if self._structure_startup_scanned:
             return False
         ready_at = getattr(self, "_home_ready_at", None)
@@ -7570,8 +7400,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _trigger_structure_scan(self):
-        """Silent threaded structure-scan. Callback shows the reorganize popup
-        on mismatch (unless dismissed), else triggers a backup-scan."""
+        """Silent threaded structure-scan; on mismatch shows reorg popup."""
         if self._structure_scanning:
             return
         self._structure_scanning = True
@@ -7597,7 +7426,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_periodic_structure_done(self, moves, dups):
         self._structure_scanning = False
-        # Only hide donut when nothing else is running.
+        # Only hide donut if nothing else running.
         if not self._backup_scanning and not self._backup_running:
             self._set_donuts_visible(False)
         self._redraw_donuts()
@@ -7611,17 +7440,14 @@ class MainWindow(Adw.ApplicationWindow):
         if had_mismatch and not self._structure_popup_dismissed \
                 and not self._reorganize_active:
             self._reorganize_active = True
-            # Silent-check is inside _on_reorganize_scan_done so both auto
-            # and manual paths respect it.
+            # Silent-check lives in _on_reorganize_scan_done.
             self._on_reorganize_scan_done(moves, dups, True)
             return False
         self._maybe_trigger_backup_now()
         return False
 
     def _maybe_trigger_backup_now(self):
-        """Start backup-scan if idle, configured, drive present. Skip when
-        "all synced" was just seen and nothing has imported since — otherwise
-        large USBs with multi-minute rsync dry-runs would loop."""
+        """Start backup-scan if idle + configured. Cooldown skips re-scanning if synced."""
         try:
             if self._backup_running or self._backup_scanning:
                 return
@@ -7634,9 +7460,7 @@ class MainWindow(Adw.ApplicationWindow):
                 return
             if self._backup_drive_mountpoint() is None:
                 return
-            # Cooldown: last scan <10min ago and no new import since → skip.
-            # Manual scan and drive-attach bypass this (they call
-            # _trigger_backup_scan directly).
+            # Cooldown: last scan <10min + no new import → skip.
             last_backup = self.settings.get("last_backup_time", 0) or 0
             last_import = self.settings.get("last_import_time", 0) or 0
             if last_backup and (time.time() - last_backup) < 600 \
@@ -7652,11 +7476,11 @@ class MainWindow(Adw.ApplicationWindow):
             save_settings(self.settings)
 
     def on_dup_switch_toggled(self, switch, _pspec):
-        # On = strict (1), Off = 0 (disabled)
+        # On = strict (1), Off = 0.
         active = switch.get_active()
         self.settings["duplicate_threshold"] = 1 if active else 0
         if not active and self.settings.get("backup_dedup"):
-            # Main detection off → USB-dedup can't be on.
+            # Main detection off → USB-dedup off too.
             self.settings["backup_dedup"] = False
             if hasattr(self, "settings_dedup_switch"):
                 self.settings_dedup_switch.set_active(False)
@@ -7670,8 +7494,7 @@ class MainWindow(Adw.ApplicationWindow):
         active = switch.get_active()
         if not active and self.settings.get("backup_enabled") \
                 and self.settings.get("backup_uuid"):
-            # User disables backup while config is present → confirm.
-            # Can't undo the switch during signal emit; schedule on idle.
+            # Confirm disable (can't undo switch during signal emit).
             def _confirm():
                 dlg = Adw.AlertDialog(
                     heading=_("Turn off automatic backup?"),
@@ -7717,7 +7540,7 @@ class MainWindow(Adw.ApplicationWindow):
         if response == "disable":
             self._apply_backup_toggle(False)
         else:
-            # Revert the switch without re-firing the toggle handler.
+            # Revert switch without re-firing handler.
             self.settings_backup_switch.handler_block_by_func(
                 self.on_settings_backup_toggle
             )
@@ -7754,7 +7577,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings_backup_folder_row.set_subtitle(_("Not configured"))
         if hasattr(self, "settings_backup_folder_btn"):
             self.settings_backup_folder_btn.set_label(_("Set up"))
-        # Rebuild drive list to remove the forgotten drive.
+        # Rebuild drive list to drop the forgotten drive.
         if hasattr(self, "settings_drive_model"):
             while self.settings_drive_model.get_n_items() > 0:
                 self.settings_drive_model.remove(0)
@@ -7772,7 +7595,7 @@ class MainWindow(Adw.ApplicationWindow):
     def on_backup_silent_toggle(self, switch, _pspec):
         active = switch.get_active()
         if active and not self.settings.get("backup_silent"):
-            # User enables → confirm first; revert on cancel.
+            # Enable: confirm first, revert on cancel.
             def _confirm():
                 dlg = Adw.AlertDialog(
                     heading=_("Turn on auto-confirm?"),
@@ -7805,20 +7628,20 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_settings_manual_scan(self, btn):
         if self._backup_running or self._backup_scanning:
-            log_info("Manual scan: afgewezen — backup/scan al bezig")
+            log_info("Manual scan: rejected — backup/scan already running")
             return
         if not (self.settings.get("backup_enabled")
                 and self.settings.get("backup_uuid")
                 and self.settings.get("backup_path")):
-            log_info("Manual scan: afgewezen — backup niet geconfigureerd")
+            log_info("Manual scan: rejected — backup not configured")
             return
         if self._backup_drive_mountpoint() is None:
-            log_info("Manual scan: afgewezen — drive niet gemount")
+            log_info("Manual scan: rejected — drive not mounted")
             return
         if self._reorganize_active \
                 or time.time() < self._reorganize_block_until:
-            # Reorganize gate blocks even an explicit user click. Log it.
-            log_info("Manual scan: afgewezen — reorganize-gate actief")
+            # Reorganize gate blocks even explicit user click.
+            log_info("Manual scan: rejected — reorganize-gate active")
             return
         log_info(_("Backup scan started manually"))
         self._manual_scan_requested = True
@@ -7826,7 +7649,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._trigger_backup_scan()
 
     def _set_manual_scan_state(self, state):
-        """state ∈ {'idle', 'checking', 'uptodate'}."""
+        """state: idle|checking|uptodate."""
         if not hasattr(self, "_scan_btn_stack"):
             return
         if self._scan_btn_fade_id is not None:
@@ -7869,14 +7692,13 @@ class MainWindow(Adw.ApplicationWindow):
             save_settings(self.settings)
 
     def _build_settings_drive_list(self):
-        """List of (uuid, label). Includes the configured drive with its
-        saved label even if not connected, so the combo keeps showing the name."""
+        """[(uuid, label)]; includes saved drive even if disconnected."""
         drives = list(get_available_drives())
         saved_uuid = self.settings.get("backup_uuid")
         if saved_uuid and not any(u == saved_uuid for u, _l in drives):
             label = self.settings.get("backup_label") or _("Saved backup drive")
             drives.insert(0, (saved_uuid, label))
-        # Persist label when we see the drive for the first time.
+        # Persist label on first sighting.
         if saved_uuid and not self.settings.get("backup_label"):
             for u, lab in drives:
                 if u == saved_uuid:
@@ -7893,7 +7715,7 @@ class MainWindow(Adw.ApplicationWindow):
         if self.settings_drives and selected < len(self.settings_drives):
             new_uuid, new_label = self.settings_drives[selected]
             if new_uuid != self.settings.get("backup_uuid"):
-                # Different drive picked → old path no longer valid.
+                # Different drive → old path invalid.
                 self.settings["backup_path"] = None
                 self.settings_backup_folder_row.set_subtitle(_("Not configured"))
                 self.settings_backup_folder_btn.set_label(_("Set up"))
@@ -7904,7 +7726,7 @@ class MainWindow(Adw.ApplicationWindow):
                 self.settings_drive_reset_btn.set_visible(True)
 
     def on_settings_refresh_drives(self, btn):
-        # The user explicitly asked for fresh data; bypass the cache.
+        # User asked for fresh data; bypass cache.
         _lsblk_data(force=True)
         while self.settings_drive_model.get_n_items() > 0:
             self.settings_drive_model.remove(0)
@@ -7950,8 +7772,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._sync_now_if_ready)
 
     def _refresh_settings_drive_state(self):
-        """Live-update backup section on drive attach/detach while settings
-        is open. No-op if UI not built."""
+        """Live-update backup section on drive attach/detach; no-op if UI unbuilt."""
         if not hasattr(self, "settings_backup_folder_row"):
             return False
         backup_on = bool(self.settings.get("backup_enabled"))
@@ -7988,8 +7809,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _sync_now_if_ready(self):
-        """Trigger a backup-diff scan once settings are complete and the
-        drive is present. Called after config changes + drive-attach."""
+        """Backup-diff scan when settings complete + drive present."""
         if self._backup_running or self._backup_scanning:
             return False
         if not (self.settings.get("backup_enabled")
@@ -8005,14 +7825,12 @@ class MainWindow(Adw.ApplicationWindow):
     def _trigger_backup_scan(self):
         if self._backup_running or self._backup_scanning:
             return
-        # Reorganize takes priority: popup open, scan/moves running, or within
-        # 10s cooldown → skip. Periodic tick / post-cooldown timer retries.
+        # Reorganize takes priority; skip if active or within 10s cooldown.
         if self._reorganize_active or time.time() < self._reorganize_block_until:
             return
         self._backup_scanning = True
         self._backup_scan_phase = 0.0
-        # No percentage during scan — a previous time-guess was misleading.
-        # Popover subtitle explains USB slowness so users don't think it hung.
+        # No percentage: earlier time-guess was misleading.
         self._backup_detail = _("This may take a while on a USB drive")
         tip = _("Scanning for new photos…")
         if hasattr(self, "_backup_donut_btn"):
@@ -8052,11 +7870,8 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         mode = self.settings.get("backup_mode", "backup")
 
-        # Pure-Python set-diff on relative paths. Previously rsync --dry-run
-        # was used, but that blocks minutes on flaky USB (rsync stat's every
-        # dest file for attribute preservation — much slower than needed on
-        # FAT/exFAT). rsync is still used for the real backup below.
-        # Dedup happens in the backup thread so the scan always finishes fast.
+        # Python set-diff on rel paths (rsync --dry-run blocks minutes on FAT/exFAT).
+        # Dedup runs in backup thread so scan stays fast.
         src_files = {}
         try:
             for root, _dirs, files in os.walk(str(photo_path)):
@@ -8080,7 +7895,7 @@ class MainWindow(Adw.ApplicationWindow):
                         df = os.path.join(root, fn)
                         dest_rels.add(os.path.relpath(df, str(backup_dest)))
             except Exception:
-                pass  # partial enumeration → missing files treated as "new"
+                pass  # partial walk → missing treated as "new"
 
         src_rels = set(src_files.keys())
         to_transfer_rels = sorted(src_rels - dest_rels)
@@ -8106,8 +7921,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_scanning = False
         if hasattr(self, "_backup_donut"):
             self._redraw_donuts()
-        # Defer donut visibility until we know if silent-mode starts a
-        # backup — otherwise it'd flicker off between scan-end and backup-start.
+        # Defer donut visibility — else it flickers between scan-end and backup-start.
         manual_requested = self._manual_scan_requested
         self._manual_scan_requested = False
         silent = bool(self.settings.get("backup_silent"))
@@ -8122,13 +7936,11 @@ class MainWindow(Adw.ApplicationWindow):
         bytes_to_transfer = result["bytes"]
         dup_count = result.get("dup_count", 0)
         mode = result.get("mode", self.settings.get("backup_mode", "backup"))
-        # Remember orphan state for both modes: backup-mode uses the count
-        # for the post-backup review, sync-mode uses the rel list for the
-        # pre-delete review before rsync --delete.
+        # Remember orphans: backup-mode uses count for post-review, sync uses rels.
         orphans = result.get("orphans", [])
         self._last_scan_orphan_count = delete_count if mode == "backup" else 0
         self._last_scan_orphan_rels = list(orphans)
-        # Also remember backup_dest so orphan review can locate/delete files.
+        # Remember backup_dest for orphan review.
         drive_root = self._backup_drive_mountpoint()
         if drive_root:
             from pathlib import Path as _P
@@ -8138,8 +7950,7 @@ class MainWindow(Adw.ApplicationWindow):
                 else drive_root / "Pixora"
             )
 
-        # In backup mode, orphans are informational (kept). For the
-        # "already synced" check we ignore them.
+        # Backup-mode orphans are informational (kept); ignore for "synced" check.
         actionable_delete = delete_count if mode == "sync" else 0
 
         if new_count == 0 and actionable_delete == 0 and dup_count == 0:
@@ -8152,8 +7963,7 @@ class MainWindow(Adw.ApplicationWindow):
             log_info(_("Backup scan: everything in sync"))
             if hasattr(self, "_backup_donut_btn"):
                 self._set_donuts_visible(self._backup_running)
-            # Orphans in backup-mode are still worth surfacing on a manual
-            # click — user explicitly asked to check.
+            # Surface backup-mode orphans on manual click.
             if delete_count > 0 and mode == "backup" and manual_requested:
                 if (self.settings.get("backup_dedup")
                         and self._last_scan_orphan_rels):
@@ -8178,8 +7988,7 @@ class MainWindow(Adw.ApplicationWindow):
             n=new_count, d=delete_count, m=mode,
             b=bytes_to_transfer, u=dup_count,
         ))
-        # Silent-mode: skip the dialog and start backup, even on a manual
-        # check — user opted into auto-confirm.
+        # Silent-mode: start backup w/o dialog even on manual check.
         if silent:
             log_info(_("Silent mode: backup starts automatically without dialog"))
             if hasattr(self, "_backup_donut_btn"):
@@ -8187,7 +7996,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.start_backup()
             self._set_manual_scan_state("idle")
             return False
-        # Non-silent: hide donut (scan done, no backup running).
+        # Non-silent: hide donut.
         if hasattr(self, "_backup_donut_btn"):
             self._set_donuts_visible(self._backup_running)
         self._show_backup_scan_dialog(
@@ -8238,8 +8047,7 @@ class MainWindow(Adw.ApplicationWindow):
                                  dup_count=0, mode="backup"):
         if self._backup_scan_dialog_open:
             return
-        # Defer during startup (home-grid <2s visible) so the popup doesn't
-        # land on a half-loaded UI.
+        # Defer during startup (home-grid <2s) so popup avoids half-loaded UI.
         ready_at = getattr(self, "_home_ready_at", None)
         if ready_at is None or (time.time() - ready_at) < 2.0:
             GLib.timeout_add(500, self._show_backup_scan_dialog,
@@ -8262,7 +8070,7 @@ class MainWindow(Adw.ApplicationWindow):
                     delete_count,
                 ).format(n=delete_count))
             else:
-                # backup-mode: orphans are kept — purely informational.
+                # Backup-mode: orphans kept, informational only.
                 lines.append(ngettext(
                     "{n} photo on USB no longer in Pixora (kept)",
                     "{n} photos on USB no longer in Pixora (kept)",
@@ -8349,7 +8157,7 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._check_pending_backup)
 
     def _is_backup_pending(self):
-        """True if there's been an import since the last backup."""
+        """True if import happened since last backup."""
         if not self.settings.get("backup_enabled"):
             return False
         if not self.settings.get("backup_uuid"):
@@ -8359,7 +8167,7 @@ class MainWindow(Adw.ApplicationWindow):
         return last_import > last_backup
 
     def _backup_drive_mountpoint(self):
-        """Return Path of the backup drive when attached, else None."""
+        """Path of backup drive when attached, else None."""
         uuid = self.settings.get("backup_uuid")
         if not uuid:
             return None
@@ -8373,8 +8181,7 @@ class MainWindow(Adw.ApplicationWindow):
             return None
 
     def _check_pending_backup(self):
-        """After import or drive-attach: scan; the scan itself shows a dialog
-        on a non-empty diff, silent otherwise."""
+        """Scan after import/drive-attach; scan opens dialog on non-empty diff."""
         if self._backup_running or self._backup_scanning:
             return False
         if not (self.settings.get("backup_enabled")
@@ -8389,10 +8196,8 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _present_dialog(self, dlg):
-        """Parent the popup on the settings dialog if open, else on self.
-        Without this, the popup lands behind a modal settings and blocks
-        the taskbar. Never call self.present() — GNOME Shell then fires a
-        "Pixora is ready" notification and adds a taskbar badge."""
+        """Parent popup on settings dialog if open, else self.
+        Never call self.present() — GNOME Shell fires a "ready" notification."""
         parent = self._settings_dialog if self._settings_dialog is not None else self
         try:
             dlg.present(parent)
@@ -8403,7 +8208,7 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
 
     def _show_backup_pending_banner(self):
-        # Banner disabled — feedback now lives in the settings UI.
+        # Banner disabled — feedback lives in settings UI now.
         try:
             self.backup_pending_banner.set_revealed(False)
         except Exception:
@@ -8416,8 +8221,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _periodic_scan(self):
-        """60s tick: structure-scan first (works without a backup drive);
-        backup-scan runs via _on_periodic_structure_done once structure's done."""
+        """60s tick: structure-scan first, then backup-scan via callback."""
         try:
             ready_at = getattr(self, "_home_ready_at", None)
             if ready_at is None or (time.time() - ready_at) < 2.0:
@@ -8434,9 +8238,8 @@ class MainWindow(Adw.ApplicationWindow):
         return True
 
     def _poll_backup_drive(self):
-        """Drive attach/detach → UI update. Attach: scan for diff; detach:
-        grey out settings-backup + show banner."""
-        # Force-refresh lsblk so cache never lies about attach/detach state.
+        """Drive attach → scan for diff; detach → grey settings + banner."""
+        # Force-refresh lsblk so cache can't lie about attach state.
         _lsblk_data(force=True)
         drive_now = self._backup_drive_mountpoint() is not None
         just_attached = drive_now and not self._backup_drive_last_seen
@@ -8492,9 +8295,7 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._backup_thread, daemon=True).start()
 
     def _check_backup_dest_writable(self, drive_root, backup_dest):
-        """Return None if writable, else a clear error with a fix hint.
-        Tries dest first, then drive root — detects read-only even when
-        the dest folder doesn't exist yet."""
+        """None if writable, else error with hint. Tries dest then drive root."""
         candidates = [p for p in (backup_dest, drive_root)
                       if p is not None and os.path.isdir(str(p))]
         if not candidates:
@@ -8507,7 +8308,7 @@ class MainWindow(Adw.ApplicationWindow):
             os.remove(test_path)
             return None
         except OSError as exc:
-            if exc.errno == 30:  # EROFS — read-only filesystem
+            if exc.errno == 30:  # EROFS
                 return _(
                     "Backup drive is mounted read-only. This often happens with NTFS/exFAT after an unsafe eject on Windows.\n\nFix: unmount the drive in your file manager and reconnect it, or run in a terminal:\n  sudo ntfsfix /dev/sdXN\n(replace sdXN with your USB device, e.g. sdb1)"
                 )
@@ -8520,13 +8321,11 @@ class MainWindow(Adw.ApplicationWindow):
             )
 
     def _dedup_for_backup(self, photo_path, backup_dest):
-        """Return relative paths (from photo_path) to exclude from the backup
-        because they already exist on USB visually. Runs in the backup thread
-        before rsync so scans stay fast; popover shows "Duplicaat-check: X/Y"."""
+        """Relative paths to exclude from backup (visual dupes already on USB)."""
         if not self.settings.get("backup_dedup"):
             return []
 
-        # Filename-based set-diff; dedup only checks files not already on USB.
+        # Dedup only on files not already on USB.
         src_rels = set()
         try:
             for root, _dirs, files in os.walk(str(photo_path)):
@@ -8548,8 +8347,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not to_check or not dest_rels:
             return []
 
-        # 10% threshold: USB must hold a substantial library before pHash
-        # work is statistically worth it.
+        # 10% threshold: skip pHash unless USB has substantial lib.
         if len(dest_rels) * 10 < len(src_rels):
             log_info(_("Duplicate check skipped: USB is too empty ({d} photos vs {s} in Pixora)").format(
                 d=len(dest_rels), s=len(src_rels)))
@@ -8580,7 +8378,7 @@ class MainWindow(Adw.ApplicationWindow):
                     self._viewer_donut_btn.set_tooltip_text(tip)
                 except Exception:
                     pass
-            # Reuse the scan animation for the donut spinner.
+            # Reuse scan animation for donut.
             if self._backup_scan_anim_id is None:
                 self._backup_scan_anim_id = GLib.timeout_add(
                     80, self._tick_backup_scan)
@@ -8614,7 +8412,7 @@ class MainWindow(Adw.ApplicationWindow):
         return excluded
 
     def _set_dedup_detail(self, text):
-        """Thread-safe setter for popover subtitle during dedup."""
+        """Thread-safe popover subtitle during dedup."""
         self._backup_detail = text or ""
         if hasattr(self, "_backup_donut"):
             self._redraw_donuts()
@@ -8630,8 +8428,7 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._backup_finished, False, _("Backup drive not found."))
             return
         backup_dest = _P(backup_path_str) if backup_path_str else drive_root / "Pixora"
-        # Common case: NTFS/exFAT drive mounted read-only after unsafe eject
-        # on Windows. Tell the user early instead of crashing in rsync.
+        # NTFS/exFAT read-only after unsafe eject: warn early instead of rsync crash.
         ro_msg = self._check_backup_dest_writable(drive_root, backup_dest)
         if ro_msg is not None:
             GLib.idle_add(self._backup_finished, False, ro_msg)
@@ -8652,8 +8449,7 @@ class MainWindow(Adw.ApplicationWindow):
                         pass
 
         mode = self.settings.get("backup_mode", "backup")
-        # Dedup runs here (before rsync) so the scan dialog is always instant;
-        # pHash runs in the backup phase with visible progress in the donut.
+        # Dedup before rsync: scan dialog stays instant; pHash shows donut progress.
         excluded = self._dedup_for_backup(photo_path, backup_dest)
         exclude_file = None
         success = False
@@ -8718,7 +8514,7 @@ class MainWindow(Adw.ApplicationWindow):
                     "USB is mounted read-only. Unmount and reconnect it, or run `sudo ntfsfix /dev/sdXN` in a terminal."
                 )
             elif rsync_err:
-                # First line of rsync stderr usually holds the real reason.
+                # First line of rsync stderr = real reason.
                 first = rsync_err.splitlines()[0] if rsync_err else ""
                 note = _("Backup failed: {err}").format(err=first[:200])
             else:
@@ -8726,9 +8522,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._backup_finished, success, note)
 
     def _manual_backup(self, src, dst, delete_extraneous=False, excluded=None):
-        """Fallback without rsync: copy manually with progress.
-        delete_extraneous=True → sync: remove dst files not in src.
-        excluded = set of src-relative paths to skip (dedup matches)."""
+        """Fallback manual copy; delete_extraneous=sync mode; excluded=dedup skips."""
         excluded = excluded or set()
         try:
             all_src = []
@@ -8786,7 +8580,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _set_donuts_visible(self, visible):
-        """Keep header and viewer-overlay donut visibility in sync."""
+        """Sync header + viewer-overlay donut visibility."""
         for name in ("_backup_donut_btn", "_viewer_donut_btn"):
             btn = getattr(self, name, None)
             if btn is not None:
@@ -8805,8 +8599,7 @@ class MainWindow(Adw.ApplicationWindow):
                     pass
 
     def _draw_backup_donut(self, area, cr, w, h):
-        """Pie chart filling 0°→progress×360°. While scanning, a rotating
-        quarter-arc serves as indeterminate indicator."""
+        """Pie chart 0°→progress; scanning = rotating quarter-arc."""
         try:
             cx = w / 2
             cy = h / 2
@@ -8818,8 +8611,7 @@ class MainWindow(Adw.ApplicationWindow):
             cr.arc_negative(cx, cy, r_inner, 2 * math.pi, 0)
             cr.fill()
 
-            # Orange when backup-related; dark blue for structure/reorganize
-            # (no-backup context).
+            # Orange = backup-related; dark blue = structure/reorg.
             if (self._backup_scanning or self._backup_running
                     or self._orphan_reviewing):
                 color = (0.914, 0.329, 0.125)  # orange
@@ -8829,7 +8621,7 @@ class MainWindow(Adw.ApplicationWindow):
             if (self._backup_scanning or self._structure_scanning
                     or self._backup_deduping or self._orphan_reviewing):
                 start = self._backup_scan_phase - math.pi / 2
-                end = start + math.pi / 2  # quarter arc
+                end = start + math.pi / 2
                 cr.set_source_rgb(*color)
                 cr.move_to(cx, cy)
                 cr.arc(cx, cy, r_outer, start, end)
@@ -8841,13 +8633,13 @@ class MainWindow(Adw.ApplicationWindow):
                 cr.set_operator(cairo.OPERATOR_OVER)
                 return
 
-            # Progress mode: reorganize has priority, else backup.
+            # Progress: reorganize wins priority.
             if self._reorganize_moving:
                 frac = max(0.0, min(1.0, self._reorganize_fraction))
             else:
                 frac = max(0.0, min(1.0, self._backup_fraction))
             if frac > 0.001:
-                start = -math.pi / 2  # 12 o'clock
+                start = -math.pi / 2  # 12 o'clock origin
                 end = start + frac * 2 * math.pi
                 cr.set_source_rgb(*color)
                 cr.move_to(cx, cy)
@@ -8862,8 +8654,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _on_backup_donut_clicked(self, btn):
-        """Donut click → live-updating popover. Labels are stored as attrs
-        so _refresh_donut_popover can rewrite them in place."""
+        """Live-updating popover; labels stored as attrs for in-place refresh."""
         pop = Gtk.Popover()
         pop.set_parent(btn)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -8884,7 +8675,7 @@ class MainWindow(Adw.ApplicationWindow):
         pop.set_child(box)
         self._donut_popover = pop
         self._refresh_donut_popover()
-        # Refresh every 250ms while visible.
+        # 250ms refresh while visible.
         self._donut_pop_tick_id = GLib.timeout_add(
             250, self._refresh_donut_popover)
         def _on_closed(_p):
@@ -8904,7 +8695,7 @@ class MainWindow(Adw.ApplicationWindow):
         if pop is None or not hasattr(self, "_donut_pop_title"):
             return False
         is_sync = self.settings.get("backup_mode", "backup") == "sync"
-        # Pick title + visible fields based on what's running.
+        # Pick title/fields by what's running.
         if self._reorganize_moving:
             title = _("Updating folder structure")
             pct_val = int(max(0.0, min(1.0, self._reorganize_fraction)) * 100)
@@ -8964,8 +8755,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _show_backup_done_banner(self, success, note):
-        # Banner disabled — done feedback is a popup (same style as start
-        # dialog); heading toggles by backup_mode ("Sync voltooid" etc.).
+        # Banner disabled — done feedback is now a popup.
         try:
             self.backup_done_banner.set_revealed(False)
         except Exception:
@@ -8976,8 +8766,7 @@ class MainWindow(Adw.ApplicationWindow):
         has_orphans = (success and mode == "backup" and orphan_count > 0
                        and self._last_scan_orphan_rels)
 
-        # Orphans + dedup on → run pHash analysis + choice dialog (replaces
-        # the done popup). Without dedup, just a simple "heads up" message.
+        # Orphans + dedup → pHash analysis + choice dialog. No dedup → info popup.
         if has_orphans and dedup_on:
             log_info(_("Backup complete, orphan analysis started ({n} orphans)").format(n=orphan_count))
             threading.Thread(
@@ -8985,9 +8774,7 @@ class MainWindow(Adw.ApplicationWindow):
             ).start()
             return
 
-        # Silent-mode: skip success popup, keep error popups. Exception:
-        # orphans in backup-mode without dedup → still an info popup so the
-        # user knows something unexpected sits on the USB.
+        # Silent-mode: skip success popup, keep errors. Orphans still warn.
         if success and self.settings.get("backup_silent"):
             if has_orphans:
                 log_info(_("Silent mode: backup complete, {n} orphans reported").format(n=orphan_count))
@@ -9038,11 +8825,8 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _categorize_orphans(self, photo_path, backup_dest, orphan_rels,
                             progress_cb=None):
-        """pHash-match every orphan against the Pixora library. Returns
-        (dup_rels, unique_rels). progress_cb(cur, total, phase) where
-        phase='build' (hash-cache build) or phase='check' (comparing).
-        On import/hash error, everything falls into unique_rels — safer
-        default is not to flag as duplicate when unsure."""
+        """pHash-match orphans vs library → (dup_rels, unique_rels).
+        progress_cb(cur, total, phase); errors default everything to unique."""
         try:
             from importer_page import (
                 perceptual_hash, build_library_hashes, find_duplicate,
@@ -9052,7 +8836,7 @@ class MainWindow(Adw.ApplicationWindow):
             log_warn(_("Orphan analysis skipped: {err}").format(err=e))
             return [], list(orphan_rels)
 
-        # Throttle build_library_hashes progress to every 25 for calm UI.
+        # Throttle progress to every 25 for calm UI.
         def _build_progress(i, total, _name):
             if progress_cb and i % 25 == 0:
                 try:
@@ -9089,7 +8873,7 @@ class MainWindow(Adw.ApplicationWindow):
         return dup_rels, unique_rels
 
     def _start_orphan_review_ui(self):
-        """Enable donut spinner + tooltip for the pHash phase."""
+        """Donut spinner + tooltip for pHash phase."""
         tip = _("Analyzing for duplicate copies…")
         if hasattr(self, "_backup_donut_btn"):
             try:
@@ -9108,8 +8892,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _review_orphans_thread(self):
-        """After a backup: pHash-categorize orphans on USB, then show the
-        choice dialog."""
+        """After backup: pHash-categorize USB orphans, then choice dialog."""
         from pathlib import Path as _P
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
         backup_dest = self._last_scan_backup_dest
@@ -9117,8 +8900,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not backup_dest or not orphan_rels:
             return
 
-        # Donut spinner on during analysis so there's no "dead gap" between
-        # backup-done and the choice dialog.
+        # Donut on during analysis so no dead gap before choice dialog.
         self._orphan_reviewing = True
         GLib.idle_add(self._start_orphan_review_ui)
 
@@ -9142,7 +8924,7 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._show_orphan_review_dialog, dup_rels, unique_rels)
 
     def _finish_review_ui(self):
-        """Hide donut after orphan analysis completes."""
+        """Hide donut after orphan analysis."""
         if hasattr(self, "_backup_donut_btn"):
             try:
                 self._set_donuts_visible(self._backup_running)
@@ -9205,7 +8987,7 @@ class MainWindow(Adw.ApplicationWindow):
                 deleted += 1
             except OSError as e:
                 log_warn(_("Could not delete orphan: {p} ({err})").format(p=str(path), err=e))
-        # Prune empty dirs on USB bottom-up.
+        # Prune USB empty dirs bottom-up.
         try:
             for root, _dirs, _files in os.walk(
                     str(backup_dest), topdown=False):

@@ -58,10 +58,7 @@ BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "
 
 
 def get_available_drives():
-    """Return drives suitable as backup target. Mirrors main_window's
-    detector: accepts any of hotplug / removable / TRAN=usb / mount under
-    /media|/run/media|/mnt, so plain-hotplug-false USBs in virtualized
-    environments also show up."""
+    """Return external drives usable as backup target (mirrors main_window detector)."""
     drives = []
     SYS_MOUNTS = {"/", "/boot", "/boot/efi", "/home", "/var", "/usr", "/etc"}
     EXTERNAL_PREFIXES = ("/media/", "/run/media/", "/mnt/")
@@ -92,7 +89,7 @@ def get_available_drives():
             size = device.get("size") or ""
             mountpoint = (device.get("mountpoint") or "").strip()
             if mountpoint in SYS_MOUNTS:
-                pass  # skip system partition but still recurse into children
+                pass  # skip system partition, still recurse into children
             elif uuid and fstype in BACKUP_FSTYPES:
                 if _is_external(mountpoint, hotplug, rm, tran) and uuid not in seen_uuids:
                     seen_uuids.add(uuid)
@@ -118,12 +115,10 @@ class SetupWizard(Adw.Window):
         self.app = app
         self.drives = []
         self.selected_backup_path = None
-        self._chosen_lang = _lang  # starts at detected/settings language
+        self._chosen_lang = _lang  # from settings or detected locale
         self._chosen_thumb_size = 200
         self._chosen_structure = "year_month"
-        # Latest released version from GitHub; fetched async so wizard opens
-        # fast. Left empty on network failure — license page falls back to
-        # just "Pixora" without a number.
+        # Fetched async; empty on network failure → license shows "Pixora" only.
         self._released_version = ""
         threading.Thread(
             target=self._fetch_released_version, daemon=True
@@ -155,8 +150,7 @@ class SetupWizard(Adw.Window):
 
         self.stack.set_hexpand(True)
         self.stack.set_vexpand(True)
-        # Overlay the stack with a spinner-card we show during live language
-        # switches so the rebuild flash isn't visible.
+        # Spinner-card overlay masks the rebuild flash during live language switches.
         self.stack_overlay = Gtk.Overlay()
         self.stack_overlay.set_hexpand(True)
         self.stack_overlay.set_vexpand(True)
@@ -211,8 +205,7 @@ class SetupWizard(Adw.Window):
         btn_bar.append(self.next_btn)
 
         main_box.append(btn_bar)
-        # Pin a generous min content size so the window doesn't resize when
-        # language switches change the natural width of the pages.
+        # Pinned min size so the window doesn't resize on language switches.
         main_box.set_size_request(680, 600)
         self.set_content(main_box)
 
@@ -220,8 +213,7 @@ class SetupWizard(Adw.Window):
                       "duplicate", "thumbnail", "license"]
         self.current = 0
 
-        # Live drive-detection: fire a refresh ~1s after any block event so
-        # newly plugged USBs show up without having to click refresh.
+        # Live drive-detection: refresh ~1s after any block event so plugged USBs auto-appear.
         self._udev_client = None
         self._udev_refresh_id = None
         if _GUDEV_AVAILABLE:
@@ -240,14 +232,13 @@ class SetupWizard(Adw.Window):
         return sw
 
     def _on_dark_mode_changed(self, manager, _pspec):
-        # Welcome page uses the light/dark wordmark — refresh when theme flips.
+        # Welcome logo has light/dark variants — swap on theme change.
         if hasattr(self, "welcome_logo"):
             path = self._logo_path()
             if path:
                 self.welcome_logo.set_filename(path)
 
-    # Native display names, NOT translated — always shown in their own tongue.
-    # Flag emojis match the settings dialog (main_window.py:5340).
+    # Native names, never translated. Flags match Settings dialog (main_window.py:5340).
     _LANG_CODES  = ["nl", "en", "de", "fr"]
     _LANG_LABELS = ["🇳🇱  Nederlands", "🇬🇧  English", "🇩🇪  Deutsch", "🇫🇷  Français"]
 
@@ -261,7 +252,7 @@ class SetupWizard(Adw.Window):
         page.set_valign(Gtk.Align.CENTER)
         page.set_valign(Gtk.Align.START)
 
-        # SVG rendered at native size (340x120) so there's no downscale blur.
+        # Native size (340x120) avoids downscale blur.
         logo_center = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         logo_center.set_halign(Gtk.Align.CENTER)
         self.welcome_logo = Gtk.Picture()
@@ -308,7 +299,7 @@ class SetupWizard(Adw.Window):
 
         return page
 
-    # ── Pagina: Foto map ─────────────────────────────────────────────
+    # ── Page: photo folder ───────────────────────────────────────────
 
     def _build_folder(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -345,7 +336,7 @@ class SetupWizard(Adw.Window):
 
         return page
 
-    # ── Pagina: Mappen-structuur ─────────────────────────────────────
+    # ── Page: folder structure ───────────────────────────────────────
 
     def _build_structure(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -417,7 +408,7 @@ class SetupWizard(Adw.Window):
         if btn.get_active():
             self._chosen_structure = value
 
-    # ── Pagina: Backup ───────────────────────────────────────────────
+    # ── Page: backup ─────────────────────────────────────────────────
 
     def _build_backup(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -485,7 +476,7 @@ class SetupWizard(Adw.Window):
         self.backup_folder_row.set_sensitive(False)
         group.add(self.backup_folder_row)
 
-        # Backup-mode radios (same copy as the Settings dialog).
+        # Backup-mode radios (same copy as Settings dialog).
         self.radio_mode_backup = Gtk.CheckButton()
         self.radio_mode_backup.set_active(self._chosen_backup_mode == "backup")
         self.radio_mode_backup.connect(
@@ -525,8 +516,7 @@ class SetupWizard(Adw.Window):
         self._mode_sync_row.set_sensitive(False)
         group.add(self._mode_sync_row)
 
-        # Backup-dedup toggle (only effective once main duplicate-check is on,
-        # but we let the user set it here; MainWindow enforces at runtime).
+        # Dedup only effective if main dup-check is on; MainWindow enforces at runtime.
         self.backup_dedup_switch = Gtk.Switch()
         self.backup_dedup_switch.set_valign(Gtk.Align.CENTER)
         self.backup_dedup_switch.set_active(self._chosen_backup_dedup)
@@ -547,7 +537,6 @@ class SetupWizard(Adw.Window):
         self._dedup_row.set_sensitive(False)
         group.add(self._dedup_row)
 
-        # Auto-confirm (silent) toggle.
         self.backup_silent_switch = Gtk.Switch()
         self.backup_silent_switch.set_valign(Gtk.Align.CENTER)
         self.backup_silent_switch.set_active(self._chosen_backup_silent)
@@ -675,7 +664,6 @@ class SetupWizard(Adw.Window):
         self.thumb_scale.connect("value-changed", self._on_thumb_scale_changed)
         scale_row.add_suffix(self.thumb_scale)
 
-        # Reset-to-default button (same icon as Settings).
         self.thumb_reset_btn = Gtk.Button(icon_name="edit-undo-symbolic")
         self.thumb_reset_btn.add_css_class("flat")
         self.thumb_reset_btn.add_css_class("circular")
@@ -705,7 +693,7 @@ class SetupWizard(Adw.Window):
         return page
 
     def _on_thumb_scale_changed(self, scale):
-        # Round to 25-px steps to match the scale's increment.
+        # Snap to 25-px increment.
         self._chosen_thumb_size = int(round(scale.get_value() / 25) * 25)
         if hasattr(self, "_thumb_preview") and self._thumb_preview is not None:
             try:
@@ -719,12 +707,9 @@ class SetupWizard(Adw.Window):
                 pass
 
     def _draw_wizard_thumb_preview(self, area, cr, w, h):
-        """Mirror of main_window's _draw_thumb_preview: mock home-grid with
-        header strip and Pixora icon so the wizard and Settings show the
-        same visualization."""
+        """Mock home-grid preview; mirrors main_window._draw_thumb_preview."""
         try:
             size = getattr(self, "_chosen_thumb_size", 200)
-            # Clip to rounded card.
             outer_r = 10.0
             cr.new_sub_path()
             cr.arc(w - outer_r, outer_r, outer_r, -math.pi / 2, 0)
@@ -771,7 +756,7 @@ class SetupWizard(Adw.Window):
             cr.rectangle(18, header_h / 2 - 1, 28, 2)
             cr.fill()
 
-            # 12% scale reads well in the 140-wide canvas (true range 200→500 px).
+            # 12% scale reads well in a 140-wide canvas (real range 200→500 px).
             scale = 0.12
             base = size * scale
             gap = max(3.0, base * 0.08)
@@ -831,11 +816,10 @@ class SetupWizard(Adw.Window):
         except Exception:
             pass
 
-    # ── Pagina: Licentie ─────────────────────────────────────────────
+    # ── Page: license ────────────────────────────────────────────────
 
     def _build_license(self):
-        """Mirror of main_window._on_view_license: ✓/!/✗ summary plus the
-        full LICENSE text embedded inline."""
+        """✓/!/✗ summary + inline LICENSE text; mirrors main_window._on_view_license."""
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         page.set_margin_top(20)
         page.set_margin_bottom(20)
@@ -928,9 +912,7 @@ class SetupWizard(Adw.Window):
         return f"© 2024 {product} · LinuxGinger"
 
     def _fetch_released_version(self):
-        """Background: ask GitHub Releases API for the tag of the latest
-        release. Short timeout + silent failure — first-time users may have
-        no network yet and we don't want to stall the UI."""
+        """Fetch latest release tag from GitHub; silent failure so UI never stalls."""
         try:
             req = urllib.request.Request(
                 "https://api.github.com/repos/Linux-Ginger/Pixora/releases/latest",
@@ -946,7 +928,7 @@ class SetupWizard(Adw.Window):
 
     def _apply_released_version(self, version):
         self._released_version = version
-        # Refresh the visible copyright label if the license page is built.
+        # Refresh copyright label if license page already built.
         if hasattr(self, "_copyright_label") and self._copyright_label is not None:
             try:
                 self._copyright_label.set_text(self._copyright_text())
@@ -955,8 +937,7 @@ class SetupWizard(Adw.Window):
         return False
 
     def _license_summary_col(self, title, icon_char, css_class, items):
-        """Same layout as main_window._license_summary_col — Unicode badge
-        (✓ / ! / ✗) so we don't depend on an icon theme."""
+        """Unicode badge (✓/!/✗) avoids icon-theme dependency; mirrors main_window."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         badge = Gtk.Label(label=icon_char)
@@ -977,7 +958,7 @@ class SetupWizard(Adw.Window):
             box.append(lbl)
         return box
 
-    # ── Live language switch ────────────────────────────────────────────
+    # ── Live language switch ─────────────────────────────────────────
 
     def _on_lang_selected(self, combo, _pspec):
         idx = combo.get_selected()
@@ -986,8 +967,7 @@ class SetupWizard(Adw.Window):
         new_lang = self._LANG_CODES[idx]
         if new_lang == self._chosen_lang:
             return
-        # Show the spinner *before* the heavy rebuild so the user sees feedback;
-        # the short timeout lets GTK actually paint the overlay.
+        # Show spinner before rebuild; timeout lets GTK paint the overlay first.
         self.lang_spinner_box.set_visible(True)
         GLib.timeout_add(80, self._apply_language_switch, new_lang)
 
@@ -1020,7 +1000,7 @@ class SetupWizard(Adw.Window):
 
         self._apply_wizard_state()
 
-        # Re-translate the things that live outside the stack.
+        # Re-translate widgets outside the stack.
         self.set_title(_("Pixora Setup"))
         self.back_btn.set_label(_("Back"))
         self.next_btn.set_label(
@@ -1029,7 +1009,7 @@ class SetupWizard(Adw.Window):
         self.lang_spinner_label.set_text(_("Switching language…"))
 
         self.lang_spinner_box.set_visible(False)
-        return False  # don't repeat
+        return False
 
     def _capture_wizard_state(self):
         if hasattr(self, "folder_entry"):
@@ -1040,8 +1020,7 @@ class SetupWizard(Adw.Window):
             self._chosen_drive_idx = self.drive_combo.get_selected()
         if hasattr(self, "dup_switch"):
             self._chosen_dup = self.dup_switch.get_active()
-        # _chosen_thumb_size + _chosen_lang + selected_backup_path already live
-        # on self and survive the rebuild on their own.
+        # _chosen_thumb_size, _chosen_lang, selected_backup_path already on self.
 
     def _apply_wizard_state(self):
         if hasattr(self, "folder_entry") and hasattr(self, "_chosen_folder"):
@@ -1119,9 +1098,7 @@ class SetupWizard(Adw.Window):
         active = switch.get_active()
         self.drive_row.set_sensitive(active)
         self.drive_combo.set_sensitive(active and bool(self.drives))
-        # Folder-row stays off until a drive is actually selected; without
-        # a drive there's nothing valid to browse. _on_drive_selected
-        # enables it.
+        # Folder-row stays off until a drive is selected (see _on_drive_selected).
         has_drive = (
             bool(self.drives)
             and self.drive_combo.get_selected() < len(self.drives)
@@ -1139,16 +1116,14 @@ class SetupWizard(Adw.Window):
     def _on_drive_selected(self, combo, _pspec):
         selected = combo.get_selected()
         if self.drives and selected < len(self.drives):
-            # Only unlock the folder row if backup-mode itself is enabled.
+            # Only unlock folder-row if backup is enabled.
             self.backup_folder_row.set_sensitive(self.backup_switch.get_active())
             self.backup_folder_row.set_subtitle(_("No folder chosen yet"))
             self.selected_backup_path = None
             self.backup_error.set_visible(False)
 
     def _on_browse_backup_folder(self, btn):
-        """Use the same custom picker as the Settings dialog instead of the
-        GNOME file chooser — it's confined to the USB root, has inline
-        'create subfolder', and sidesteps the GNOME dialog's quirks."""
+        """Custom picker confined to USB root with inline 'create subfolder'; avoids GNOME dialog quirks."""
         selected = self.drive_combo.get_selected()
         if not (self.drives and selected < len(self.drives)):
             return
@@ -1202,10 +1177,7 @@ class SetupWizard(Adw.Window):
         threading.Thread(target=do_refresh, daemon=True).start()
 
     def _on_block_event(self, client, action, device):
-        # 'add' = new device registered; 'change' = partition table rescanned
-        # (e.g. after auto-mount assigns a mountpoint). Debounce a refresh
-        # a second later — lsblk needs a beat after udev before UUID/fstype
-        # are filled in.
+        # Debounce 1s: lsblk needs a beat after udev before UUID/fstype are populated.
         if action not in ("add", "change"):
             return
         if self._udev_refresh_id is not None:
@@ -1217,8 +1189,7 @@ class SetupWizard(Adw.Window):
 
     def _udev_trigger_refresh(self):
         self._udev_refresh_id = None
-        # Only refresh if the backup page has been built — otherwise
-        # there's nothing to update.
+        # Only refresh if backup page is built.
         if hasattr(self, "refresh_btn"):
             self._on_refresh_drives(None)
         return False
@@ -1241,8 +1212,7 @@ class SetupWizard(Adw.Window):
             self.drive_model.remove(0)
 
         self.drives = drives
-        # Keep combo usable when backup is on but no drives yet, so user can
-        # re-click refresh.
+        # Keep combo usable when backup is on but no drives yet (for refresh retry).
         backup_on = self.backup_switch.get_active() if hasattr(self, "backup_switch") else True
         if drives:
             for uuid, label in drives:
@@ -1250,9 +1220,7 @@ class SetupWizard(Adw.Window):
         else:
             self.drive_model.append(_("No external drives found"))
         self.drive_combo.set_sensitive(backup_on and bool(drives))
-        # Folder-row follows the drive-selected state. A fresh drives list
-        # re-selects index 0, which may or may not fire notify::selected —
-        # update here explicitly so the row doesn't stay locked out.
+        # Explicit toggle: re-selecting index 0 may not fire notify::selected.
         if hasattr(self, "backup_folder_row"):
             self.backup_folder_row.set_sensitive(backup_on and bool(drives))
 
@@ -1295,9 +1263,7 @@ class SetupWizard(Adw.Window):
             "thumbnail_size":      self._chosen_thumb_size,
         }
 
-        # Atomic write + 0600: same pattern as save_settings in main_window.
-        # Crash mid-write leaves the previous file intact (or no file, which
-        # cleanly re-triggers the wizard) instead of a corrupt half-JSON.
+        # Atomic write + 0600: crash mid-write leaves prior file (or none) intact, never half-JSON.
         os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
         tmp = CONFIG_PATH + ".tmp"
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -1307,11 +1273,7 @@ class SetupWizard(Adw.Window):
 
         from main_window import MainWindow
         win = MainWindow(self.app, settings)
-        # set_visible (not present): present() on GNOME Shell fires a
-        # "Pixora is ready" notification and, combined with immediately
-        # closing the wizard, can leave MainWindow registered-but-never-mapped
-        # so the whole app stays alive invisibly.
+        # set_visible (not present()): avoids GNOME "Pixora is ready" notification + hidden-window bug.
         win.set_visible(True)
-        # Defer our own close so the new window is fully mapped before the
-        # wizard disappears from the compositor's window list.
+        # Defer close so MainWindow is fully mapped before wizard leaves compositor list.
         GLib.idle_add(self.close)

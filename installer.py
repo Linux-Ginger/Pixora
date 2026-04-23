@@ -2,7 +2,7 @@
 
 # ─────────────────────────────────────────────
 #  Pixora — installer.py
-#  Grafische installer (GTK4/Adwaita)
+#  Graphical installer (GTK4/Adwaita)
 #  by LinuxGinger
 # ─────────────────────────────────────────────
 
@@ -44,18 +44,14 @@ RELEASES_API = "https://api.github.com/repos/Linux-Ginger/Pixora/releases"
 
 
 def _ensure_icon_installed():
-    """Install the Pixora icon AND a minimal .desktop for the installer
-    so GNOME Shell can match the running window to our logo instead of
-    the default gear. On Wayland set_icon_name() alone doesn't work —
-    Shell resolves the icon by application-id via a .desktop file."""
+    """Install icon + .desktop so GNOME Shell maps window to our logo (Wayland)."""
     try:
         if not ICON_PATH.exists():
             return
         icons_dir = (Path.home() / ".local" / "share" / "icons"
                      / "hicolor" / "scalable" / "apps")
         icons_dir.mkdir(parents=True, exist_ok=True)
-        # Two icon names: pixora-icon (generic) + app-id name (GNOME Shell
-        # matches this against StartupWMClass of the running window).
+        # Two names: generic + app-id (Shell matches StartupWMClass).
         for name in ("pixora-icon.svg",
                      "com.linuxginger.pixora.installer.svg"):
             dest = icons_dir / name
@@ -64,17 +60,12 @@ def _ensure_icon_installed():
                 shutil.copy(ICON_PATH, dest)
     except Exception:
         pass
-    # Minimal .desktop — NoDisplay hides it from the app-grid; Shell only
-    # uses it for window→icon mapping.
+    # Minimal .desktop: only used by Shell for window→icon mapping.
     try:
         desktop_dir = Path.home() / ".local" / "share" / "applications"
         desktop_dir.mkdir(parents=True, exist_ok=True)
         desktop_file = desktop_dir / "com.linuxginger.pixora.installer.desktop"
-        # Absolute Icon-path is betrouwbaarder dan theme-name lookup —
-        # GNOME Shell leest het bestand direct, onafhankelijk van de
-        # hicolor-cache state. Geen NoDisplay=true omdat sommige Shell-
-        # versies .desktops met NoDisplay=true uit de window-match-map
-        # filteren.
+        # Absolute Icon path beats theme lookup; bypasses hicolor-cache state.
         content = (
             "[Desktop Entry]\n"
             "Type=Application\n"
@@ -118,8 +109,7 @@ class InstallerWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title(_("Pixora Installer"))
-        # Match the application-id so the installed .desktop resolves
-        # this window to our icon (Shell uses app-id for lookup).
+        # Match app-id so .desktop resolves window→icon via Shell lookup.
         self.set_icon_name("com.linuxginger.pixora.installer")
         self.set_default_size(460, 360)
         self.set_resizable(False)
@@ -133,7 +123,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         header.set_show_start_title_buttons(False)
         toolbar.add_top_bar(header)
 
-        # Twee schermen: versie-kiezer en installatie-voortgang
+        # Two screens: version picker and install progress.
         self.main_stack = Gtk.Stack()
         self.main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.main_stack.set_transition_duration(200)
@@ -143,10 +133,10 @@ class InstallerWindow(Adw.ApplicationWindow):
         toolbar.set_content(self.main_stack)
         self.set_content(toolbar)
 
-        # Releases ophalen op achtergrond
+        # Fetch releases in background.
         threading.Thread(target=self._fetch_releases, daemon=True).start()
 
-    # ── Versie-kiezer pagina ───────────────────────────────────────────
+    # ── Version picker page ───────────────────────────────────────────
 
     def _build_select_page(self):
         version_file = Path.home() / ".config" / "pixora" / "installed_version"
@@ -167,7 +157,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         scroll.set_child(page)
 
-        # Logo / titel
+        # Logo / title
         top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         top.set_margin_top(20)
         top.set_margin_bottom(16)
@@ -185,7 +175,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         page.append(top)
 
-        # Versie selectie
+        # Version selection
         ver_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         ver_box.set_margin_start(24)
         ver_box.set_margin_end(24)
@@ -226,14 +216,14 @@ class InstallerWindow(Adw.ApplicationWindow):
         ver_box.append(listbox)
         page.append(ver_box)
 
-        # Installeren / bijwerken knop
+        # Install / update button
         btn_box = Gtk.Box()
         btn_box.set_margin_start(24)
         btn_box.set_margin_end(24)
         btn_box.set_margin_top(8)
         btn_box.set_margin_bottom(20)
 
-        btn_label = _("Update") if already_installed else _("Installing")  # bijgewerkt door _fetch_releases
+        btn_label = _("Update") if already_installed else _("Installing")  # updated by _fetch_releases
         self.install_btn = Gtk.Button(label=btn_label)
         self.install_btn.add_css_class("suggested-action")
         self.install_btn.add_css_class("pill")
@@ -245,7 +235,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         page.append(btn_box)
         return scroll
 
-    # ── Installatie-voortgang pagina ───────────────────────────────────
+    # ── Install progress page ───────────────────────────────────
 
     def _build_install_page(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -325,7 +315,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         return page
 
-    # ── Releases ophalen ──────────────────────────────────────────────
+    # ── Fetch releases ──────────────────────────────────────────────
 
     def _make_logo(self, size):
         if ICON_PATH.exists():
@@ -397,7 +387,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         self.version_combo.set_selected(0)
         return False
 
-    # ── Install starten ───────────────────────────────────────────────
+    # ── Start install ───────────────────────────────────────────────
 
     def _on_install_clicked(self, btn):
         selected = self.version_combo.get_selected()
@@ -450,7 +440,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         GLib.idle_add(self.progress.set_fraction, 1.0)
 
-    # ── Installatie stappen ───────────────────────────────────────────
+    # ── Install steps ───────────────────────────────────────────
 
     def _clone_repo(self):
         try:
@@ -489,7 +479,7 @@ class InstallerWindow(Adw.ApplicationWindow):
                            check=True, capture_output=True)
         except subprocess.CalledProcessError:
             return False, _("apt failed")
-        # WebKit typelib — probeer 6.0 eerst, valt terug op 4.1
+        # WebKit typelib: try 6.0, fall back to 4.1.
         for wk in ("gir1.2-webkit-6.0", "gir1.2-webkit2-4.1"):
             try:
                 subprocess.run(["sudo", "apt-get", "install", "-y", "-qq", wk],
@@ -533,8 +523,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
             icon = INSTALL_DIR / "assets" / "logos" / "pixora-icon.svg"
             desktop = DESKTOP_DIR / "pixora.desktop"
-            # .desktop-file i18n: GenericName[xx]= / Comment[xx]= worden door de
-            # desktop-environment gekozen op basis van $LANG van de gebruiker.
+            # .desktop i18n: DE picks GenericName[xx]/Comment[xx] by $LANG.
             desktop.write_text(
                 "[Desktop Entry]\n"
                 "Name=Pixora\n"
@@ -567,10 +556,8 @@ class InstallerWindow(Adw.ApplicationWindow):
         return True, ""
 
     def _install_apparmor_profile(self):
-        # Ubuntu 24.04+ blokkeert unprivileged user-namespaces via AppArmor,
-        # waardoor WebKit's sandbox (kaart-weergave) faalt. Dit profile geeft
-        # alleen Pixora de userns-permission; de system-wide AppArmor-
-        # restrictie blijft intact voor andere apps.
+        # Ubuntu 24.04+ blocks userns via AppArmor; grant it only to Pixora
+        # so WebKit's sandbox (map view) works without loosening global policy.
         if not os.path.isdir("/etc/apparmor.d"):
             return
         profile_path = "/etc/apparmor.d/pixora"
@@ -605,21 +592,15 @@ class InstallerWindow(Adw.ApplicationWindow):
                 installed_version_file.parent.mkdir(parents=True, exist_ok=True)
                 installed_version_file.write_text(version_src.read_text())
 
-            # Prefer the installed launcher when it exists; otherwise run
-            # main.py directly.
+            # Prefer installed launcher; otherwise run main.py directly.
             pixora_bin = Path.home() / ".local" / "bin" / "pixora"
             if pixora_bin.exists():
                 cmd = [str(pixora_bin)]
             else:
                 main_py = INSTALL_DIR / "viewer" / "main.py"
                 cmd = [sys.executable, str(main_py)]
-            # Detach from the installer's process group and redirect IO —
-            # without start_new_session + DEVNULL pipes, the installer's
-            # own quit() (1.5s later) sends SIGHUP to the child Pixora
-            # before it finishes its splash, and Pixora dies silently.
-            # PIXORA_IN_DEV_TERM=1 voorkomt dat main.py een gnome-terminal
-            # probeert te spawnen als dev_mode aanstaat (die spawn faalt
-            # vaak in virtualized setups → Pixora opent dan nooit).
+            # Detach from installer PG + DEVNULL so quit() doesn't SIGHUP Pixora.
+            # PIXORA_IN_DEV_TERM=1 skips dev-terminal spawn (fails in VMs).
             child_env = dict(os.environ)
             child_env["PIXORA_IN_DEV_TERM"] = "1"
             child_env.pop("PIXORA_DEV_LOG_OPENED", None)
