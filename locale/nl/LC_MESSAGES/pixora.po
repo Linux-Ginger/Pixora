@@ -2328,3 +2328,18 @@ msgstr "Hoe groot foto's in het overzicht tonen."
 
 msgid "⚠️  The selected drive is not mounted"
 msgstr "⚠️  De gekozen schijf is niet gekoppeld"
+
+msgid "Performance"
+msgstr "Prestaties"
+
+msgid "Turn off animations for a faster, snappier feel on slow systems (VMs, no GPU acceleration)."
+msgstr "Schakel animaties uit voor een vlottere ervaring op trage systemen (VMs, geen GPU-acceleratie)."
+
+msgid "Reduce animations"
+msgstr "Animaties verminderen"
+
+msgid "Disables fade/slide transitions between views."
+msgstr "Zet fade/slide-overgangen tussen schermen uit."
+
+msgid "Failed to save animations_enabled: {e}"
+msgstr "Kon animations_enabled niet opslaan: {e}"

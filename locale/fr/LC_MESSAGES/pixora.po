@@ -2356,3 +2356,18 @@ msgstr "Taille des photos dans la vue en grille."
 
 msgid "⚠️  The selected drive is not mounted"
 msgstr "⚠️  Le lecteur sélectionné n'est pas monté"
+
+msgid "Performance"
+msgstr "Performances"
+
+msgid "Turn off animations for a faster, snappier feel on slow systems (VMs, no GPU acceleration)."
+msgstr "Désactive les animations pour une interface plus réactive sur les systèmes lents (VMs, pas d'accélération GPU)."
+
+msgid "Reduce animations"
+msgstr "Réduire les animations"
+
+msgid "Disables fade/slide transitions between views."
+msgstr "Désactive les transitions fondu/glissement entre les vues."
+
+msgid "Failed to save animations_enabled: {e}"
+msgstr "Échec de l'enregistrement de animations_enabled : {e}"

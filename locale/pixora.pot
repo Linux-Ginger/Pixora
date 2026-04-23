@@ -1486,3 +1486,18 @@ msgstr ""
 
 msgid "⚠️  The selected drive is not mounted"
 msgstr ""
+
+msgid "Performance"
+msgstr ""
+
+msgid "Turn off animations for a faster, snappier feel on slow systems (VMs, no GPU acceleration)."
+msgstr ""
+
+msgid "Reduce animations"
+msgstr ""
+
+msgid "Disables fade/slide transitions between views."
+msgstr ""
+
+msgid "Failed to save animations_enabled: {e}"
+msgstr ""

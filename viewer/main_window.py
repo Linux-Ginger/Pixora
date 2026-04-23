@@ -1458,6 +1458,10 @@ class MainWindow(Adw.ApplicationWindow):
         # Pre-warm drive cache so the first Settings/backup click doesn't
         # pay a ~5s synchronous lsblk. Cheap on its own thread.
         _warm_lsblk_cache_async()
+        # Apply animation preference to every Gtk.Stack we just built. When
+        # animations are off, transition_duration(0) makes view switches
+        # snap instantly — helps on slow/VM renderers.
+        self._apply_animations_state()
         self._ios_device_present = False
         self._recovery_prompt_active = False
         self._recovery_cooldown_until = 0.0
@@ -1473,6 +1477,21 @@ class MainWindow(Adw.ApplicationWindow):
             save_metadata_cache()
             return True  # keep repeating
         GLib.timeout_add_seconds(300, _periodic_save_cache)
+
+    def _apply_animations_state(self):
+        """Gate the Adwaita transition-durations on the user's preference.
+        When animations are off we set every stack to 0ms so view-swaps
+        are instant — big difference on VM/software-rendered GTK."""
+        enabled = bool(self.settings.get("animations_enabled", True))
+        main_d = 200 if enabled else 0
+        content_d = 150 if enabled else 0
+        bottom_d = 150 if enabled else 0
+        if hasattr(self, "main_stack"):
+            self.main_stack.set_transition_duration(main_d)
+        if hasattr(self, "content_stack"):
+            self.content_stack.set_transition_duration(content_d)
+        if hasattr(self, "bottom_stack"):
+            self.bottom_stack.set_transition_duration(bottom_d)
 
     def _start_services(self):
         try:
@@ -5386,6 +5405,27 @@ class MainWindow(Adw.ApplicationWindow):
 
         display_page.add(display_group)
 
+        perf_group = Adw.PreferencesGroup()
+        perf_group.set_title(_("Performance"))
+        perf_group.set_description(
+            _("Turn off animations for a faster, snappier feel on slow systems (VMs, no GPU acceleration).")
+        )
+        self._anim_switch = Gtk.Switch()
+        self._anim_switch.set_valign(Gtk.Align.CENTER)
+        self._anim_switch.set_active(
+            not bool(self.settings.get("animations_enabled", True))
+        )
+        self._anim_switch.connect("notify::active", self._on_anim_toggle)
+        anim_row = Adw.ActionRow(
+            title=_("Reduce animations"),
+            subtitle=_("Disables fade/slide transitions between views."),
+        )
+        anim_row.add_prefix(Gtk.Image.new_from_icon_name("media-playback-pause-symbolic"))
+        anim_row.add_suffix(self._anim_switch)
+        anim_row.set_activatable_widget(self._anim_switch)
+        perf_group.add(anim_row)
+        advanced_page.add(perf_group)
+
         dev_group = Adw.PreferencesGroup()
         dev_group.set_title(_("Advanced"))
         dev_group.set_description(
@@ -6164,6 +6204,16 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_error(_("Restart sentinel write failed: {err}").format(err=e))
         GLib.timeout_add(600, lambda: (self.get_application().quit(), False)[1])
+
+    def _on_anim_toggle(self, switch, _pspec):
+        # Switch is "Reduce animations" — ACTIVE means reduce → animations_enabled=False.
+        reduce = switch.get_active()
+        self.settings["animations_enabled"] = not reduce
+        try:
+            save_settings(self.settings)
+        except Exception as e:
+            log_error(_("Failed to save animations_enabled: {e}").format(e=e))
+        self._apply_animations_state()
 
     def _on_toggle_dev_mode(self, btn, row):
         currently_active = bool(self.settings.get("dev_mode", False))

@@ -2310,3 +2310,18 @@ msgstr "How big photos appear in the grid."
 
 msgid "⚠️  The selected drive is not mounted"
 msgstr "⚠️  The selected drive is not mounted"
+
+msgid "Performance"
+msgstr "Performance"
+
+msgid "Turn off animations for a faster, snappier feel on slow systems (VMs, no GPU acceleration)."
+msgstr "Turn off animations for a faster, snappier feel on slow systems (VMs, no GPU acceleration)."
+
+msgid "Reduce animations"
+msgstr "Reduce animations"
+
+msgid "Disables fade/slide transitions between views."
+msgstr "Disables fade/slide transitions between views."
+
+msgid "Failed to save animations_enabled: {e}"
+msgstr "Failed to save animations_enabled: {e}"

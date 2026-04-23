@@ -2340,3 +2340,18 @@ msgstr "Wie groß Fotos in der Übersicht angezeigt werden."
 
 msgid "⚠️  The selected drive is not mounted"
 msgstr "⚠️  Das gewählte Laufwerk ist nicht eingehängt"
+
+msgid "Performance"
+msgstr "Leistung"
+
+msgid "Turn off animations for a faster, snappier feel on slow systems (VMs, no GPU acceleration)."
+msgstr "Animationen deaktivieren für eine flüssigere Nutzung auf langsamen Systemen (VMs, keine GPU-Beschleunigung)."
+
+msgid "Reduce animations"
+msgstr "Animationen reduzieren"
+
+msgid "Disables fade/slide transitions between views."
+msgstr "Deaktiviert Fade-/Slide-Übergänge zwischen Ansichten."
+
+msgid "Failed to save animations_enabled: {e}"
+msgstr "animations_enabled konnte nicht gespeichert werden: {e}"
