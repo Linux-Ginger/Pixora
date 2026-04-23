@@ -15,6 +15,7 @@ INSTALL_DIR="$HOME/.local/share/pixora"
 
 GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
+WHITE='\033[1;97m'   # bold bright white — leesbaar op zowel dark als light
 BOLD='\033[1m'
 NC='\033[0m'
 
@@ -59,16 +60,23 @@ if ! command -v apt &> /dev/null; then
     exit 1
 fi
 
-# Fallback ASCII art for wanneer chafa er niet is / geen net / etc.
+# Block-letter "PIXORA" text in wit. Wordt zowel in de fallback als
+# naast het chafa-icoon gebruikt.
+PIXORA_TEXT=(
+"██████╗ ██╗██╗  ██╗ ██████╗ ██████╗  █████╗ "
+"██╔══██╗██║╚██╗██╔╝██╔═══██╗██╔══██╗██╔══██╗"
+"██████╔╝██║ ╚███╔╝ ██║   ██║██████╔╝███████║"
+"██╔═══╝ ██║ ██╔██╗ ██║   ██║██╔══██╗██╔══██║"
+"██║     ██║██╔╝ ██╗╚██████╔╝██║  ██║██║  ██║"
+"╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝"
+)
+
+# Fallback voor wanneer chafa/curl/internet er niet is.
 print_ascii_logo() {
-    echo -e "${ORANGE}${BOLD}"
-    echo "  ██████╗ ██╗██╗  ██╗ ██████╗ ██████╗  █████╗ "
-    echo "  ██╔══██╗██║╚██╗██╔╝██╔═══██╗██╔══██╗██╔══██╗"
-    echo "  ██████╔╝██║ ╚███╔╝ ██║   ██║██████╔╝███████║"
-    echo "  ██╔═══╝ ██║ ██╔██╗ ██║   ██║██╔══██╗██╔══██║"
-    echo "  ██║     ██║██╔╝ ██╗╚██████╔╝██║  ██║██║  ██║"
-    echo "  ╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝"
-    echo -e "${NC}"
+    local line
+    for line in "${PIXORA_TEXT[@]}"; do
+        printf '%b%s%b\n' "${WHITE}" "  $line" "${NC}"
+    done
 }
 
 # Eerst ASCII art tonen zodat de user direct feedback heeft. Na deps-
@@ -93,9 +101,9 @@ sudo apt-get install -y -qq \
     curl \
     2>/dev/null
 
-# Echte logo rendering. Alleen het aperture-icoon (kleurige bloem)
-# via chafa; de "PIXORA" tekst blijft als block-ASCII eronder want
-# wordmark-render wordt op terminal-grootte onleesbaar.
+# Echte logo rendering. Chafa tekent alleen het aperture-icoon
+# (kleurige bloem); daarnaast zetten we de "PIXORA" block-ASCII,
+# line-by-line verticaal gecentreerd tegen het icoon.
 render_real_logo() {
     if ! command -v chafa &>/dev/null; then return 1; fi
     if ! command -v curl   &>/dev/null; then return 1; fi
@@ -107,36 +115,36 @@ render_real_logo() {
         return 1
     fi
     local out
-    # Icon is viewBox 0 0 120 120 (1:1). Chafa gebruikt half-blocks
-    # verticaal, dus 18x9 cellen → visueel ~18x18 pixel-resolutie.
+    # Icon viewBox 0 0 120 120 (1:1). 18x9 cellen = ~18×18 logische
+    # pixels bij half-block rendering — genoeg detail voor de bloem.
     out=$(chafa --size 18x9 "$tmp" 2>/dev/null)
     rm -f "$tmp"
     if [ -z "$out" ]; then return 1; fi
+
+    local -a icon_arr
+    mapfile -t icon_arr <<< "$out"
+    local icon_rows=${#icon_arr[@]}
+    local text_rows=${#PIXORA_TEXT[@]}
+    # Verticaal centreren: offset = hoeveel blank boven text om 'm onder
+    # het icoon hoogte-te-lijnen te krijgen.
+    local vpad=$(( (icon_rows - text_rows) / 2 ))
+    local max=$icon_rows
+    [ "$text_rows" -gt "$max" ] && max=$text_rows
+
     clear
     echo ""
-    # Links: kleurige aperture-flower. Rechts: tekst-banner.
-    # Paste ze side-by-side met paste(1).
-    local text_file flower_file combined
-    text_file=$(mktemp) || { echo "$out"; return 0; }
-    flower_file=$(mktemp) || { rm -f "$text_file"; echo "$out"; return 0; }
-    printf '%s\n' "$out" > "$flower_file"
-    {
-        echo ""
-        echo -e "${ORANGE}${BOLD}██████╗ ██╗██╗  ██╗ ██████╗ ██████╗  █████╗${NC}"
-        echo -e "${ORANGE}${BOLD}██╔══██╗██║╚██╗██╔╝██╔═══██╗██╔══██╗██╔══██╗${NC}"
-        echo -e "${ORANGE}${BOLD}██████╔╝██║ ╚███╔╝ ██║   ██║██████╔╝███████║${NC}"
-        echo -e "${ORANGE}${BOLD}██╔═══╝ ██║ ██╔██╗ ██║   ██║██╔══██╗██╔══██║${NC}"
-        echo -e "${ORANGE}${BOLD}██║     ██║██╔╝ ██╗╚██████╔╝██║  ██║██║  ██║${NC}"
-        echo -e "${ORANGE}${BOLD}╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝${NC}"
-        echo ""
-    } > "$text_file"
-    # paste werkt met TAB-separator; -d ' ' scheidt met een spatie.
-    # pad flower naar gelijk aantal regels via printf-herhaling, maar
-    # simpeler: gewoon onder elkaar. Geeft minder brede banner maar
-    # blijft leesbaar.
-    cat "$flower_file"
-    cat "$text_file"
-    rm -f "$flower_file" "$text_file"
+    local i left ti right
+    for ((i=0; i<max; i++)); do
+        left="${icon_arr[$i]:-}"
+        ti=$(( i - vpad ))
+        if [ "$ti" -ge 0 ] && [ "$ti" -lt "$text_rows" ]; then
+            right="${PIXORA_TEXT[$ti]}"
+            printf '  %s  %b%s%b\n' "$left" "$WHITE" "$right" "$NC"
+        else
+            printf '  %s\n' "$left"
+        fi
+    done
+    echo ""
     echo -e "  ${BOLD}${LBL_BY}${NC}"
     echo ""
     return 0
