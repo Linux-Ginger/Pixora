@@ -60,6 +60,50 @@ def _compile_stale_mo_files():
 _compile_stale_mo_files()
 
 
+_GSK_PENDING_PATH = os.path.expanduser("~/.cache/pixora/.gsk_pending")
+
+
+def _check_gsk_crash_recovery():
+    """If the last run was using a non-default renderer and didn't survive
+    the startup window (MainWindow clears the marker after 5s), assume
+    that renderer crashed Pixora and revert to 'auto' so the user isn't
+    locked out of the app."""
+    if not os.path.exists(_GSK_PENDING_PATH):
+        return
+    try:
+        with open(_GSK_PENDING_PATH, "r") as f:
+            pending = f.read().strip()
+    except Exception:
+        pending = ""
+    try:
+        os.remove(_GSK_PENDING_PATH)
+    except Exception:
+        pass
+    if not pending or pending == "auto":
+        return
+    print(
+        f"Pixora: previous run with GSK_RENDERER={pending!r} didn't "
+        f"complete — reverting to 'auto'.",
+        flush=True,
+    )
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            settings = json.load(f)
+    except Exception:
+        return
+    if settings.get("gsk_renderer") != pending:
+        return  # user changed it again in the meantime, don't clobber
+    settings["gsk_renderer"] = "auto"
+    try:
+        os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+        tmp = CONFIG_PATH + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(settings, f, indent=2)
+        os.replace(tmp, CONFIG_PATH)
+    except Exception:
+        pass
+
+
 def _apply_gsk_renderer_env():
     """Read settings.json BEFORE GTK initializes and honor the user's
     renderer choice. Values: 'auto' (no-op), 'gl', 'cairo'. Must run
@@ -72,8 +116,17 @@ def _apply_gsk_renderer_env():
         choice = "auto"
     if choice in ("gl", "cairo", "ngl"):
         os.environ["GSK_RENDERER"] = choice
+        # Record the attempt so the next start knows whether this one
+        # survived. MainWindow removes this file 5s after the window is up.
+        try:
+            os.makedirs(os.path.dirname(_GSK_PENDING_PATH), exist_ok=True)
+            with open(_GSK_PENDING_PATH, "w") as f:
+                f.write(choice)
+        except Exception:
+            pass
 
 
+_check_gsk_crash_recovery()
 _apply_gsk_renderer_env()
 
 

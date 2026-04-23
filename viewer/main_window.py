@@ -1466,6 +1466,9 @@ class MainWindow(Adw.ApplicationWindow):
         # check renderer + frame-timing. Shows a one-time popup if the app
         # appears slow.
         GLib.timeout_add_seconds(5, self._start_perf_check)
+        # Same 5s mark as "startup survived" — clears main.py's crash-
+        # recovery marker so a non-auto gsk_renderer keeps being applied.
+        GLib.timeout_add_seconds(5, self._clear_gsk_pending)
         self._ios_device_present = False
         self._recovery_prompt_active = False
         self._recovery_cooldown_until = 0.0
@@ -1481,6 +1484,18 @@ class MainWindow(Adw.ApplicationWindow):
             save_metadata_cache()
             return True  # keep repeating
         GLib.timeout_add_seconds(300, _periodic_save_cache)
+
+    def _clear_gsk_pending(self):
+        """Signals main.py's crash-recovery that the current gsk_renderer
+        choice booted successfully. Missing file → next run assumes crash
+        and reverts to 'auto'."""
+        try:
+            path = os.path.expanduser("~/.cache/pixora/.gsk_pending")
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+        return False
 
     def _set_toolbars_revealed(self, visible):
         """Adw.ToolbarView has no reveal-duration API, so when animations
