@@ -1490,15 +1490,17 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.timeout_add_seconds(300, _periodic_save_cache)
 
     def _tune_settings_stack(self, dialog):
-        """Walk Adw.PreferencesWindow's internal widget tree to find its
-        Gtk.Stack children and make the page-switch transitions longer
-        so users actually perceive them. Defensive: libadwaita's internal
-        layout isn't a public API, so any failure is swallowed."""
+        """Walk Adw.PreferencesWindow's internal widget tree to find stacks
+        and make the page-switch transitions long enough to actually be
+        seen. The pages are wrapped in Adw.ViewStack or Gtk.Stack depending
+        on libadwaita version, so we handle both. Defensive: all wrapped
+        in try/except since the internal layout isn't public API."""
         try:
             anim_on = bool(self.settings.get("animations_enabled", True))
-            # DFS walk
+            duration = 400 if anim_on else 0
             stack_of_widgets = [dialog]
-            stacks_found = []
+            seen = 0
+            tuned = 0
             while stack_of_widgets:
                 w = stack_of_widgets.pop()
                 try:
@@ -1506,30 +1508,41 @@ class MainWindow(Adw.ApplicationWindow):
                 except Exception:
                     child = None
                 while child is not None:
+                    seen += 1
+                    # Try Gtk.Stack first, then Adw.ViewStack.
+                    handled = False
                     if isinstance(child, Gtk.Stack):
-                        stacks_found.append(child)
+                        try:
+                            child.set_transition_duration(duration)
+                            if anim_on:
+                                child.set_transition_type(
+                                    Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+                            else:
+                                child.set_transition_type(
+                                    Gtk.StackTransitionType.NONE)
+                            handled = True
+                            tuned += 1
+                        except Exception:
+                            pass
+                    if not handled:
+                        try:
+                            # Adw.ViewStack has set_transition_duration and
+                            # enable-transitions properties.
+                            if hasattr(child, "set_transition_duration"):
+                                child.set_transition_duration(duration)
+                                tuned += 1
+                            if hasattr(child, "set_enable_transitions"):
+                                child.set_enable_transitions(anim_on)
+                        except Exception:
+                            pass
                     stack_of_widgets.append(child)
                     try:
                         child = child.get_next_sibling()
                     except Exception:
                         child = None
-            for st in stacks_found:
-                try:
-                    if not anim_on:
-                        st.set_transition_duration(0)
-                        st.set_transition_type(Gtk.StackTransitionType.NONE)
-                    else:
-                        st.set_transition_duration(350)
-                        # OVER_UP_DOWN gives a noticeable vertical reveal for
-                        # the big page-stack; smaller inner stacks still use it
-                        # harmlessly (they're tiny enough to just crossfade-ish).
-                        st.set_transition_type(
-                            Gtk.StackTransitionType.CROSSFADE
-                        )
-                except Exception:
-                    pass
-        except Exception:
-            pass
+            log_info(_("Settings stacks tuned: {t}/{s} widgets").format(t=tuned, s=seen))
+        except Exception as e:
+            log_error(_("Settings stack tune failed: {e}").format(e=e))
         return False
 
     def _clear_gsk_pending(self):
