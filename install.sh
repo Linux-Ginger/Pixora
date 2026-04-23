@@ -81,28 +81,6 @@ print_ascii_logo() {
     done
 }
 
-# Eerst ASCII art tonen zodat de user direct feedback heeft. Na deps-
-# install kunnen we 'm vervangen door het échte SVG-logo via chafa.
-print_ascii_logo
-echo -e "  ${BOLD}${LBL_BY}${NC}"
-echo ""
-
-# ── Minimale deps ── (chafa meegenomen zodat we straks het echte logo
-# kunnen renderen)
-echo -e "  ${ORANGE}${LBL_PREP}${NC}"
-sudo apt-get install -y -qq \
-    python3 \
-    python3-gi \
-    python3-gi-cairo \
-    gir1.2-gtk-4.0 \
-    gir1.2-adw-1 \
-    gir1.2-gudev-1.0 \
-    git \
-    gettext \
-    chafa \
-    curl \
-    2>/dev/null
-
 # Echte logo rendering. Chafa tekent alleen het aperture-icoon
 # (kleurige bloem); daarnaast zetten we de "PIXORA" block-ASCII,
 # line-by-line verticaal gecentreerd tegen het icoon.
@@ -142,8 +120,8 @@ render_real_logo() {
         echo ""
         print_ascii_logo
     else
-        # Verticaal centreren: offset = hoeveel blank boven text om 'm onder
-        # het icoon hoogte-te-lijnen te krijgen.
+        # Verticaal centreren: vpad lege regels boven de tekst zodat hij
+        # visueel in het midden van het icoon staat.
         local vpad=$(( (icon_rows - text_rows) / 2 ))
         local max=$icon_rows
         [ "$text_rows" -gt "$max" ] && max=$text_rows
@@ -165,7 +143,42 @@ render_real_logo() {
     return 0
 }
 
-render_real_logo || true
+LOGO_RENDERED=0
+
+# Proberen het kleurlogo meteen te renderen — als chafa + curl al op
+# het systeem staan, ziet de user het logo VOOR de sudo-prompt. Zo
+# niet, valt het terug op de ASCII-banner en proberen we het na de
+# deps-install opnieuw (dan is chafa er wel).
+if render_real_logo; then
+    LOGO_RENDERED=1
+else
+    print_ascii_logo
+    echo -e "  ${BOLD}${LBL_BY}${NC}"
+    echo ""
+fi
+
+# ── Minimale deps ── (chafa meegenomen zodat we het logo na install
+# alsnog kunnen tonen wanneer de eerste poging faalde)
+echo -e "  ${ORANGE}${LBL_PREP}${NC}"
+sudo apt-get install -y -qq \
+    python3 \
+    python3-gi \
+    python3-gi-cairo \
+    gir1.2-gtk-4.0 \
+    gir1.2-adw-1 \
+    gir1.2-gudev-1.0 \
+    git \
+    gettext \
+    chafa \
+    curl \
+    2>/dev/null
+
+# Als de eerste render faalde (chafa was toen nog niet geïnstalleerd),
+# nu opnieuw proberen — de apt-install hierboven heeft chafa + curl
+# meegenomen. Silent falen is prima; dan blijft de ASCII gewoon staan.
+if [ "$LOGO_RENDERED" -eq 0 ]; then
+    render_real_logo || true
+fi
 
 # WebKitGTK typelib — probeer nieuwste (6.0) eerst, valt terug op 4.1
 sudo apt-get install -y -qq gir1.2-webkit-6.0 2>/dev/null || \
