@@ -1489,6 +1489,49 @@ class MainWindow(Adw.ApplicationWindow):
             return True  # keep repeating
         GLib.timeout_add_seconds(300, _periodic_save_cache)
 
+    def _tune_settings_stack(self, dialog):
+        """Walk Adw.PreferencesWindow's internal widget tree to find its
+        Gtk.Stack children and make the page-switch transitions longer
+        so users actually perceive them. Defensive: libadwaita's internal
+        layout isn't a public API, so any failure is swallowed."""
+        try:
+            anim_on = bool(self.settings.get("animations_enabled", True))
+            # DFS walk
+            stack_of_widgets = [dialog]
+            stacks_found = []
+            while stack_of_widgets:
+                w = stack_of_widgets.pop()
+                try:
+                    child = w.get_first_child()
+                except Exception:
+                    child = None
+                while child is not None:
+                    if isinstance(child, Gtk.Stack):
+                        stacks_found.append(child)
+                    stack_of_widgets.append(child)
+                    try:
+                        child = child.get_next_sibling()
+                    except Exception:
+                        child = None
+            for st in stacks_found:
+                try:
+                    if not anim_on:
+                        st.set_transition_duration(0)
+                        st.set_transition_type(Gtk.StackTransitionType.NONE)
+                    else:
+                        st.set_transition_duration(350)
+                        # OVER_UP_DOWN gives a noticeable vertical reveal for
+                        # the big page-stack; smaller inner stacks still use it
+                        # harmlessly (they're tiny enough to just crossfade-ish).
+                        st.set_transition_type(
+                            Gtk.StackTransitionType.CROSSFADE
+                        )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return False
+
     def _clear_gsk_pending(self):
         """Signals main.py's crash-recovery that the current gsk_renderer
         choice booted successfully. Missing file → next run assumes crash
@@ -6161,6 +6204,12 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.add(advanced_page)
         dialog.add(about_page)
         dialog.present()
+        # Adw.PreferencesWindow hides its internal Gtk.Stack; tune it after
+        # present() so page-switch crossfades are visible (longer duration)
+        # and honor the animations-toggle. Walker is defensive — wrapped in
+        # try/except so a future libadwaita restructure doesn't crash the
+        # dialog.
+        GLib.idle_add(self._tune_settings_stack, dialog)
 
     def _on_thumb_size_changed(self, scale, row):
         new_size = int(scale.get_value())
