@@ -4039,7 +4039,10 @@ class MainWindow(Adw.ApplicationWindow):
             self._viewer_stack.set_transition_duration(0)
             self._viewer_stack.set_transition_type(Gtk.StackTransitionType.NONE)
         else:
-            self._viewer_stack.set_transition_duration(250)
+            # Shorter slide when firing a queued target — arrow-key spam
+            # keeps up instead of lagging behind at 250ms per hop.
+            duration = 100 if getattr(self, "_viewer_firing_queued", False) else 250
+            self._viewer_stack.set_transition_duration(duration)
             nav = getattr(self, "_nav_direction", None)
             if nav == "next":
                 self._viewer_stack.set_transition_type(
@@ -4092,7 +4095,11 @@ class MainWindow(Adw.ApplicationWindow):
         if pending is None:
             return
         self._viewer_pending_show = None
-        self._show_full_photo(*pending)
+        self._viewer_firing_queued = True
+        try:
+            self._show_full_photo(*pending)
+        finally:
+            self._viewer_firing_queued = False
 
     def prev_photo(self, btn=None):
         if self.current_index > 0:
