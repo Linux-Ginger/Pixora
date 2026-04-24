@@ -106,6 +106,10 @@ def _check_gsk_crash_recovery():
         os.replace(tmp, CONFIG_PATH)
     except Exception:
         pass
+    # Recovery run happens inside the detached watcher subprocess, where
+    # gnome-terminal DBus activation fails ("Failed to get screen"). Mark
+    # so _launch_dev_terminal skips and Pixora opens directly instead.
+    os.environ["PIXORA_GSK_RECOVERY_RUN"] = "1"
 
 
 def _apply_gsk_renderer_env():
@@ -161,6 +165,10 @@ def _launch_dev_terminal():
     # Skip terminal when a risky GSK renderer is pending — the launcher needs
     # to watch this process directly to auto-respawn on a startup crash.
     if os.path.exists(_GSK_PENDING_PATH):
+        return
+    # Recovery run from the watcher: gnome-terminal DBus activation fails
+    # inside a detached session. Open the window directly instead.
+    if os.environ.get("PIXORA_GSK_RECOVERY_RUN"):
         return
 
     pixora_bin = os.path.expanduser("~/.local/bin/pixora")
