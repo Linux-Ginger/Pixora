@@ -2362,8 +2362,8 @@ msgstr "Failed to save gsk_renderer: {e}"
 msgid "Restarting Pixora…"
 msgstr "Restarting Pixora…"
 
-msgid "Pixora crashed last time"
-msgstr "Pixora crashed last time"
+msgid "Pixora has crashed"
+msgstr "Pixora has crashed"
 
 msgid "Switched back to the Automatic rendering backend."
 msgstr "Switched back to the Automatic rendering backend."

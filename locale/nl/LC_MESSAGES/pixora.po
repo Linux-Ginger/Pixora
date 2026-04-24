@@ -2380,8 +2380,8 @@ msgstr "Kon gsk_renderer niet opslaan: {e}"
 msgid "Restarting Pixora…"
 msgstr "Pixora wordt herstart…"
 
-msgid "Pixora crashed last time"
-msgstr "Pixora crashte de vorige keer"
+msgid "Pixora has crashed"
+msgstr "Pixora is gecrasht"
 
 msgid "Switched back to the Automatic rendering backend."
 msgstr "Teruggezet op de Automatische render-backend."

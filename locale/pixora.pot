@@ -1538,7 +1538,7 @@ msgstr ""
 msgid "Restarting Pixora…"
 msgstr ""
 
-msgid "Pixora crashed last time"
+msgid "Pixora has crashed"
 msgstr ""
 
 msgid "Switched back to the Automatic rendering backend."

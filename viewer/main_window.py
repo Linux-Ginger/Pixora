@@ -1479,7 +1479,7 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         dlg = Adw.AlertDialog(
-            heading=_("Pixora crashed last time"),
+            heading=_("Pixora has crashed"),
             body=_("Switched back to the Automatic rendering backend."),
         )
         dlg.add_response("ok", _("OK"))

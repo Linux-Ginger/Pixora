@@ -2392,8 +2392,8 @@ msgstr "gsk_renderer konnte nicht gespeichert werden: {e}"
 msgid "Restarting Pixora…"
 msgstr "Pixora wird neu gestartet…"
 
-msgid "Pixora crashed last time"
-msgstr "Pixora ist beim letzten Mal abgestürzt"
+msgid "Pixora has crashed"
+msgstr "Pixora ist abgestürzt"
 
 msgid "Switched back to the Automatic rendering backend."
 msgstr "Zurück auf das automatische Rendering-Backend gewechselt."
