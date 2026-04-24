@@ -6791,14 +6791,11 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_error(_("Failed to save gsk_renderer: {e}").format(e=e))
             return
-        # Sentinel-restart pattern (same as _on_language_changed).
-        try:
-            sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
-            os.makedirs(os.path.dirname(sentinel), exist_ok=True)
-            with open(sentinel, "w") as f:
-                f.write("1")
-        except Exception as e:
-            log_error(_("Restart sentinel write failed: {err}").format(err=e))
+        # Detached watcher handles the restart + crash-respawn. Done here
+        # instead of via the .restart_pending sentinel so auto-restart on a
+        # bad GSK renderer works regardless of launcher version or how
+        # Pixora was invoked.
+        self._spawn_gsk_restart_watcher()
         # Overlay gives user feedback before restart.
         overlay = Gtk.Window()
         overlay.set_modal(True)
@@ -6825,6 +6822,46 @@ class MainWindow(Adw.ApplicationWindow):
         overlay.set_child(box)
         overlay.present()
         GLib.timeout_add(600, lambda: (self.get_application().quit(), False)[1])
+
+    def _spawn_gsk_restart_watcher(self):
+        """Detached bash that waits for our PID to exit, starts Pixora,
+        and reruns it once if the new GSK_RENDERER crashed startup."""
+        pixora_bin = os.path.expanduser("~/.local/bin/pixora")
+        if os.path.exists(pixora_bin):
+            launch_cmd = f'"{pixora_bin}"'
+        else:
+            main_py = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "main.py")
+            )
+            launch_cmd = f'"{sys.executable}" "{main_py}"'
+        gsk_sentinel = os.path.expanduser("~/.cache/pixora/.gsk_pending")
+        my_pid = os.getpid()
+        watcher_bash = (
+            f"for _ in $(seq 1 100); do "
+            f"  kill -0 {my_pid} 2>/dev/null || break; "
+            f"  sleep 0.1; "
+            f"done; "
+            f"{launch_cmd}; rc=$?; "
+            f'if [ $rc -ne 0 ] && [ -f "{gsk_sentinel}" ]; then '
+            f"  {launch_cmd}; "
+            f"fi"
+        )
+        env = os.environ.copy()
+        # Fresh env for the new Pixora; dev-terminal skips itself when
+        # .gsk_pending is set so the watcher sees the crash directly.
+        env.pop("PIXORA_IN_DEV_TERM", None)
+        env.pop("PIXORA_RESTART_COUNT", None)
+        try:
+            subprocess.Popen(
+                ["bash", "-c", watcher_bash],
+                start_new_session=True,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception as e:
+            log_error(_("Restart watcher spawn failed: {err}").format(err=e))
 
     def _on_toggle_dev_mode(self, btn, row):
         currently_active = bool(self.settings.get("dev_mode", False))

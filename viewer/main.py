@@ -280,9 +280,7 @@ class PixoraApp(Adw.Application):
 
 
 def _consume_restart_sentinel():
-    """Fork+wait the restart, and respawn once if a risky GSK renderer
-    crashed startup. Keeping the respawn here (not only in the shell
-    launcher) makes it work regardless of how Pixora was started."""
+    """Exec in-place on sentinel; preserves env so dev-terminal isn't re-spawned."""
     sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
     if not os.path.exists(sentinel):
         return
@@ -309,43 +307,18 @@ def _consume_restart_sentinel():
             flush=True,
         )
         return
-    print("Pixora: restart sentinel detected, respawning…", flush=True)
+    print("Pixora: restart sentinel detected, exec'ing…", flush=True)
     new_env = dict(os.environ)
     new_env["PIXORA_RESTART_COUNT"] = str(restart_count + 1)
     pixora_bin = os.path.expanduser("~/.local/bin/pixora")
-    if os.path.exists(pixora_bin):
-        prog, args = pixora_bin, [pixora_bin]
-    else:
-        script = os.path.abspath(__file__)
-        prog, args = sys.executable, [sys.executable, script]
-
-    def _spawn_and_wait():
-        pid = os.fork()
-        if pid == 0:
-            try:
-                os.execvpe(prog, args, new_env)
-            except Exception as e:
-                print(f"Pixora restart exec failed: {e}", flush=True)
-                os._exit(127)
-        try:
-            _, status = os.waitpid(pid, 0)
-        except Exception:
-            return 1
-        if os.WIFEXITED(status):
-            return os.WEXITSTATUS(status)
-        if os.WIFSIGNALED(status):
-            return 128 + os.WTERMSIG(status)
-        return 1
-
-    rc = _spawn_and_wait()
-    # GSK startup crash: .gsk_pending persists when MainWindow didn't
-    # reach the 5s window that clears it. Respawn once — the next run's
-    # _check_gsk_crash_recovery reverts the renderer to 'auto'.
-    gsk_sentinel = _GSK_PENDING_PATH
-    if rc != 0 and os.path.exists(gsk_sentinel):
-        print("Pixora: GSK startup crash detected, respawning…", flush=True)
-        rc = _spawn_and_wait()
-    sys.exit(rc)
+    try:
+        if os.path.exists(pixora_bin):
+            os.execvpe(pixora_bin, [pixora_bin], new_env)
+        else:
+            script = os.path.abspath(__file__)
+            os.execvpe(sys.executable, [sys.executable, script], new_env)
+    except Exception as e:
+        print(f"Pixora restart failed: {e}", flush=True)
 
 
 def main():
