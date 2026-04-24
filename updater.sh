@@ -102,6 +102,33 @@ DESKTOP_DIR="$TARGET_HOME/.local/share/applications"
 DESKTOP_FILE="$DESKTOP_DIR/pixora.desktop"
 LAUNCHER="$TARGET_HOME/.local/bin/pixora"
 ICON_FILE="$INSTALL_DIR/assets/logos/pixora-icon.svg"
+
+# Regenerate launcher so existing installs pick up the GSK crash-respawn logic.
+if [ -f "$LAUNCHER" ]; then
+    mkdir -p "$(dirname "$LAUNCHER")"
+    cat > "$LAUNCHER" <<LAUNCHER_EOF
+#!/bin/bash
+MAIN=$INSTALL_DIR/viewer/main.py
+GSK_SENTINEL="\${HOME}/.cache/pixora/.gsk_pending"
+run_pixora() {
+  if command -v aa-exec >/dev/null 2>&1 && [ -r /etc/apparmor.d/pixora ]; then
+    aa-exec -p pixora -- python3 "\$MAIN" "\$@"
+  else
+    python3 "\$MAIN" "\$@"
+  fi
+}
+run_pixora "\$@"
+rc=\$?
+if [ \$rc -ne 0 ] && [ -f "\$GSK_SENTINEL" ]; then
+  run_pixora "\$@"
+  rc=\$?
+fi
+exit \$rc
+LAUNCHER_EOF
+    chmod 0755 "$LAUNCHER"
+    chown "$RUN_UID:$TARGET_GID" "$LAUNCHER"
+fi
+
 if [ -f "$ICON_FILE" ] && [ -f "$LAUNCHER" ]; then
     mkdir -p "$DESKTOP_DIR"
     cat > "$DESKTOP_FILE" <<DESKTOP_EOF
