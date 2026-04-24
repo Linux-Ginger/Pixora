@@ -4018,8 +4018,15 @@ class MainWindow(Adw.ApplicationWindow):
         if pixbuf:
             incoming_pic.set_pixbuf(pixbuf)
         # Transition type from nav direction + animations toggle.
+        # Mid-flight transition + new nav = GtkStack snaps to old target first (visible jump).
+        # Swap instantly instead — keeps rapid next/prev responsive.
         anim_on = bool(self.settings.get("animations_enabled", True))
-        if not anim_on:
+        mid_transition = False
+        try:
+            mid_transition = self._viewer_stack.get_transition_running()
+        except Exception:
+            pass
+        if not anim_on or mid_transition:
             self._viewer_stack.set_transition_duration(0)
             self._viewer_stack.set_transition_type(Gtk.StackTransitionType.NONE)
         else:
@@ -5450,6 +5457,9 @@ class MainWindow(Adw.ApplicationWindow):
                 "  transition: transform 200ms cubic-bezier(.2,.9,.3,1.2),"
                 "              -gtk-icon-size 200ms;"
                 "  -gtk-icon-size: 20px;"
+                # Reserve 24px (checked size) so headerbar height stays constant.
+                "  min-width: 24px;"
+                "  min-height: 24px;"
                 "}"
                 ".pixora-settings-tab:hover image {"
                 "  transform: translateY(-2px);"
