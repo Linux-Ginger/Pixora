@@ -235,11 +235,6 @@ def _quit_pixora_app():
     return False
 
 
-def kill_dev_terminal():
-    """Compat-stub; main_window.on_close still calls it."""
-    return
-
-
 # SIGHUP handler: closing the dev-terminal quits Pixora cleanly.
 def _install_dev_term_signal_handler():
     if not os.environ.get("PIXORA_IN_DEV_TERM"):

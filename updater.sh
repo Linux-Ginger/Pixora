@@ -2,8 +2,8 @@
 
 # ─────────────────────────────────────────────
 #  Pixora — updater.sh
-#  Draait als root via pkexec. Emit "STEP:<key>:<label>" markers
-#  zodat de GUI-updater per stap een spinner/check kan tonen.
+#  Runs as root via pkexec. Emits "STEP:<key>:<label>" markers so the
+#  GUI updater can show per-step spinner/check state.
 # ─────────────────────────────────────────────
 
 set -e

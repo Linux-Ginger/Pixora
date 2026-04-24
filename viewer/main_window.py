@@ -2383,11 +2383,6 @@ class MainWindow(Adw.ApplicationWindow):
             gc.collect()
         except Exception:
             pass
-        try:
-            import main as _main_mod
-            _main_mod.kill_dev_terminal()
-        except Exception:
-            pass
         # Truncate dev log for fresh next session.
         global _LOG_FILE
         try:
@@ -8376,24 +8371,6 @@ class MainWindow(Adw.ApplicationWindow):
         if just_attached or just_detached:
             GLib.idle_add(self._refresh_settings_drive_state)
         return True
-
-    def _prompt_backup_on_insert(self):
-        if self._backup_running:
-            return False
-        dlg = Adw.AlertDialog(
-            heading=_("Backup drive detected"),
-            body=_("Your USB drive is connected. New photos are ready to be backed up. Start now?"),
-        )
-        dlg.add_response("later", _("Later"))
-        dlg.add_response("start", _("Back up now"))
-        dlg.set_response_appearance("start", Adw.ResponseAppearance.SUGGESTED)
-        dlg.connect("response", self._on_backup_prompt_response)
-        self._present_dialog(dlg)
-        return False
-
-    def _on_backup_prompt_response(self, dlg, response):
-        if response == "start":
-            self.start_backup()
 
     def _on_close_guard_response(self, dlg, response):
         if response == "close":
