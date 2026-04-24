@@ -1538,16 +1538,10 @@ msgstr ""
 msgid "Restarting Pixora…"
 msgstr ""
 
-msgid "Pixora recovered from a crash"
+msgid "Pixora crashed last time"
 msgstr ""
 
-msgid "The last startup crashed while using the '{r}' rendering backend. Pixora reverted to 'Automatic' so it can start again. You'll find this setting under Settings → Advanced → Performance → Rendering backend."
-msgstr ""
-
-msgid "Try '{r}' again?"
-msgstr ""
-
-msgid "A previous attempt with this backend crashed Pixora and we had to revert. It may crash again. If it does, Pixora will switch back to 'Automatic' on the next start."
+msgid "Try '{r}' anyway?"
 msgstr ""
 
 msgid "Try anyway"

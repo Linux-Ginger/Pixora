@@ -1482,12 +1482,8 @@ class MainWindow(Adw.ApplicationWindow):
             save_settings(self.settings)
         except Exception:
             pass
-        nice = {"gl": "GPU (GL)", "cairo": "Software (Cairo)", "ngl": "NGL"}.get(
-            renderer, renderer or "?"
-        )
         dlg = Adw.AlertDialog(
-            heading=_("Pixora recovered from a crash"),
-            body=_("The last startup crashed while using the '{r}' rendering backend. Pixora reverted to 'Automatic' so it can start again. You'll find this setting under Settings → Advanced → Performance → Rendering backend.").format(r=nice),
+            heading=_("Pixora crashed last time"),
         )
         dlg.add_response("ok", _("OK"))
         dlg.set_default_response("ok")
@@ -5872,6 +5868,36 @@ class MainWindow(Adw.ApplicationWindow):
             self._gsk_combo.set_selected(self._gsk_codes.index(current_gsk))
         except ValueError:
             self._gsk_combo.set_selected(0)
+        # Popup rows: label + warning icon for previously-crashed backends,
+        # same style as the "update available" badge in About.
+        list_factory = Gtk.SignalListItemFactory()
+        def _gsk_row_setup(_f, list_item):
+            box = Gtk.Box(
+                orientation=Gtk.Orientation.HORIZONTAL, spacing=6,
+            )
+            lbl = Gtk.Label(xalign=0)
+            lbl.set_hexpand(True)
+            icon = Gtk.Image.new_from_icon_name(
+                "software-update-available-symbolic"
+            )
+            icon.add_css_class("accent")
+            icon.set_visible(False)
+            box.append(lbl)
+            box.append(icon)
+            list_item.set_child(box)
+        def _gsk_row_bind(_f, list_item):
+            box = list_item.get_child()
+            lbl = box.get_first_child()
+            icon = lbl.get_next_sibling()
+            item = list_item.get_item()
+            lbl.set_text(item.get_string() if item is not None else "")
+            pos = list_item.get_position()
+            code = self._gsk_codes[pos] if 0 <= pos < len(self._gsk_codes) else ""
+            bl = self.settings.get("gsk_renderer_crashed") or []
+            icon.set_visible(code in bl)
+        list_factory.connect("setup", _gsk_row_setup)
+        list_factory.connect("bind", _gsk_row_bind)
+        self._gsk_combo.set_list_factory(list_factory)
         self._gsk_combo.connect("notify::selected", self._on_gsk_renderer_changed)
         gsk_row = Adw.ActionRow(
             title=_("Rendering backend"),
@@ -6728,8 +6754,7 @@ class MainWindow(Adw.ApplicationWindow):
             new_choice, new_choice
         )
         dlg = Adw.AlertDialog(
-            heading=_("Try '{r}' again?").format(r=nice),
-            body=_("A previous attempt with this backend crashed Pixora and we had to revert. It may crash again. If it does, Pixora will switch back to 'Automatic' on the next start."),
+            heading=_("Try '{r}' anyway?").format(r=nice),
         )
         dlg.add_response("cancel", _("Cancel"))
         dlg.add_response("apply", _("Try anyway"))

@@ -2380,17 +2380,11 @@ msgstr "Kon gsk_renderer niet opslaan: {e}"
 msgid "Restarting Pixora…"
 msgstr "Pixora wordt herstart…"
 
-msgid "Pixora recovered from a crash"
-msgstr "Pixora is hersteld van een crash"
+msgid "Pixora crashed last time"
+msgstr "Pixora crashte de vorige keer"
 
-msgid "The last startup crashed while using the '{r}' rendering backend. Pixora reverted to 'Automatic' so it can start again. You'll find this setting under Settings → Advanced → Performance → Rendering backend."
-msgstr "De vorige start crashte met de '{r}' render-backend. Pixora is teruggezet op 'Automatisch' zodat hij weer opstart. Deze instelling staat onder Instellingen → Geavanceerd → Prestaties → Render-backend."
-
-msgid "Try '{r}' again?"
-msgstr "'{r}' opnieuw proberen?"
-
-msgid "A previous attempt with this backend crashed Pixora and we had to revert. It may crash again. If it does, Pixora will switch back to 'Automatic' on the next start."
-msgstr "Een eerdere poging met deze backend crashte Pixora en we moesten terugzetten. Het kan opnieuw crashen. Als dat gebeurt, wisselt Pixora bij de volgende start terug naar 'Automatisch'."
+msgid "Try '{r}' anyway?"
+msgstr "'{r}' toch proberen?"
 
 msgid "Try anyway"
 msgstr "Toch proberen"

@@ -153,6 +153,10 @@ def _launch_dev_terminal():
     PIXORA_DEV_MODE = True
     if os.environ.get("PIXORA_IN_DEV_TERM"):
         return
+    # Skip terminal when a risky GSK renderer is pending — the launcher needs
+    # to watch this process directly to auto-respawn on a startup crash.
+    if os.path.exists(_GSK_PENDING_PATH):
+        return
 
     pixora_bin = os.path.expanduser("~/.local/bin/pixora")
     if os.path.exists(pixora_bin):
