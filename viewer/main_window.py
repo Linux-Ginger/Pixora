@@ -1434,8 +1434,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._apply_animations_state()
         # 5s delay: skip startup-load burst, then check renderer + frame-timing.
         GLib.timeout_add_seconds(5, self._start_perf_check)
-        # 5s = "startup survived" → clears main.py's crash-recovery marker.
-        GLib.timeout_add_seconds(5, self._clear_gsk_pending)
+        # 5s = "startup survived" → un-blacklist current renderer. The
+        # .gsk_pending sentinel itself is cleared on Gio.Application::shutdown
+        # (clean exit only), so post-startup crashes still trigger recovery.
+        GLib.timeout_add_seconds(5, self._unblacklist_current_gsk)
         # If main.py reverted a crashing renderer, notify user once.
         if self.settings.get("gsk_recent_crash"):
             GLib.idle_add(self._show_gsk_recovery_popup)
@@ -1455,14 +1457,8 @@ class MainWindow(Adw.ApplicationWindow):
             return True
         GLib.timeout_add_seconds(300, _periodic_save_cache)
 
-    def _clear_gsk_pending(self):
-        """Signal main.py that the current gsk_renderer booted OK and un-blacklist it."""
-        try:
-            path = os.path.expanduser("~/.cache/pixora/.gsk_pending")
-            if os.path.exists(path):
-                os.remove(path)
-        except Exception:
-            pass
+    def _unblacklist_current_gsk(self):
+        """Survived 5s startup → drop current renderer from the crash blacklist."""
         current = self.settings.get("gsk_renderer", "auto")
         bl = self.settings.get("gsk_renderer_crashed") or []
         if current in bl:
@@ -6835,16 +6831,24 @@ class MainWindow(Adw.ApplicationWindow):
             )
             launch_cmd = f'"{sys.executable}" "{main_py}"'
         gsk_sentinel = os.path.expanduser("~/.cache/pixora/.gsk_pending")
+        log_path = os.path.expanduser("~/.cache/pixora/watcher.log")
         my_pid = os.getpid()
         watcher_bash = (
+            f"set -x; "
+            f"echo '--- watcher start' $(date -Iseconds) pid=$$; "
             f"for _ in $(seq 1 100); do "
             f"  kill -0 {my_pid} 2>/dev/null || break; "
             f"  sleep 0.1; "
             f"done; "
+            f"echo 'old pid gone, launching'; "
             f"{launch_cmd}; rc=$?; "
+            f"echo \"first run rc=$rc, sentinel exists: $([ -f '{gsk_sentinel}' ] && echo yes || echo no)\"; "
             f'if [ $rc -ne 0 ] && [ -f "{gsk_sentinel}" ]; then '
-            f"  {launch_cmd}; "
-            f"fi"
+            f"  echo 'respawning'; "
+            f"  {launch_cmd}; rc=$?; "
+            f"  echo \"second run rc=$rc\"; "
+            f"fi; "
+            f"echo '--- watcher done'"
         )
         env = os.environ.copy()
         # Fresh env for the new Pixora; dev-terminal skips itself when
@@ -6852,13 +6856,15 @@ class MainWindow(Adw.ApplicationWindow):
         env.pop("PIXORA_IN_DEV_TERM", None)
         env.pop("PIXORA_RESTART_COUNT", None)
         try:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            log_f = open(log_path, "a")
             subprocess.Popen(
                 ["bash", "-c", watcher_bash],
                 start_new_session=True,
                 env=env,
                 stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=log_f,
+                stderr=log_f,
             )
         except Exception as e:
             log_error(_("Restart watcher spawn failed: {err}").format(err=e))

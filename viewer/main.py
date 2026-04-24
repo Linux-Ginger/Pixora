@@ -79,7 +79,7 @@ def _check_gsk_crash_recovery():
         return
     print(
         f"Pixora: previous run with GSK_RENDERER={pending!r} didn't "
-        f"complete — reverting to 'auto'.",
+        f"complete cleanly — reverting to 'auto'.",
         flush=True,
     )
     try:
@@ -88,7 +88,9 @@ def _check_gsk_crash_recovery():
     except Exception:
         return
     if settings.get("gsk_renderer") != pending:
-        return  # user changed it again in the meantime, don't clobber
+        print(f"Pixora: user already changed renderer, not clobbering.",
+              flush=True)
+        return
     settings["gsk_renderer"] = "auto"
     # Mark renderer as known-bad so Settings can warn on re-selection.
     blacklist = settings.get("gsk_renderer_crashed") or []
@@ -115,13 +117,16 @@ def _apply_gsk_renderer_env():
         choice = "auto"
     if choice in ("gl", "cairo", "ngl"):
         os.environ["GSK_RENDERER"] = choice
-        # Sentinel; MainWindow removes it 5s after window is up.
+        # Sentinel; cleared on Gio.Application::shutdown so a crash/hang
+        # at any point during the session leaves it for recovery.
         try:
             os.makedirs(os.path.dirname(_GSK_PENDING_PATH), exist_ok=True)
             with open(_GSK_PENDING_PATH, "w") as f:
                 f.write(choice)
         except Exception:
             pass
+        print(f"Pixora: GSK_RENDERER={choice} (.gsk_pending written)",
+              flush=True)
 
 
 _check_gsk_crash_recovery()
@@ -264,6 +269,17 @@ class PixoraApp(Adw.Application):
             flags=Gio.ApplicationFlags.FLAGS_NONE
         )
         self.connect("activate", self.on_activate)
+        # shutdown only fires on clean exit — not on SIGSEGV/SIGKILL/hang.
+        # So if Pixora crashes with a custom GSK_RENDERER, .gsk_pending
+        # survives and next-run crash-recovery (+ watcher respawn) triggers.
+        self.connect("shutdown", self._on_shutdown)
+
+    def _on_shutdown(self, _app):
+        try:
+            if os.path.exists(_GSK_PENDING_PATH):
+                os.remove(_GSK_PENDING_PATH)
+        except Exception:
+            pass
 
     def on_activate(self, app):
         settings = load_settings()
