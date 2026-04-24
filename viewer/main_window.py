@@ -1484,6 +1484,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         dlg = Adw.AlertDialog(
             heading=_("Pixora crashed last time"),
+            body=_("Switched back to the Automatic rendering backend."),
         )
         dlg.add_response("ok", _("OK"))
         dlg.set_default_response("ok")
@@ -5877,10 +5878,8 @@ class MainWindow(Adw.ApplicationWindow):
             )
             lbl = Gtk.Label(xalign=0)
             lbl.set_hexpand(True)
-            icon = Gtk.Image.new_from_icon_name(
-                "software-update-available-symbolic"
-            )
-            icon.add_css_class("accent")
+            icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
+            icon.add_css_class("warning")
             icon.set_visible(False)
             box.append(lbl)
             box.append(icon)
@@ -6755,6 +6754,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         dlg = Adw.AlertDialog(
             heading=_("Try '{r}' anyway?").format(r=nice),
+            body=_("This backend crashed Pixora last time."),
         )
         dlg.add_response("cancel", _("Cancel"))
         dlg.add_response("apply", _("Try anyway"))

@@ -2383,8 +2383,14 @@ msgstr "Pixora wordt herstart…"
 msgid "Pixora crashed last time"
 msgstr "Pixora crashte de vorige keer"
 
+msgid "Switched back to the Automatic rendering backend."
+msgstr "Teruggezet op de Automatische render-backend."
+
 msgid "Try '{r}' anyway?"
 msgstr "'{r}' toch proberen?"
+
+msgid "This backend crashed Pixora last time."
+msgstr "Deze backend crashte Pixora de vorige keer."
 
 msgid "Try anyway"
 msgstr "Toch proberen"
