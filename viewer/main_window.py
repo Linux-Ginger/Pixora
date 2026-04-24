@@ -3987,10 +3987,28 @@ class MainWindow(Adw.ApplicationWindow):
         initial, coords = self._determine_initial_location(path)
         searching = bool(coords)
         if load_id == self._viewer_load_id:
-            GLib.idle_add(self._show_full_photo, pixbuf, path, initial, searching)
+            GLib.idle_add(
+                self._apply_loaded_pixbuf,
+                pixbuf, path, initial, searching, load_id,
+            )
             GLib.idle_add(self._preload_adjacent_photos)
         if coords:
             self._start_geocode_upgrade(path, coords, load_id)
+
+    def _apply_loaded_pixbuf(self, pixbuf, path, location, searching, load_id):
+        if load_id != self._viewer_load_id:
+            return False
+        if getattr(self, "_viewer_placeholder_shown", False):
+            # Placeholder (thumbnail) already slid in; swap in full-res on the
+            # visible slot without a second slide.
+            if pixbuf and self.photo_picture:
+                self.photo_picture.set_pixbuf(pixbuf)
+                self._viewer_pixbuf = pixbuf
+                self._apply_viewer_transform()
+            self._viewer_placeholder_shown = False
+        else:
+            self._show_full_photo(pixbuf, path, location, searching)
+        return False
 
     def _update_viewer_location(self, text, load_id):
         # Guard against stale callbacks after nav.
@@ -4125,15 +4143,24 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._preload_adjacent_photos)
                 return
 
-        # Cache miss: show thumbnail as placeholder.
-        try:
-            thumb_path = get_cache_path(path, THUMB_SIZE)
-            if os.path.exists(thumb_path):
-                thumb_pb = GdkPixbuf.Pixbuf.new_from_file(thumb_path)
-                if thumb_pb:
-                    self.photo_picture.set_pixbuf(thumb_pb)
-        except Exception:
-            pass
+        # Cache miss: slide in the thumbnail as placeholder now, upgrade to
+        # full-res in-place when loaded. Writing the thumb onto the current
+        # slot instead would replace the old photo without a slide and only
+        # animate later when the full load finishes.
+        self._viewer_placeholder_shown = False
+        if not is_video(path):
+            try:
+                thumb_path = get_cache_path(path, THUMB_SIZE)
+                if os.path.exists(thumb_path):
+                    thumb_pb = GdkPixbuf.Pixbuf.new_from_file(thumb_path)
+                    if thumb_pb:
+                        initial, coords = self._determine_initial_location(path)
+                        self._show_full_photo(
+                            thumb_pb, path, initial, searching=bool(coords)
+                        )
+                        self._viewer_placeholder_shown = True
+            except Exception:
+                pass
 
         self._nav_debounce_id = GLib.timeout_add(0, self._do_scheduled_load)
 
