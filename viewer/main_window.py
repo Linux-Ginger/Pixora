@@ -2247,13 +2247,13 @@ class MainWindow(Adw.ApplicationWindow):
         return self.style_manager.get_dark()
 
     def _load_header_logo_texture(self):
-        # Render SVG to a 140x36 texture; otherwise GTK ≥ 4.18 sizes the
-        # HeaderBar to the SVG's 340x120 intrinsic dimensions.
+        # Render at 4× target so downscale stays crisp; CSS max-height clamps
+        # the layout natural-size, otherwise HeaderBar sizes to texture pixels.
         logo_path = get_logo_path(self.is_dark())
         if not os.path.exists(logo_path):
             return None
         try:
-            pb = GdkPixbuf.Pixbuf.new_from_file_at_size(logo_path, 140, 36)
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_size(logo_path, 560, 144)
             return Gdk.Texture.new_for_pixbuf(pb)
         except Exception:
             return None
@@ -2432,8 +2432,18 @@ class MainWindow(Adw.ApplicationWindow):
         texture = self._load_header_logo_texture()
         if texture is not None:
             self.logo_picture.set_paintable(texture)
-        self.logo_picture.set_size_request(140, 36)
+        self.logo_picture.add_css_class("pixora-header-logo")
         self.logo_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self._logo_css = Gtk.CssProvider()
+        self._logo_css.load_from_string(
+            ".pixora-header-logo {"
+            "  min-width: 140px; max-width: 140px;"
+            "  min-height: 36px; max-height: 36px;"
+            "}"
+        )
+        self.logo_picture.get_style_context().add_provider(
+            self._logo_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
         self.header.pack_start(self.logo_picture)
 
         self.sort_model = Gtk.StringList()
