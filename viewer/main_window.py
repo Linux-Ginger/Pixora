@@ -162,7 +162,7 @@ if _DEV_MODE:
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gdk, Pango
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gdk, Pango, GObject
 gi.require_foreign("cairo")
 import cairo
 
@@ -723,6 +723,29 @@ def load_thumbnail(photo_path, thumb_size=None):
             return pixbuf
         except Exception:
             return None
+
+
+class _FixedSizePaintable(GObject.GObject, Gdk.Paintable):
+    # GTK4 Picture sizes the HeaderBar to the paintable's intrinsic size; this
+    # wraps a hi-res Texture but reports a smaller intrinsic for layout while
+    # the GPU downscales the source on snapshot.
+    def __init__(self, source, intrinsic_w, intrinsic_h):
+        super().__init__()
+        self._source = source
+        self._w = intrinsic_w
+        self._h = intrinsic_h
+
+    def do_get_intrinsic_width(self):
+        return self._w
+
+    def do_get_intrinsic_height(self):
+        return self._h
+
+    def do_get_intrinsic_aspect_ratio(self):
+        return float(self._w) / float(self._h) if self._h else 0.0
+
+    def do_snapshot(self, snapshot, width, height):
+        self._source.snapshot(snapshot, width, height)
 
 
 class PhotoFolderHandler(FileSystemEventHandler):
@@ -2246,22 +2269,24 @@ class MainWindow(Adw.ApplicationWindow):
     def is_dark(self):
         return self.style_manager.get_dark()
 
-    def _load_header_logo_texture(self):
-        # Render at 4× target so downscale stays crisp; CSS max-height clamps
-        # the layout natural-size, otherwise HeaderBar sizes to texture pixels.
+    def _load_header_logo_paintable(self):
+        # Render SVG at 4× display size for crisp downscale; wrap in a paintable
+        # that reports 140×36 intrinsic so the HeaderBar doesn't grow to the
+        # texture's pixel dimensions.
         logo_path = get_logo_path(self.is_dark())
         if not os.path.exists(logo_path):
             return None
         try:
             pb = GdkPixbuf.Pixbuf.new_from_file_at_size(logo_path, 560, 144)
-            return Gdk.Texture.new_for_pixbuf(pb)
+            tex = Gdk.Texture.new_for_pixbuf(pb)
+            return _FixedSizePaintable(tex, 140, 36)
         except Exception:
             return None
 
     def on_dark_mode_changed(self, manager, _pspec):
-        texture = self._load_header_logo_texture()
-        if texture is not None:
-            self.logo_picture.set_paintable(texture)
+        paintable = self._load_header_logo_paintable()
+        if paintable is not None:
+            self.logo_picture.set_paintable(paintable)
 
     def start_watcher(self, path):
         if not WATCHDOG_AVAILABLE or not os.path.exists(path):
@@ -2429,21 +2454,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.header.add_css_class("flat")
 
         self.logo_picture = Gtk.Picture()
-        texture = self._load_header_logo_texture()
-        if texture is not None:
-            self.logo_picture.set_paintable(texture)
-        self.logo_picture.add_css_class("pixora-header-logo")
+        paintable = self._load_header_logo_paintable()
+        if paintable is not None:
+            self.logo_picture.set_paintable(paintable)
+        self.logo_picture.set_size_request(140, 36)
         self.logo_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
-        self._logo_css = Gtk.CssProvider()
-        self._logo_css.load_from_string(
-            ".pixora-header-logo {"
-            "  min-width: 140px; max-width: 140px;"
-            "  min-height: 36px; max-height: 36px;"
-            "}"
-        )
-        self.logo_picture.get_style_context().add_provider(
-            self._logo_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
         self.header.pack_start(self.logo_picture)
 
         self.sort_model = Gtk.StringList()
