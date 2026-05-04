@@ -2246,10 +2246,22 @@ class MainWindow(Adw.ApplicationWindow):
     def is_dark(self):
         return self.style_manager.get_dark()
 
-    def on_dark_mode_changed(self, manager, _pspec):
+    def _load_header_logo_texture(self):
+        # Render SVG to a 140x36 texture; otherwise GTK ≥ 4.18 sizes the
+        # HeaderBar to the SVG's 340x120 intrinsic dimensions.
         logo_path = get_logo_path(self.is_dark())
-        if os.path.exists(logo_path):
-            self.logo_picture.set_filename(logo_path)
+        if not os.path.exists(logo_path):
+            return None
+        try:
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_size(logo_path, 140, 36)
+            return Gdk.Texture.new_for_pixbuf(pb)
+        except Exception:
+            return None
+
+    def on_dark_mode_changed(self, manager, _pspec):
+        texture = self._load_header_logo_texture()
+        if texture is not None:
+            self.logo_picture.set_paintable(texture)
 
     def start_watcher(self, path):
         if not WATCHDOG_AVAILABLE or not os.path.exists(path):
@@ -2416,10 +2428,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.header = Adw.HeaderBar()
         self.header.add_css_class("flat")
 
-        logo_path = get_logo_path(self.is_dark())
         self.logo_picture = Gtk.Picture()
-        if os.path.exists(logo_path):
-            self.logo_picture.set_filename(logo_path)
+        texture = self._load_header_logo_texture()
+        if texture is not None:
+            self.logo_picture.set_paintable(texture)
         self.logo_picture.set_size_request(140, 36)
         self.logo_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
         self.header.pack_start(self.logo_picture)
