@@ -1444,7 +1444,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._ios_device_present = False
         self._recovery_prompt_active = False
         self._recovery_cooldown_until = 0.0
-        GLib.idle_add(self._poll_import_device)
+        # _poll_import_device returns True to rearm the 10s timer; idle_add
+        # would re-fire it as fast as possible, fork-bombing the main thread.
+        GLib.idle_add(self._poll_import_device_once)
         GLib.timeout_add_seconds(10, self._poll_import_device)
         self._setup_usb_monitor()
         self._backup_drive_last_seen = False
@@ -1754,6 +1756,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _clear_iphone_banner(self):
         self.iphone_banner.set_revealed(False)
+        return False
+
+    def _poll_import_device_once(self):
+        self._poll_import_device()
         return False
 
     def _poll_import_device(self):
@@ -6603,7 +6609,7 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.add_response("ok", _("OK"))
         dialog.present()
         if ok:
-            GLib.timeout_add(500, self._poll_import_device)
+            GLib.timeout_add(500, self._poll_import_device_once)
         return False
 
     def _on_clear_pair_records(self, btn):
