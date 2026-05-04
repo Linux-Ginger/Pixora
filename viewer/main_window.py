@@ -742,7 +742,9 @@ class _FixedSizePaintable(GObject.GObject, Gdk.Paintable):
         return self._h
 
     def do_get_intrinsic_aspect_ratio(self):
-        return float(self._w) / float(self._h) if self._h else 0.0
+        # Use source's true aspect so Picture's CONTAIN preserves the SVG
+        # ratio inside the reported intrinsic box.
+        return self._source.get_intrinsic_aspect_ratio()
 
     def do_snapshot(self, snapshot, width, height):
         self._source.snapshot(snapshot, width, height)
