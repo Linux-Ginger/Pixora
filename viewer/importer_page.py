@@ -589,8 +589,44 @@ def _crop_to_square(pixbuf) -> "GdkPixbuf.Pixbuf":
     return pixbuf.new_subpixbuf(x, y, size, size)
 
 
+def _square_thumb_to_cache(src: Path, cache: Path) -> bool:
+    """Write a square SELECT_THUMB PNG to `cache`. PIL first (reads HEIC via
+    pillow_heif), GdkPixbuf as fallback. Returns True on success."""
+    try:
+        from PIL import Image, ImageOps
+        with Image.open(src) as img:
+            img = ImageOps.exif_transpose(img)
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGB")
+            w, h = img.size
+            side = min(w, h)
+            left = (w - side) // 2
+            top = (h - side) // 2
+            img = img.crop((left, top, left + side, top + side))
+            img = img.resize((SELECT_THUMB, SELECT_THUMB), Image.LANCZOS)
+            img.save(str(cache), "PNG")
+        return True
+    except Exception:
+        pass
+    # Fallback for formats PIL can't open but GdkPixbuf can.
+    try:
+        raw = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+            str(src), SELECT_THUMB * 2, SELECT_THUMB * 2, True
+        )
+        square = _crop_to_square(raw)
+        thumb = square.scale_simple(SELECT_THUMB, SELECT_THUMB, GdkPixbuf.InterpType.HYPER)
+        thumb.savev(str(cache), "png", [], [])
+        return True
+    except Exception:
+        return False
+
+
 def load_select_thumb(photo_path: Path):
-    """Square SELECT_THUMB thumbnail for the selection page; disk-cached."""
+    """Square SELECT_THUMB thumbnail for the selection page; disk-cached.
+
+    iPhone photos are HEIC, which GdkPixbuf usually can't decode, so this goes
+    through PIL/pillow_heif (same as the gallery) instead.
+    """
     IMPORT_THUMB_DIR.mkdir(parents=True, exist_ok=True)
     cache = _import_cache_path(photo_path)
 
@@ -600,34 +636,31 @@ def load_select_thumb(photo_path: Path):
         except Exception:
             cache.unlink(missing_ok=True)
 
-    try:
-        ext = photo_path.suffix.lower()
-        if ext in {".mp4", ".mov", ".m4v"}:
-            if not _cmd_available("ffmpeg"):
-                return None
-            # No seek: first-frame-only is more reliable on FUSE/USB.
-            tmp = cache.with_suffix(".tmp.jpg")
+    ext = photo_path.suffix.lower()
+    if ext in {".mp4", ".mov", ".m4v", ".3gp"}:
+        if not _cmd_available("ffmpeg"):
+            return None
+        # No seek: first-frame-only is more reliable on FUSE/USB.
+        tmp = cache.with_suffix(".tmp.jpg")
+        try:
             result = subprocess.run(
                 ["ffmpeg", "-i", str(photo_path),
                  "-frames:v", "1", str(tmp), "-y"],
                 capture_output=True, timeout=30
             )
-            if result.returncode != 0 or not tmp.exists():
-                return None
-            raw = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-                str(tmp), SELECT_THUMB * 2, SELECT_THUMB * 2, True
-            )
-            tmp.unlink(missing_ok=True)
-        else:
-            # Load at 2x for better quality after downscale.
-            raw = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-                str(photo_path), SELECT_THUMB * 2, SELECT_THUMB * 2, True
-            )
+        except Exception:
+            return None
+        if result.returncode != 0 or not tmp.exists():
+            return None
+        ok = _square_thumb_to_cache(tmp, cache)
+        tmp.unlink(missing_ok=True)
+    else:
+        ok = _square_thumb_to_cache(photo_path, cache)
 
-        square = _crop_to_square(raw)
-        thumb = square.scale_simple(SELECT_THUMB, SELECT_THUMB, GdkPixbuf.InterpType.HYPER)
-        thumb.savev(str(cache), "png", [], [])
-        return thumb
+    if not ok or not cache.exists():
+        return None
+    try:
+        return GdkPixbuf.Pixbuf.new_from_file(str(cache))
     except Exception:
         return None
 
