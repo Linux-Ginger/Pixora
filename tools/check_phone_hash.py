@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Compare a phone photo's perceptual hash (read over FUSE, and again from a
-local copy) against the archive copy — to find why duplicate detection misses it.
+"""Pin down why a phone photo's perceptual hash doesn't match its archive copy.
+
+For the given DCIM name it reports, for the phone file:
+  - phash decoded directly over FUSE (the old, unreliable way)
+  - phash from a full byte-read over FUSE (what dedup does now)
+  - phash from a local copy (ground truth)
+  - whether an edited render exists, and that render's phash
+and compares each to any archive copies passed as extra args.
 
 Usage:
-  python3 tools/check_phone_hash.py IMG_3469.HEIC [archive_copy.heic ...]
+  python3 tools/check_phone_hash.py IMG_3338.HEIC [~/Afbeeldingen/Pixora/IMG_3338.heic ...]
 """
 import shutil
 import subprocess
@@ -19,7 +25,7 @@ from PIL import Image
 import imagehash
 
 
-def phash_direct(p):
+def ph_direct(p):
     try:
         with Image.open(p) as im:
             return imagehash.phash(im.convert("RGB"))
@@ -27,8 +33,7 @@ def phash_direct(p):
         return f"FAIL({e})"
 
 
-def phash_bytes(p):
-    """Read the whole file first, then decode from memory (avoids FUSE seeks)."""
+def ph_bytes(p):
     try:
         with open(p, "rb") as fh:
             data = fh.read()
@@ -38,9 +43,32 @@ def phash_bytes(p):
         return f"FAIL({e})"
 
 
+def find_render(mount, fp):
+    parts = fp.parts
+    if "DCIM" not in parts:
+        return None
+    i = parts.index("DCIM")
+    rel = Path(*parts[i + 1:])
+    adj = mount / "PhotoData" / "Mutations" / "DCIM" / rel.parent / fp.stem / "Adjustments"
+    try:
+        if adj.is_dir():
+            for c in sorted(adj.iterdir()):
+                if c.stem.lower() == "fullsizerender" and c.is_file():
+                    return c
+    except OSError:
+        pass
+    return None
+
+
+def dist(a, b):
+    if str(a).startswith("FAIL") or str(b).startswith("FAIL"):
+        return "n/a"
+    return a - b
+
+
 def main():
-    name = sys.argv[1] if len(sys.argv) > 1 else "IMG_3469.HEIC"
-    archive_args = sys.argv[2:]
+    name = sys.argv[1] if len(sys.argv) > 1 else "IMG_3338.HEIC"
+    archives = sys.argv[2:]
 
     ids = subprocess.run(["idevice_id", "-l"],
                          capture_output=True, text=True).stdout.split()
@@ -57,32 +85,39 @@ def main():
         return
     time.sleep(1)
 
-    results = {}
     try:
         matches = list((mp / "DCIM").rglob(name))
-        print(f"found {len(matches)} copy/copies of {name} on the phone:")
+        print(f"found {len(matches)} copy/copies of {name}\n")
         for fp in matches:
-            direct = phash_direct(fp)
+            direct = ph_direct(fp)
             tmp = Path(tempfile.gettempdir()) / ("hc_" + fp.name)
             shutil.copy2(fp, tmp)
-            local = phash_bytes(tmp)
+            local = ph_bytes(tmp)
             tmp.unlink(missing_ok=True)
-            sz = fp.stat().st_size // 1024
-            print(f"  {fp.relative_to(mp)}  ({sz} KB)")
-            print(f"    over-FUSE (direct)  = {direct}")
-            print(f"    local copy (bytes)  = {local}")
-            if not str(direct).startswith("FAIL") and not str(local).startswith("FAIL"):
-                print(f"    FUSE-vs-local distance = {direct - local}")
-                results[str(fp)] = local
+            over_fuse_bytes = ph_bytes(fp)
+
+            print(f"{fp.relative_to(mp)}  ({fp.stat().st_size // 1024} KB)")
+            print(f"  direct over FUSE     = {direct}")
+            print(f"  byte-read over FUSE  = {over_fuse_bytes}   (dist vs local: {dist(over_fuse_bytes, local)})")
+            print(f"  local copy (truth)   = {local}")
+
+            render = find_render(mp, fp)
+            if render:
+                rh = ph_bytes(render)
+                print(f"  EDITED render exists = {render.name}")
+                print(f"    render phash       = {rh}   (dist vs master: {dist(rh, local)})")
+            else:
+                print("  no edited render (not an edited photo)")
+
+            for ap in archives:
+                ah = ph_bytes(ap)
+                print(f"  archive {Path(ap).name} phash = {ah}")
+                print(f"    dist archive vs master = {dist(ah, local)}")
+                if render:
+                    print(f"    dist archive vs render = {dist(ah, ph_bytes(render))}")
+            print()
     finally:
         subprocess.run(["fusermount", "-uz", str(mp)], capture_output=True)
-
-    for ap in archive_args:
-        ah = phash_bytes(ap)
-        print(f"\narchive {ap}\n    phash = {ah}")
-        if not str(ah).startswith("FAIL"):
-            for fp, ph in results.items():
-                print(f"    distance to phone {Path(fp).name} = {ph - ah}")
 
 
 if __name__ == "__main__":
