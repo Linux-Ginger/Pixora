@@ -1713,12 +1713,16 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _iphone_recovery_flow(self):
-        """Auto recovery: check first, reset usbmuxd on fail."""
-        has_device = self._idevice_check()
-        if has_device:
-            log_info(_("iPhone directly recognised by usbmuxd"))
-            GLib.idle_add(self._iphone_flow_success, False)
-            return
+        """Auto recovery: wait patiently for usbmuxd, reset only as last resort."""
+        # Freshly-plugged devices (and the Trust handshake) can take a while to
+        # register. Poll for ~12s before doing anything drastic so we don't
+        # nag the user with a usbmuxd reset that isn't needed.
+        for _attempt in range(8):
+            if self._idevice_check():
+                log_info(_("iPhone directly recognised by usbmuxd"))
+                GLib.idle_add(self._iphone_flow_success, False)
+                return
+            time.sleep(1.5)
         log_warn(_("iPhone not recognised by usbmuxd — starting auto-recovery"))
         GLib.idle_add(self._set_iphone_banner,
                       _("🔧 Restoring connection, please wait…"))

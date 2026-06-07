@@ -2422,3 +2422,29 @@ msgstr "Ce moteur a planté Pixora la dernière fois."
 
 msgid "Try anyway"
 msgstr "Essayer quand même"
+
+msgid "Waiting for trust…"
+msgstr "En attente de confiance…"
+
+msgid "Tap 'Trust' on your iPhone and enter your passcode.\nImporting continues automatically once you confirm."
+msgstr "Touchez « Se fier » sur votre iPhone et saisissez votre code.\nL'importation continue automatiquement après confirmation."
+
+msgid "The device was disconnected. Reconnect it and try again."
+msgstr "L'appareil a été déconnecté. Reconnectez-le et réessayez."
+
+msgid "Could not pair with the device. Unlock your iPhone, tap 'Trust', then try again."
+msgstr "Impossible de jumeler l'appareil. Déverrouillez votre iPhone, touchez « Se fier », puis réessayez."
+
+msgid "Sorting and processing…"
+msgstr "Tri et traitement…"
+
+msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
+msgstr "{done} / {total}  ·  {fps} éléments/s  ·  {mb} Mo/s"
+
+msgid "about {eta} remaining  ·  {name}"
+msgstr "environ {eta} restant  ·  {name}"
+
+msgid "%d file is being copied and prepared."
+msgid_plural "%d files are being copied and prepared."
+msgstr[0] "%d fichier est copié et préparé."
+msgstr[1] "%d fichiers sont copiés et préparés."

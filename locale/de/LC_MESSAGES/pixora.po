@@ -2406,3 +2406,29 @@ msgstr "Dieses Backend ist beim letzten Mal abgestürzt."
 
 msgid "Try anyway"
 msgstr "Trotzdem versuchen"
+
+msgid "Waiting for trust…"
+msgstr "Warte auf Vertrauen…"
+
+msgid "Tap 'Trust' on your iPhone and enter your passcode.\nImporting continues automatically once you confirm."
+msgstr "Tippe auf 'Vertrauen' auf deinem iPhone und gib deinen Code ein.\nDer Import wird automatisch fortgesetzt, sobald du bestätigst."
+
+msgid "The device was disconnected. Reconnect it and try again."
+msgstr "Das Gerät wurde getrennt. Schließe es erneut an und versuche es noch einmal."
+
+msgid "Could not pair with the device. Unlock your iPhone, tap 'Trust', then try again."
+msgstr "Kopplung mit dem Gerät fehlgeschlagen. Entsperre dein iPhone, tippe auf 'Vertrauen' und versuche es erneut."
+
+msgid "Sorting and processing…"
+msgstr "Sortieren und verarbeiten…"
+
+msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
+msgstr "{done} / {total}  ·  {fps} Elemente/s  ·  {mb} MB/s"
+
+msgid "about {eta} remaining  ·  {name}"
+msgstr "noch ca. {eta}  ·  {name}"
+
+msgid "%d file is being copied and prepared."
+msgid_plural "%d files are being copied and prepared."
+msgstr[0] "%d Datei wird kopiert und vorbereitet."
+msgstr[1] "%d Dateien werden kopiert und vorbereitet."

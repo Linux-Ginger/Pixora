@@ -2394,3 +2394,29 @@ msgstr "Deze backend crashte Pixora de vorige keer."
 
 msgid "Try anyway"
 msgstr "Toch proberen"
+
+msgid "Waiting for trust…"
+msgstr "Wachten op vertrouwen…"
+
+msgid "Tap 'Trust' on your iPhone and enter your passcode.\nImporting continues automatically once you confirm."
+msgstr "Tik op 'Vertrouw' op je iPhone en voer je toegangscode in.\nHet importeren gaat automatisch verder zodra je bevestigt."
+
+msgid "The device was disconnected. Reconnect it and try again."
+msgstr "Het apparaat is losgekoppeld. Sluit het opnieuw aan en probeer het opnieuw."
+
+msgid "Could not pair with the device. Unlock your iPhone, tap 'Trust', then try again."
+msgstr "Kon niet koppelen met het apparaat. Ontgrendel je iPhone, tik op 'Vertrouw' en probeer het opnieuw."
+
+msgid "Sorting and processing…"
+msgstr "Sorteren en verwerken…"
+
+msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
+msgstr "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
+
+msgid "about {eta} remaining  ·  {name}"
+msgstr "nog ~{eta}  ·  {name}"
+
+msgid "%d file is being copied and prepared."
+msgid_plural "%d files are being copied and prepared."
+msgstr[0] "%d bestand wordt gekopieerd en voorbereid."
+msgstr[1] "%d bestanden worden gekopieerd en voorbereid."

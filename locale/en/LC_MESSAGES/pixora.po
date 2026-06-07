@@ -2376,3 +2376,29 @@ msgstr "This backend crashed Pixora last time."
 
 msgid "Try anyway"
 msgstr "Try anyway"
+
+msgid "Waiting for trust…"
+msgstr "Waiting for trust…"
+
+msgid "Tap 'Trust' on your iPhone and enter your passcode.\nImporting continues automatically once you confirm."
+msgstr "Tap 'Trust' on your iPhone and enter your passcode.\nImporting continues automatically once you confirm."
+
+msgid "The device was disconnected. Reconnect it and try again."
+msgstr "The device was disconnected. Reconnect it and try again."
+
+msgid "Could not pair with the device. Unlock your iPhone, tap 'Trust', then try again."
+msgstr "Could not pair with the device. Unlock your iPhone, tap 'Trust', then try again."
+
+msgid "Sorting and processing…"
+msgstr "Sorting and processing…"
+
+msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
+msgstr "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
+
+msgid "about {eta} remaining  ·  {name}"
+msgstr "about {eta} remaining  ·  {name}"
+
+msgid "%d file is being copied and prepared."
+msgid_plural "%d files are being copied and prepared."
+msgstr[0] "%d file is being copied and prepared."
+msgstr[1] "%d files are being copied and prepared."

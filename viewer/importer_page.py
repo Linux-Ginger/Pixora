@@ -191,6 +191,93 @@ def unmount_iphone(mountpoint: Path):
         pass
 
 
+def pair_state(udid: str) -> str:
+    """Current trust state: 'paired' | 'unpaired' | 'nodevice'.
+
+    idevice_id lists a device even before it is trusted, so we validate the
+    pairing explicitly to know whether a mount can succeed yet.
+    """
+    if not _cmd_available("idevicepair"):
+        return "paired"  # can't check; let the mount attempt decide
+    try:
+        r = subprocess.run(["idevicepair", "-u", udid, "validate"],
+                           capture_output=True, text=True, timeout=8)
+        out = (r.stdout + r.stderr).lower()
+        if r.returncode == 0 or "validated" in out:
+            return "paired"
+        if "no device found" in out or "could not connect" in out:
+            return "nodevice"
+        return "unpaired"
+    except subprocess.TimeoutExpired:
+        return "unpaired"
+    except Exception:
+        return "unpaired"
+
+
+def pair_attempt(udid: str) -> str:
+    """Trigger the on-device trust dialog: 'paired' | 'pending' | 'nodevice'.
+
+    Returns 'pending' while the user still has to tap Trust / enter the
+    passcode, so the caller can keep retrying instead of giving up.
+    """
+    if not _cmd_available("idevicepair"):
+        return "paired"
+    try:
+        r = subprocess.run(["idevicepair", "-u", udid, "pair"],
+                           capture_output=True, text=True, timeout=12)
+        out = (r.stdout + r.stderr).lower()
+        if r.returncode == 0 or "success" in out:
+            return "paired"
+        if "no device found" in out:
+            return "nodevice"
+        # "Please accept the trust dialog", "enter the passcode",
+        # "pairing dialog response pending" -> keep waiting.
+        return "pending"
+    except subprocess.TimeoutExpired:
+        return "pending"
+    except Exception:
+        return "pending"
+
+
+def find_edited_render(src: Path) -> Path | None:
+    """Return the phone-rendered edit for a DCIM file, if one exists.
+
+    iOS keeps the master in DCIM and stores the rendered edit (crop, filters,
+    markup) under PhotoData/Mutations/DCIM/<sub>/<STEM>/Adjustments/
+    FullSizeRender.*. Importing that render gives exactly what the phone shows.
+    """
+    try:
+        parts = src.parts
+        if "DCIM" not in parts:
+            return None
+        i = parts.index("DCIM")
+        mount = Path(*parts[:i]) if i > 0 else Path(src.anchor)
+        rel = Path(*parts[i + 1:])  # e.g. 100APPLE/IMG_0001.HEIC
+        adj = (mount / "PhotoData" / "Mutations" / "DCIM"
+               / rel.parent / src.stem / "Adjustments")
+        try:
+            if not adj.is_dir():
+                return None
+            for cand in sorted(adj.iterdir()):
+                if cand.stem.lower() == "fullsizerender" and cand.is_file():
+                    return cand
+        except OSError:
+            return None
+    except Exception:
+        pass
+    return None
+
+
+def _format_eta(seconds: float) -> str:
+    """Human 'h:mm:ss' / 'm:ss' remaining-time string."""
+    seconds = max(0, int(seconds))
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    if h:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
 _EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, Digitized, DateTime
 _VIDEO_EXT = {".mp4", ".mov", ".m4v", ".3gp"}
 
@@ -1097,11 +1184,47 @@ class ImporterPage(Gtk.Box):
             GLib.idle_add(self._show_error,
                 _("ifuse or libimobiledevice is not installed. Install the required packages below."), True)
             return
+        # Patiently wait for trust instead of failing on the first try; iOS
+        # pairing can take up to a minute the first time you tap Trust.
+        if not self._ensure_paired():
+            return
         if not mount_iphone(self.udid, MOUNT_POINT):
             GLib.idle_add(self._show_error,
                 _("Could not mount the device. Make sure the screen is unlocked and tap 'Trust' when asked."), False)
             return
         GLib.idle_add(self._start_scan)
+
+    def _ensure_paired(self) -> bool:
+        """Block until the device is trusted, auto-triggering the trust dialog.
+
+        Runs on the mount worker thread. Returns False (after showing a
+        friendly error) only if the user never confirms or unplugs.
+        """
+        deadline = time.monotonic() + 90
+        asked = False
+        while time.monotonic() < deadline:
+            if not self.udid:
+                GLib.idle_add(self._show_error,
+                    _("The device was disconnected. Reconnect it and try again."), False)
+                return False
+            state = pair_state(self.udid)
+            if state == "paired":
+                return True
+            if state == "nodevice":
+                time.sleep(1.0)
+                continue
+            # Not trusted yet -> pop the trust dialog and keep waiting.
+            if pair_attempt(self.udid) == "paired":
+                return True
+            if not asked:
+                asked = True
+                GLib.idle_add(self._set_progress,
+                    _("Waiting for trust…"),
+                    _("Tap 'Trust' on your iPhone and enter your passcode.\nImporting continues automatically once you confirm."))
+            time.sleep(2.0)
+        GLib.idle_add(self._show_error,
+            _("Could not pair with the device. Unlock your iPhone, tap 'Trust', then try again."), False)
+        return False
 
     def _start_scan(self):
         self._set_progress(_("Scanning photos…"), _("Searching for photos and videos on your device."))
@@ -1531,10 +1654,10 @@ class ImporterPage(Gtk.Box):
     def _start_import(self):
         total = len(self.to_import)
         self._set_progress(
-            _("Importing…"),
+            _("Sorting and processing…"),
             ngettext(
-                "%d file is being copied.",
-                "%d files are being copied.",
+                "%d file is being copied and prepared.",
+                "%d files are being copied and prepared.",
                 total,
             ) % total
         )
@@ -1547,10 +1670,29 @@ class ImporterPage(Gtk.Box):
         total = len(self.to_import)
         imported = 0
 
+        # Best-effort total size for live speed/ETA (metadata reads are cheap).
+        total_bytes = 0
+        for f in self.to_import:
+            try:
+                total_bytes += f.stat().st_size
+            except OSError:
+                pass
+
+        start = time.monotonic()
+        done_bytes = 0
+
         for i, src in enumerate(self.to_import):
+            copy_src = src
             try:
                 mtime = datetime.fromtimestamp(src.stat().st_mtime)
-                dst = dest_path(photo_path, structure, src.name, mtime)
+
+                # Prefer the phone-rendered edit so crops/filters come over
+                # exactly as shown on the device; fall back to the master.
+                render = find_edited_render(src)
+                if render is not None:
+                    copy_src = render
+                out_name = src.stem + copy_src.suffix
+                dst = dest_path(photo_path, structure, out_name, mtime)
 
                 # "keep both" case: find a unique filename.
                 if dst.exists():
@@ -1561,23 +1703,58 @@ class ImporterPage(Gtk.Box):
                         counter += 1
 
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dst)
+                shutil.copy2(copy_src, dst)
 
-                aae = src.with_suffix(".AAE")
-                if not aae.exists():
-                    aae = src.with_suffix(".aae")
-                if aae.exists() and dst.suffix.lower() in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng"):
-                    apply_aae_edits(dst, aae)
+                # The render already has edits baked in; only reconstruct from
+                # the AAE sidecar when we copied the unedited master.
+                if render is None:
+                    aae = src.with_suffix(".AAE")
+                    if not aae.exists():
+                        aae = src.with_suffix(".aae")
+                    if aae.exists() and dst.suffix.lower() in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng"):
+                        apply_aae_edits(dst, aae)
+
+                # Pre-build the gallery thumbnail now so the library shows no
+                # "loading" placeholders after the import finishes.
+                try:
+                    import main_window as _mw
+                    _mw.load_thumbnail(str(dst))
+                except Exception:
+                    pass
 
                 imported += 1
             except Exception:
                 pass
 
+            try:
+                done_bytes += copy_src.stat().st_size
+            except OSError:
+                pass
+
             frac = (i + 1) / total if total > 0 else 1.0
-            GLib.idle_add(self._update_progress, frac, f"{i + 1} / {total}", src.name)
+            text, detail = self._format_import_stats(
+                i + 1, total, done_bytes, total_bytes, start, src.name)
+            GLib.idle_add(self._update_progress, frac, text, detail)
 
         self.import_count = imported
         GLib.idle_add(self._on_import_done)
+
+    def _format_import_stats(self, done, total, done_bytes, total_bytes, start, name):
+        """Return (subtitle, detail) with live items/s, MB/s and ETA."""
+        elapsed = max(time.monotonic() - start, 0.001)
+        fps = done / elapsed
+        mbps = (done_bytes / (1024 * 1024)) / elapsed
+        if total_bytes > 0 and done_bytes > 0:
+            remaining = (total_bytes - done_bytes) / (done_bytes / elapsed)
+        elif fps > 0:
+            remaining = (total - done) / fps
+        else:
+            remaining = 0
+        text = _("{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s").format(
+            done=done, total=total, fps=f"{fps:.1f}", mb=f"{mbps:.0f}")
+        detail = _("about {eta} remaining  ·  {name}").format(
+            eta=_format_eta(remaining), name=name)
+        return text, detail
 
     def _on_import_done(self):
         unmount_iphone(MOUNT_POINT)
