@@ -93,11 +93,17 @@ def load_settings() -> dict:
 def perceptual_hash(path: Path) -> str | None:
     if not HAS_IMAGEHASH:
         return None
-    try:
-        img = Image.open(path).convert("RGB")
-        return str(imagehash.phash(img))
-    except Exception:
-        return None
+    # Retry once: libheif can fail transiently under concurrent decoding, and a
+    # silent miss here drops the photo from the duplicate index.
+    for attempt in range(2):
+        try:
+            with Image.open(path) as im:
+                img = im.convert("RGB")
+            return str(imagehash.phash(img))
+        except Exception:
+            if attempt == 0:
+                time.sleep(0.05)
+    return None
 
 
 def dest_path(base: Path, structure: str, filename: str, mtime: datetime) -> Path:
@@ -712,6 +718,7 @@ def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
         done = 0
         total = len(all_files)
         cached = total - len(to_hash)
+        failed = []
         with ThreadPoolExecutor(max_workers=8) as pool:
             for fp, ph in zip(to_hash, pool.map(perceptual_hash, to_hash)):
                 done += 1
@@ -720,6 +727,33 @@ def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
                 if ph:
                     cache[cache_keys[fp]] = ph
                     hashes[str(fp)] = ph
+                else:
+                    failed.append(fp)
+        # libheif isn't reliably thread-safe, so a few HEICs fail under parallel
+        # decoding. Retry those serially — otherwise they're missing from the
+        # index and re-import as duplicates. (Videos legitimately yield no hash.)
+        if failed:
+            try:
+                from main_window import log_warn
+                log_warn("build_library_hashes: %d failed parallel, retry serial"
+                         % len(failed))
+            except Exception:
+                pass
+            recovered = 0
+            for fp in failed:
+                if fp.suffix.lower() in _VIDEO_EXT:
+                    continue
+                ph = perceptual_hash(fp)
+                if ph:
+                    cache[cache_keys[fp]] = ph
+                    hashes[str(fp)] = ph
+                    recovered += 1
+            try:
+                from main_window import log_info
+                log_info("build_library_hashes: recovered %d/%d serially"
+                         % (recovered, len(failed)))
+            except Exception:
+                pass
     elif progress_cb:
         progress_cb(len(all_files), len(all_files), "")
 
