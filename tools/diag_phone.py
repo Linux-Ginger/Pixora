@@ -53,16 +53,24 @@ def main():
 
         pd = mp / "PhotoData"
         if pd.exists():
-            pc = Counter()
-            for root, _, fs in os.walk(pd):
-                for fn in fs:
-                    e = Path(fn).suffix.lower()
-                    if e in SUP:
-                        pc[e] += 1
-            print(f"\n🗂️  PhotoData media (outside DCIM): {sum(pc.values())}",
-                  dict(pc))
-            subs = [p.name for p in pd.iterdir() if p.is_dir()]
-            print("   PhotoData subdirs:", sorted(subs))
+            print("\n🗂️  PhotoData — media per subdir "
+                  "(big = likely originals ≥300 KB):")
+            grand_big = 0
+            for sub in sorted(p for p in pd.iterdir() if p.is_dir()):
+                n = big = 0
+                for root, _, fs in os.walk(sub):
+                    for fn in fs:
+                        if Path(fn).suffix.lower() in SUP:
+                            n += 1
+                            try:
+                                if (Path(root) / fn).stat().st_size >= 300_000:
+                                    big += 1
+                            except OSError:
+                                pass
+                if n:
+                    grand_big += big
+                    print(f"   {sub.name:24s} media={n:5d}  big={big:5d}")
+            print(f"\n   → total 'big' media in PhotoData: {grand_big}")
     finally:
         subprocess.run(["fusermount", "-uz", str(mp)], capture_output=True)
         print("\n✅ done (device unmounted)")
