@@ -71,6 +71,31 @@ def main():
                     grand_big += big
                     print(f"   {sub.name:24s} media={n:5d}  big={big:5d}")
             print(f"\n   → total 'big' media in PhotoData: {grand_big}")
+
+        # Deep-dive on CPLAssets — these are the iCloud-library originals that
+        # never land in DCIM, so we need to know their layout to import them.
+        cpl = pd / "CPLAssets"
+        if cpl.exists():
+            cnt = Counter()
+            samples = []
+            for root, _, fs in os.walk(cpl):
+                for fn in fs:
+                    e = Path(fn).suffix.lower()
+                    if e in SUP:
+                        cnt[e] += 1
+                        if len(samples) < 10:
+                            p = Path(root) / fn
+                            rel = p.relative_to(cpl)
+                            try:
+                                kb = p.stat().st_size // 1024
+                            except OSError:
+                                kb = -1
+                            samples.append(f"{rel}  ({kb} KB)")
+            print("\n🔍 CPLAssets deep-dive:")
+            print("   extensions:", dict(cnt))
+            print("   sample files (path relative to CPLAssets):")
+            for s in samples:
+                print(f"     {s}")
     finally:
         subprocess.run(["fusermount", "-uz", str(mp)], capture_output=True)
         print("\n✅ done (device unmounted)")
