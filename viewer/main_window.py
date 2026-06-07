@@ -5823,8 +5823,9 @@ class MainWindow(Adw.ApplicationWindow):
                 "  box-shadow: none;"
                 "}"
                 ".pixora-settings-tab image {"
-                "  transition: transform 200ms cubic-bezier(.2,.9,.3,1.2),"
-                "              -gtk-icon-size 200ms;"
+                # Animate transform only — animating -gtk-icon-size re-rasterizes
+                # the symbolic icon each frame and flashes its magenta fallback.
+                "  transition: transform 200ms cubic-bezier(.2,.9,.3,1.2);"
                 "  -gtk-icon-size: 20px;"
                 # Reserve 24px (checked size) so headerbar height stays constant.
                 "  min-width: 24px;"
