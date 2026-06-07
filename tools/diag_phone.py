@@ -88,11 +88,65 @@ def probe_photos_db(pd: Path):
         for fn, d, z in rows:
             print(f"     {fn}  ·  {d}  ·  {_fmt_cd(z)}")
 
+        # Set of primary-asset paths, so the Live Photo analysis can tell a
+        # standalone video from a Live Photo's secondary movie resource.
+        keys = set()
+        for zdir, zfn in cur.execute(
+                "SELECT ZDIRECTORY, ZFILENAME FROM ZASSET "
+                "WHERE ZFILENAME IS NOT NULL"):
+            keys.add((f"{zdir}/{zfn}" if zdir else zfn).lower())
         con.close()
+        return keys
     except Exception as e:
         print(f"   ❌ could not read DB: {e!r}")
+        return None
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def analyze_live_photos(mp, primary_keys):
+    """Explain why Pixora's count can exceed the phone's: Live Photos are a
+    still + a movie, counted as one item by the phone but two files on disk."""
+    print("\n🎞️  Live Photo analysis:")
+
+    still_ext = {".jpg", ".jpeg", ".png", ".heic", ".heif"}
+    vid_ext = {".mov", ".mp4", ".m4v"}
+
+    # DCIM: a video is a Live Photo motion when a same-stem still sits beside it.
+    dcim = mp / "DCIM"
+    dcim_stills = {}
+    dcim_vids = []
+    for root, _, fs in os.walk(dcim):
+        for fn in fs:
+            e = Path(fn).suffix.lower()
+            stem = (root, Path(fn).stem.lower())
+            if e in still_ext:
+                dcim_stills[stem] = fn
+            elif e in vid_ext:
+                dcim_vids.append((root, fn, stem))
+    dcim_live = sum(1 for _, _, s in dcim_vids if s in dcim_stills)
+    print(f"   DCIM: {len(dcim_vids)} videos, of which {dcim_live} are Live "
+          f"Photo motions (same name as a photo) → folded by name.")
+
+    # CPLAssets: GUID names differ between still and motion, so use the DB —
+    # a video that is NOT a primary asset is a Live Photo's movie resource.
+    cpl = mp / "PhotoData" / "CPLAssets"
+    cpl_vid = cpl_vid_primary = cpl_vid_secondary = 0
+    if cpl.exists():
+        for root, _, fs in os.walk(cpl):
+            for fn in fs:
+                if Path(fn).suffix.lower() in vid_ext:
+                    cpl_vid += 1
+                    if primary_keys is not None:
+                        rel = (Path(root) / fn).relative_to(mp).as_posix().lower()
+                        if rel in primary_keys:
+                            cpl_vid_primary += 1
+                        else:
+                            cpl_vid_secondary += 1
+    print(f"   CPLAssets: {cpl_vid} videos — {cpl_vid_primary} standalone, "
+          f"{cpl_vid_secondary} are Live Photo motions (not in DB as own asset).")
+    print(f"   → these {cpl_vid_secondary} CPL motions are the extra files "
+          f"Pixora still over-counts; they need DB-based folding.")
 
 
 def main():
@@ -177,7 +231,8 @@ def main():
 
         # Can we read the Photos database? It holds the authoritative capture
         # date (ZASSET.ZDATECREATED) that the iOS Photos app sorts by.
-        probe_photos_db(pd)
+        primary_keys = probe_photos_db(pd)
+        analyze_live_photos(mp, primary_keys)
     finally:
         subprocess.run(["fusermount", "-uz", str(mp)], capture_output=True)
         print("\n✅ done (device unmounted)")
