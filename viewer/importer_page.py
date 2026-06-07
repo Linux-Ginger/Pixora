@@ -93,11 +93,17 @@ def load_settings() -> dict:
 def perceptual_hash(path: Path) -> str | None:
     if not HAS_IMAGEHASH:
         return None
-    # Retry once: libheif can fail transiently under concurrent decoding, and a
-    # silent miss here drops the photo from the duplicate index.
+    from io import BytesIO
+    # Read the whole file first, then decode from memory. Decoding a HEIC
+    # straight off the phone's FUSE mount makes PIL seek within the file, which
+    # over AFC returns partial/garbled data — a different (wrong) hash than the
+    # real image, so true duplicates were missed and re-imported. A single
+    # sequential read is reliable; retry once for transient failures.
     for attempt in range(2):
         try:
-            with Image.open(path) as im:
+            with open(path, "rb") as fh:
+                data = fh.read()
+            with Image.open(BytesIO(data)) as im:
                 img = im.convert("RGB")
             return str(imagehash.phash(img))
         except Exception:
