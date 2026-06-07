@@ -280,6 +280,36 @@ def _format_eta(seconds: float) -> str:
 
 _EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, Digitized, DateTime
 _VIDEO_EXT = {".mp4", ".mov", ".m4v", ".3gp"}
+_STILL_EXT = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".dng",
+              ".tiff", ".tif", ".webp", ".gif", ".bmp"}
+
+
+def pair_live_photos(files: list[Path]) -> tuple[list[Path], dict]:
+    """Fold Live Photos (a still + a same-named movie in the same folder) into
+    one item, exactly as the Photos app shows them.
+
+    Returns (display_files, motion_of):
+      - display_files: the stills + standalone videos, with each Live Photo's
+        movie half removed so it isn't a separate tile.
+      - motion_of: {still_path: movie_path} so the import phase can copy the
+        movie alongside its still and keep the pair linked in the archive.
+    """
+    stills = {}
+    for f in files:
+        if f.suffix.lower() in _STILL_EXT:
+            stills[(f.parent, f.stem.lower())] = f
+
+    motion_of = {}
+    hidden = set()
+    for f in files:
+        if f.suffix.lower() in _VIDEO_EXT:
+            still = stills.get((f.parent, f.stem.lower()))
+            if still is not None:
+                motion_of[still] = f
+                hidden.add(f)
+
+    display = [f for f in files if f not in hidden]
+    return display, motion_of
 
 def _get_video_date(path: Path) -> float | None:
     """Return video creation_time via ffprobe."""
@@ -1073,6 +1103,7 @@ class ImporterPage(Gtk.Box):
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.select_scroll = scroll
 
         self.select_flow = Gtk.FlowBox()
         self.select_flow.set_homogeneous(True)
@@ -1513,6 +1544,20 @@ class ImporterPage(Gtk.Box):
                 pass
 
         files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
+
+        # Fold Live Photos: the movie half is hidden from the grid but its
+        # mapping is kept so import copies it alongside the still. This makes
+        # the count and tiles match the Photos app (1 item per Live Photo).
+        files, motion_of = pair_live_photos(files)
+        self._live_motion = motion_of
+        if motion_of:
+            try:
+                from main_window import log_info
+                log_info("scan: folded %d Live Photo pairs → %d items"
+                         % (len(motion_of), len(files)))
+            except Exception:
+                pass
+
         GLib.idle_add(self._on_scan_done, files)
 
     def _begin_sort_progress(self, total):
@@ -1608,8 +1653,19 @@ class ImporterPage(Gtk.Box):
             self.select_flow.append(card)
 
         self._show_state(STATE_SELECTING)
+        # Adding cards can leave the view scrolled to the bottom; snap back to
+        # the top so the newest photo (card 1) is what the user sees first.
+        GLib.idle_add(self._scroll_select_top, priority=GLib.PRIORITY_LOW)
 
         threading.Thread(target=self._load_select_thumbs, args=(list(files),), daemon=True).start()
+
+    def _scroll_select_top(self):
+        scroll = getattr(self, "select_scroll", None)
+        if scroll is not None:
+            adj = scroll.get_vadjustment()
+            if adj is not None:
+                adj.set_value(adj.get_lower())
+        return False
 
     def _make_select_card(self, fp: Path) -> tuple[Gtk.Widget, Gtk.CheckButton, Gtk.Overlay]:
         overlay = Gtk.Overlay()
@@ -1945,6 +2001,18 @@ class ImporterPage(Gtk.Box):
                         aae = src.with_suffix(".aae")
                     if aae.exists() and dst.suffix.lower() in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng"):
                         apply_aae_edits(dst, aae)
+
+                # Live Photo: copy the movie half next to the still under the
+                # same stem, so the pair stays linked (and the gallery folds it).
+                motion = getattr(self, "_live_motion", {}).get(src)
+                if motion is not None:
+                    try:
+                        motion_dst = dst.parent / (dst.stem + motion.suffix)
+                        if not motion_dst.exists():
+                            shutil.copy2(motion, motion_dst)
+                            done_bytes += motion.stat().st_size
+                    except Exception:
+                        pass
 
                 imported += 1
             except Exception:

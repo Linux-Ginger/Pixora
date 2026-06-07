@@ -244,6 +244,30 @@ THUMB_WORKERS = 2 if _low_ram_system() else 4
 TILE_SIZE        = 256
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
 VIDEO_EXTENSIONS = {".mp4", ".mov"}
+_STILL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif"}
+
+
+def drop_live_motion(paths):
+    """Hide the movie half of a Live Photo so each shows as one tile.
+
+    A video counts as a Live Photo's motion part when a still image with the
+    same stem sits in the same folder (IMG_1234.HEIC + IMG_1234.MOV). Standalone
+    videos — no matching still — are kept. Mirrors what the iOS Photos app does.
+    """
+    stills = set()
+    for p in paths:
+        if os.path.splitext(p)[1].lower() in _STILL_EXTENSIONS:
+            stills.add((os.path.dirname(p),
+                        os.path.splitext(os.path.basename(p))[0].lower()))
+    out = []
+    for p in paths:
+        if os.path.splitext(p)[1].lower() in VIDEO_EXTENSIONS:
+            key = (os.path.dirname(p),
+                   os.path.splitext(os.path.basename(p))[0].lower())
+            if key in stills:
+                continue  # Live Photo motion — folded into its still
+        out.append(p)
+    return out
 
 
 def is_video(path):
@@ -3431,6 +3455,7 @@ class MainWindow(Adw.ApplicationWindow):
                 for file in files:
                     if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
                         photos.append(os.path.join(root, file))
+            photos = drop_live_motion(photos)
             GLib.idle_add(self._on_photos_scanned, photos, photo_path)
 
         threading.Thread(target=_scan_bg, daemon=True).start()
