@@ -2402,3 +2402,6 @@ msgid "%d file is being copied and prepared."
 msgid_plural "%d files are being copied and prepared."
 msgstr[0] "%d file is being copied and prepared."
 msgstr[1] "%d files are being copied and prepared."
+
+msgid "🔌 iPhone disconnected"
+msgstr "🔌 iPhone disconnected"

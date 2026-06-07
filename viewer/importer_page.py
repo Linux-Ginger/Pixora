@@ -1227,7 +1227,7 @@ class ImporterPage(Gtk.Box):
         return False
 
     def _start_scan(self):
-        self._set_progress(_("Scanning photos…"), _("Searching for photos and videos on your device."))
+        self._set_progress(_("Sorting and processing…"), _("Searching for photos and videos on your device."))
         self._show_state(STATE_SCANNING)
         self._start_detection_poll()
         self._start_progress_pulse()
@@ -1264,6 +1264,11 @@ class ImporterPage(Gtk.Box):
             )
         files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
         total = len(files)
+        if total == 0:
+            GLib.idle_add(self._on_scan_done, files)
+            return
+
+        # Sort by date (metadata only — the quick part; keep the bar pulsing).
         GLib.idle_add(
             self.progress_subtitle.set_text,
             ngettext(
@@ -1272,16 +1277,10 @@ class ImporterPage(Gtk.Box):
                 total,
             ) % total,
         )
-        # Chunked progress during sort keeps the UI responsive.
-        GLib.idle_add(self._begin_sort_progress, total)
         if total <= 500:
             files.sort(key=get_photo_date, reverse=True)
-            GLib.idle_add(self._update_progress, 1.0, _("Sorting done ({n})").format(n=total), "")
         else:
-            # as_completed gives per-item progress; pool.map would tick only
-            # at the end, looking frozen on FUSE.
             date_cache = {}
-            done = 0
             with ThreadPoolExecutor(max_workers=6) as pool:
                 futures = {pool.submit(get_photo_date, f): f for f in files}
                 for fut in as_completed(futures):
@@ -1290,14 +1289,33 @@ class ImporterPage(Gtk.Box):
                         date_cache[f] = fut.result()
                     except Exception:
                         date_cache[f] = 0
-                    done += 1
-                    frac = done / total
-                    GLib.idle_add(
-                        self._update_progress, frac,
-                        _("Sorting: {i} / {total}").format(i=done, total=total),
-                        f.name,
-                    )
             files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
+
+        # "Processing": build every thumbnail up front so the selection grid
+        # shows real photos immediately — no "…" placeholders, no waiting.
+        GLib.idle_add(self._begin_sort_progress, total)
+        sizes = {}
+        total_bytes = 0
+        for f in files:
+            try:
+                sz = f.stat().st_size
+            except OSError:
+                sz = 0
+            sizes[f] = sz
+            total_bytes += sz
+        start = time.monotonic()
+        done_bytes = 0
+        for i, f in enumerate(files):
+            try:
+                load_select_thumb(f)
+            except Exception:
+                pass
+            done_bytes += sizes.get(f, 0)
+            frac = (i + 1) / total
+            text, detail = self._format_progress_stats(
+                i + 1, total, done_bytes, total_bytes, start, f.name)
+            GLib.idle_add(self._update_progress, frac, text, detail)
+
         GLib.idle_add(self._on_scan_done, files)
 
     def _begin_sort_progress(self, total):
@@ -1654,10 +1672,10 @@ class ImporterPage(Gtk.Box):
     def _start_import(self):
         total = len(self.to_import)
         self._set_progress(
-            _("Sorting and processing…"),
+            _("Importing…"),
             ngettext(
-                "%d file is being copied and prepared.",
-                "%d files are being copied and prepared.",
+                "%d file is being copied.",
+                "%d files are being copied.",
                 total,
             ) % total
         )
@@ -1714,14 +1732,6 @@ class ImporterPage(Gtk.Box):
                     if aae.exists() and dst.suffix.lower() in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng"):
                         apply_aae_edits(dst, aae)
 
-                # Pre-build the gallery thumbnail now so the library shows no
-                # "loading" placeholders after the import finishes.
-                try:
-                    import main_window as _mw
-                    _mw.load_thumbnail(str(dst))
-                except Exception:
-                    pass
-
                 imported += 1
             except Exception:
                 pass
@@ -1732,14 +1742,14 @@ class ImporterPage(Gtk.Box):
                 pass
 
             frac = (i + 1) / total if total > 0 else 1.0
-            text, detail = self._format_import_stats(
+            text, detail = self._format_progress_stats(
                 i + 1, total, done_bytes, total_bytes, start, src.name)
             GLib.idle_add(self._update_progress, frac, text, detail)
 
         self.import_count = imported
         GLib.idle_add(self._on_import_done)
 
-    def _format_import_stats(self, done, total, done_bytes, total_bytes, start, name):
+    def _format_progress_stats(self, done, total, done_bytes, total_bytes, start, name):
         """Return (subtitle, detail) with live items/s, MB/s and ETA."""
         elapsed = max(time.monotonic() - start, 0.001)
         fps = done / elapsed

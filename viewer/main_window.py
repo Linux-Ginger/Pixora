@@ -1686,17 +1686,21 @@ class MainWindow(Adw.ApplicationWindow):
             self._udev_client = None
 
     def _on_usb_event(self, client, action, device):
-        if action != "add":
-            return
-        try:
-            vendor = device.get_property("ID_VENDOR_ID")
-        except Exception:
-            vendor = None
-        if vendor != "05ac":  # Apple
-            return
-        log_info(_("Apple USB device connected (vendor=05ac) — check after 2.5s"))
-        # Wait briefly so usbmuxd sees the device before we check.
-        GLib.timeout_add(2500, self._post_apple_plugin_check)
+        if action == "add":
+            try:
+                vendor = device.get_property("ID_VENDOR_ID")
+            except Exception:
+                vendor = None
+            if vendor != "05ac":  # Apple
+                return
+            log_info(_("Apple USB device connected (vendor=05ac) — check after 2.5s"))
+            # Wait briefly so usbmuxd sees the device before we check.
+            GLib.timeout_add(2500, self._post_apple_plugin_check)
+        elif action in ("remove", "unbind"):
+            # Device properties are usually gone on removal, so just re-check
+            # promptly; the poll clears the button and shows the disconnect
+            # banner if the iPhone really left.
+            GLib.timeout_add(800, self._poll_import_device_once)
 
     def _post_apple_plugin_check(self):
         # Don't interrupt an open importer.
@@ -1834,6 +1838,15 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             ctx.remove_class("pixora-import-active")
             self.import_btn.set_tooltip_text(_("Import from iPhone or iPad"))
+            # Tell the user the device left (skip while the importer is open;
+            # it has its own disconnect flow).
+            try:
+                in_importer = self.main_stack.get_visible_child_name() == "importer"
+            except Exception:
+                in_importer = False
+            if not in_importer:
+                self._set_iphone_banner(_("🔌 iPhone disconnected"))
+                GLib.timeout_add_seconds(4, self._clear_iphone_banner)
         return False
 
     def _prewarm_gstreamer(self):
