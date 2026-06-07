@@ -2413,6 +2413,12 @@ msgstr "Sorteren en verwerken…"
 msgid "Reading photo order from the device…"
 msgstr "Fotovolgorde van het apparaat lezen…"
 
+msgid "⭐ Showing favorites only"
+msgstr "⭐ Alleen favorieten"
+
+msgid "Show all"
+msgstr "Toon alles"
+
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 

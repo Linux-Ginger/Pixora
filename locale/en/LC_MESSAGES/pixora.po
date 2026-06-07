@@ -2395,6 +2395,12 @@ msgstr "Sorting and processing…"
 msgid "Reading photo order from the device…"
 msgstr "Reading photo order from the device…"
 
+msgid "⭐ Showing favorites only"
+msgstr "⭐ Showing favorites only"
+
+msgid "Show all"
+msgstr "Show all"
+
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 

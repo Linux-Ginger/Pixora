@@ -1571,6 +1571,12 @@ msgstr ""
 msgid "Reading photo order from the device…"
 msgstr ""
 
+msgid "⭐ Showing favorites only"
+msgstr ""
+
+msgid "Show all"
+msgstr ""
+
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr ""
 

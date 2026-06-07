@@ -783,17 +783,21 @@ def decode_pixbuf(path, max_dim):
             pass
     try:
         from PIL import Image, ImageOps
+        from io import BytesIO
         with Image.open(path) as img:
             img = ImageOps.exif_transpose(img)
-            has_alpha = img.mode in ("RGBA", "LA", "PA") or (
-                img.mode == "P" and "transparency" in img.info)
-            img = img.convert("RGBA" if has_alpha else "RGB")
             img.thumbnail((max_dim, max_dim), Image.LANCZOS)
-            w, h = img.size
-            channels = 4 if has_alpha else 3
-            data = GLib.Bytes.new(img.tobytes())
-            return GdkPixbuf.Pixbuf.new_from_bytes(
-                data, GdkPixbuf.Colorspace.RGB, has_alpha, 8, w, h, w * channels)
+            if img.mode not in ("RGB", "RGBA", "L"):
+                img = img.convert("RGB")
+            buf = BytesIO()
+            img.save(buf, "PNG")
+        # Go through a PNG buffer rather than new_from_bytes: GdkPixbuf rows from
+        # raw RGB data aren't 4-byte aligned when width isn't a multiple of 4,
+        # which makes cairo render garbled glitches. PNG decode is always aligned.
+        loader = GdkPixbuf.PixbufLoader.new_with_type("png")
+        loader.write(buf.getvalue())
+        loader.close()
+        return loader.get_pixbuf()
     except Exception:
         try:
             return GdkPixbuf.Pixbuf.new_from_file_at_scale(path, max_dim, max_dim, True)
@@ -1363,11 +1367,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._video_poll_id         = None
         self._video_scrubbing_lock  = False
         self._video_seek_pending_id = None
-        self._preview_cache         = OrderedDict()  # LRU: timestamp_s -> pixbuf | None
+        self._preview_cache         = OrderedDict()  # LRU: (path, ts_s) -> pixbuf
         self._viewer_pixbuf_cache   = OrderedDict()  # LRU: path -> pixbuf, max 3
         self._preview_debounce_id   = None
         self._preview_extracting    = False
-        self._preview_pending_ts    = None
+        self._preview_pending       = None           # (path, ts_s) wanted next
         self._fade_timer_id         = None
         self._fade_anim_id          = None
         self._favorites             = load_favorites()
@@ -1464,11 +1468,21 @@ class MainWindow(Adw.ApplicationWindow):
             lambda _b: self.backup_done_banner.set_revealed(False)
         )
 
+        # Makes it obvious you're viewing favorites only (so photos don't seem
+        # "missing"); the button clears the filter.
+        self.favorites_banner = Adw.Banner(
+            title=_("⭐ Showing favorites only"),
+            button_label=_("Show all"), use_markup=False
+        )
+        self.favorites_banner.set_revealed(False)
+        self.favorites_banner.connect("button-clicked", self._on_show_all_favorites)
+
         self.toolbar_view = Adw.ToolbarView()
         self.toolbar_view.add_top_bar(self.update_banner)
         self.toolbar_view.add_top_bar(self.iphone_banner)
         self.toolbar_view.add_top_bar(self.backup_pending_banner)
         self.toolbar_view.add_top_bar(self.backup_done_banner)
+        self.toolbar_view.add_top_bar(self.favorites_banner)
         self.toolbar_view.add_top_bar(self.build_header())
         self.toolbar_view.set_content(self.main_stack)
         self.toolbar_view.add_bottom_bar(self.build_bottombar())
@@ -3298,8 +3312,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_scrubber.add_css_class("video-scrubber")
         scrubber_css = Gtk.CssProvider()
         scrubber_css.load_from_string(
-            "scale.video-scrubber trough { border-radius: 6px; min-height: 5px; }"
-            " scale.video-scrubber fill { border-radius: 6px; }"
+            "scale.video-scrubber trough { border-radius: 9px; min-height: 6px; }"
+            " scale.video-scrubber trough highlight { border-radius: 9px; }"
+            " scale.video-scrubber trough fill { border-radius: 9px; }"
         )
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(),
@@ -4146,6 +4161,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._show_viewer_ui()   # reset fade state
         self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
+        self._viewer_stack.set_visible(True)  # may have been hidden for a video
         # Put new pixbuf in inactive slot, then flip stack for slide.
         incoming_slot = "b" if self._active_viewer_slot == "a" else "a"
         incoming_pic = (self._viewer_pic_b if incoming_slot == "b"
@@ -4594,9 +4610,13 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_video(self, path, location="", searching=False):
         self._stop_video()
         self._preview_cache = OrderedDict()
+        self._preview_pending = None
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
         self._show_viewer_ui()   # reset fade state
+        # Hide the whole photo stack (not just one slot) so a portrait video's
+        # letterbox shows the black background, never the previous photo.
+        self._viewer_stack.set_visible(False)
         self.photo_picture.set_visible(False)
         self.edit_btn.set_visible(False)
         self._update_favorite_btn()
@@ -4833,21 +4853,28 @@ class MainWindow(Adw.ApplicationWindow):
         dur = self._video_media.get_duration()
         if dur <= 0:
             return
+        if not self.photos or not (0 <= self.current_index < len(self.photos)):
+            return
+        path = self.photos[self.current_index]
         ts_s = (int(fraction * dur / 1_000_000) // 2) * 2  # 2s bins
         self._preview_time_lbl.set_text(format_duration(ts_s))
         w = self.video_scrubber.get_width()
         if w > 0:
             rect = Gdk.Rectangle()
-            rect.x = int(fraction * w); rect.y = 0
-            rect.width = 1; rect.height = self.video_scrubber.get_height()
+            rect.x = int(fraction * w)
+            rect.y = -10           # lift the popover clear of the timeline/cursor
+            rect.width = 1
+            rect.height = 0
             self._preview_popover.set_pointing_to(rect)
             if not self._preview_popover.get_visible():
                 self._preview_popover.popup()
-        pb = self._preview_cache.get(ts_s, "missing")
-        if pb is not None and pb != "missing":
+        # Cache keyed by (video, time) so frames never leak between videos.
+        key = (path, ts_s)
+        pb = self._preview_cache.get(key)
+        if pb is not None:
             self._preview_picture.set_pixbuf(pb)
             return
-        self._preview_pending_ts = ts_s
+        self._preview_pending = key
         if self._preview_debounce_id:
             GLib.source_remove(self._preview_debounce_id)
         self._preview_debounce_id = GLib.timeout_add(120, self._do_debounced_preview)
@@ -4868,16 +4895,14 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _do_debounced_preview(self):
         self._preview_debounce_id = None
-        ts_s = self._preview_pending_ts
-        if ts_s is None or self._preview_extracting:
+        pending = self._preview_pending
+        if pending is None or self._preview_extracting:
             return False
-        if ts_s in self._preview_cache:
+        if pending in self._preview_cache:
+            self._apply_preview_frame(pending)
             return False
-        if not self.photos or not (0 <= self.current_index < len(self.photos)):
-            return False
-        self._preview_cache[ts_s] = None  # mark loading
+        path, ts_s = pending
         self._preview_extracting = True
-        path = self.photos[self.current_index]
         # Bind to viewer-load-id so late ffmpeg output is discarded after nav.
         load_id = self._viewer_load_id
         threading.Thread(
@@ -4892,32 +4917,54 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
                 tmp = f.name
+            # -ss before -i = fast keyframe seek; -an skips audio for speed.
             subprocess.run(
-                ["ffmpeg", "-ss", str(ts_s), "-i", path,
+                ["ffmpeg", "-ss", str(ts_s), "-i", path, "-an",
                  "-vframes", "1", "-vf", "scale=160:-1", tmp, "-y"],
                 capture_output=True, timeout=8
             )
-            if load_id != self._viewer_load_id:
+            if load_id == self._viewer_load_id:
+                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(tmp, 160, 90, True)
+                key = (path, ts_s)
+                self._preview_cache[key] = pb
+                self._preview_cache.move_to_end(key)
+                while len(self._preview_cache) > 40:
+                    self._preview_cache.popitem(last=False)
+                GLib.idle_add(self._apply_preview_frame, key, load_id)
+            try:
                 os.unlink(tmp)
-                return
-            pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(tmp, 160, 90, True)
-            os.unlink(tmp)
-            self._preview_cache[ts_s] = pb
-            self._preview_cache.move_to_end(ts_s)
-            while len(self._preview_cache) > 25:
-                self._preview_cache.popitem(last=False)
-            GLib.idle_add(self._apply_preview_frame, ts_s, load_id)
+            except OSError:
+                pass
         except Exception:
             pass
         finally:
             self._preview_extracting = False
+            # A newer hover may have arrived while ffmpeg ran — service it now,
+            # otherwise the preview would freeze on the old frame.
+            GLib.idle_add(self._service_pending_preview)
 
-    def _apply_preview_frame(self, ts_s, load_id=None):
+    def _service_pending_preview(self):
+        pending = self._preview_pending
+        if pending is None:
+            return False
+        if pending in self._preview_cache:
+            self._apply_preview_frame(pending)
+        elif not self._preview_extracting:
+            if self._preview_debounce_id:
+                GLib.source_remove(self._preview_debounce_id)
+                self._preview_debounce_id = None
+            self._do_debounced_preview()
+        return False
+
+    def _apply_preview_frame(self, key, load_id=None):
         if load_id is not None and load_id != self._viewer_load_id:
             return False
-        pb = self._preview_cache.get(ts_s)
+        # Skip stale frames: only show the one currently being hovered.
+        if self._preview_pending is not None and key != self._preview_pending:
+            return False
+        pb = self._preview_cache.get(key)
         if pb:
-            self._preview_cache.move_to_end(ts_s)
+            self._preview_cache.move_to_end(key)
             if self._preview_popover.get_visible():
                 self._preview_picture.set_pixbuf(pb)
         return False
@@ -4928,8 +4975,33 @@ class MainWindow(Adw.ApplicationWindow):
         self._transform_pending = True
         GLib.idle_add(self._do_apply_viewer_transform)
 
+    def _clamp_viewer_offset(self):
+        """Keep a zoomed photo from being dragged off-screen: bound the pan so
+        the image always covers the viewport."""
+        z = self._viewer_zoom
+        if z <= 1.0:
+            self._viewer_offset = [0.0, 0.0]
+            return
+        pb = getattr(self, "_viewer_pixbuf", None)
+        W = self.photo_picture.get_width()
+        H = self.photo_picture.get_height()
+        if not pb or W <= 0 or H <= 0:
+            return
+        iw, ih = pb.get_width(), pb.get_height()
+        if iw <= 0 or ih <= 0:
+            return
+        fit = min(W / iw, H / ih)          # CONTAIN-fit size at zoom 1
+        cw, ch = iw * fit, ih * fit
+        # translate is pre-scale in the CSS matrix, so its viewport effect is ×z.
+        max_ox = max(0.0, (cw * z - W) / 2) / z
+        max_oy = max(0.0, (ch * z - H) / 2) / z
+        ox, oy = self._viewer_offset
+        self._viewer_offset[0] = max(-max_ox, min(max_ox, ox))
+        self._viewer_offset[1] = max(-max_oy, min(max_oy, oy))
+
     def _do_apply_viewer_transform(self):
         self._transform_pending = False
+        self._clamp_viewer_offset()
         z  = self._viewer_zoom
         ox = self._viewer_offset[0]
         oy = self._viewer_offset[1]
@@ -5062,7 +5134,12 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(_("Favorites filter: {state}").format(
             state=_("on") if self._favorites_only else _("off")
         ))
+        self.favorites_banner.set_revealed(self._favorites_only)
         self.load_photos()
+
+    def _on_show_all_favorites(self, _banner):
+        # Untoggling fires toggle_favorites_filter, which reloads + hides banner.
+        self.favorites_toggle.set_active(False)
 
 
     def on_edit_current(self, btn):
@@ -5428,6 +5505,9 @@ class MainWindow(Adw.ApplicationWindow):
                 self.video_display.set_visible(False)
             except Exception:
                 pass
+        # Hide the whole stack so the falling strips reveal black, not the photo
+        # underneath; _show_full_photo restores it when the next item loads.
+        self._viewer_stack.set_visible(False)
         self.photo_picture.set_visible(False)
 
         N_STRIPS = 12
@@ -5495,13 +5575,10 @@ class MainWindow(Adw.ApplicationWindow):
                     self._set_viewer_location("empty")
                 except Exception:
                     pass
-                # Re-show both; on_done's next load picks which stays visible.
+                # Leave the stack hidden — the next item's load (_show_full_photo
+                # or _show_video) makes the right surface visible. Until then the
+                # black background shows, never the deleted photo.
                 self.photo_picture.set_visible(True)
-                if is_vid:
-                    try:
-                        self.video_display.set_visible(True)
-                    except Exception:
-                        pass
                 on_done(path)
                 return False
             return True
