@@ -319,11 +319,14 @@ def _get_video_duration(path: Path) -> str | None:
     return None
 
 
-def get_photo_date(path: Path, use_name_counter: bool = True) -> float:
-    """Sort key: EXIF/ffprobe timestamp, else filename counter, else mtime.
+def get_photo_date(path: Path) -> float:
+    """Sort key: a Unix timestamp — EXIF/ffprobe capture time, else mtime.
 
-    CPLAssets files are GUID-named, so their digits are meaningless as a
-    chronological counter — callers pass use_name_counter=False for those.
+    Every branch must return a value on the same (timestamp) scale, otherwise
+    files mixing scales sort nonsensically. Screenshots/PNGs and CPLAssets
+    GUID files have no EXIF, so they fall back to the file's mtime, which over
+    AFC is the capture date — never the filename counter, which lives on a
+    tiny incomparable scale and scatters those files to one extreme.
     """
     ext = path.suffix.lower()
     if ext in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng", ".tiff", ".tif"):
@@ -342,12 +345,10 @@ def get_photo_date(path: Path, use_name_counter: bool = True) -> float:
         ts = _get_video_date(path)
         if ts:
             return ts
-    # Fallback: iPhone names (IMG_1234) are chronological; counter beats mtime.
-    if use_name_counter:
-        m = re.search(r'(\d{4,})', path.stem)
-        if m:
-            return float(m.group(1))
-    return path.stat().st_mtime
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
 
 
 def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
@@ -1386,8 +1387,7 @@ class ImporterPage(Gtk.Box):
 
         def process(f):
             try:
-                # CPLAssets files are GUID-named, so don't mine digits as a counter.
-                d = get_photo_date(f, use_name_counter=f not in cpl_set)
+                d = get_photo_date(f)
             except Exception:
                 d = 0
             try:
