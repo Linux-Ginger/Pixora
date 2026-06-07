@@ -3339,9 +3339,18 @@ class MainWindow(Adw.ApplicationWindow):
         prev_pic_css.load_from_string("picture { border-radius: 8px; }")
         self._preview_picture.get_style_context().add_provider(
             prev_pic_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        # Spinner shown over the thumb area while ffmpeg extracts the frame.
+        prev_overlay = Gtk.Overlay()
+        prev_overlay.set_size_request(160, 90)
+        prev_overlay.set_child(self._preview_picture)
+        self._preview_spinner = Gtk.Spinner()
+        self._preview_spinner.set_halign(Gtk.Align.CENTER)
+        self._preview_spinner.set_valign(Gtk.Align.CENTER)
+        self._preview_spinner.set_visible(False)
+        prev_overlay.add_overlay(self._preview_spinner)
         self._preview_time_lbl = Gtk.Label()
         self._preview_time_lbl.add_css_class("caption")
-        prev_box.append(self._preview_picture)
+        prev_box.append(prev_overlay)
         prev_box.append(self._preview_time_lbl)
         self._preview_popover.set_child(prev_box)
 
@@ -4872,8 +4881,14 @@ class MainWindow(Adw.ApplicationWindow):
         key = (path, ts_s)
         pb = self._preview_cache.get(key)
         if pb is not None:
+            self._preview_spinner.stop()
+            self._preview_spinner.set_visible(False)
             self._preview_picture.set_pixbuf(pb)
             return
+        # Frame not ready: spinner instead of a stale/other-time frame.
+        self._preview_picture.set_pixbuf(None)
+        self._preview_spinner.set_visible(True)
+        self._preview_spinner.start()
         self._preview_pending = key
         if self._preview_debounce_id:
             GLib.source_remove(self._preview_debounce_id)
@@ -4891,6 +4906,8 @@ class MainWindow(Adw.ApplicationWindow):
         if self._preview_debounce_id:
             GLib.source_remove(self._preview_debounce_id)
             self._preview_debounce_id = None
+        self._preview_spinner.stop()
+        self._preview_spinner.set_visible(False)
         self._preview_popover.popdown()
 
     def _do_debounced_preview(self):
@@ -4966,6 +4983,8 @@ class MainWindow(Adw.ApplicationWindow):
         if pb:
             self._preview_cache.move_to_end(key)
             if self._preview_popover.get_visible():
+                self._preview_spinner.stop()
+                self._preview_spinner.set_visible(False)
                 self._preview_picture.set_pixbuf(pb)
         return False
 
