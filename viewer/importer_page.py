@@ -761,6 +761,25 @@ def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
     return hashes
 
 
+def min_hash_distance(ph_str: str, library_hashes: dict):
+    """Smallest Hamming distance from ph_str to any archive hash (for diagnosis)."""
+    if not ph_str or not HAS_IMAGEHASH or not library_hashes:
+        return None
+    try:
+        ph = imagehash.hex_to_hash(ph_str)
+    except Exception:
+        return None
+    best = None
+    for lib_ph_str in library_hashes.values():
+        try:
+            d = ph - imagehash.hex_to_hash(lib_ph_str)
+            if best is None or d < best:
+                best = d
+        except Exception:
+            continue
+    return best
+
+
 def find_duplicate(ph_str: str, library_hashes: dict, max_dist: int) -> str | None:
     if not ph_str or not HAS_IMAGEHASH:
         return None
@@ -1783,6 +1802,9 @@ class ImporterPage(Gtk.Box):
                     duplicates.append((fp, Path(dup)))
                 else:
                     new_files.append(fp)
+                    md = min_hash_distance(ph, library_hashes)
+                    log_info("dedup: %s no match (nearest archive distance=%s, "
+                             "max_dist=%d)" % (fp.name, md, max_dist))
             else:
                 hashed_none += 1
                 new_files.append(fp)
