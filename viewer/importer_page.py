@@ -90,26 +90,34 @@ def load_settings() -> dict:
     return {}
 
 
-def perceptual_hash(path: Path) -> str | None:
+def perceptual_hash(path: Path, copy_first: bool = False) -> str | None:
+    """Perceptual hash of an image. Set copy_first for files on the phone's FUSE
+    mount: reading their bytes over AFC (even a full read) returns garbled data
+    and a wrong hash, but a chunked shutil copy is reliable — so stage a local
+    copy first, then hash that. Local archive files hash directly (copy_first
+    stays False)."""
     if not HAS_IMAGEHASH:
         return None
-    from io import BytesIO
-    # Read the whole file first, then decode from memory. Decoding a HEIC
-    # straight off the phone's FUSE mount makes PIL seek within the file, which
-    # over AFC returns partial/garbled data — a different (wrong) hash than the
-    # real image, so true duplicates were missed and re-imported. A single
-    # sequential read is reliable; retry once for transient failures.
-    for attempt in range(2):
+    src = path
+    tmp = None
+    if copy_first:
         try:
-            with open(path, "rb") as fh:
-                data = fh.read()
-            with Image.open(BytesIO(data)) as im:
-                img = im.convert("RGB")
-            return str(imagehash.phash(img))
+            tmp = Path(tempfile.gettempdir()) / ("pxhash_" + path.name)
+            shutil.copy2(path, tmp)
+            src = tmp
         except Exception:
-            if attempt == 0:
-                time.sleep(0.05)
-    return None
+            src = path
+    try:
+        with Image.open(src) as im:
+            return str(imagehash.phash(im.convert("RGB")))
+    except Exception:
+        return None
+    finally:
+        if tmp is not None:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
 
 def dest_path(base: Path, structure: str, filename: str, mtime: datetime) -> Path:
@@ -1800,7 +1808,10 @@ class ImporterPage(Gtk.Box):
             frac = 0.5 + (i / total) * 0.5 if total > 0 else 0.5
             GLib.idle_add(self._update_progress, frac,
                           _("Scanning device: {i}/{total}").format(i=i + 1, total=total), fp.name)
-            ph = perceptual_hash(fp)
+            # Hash exactly what import will store (the edited render if any), and
+            # stage a local copy first — reads straight off the phone are garbled.
+            hash_src = find_edited_render(fp) or fp
+            ph = perceptual_hash(hash_src, copy_first=True)
             if ph:
                 hashed_ok += 1
                 dup = find_duplicate(ph, library_hashes, max_dist)
