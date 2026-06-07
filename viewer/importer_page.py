@@ -534,6 +534,31 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
     return False
 
 
+def convert_image(src: Path, dst: Path, fmt: str) -> bool:
+    """Decode src (e.g. HEIC) and write it as JPEG or PNG. JPEG keeps the
+    original EXIF (date + orientation) so sorting and rotation survive; PNG can't
+    carry EXIF, so orientation is baked into the pixels instead. src must be a
+    local file — decoding straight off the phone's FUSE mount is unreliable."""
+    try:
+        from PIL import Image, ImageOps
+        with Image.open(src) as img:
+            if fmt == "png":
+                img = ImageOps.exif_transpose(img)
+                has_alpha = img.mode in ("RGBA", "LA", "PA") or (
+                    img.mode == "P" and "transparency" in img.info)
+                img.convert("RGBA" if has_alpha else "RGB").save(dst, "PNG")
+            else:
+                exif = img.info.get("exif")
+                rgb = img.convert("RGB")
+                if exif:
+                    rgb.save(dst, "JPEG", quality=95, exif=exif)
+                else:
+                    rgb.save(dst, "JPEG", quality=95)
+        return True
+    except Exception:
+        return False
+
+
 def _walk_media(directory: Path, files: list[Path], progress_cb, counters: dict) -> None:
     """Recursively collect supported media under `directory`.
 
@@ -2333,12 +2358,18 @@ class ImporterPage(Gtk.Box):
                 render = find_edited_render(src)
                 if render is not None:
                     copy_src = render
+                # Optionally convert HEIC to a universally-viewable format.
+                convert = (self.settings.get("convert_heic", False)
+                           and copy_src.suffix.lower() in (".heic", ".heif"))
+                conv_fmt = self.settings.get("convert_format", "jpeg")
+                out_ext = (("." + ("png" if conv_fmt == "png" else "jpg"))
+                           if convert else copy_src.suffix)
                 # CPLAssets masters are GUID-named; give them a readable,
                 # date-based name instead of a meaningless UUID in the archive.
                 if "CPLAssets" in src.parts:
-                    out_name = "IMG_" + mtime.strftime("%Y%m%d_%H%M%S") + copy_src.suffix
+                    out_name = "IMG_" + mtime.strftime("%Y%m%d_%H%M%S") + out_ext
                 else:
-                    out_name = src.stem + copy_src.suffix
+                    out_name = src.stem + out_ext
                 dst = dest_path(photo_path, structure, out_name, mtime)
 
                 # "keep both" case: find a unique filename.
@@ -2350,7 +2381,27 @@ class ImporterPage(Gtk.Box):
                         counter += 1
 
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(copy_src, dst)
+                if convert:
+                    # Stage a reliable local copy first (decoding off FUSE is
+                    # garbled), then convert; fall back to the original on error.
+                    tmp = dst.parent / (dst.stem + "_src" + copy_src.suffix)
+                    try:
+                        shutil.copy2(copy_src, tmp)
+                        if convert_image(tmp, dst, conv_fmt):
+                            try:
+                                os.utime(dst, (ts, ts))
+                            except OSError:
+                                pass
+                        else:
+                            dst = dst.with_suffix(copy_src.suffix)
+                            shutil.copy2(copy_src, dst)
+                    finally:
+                        try:
+                            tmp.unlink()
+                        except OSError:
+                            pass
+                else:
+                    shutil.copy2(copy_src, dst)
 
                 # The render already has edits baked in; only reconstruct from
                 # the AAE sidecar when we copied the unedited master.

@@ -6398,6 +6398,43 @@ class MainWindow(Adw.ApplicationWindow):
 
         import_box.append(dup_group)
 
+        convert_group = Adw.PreferencesGroup()
+        convert_group.set_title(_("Convert HEIC photos"))
+        convert_group.set_description(
+            _("Save iPhone HEIC photos in a format any app can open"))
+
+        self.settings_convert_switch = Gtk.Switch()
+        self.settings_convert_switch.set_valign(Gtk.Align.CENTER)
+        self.settings_convert_switch.set_active(
+            self.settings.get("convert_heic", False))
+        self.settings_convert_switch.connect(
+            "notify::active", self.on_convert_switch_toggled)
+        convert_row = Adw.ActionRow(
+            title=_("Convert HEIC on import"),
+            subtitle=_("HEIC photos are converted on import so they open outside Pixora too."))
+        convert_row.add_prefix(Gtk.Image.new_from_icon_name("image-x-generic-symbolic"))
+        convert_row.add_suffix(self.settings_convert_switch)
+        convert_row.set_activatable_widget(self.settings_convert_switch)
+        try:
+            convert_row.set_subtitle_lines(2)
+        except Exception:
+            pass
+        convert_group.add(convert_row)
+
+        self.settings_convert_combo = Adw.ComboRow()
+        self.settings_convert_combo.set_title(_("Convert to"))
+        self.settings_convert_combo.set_model(
+            Gtk.StringList.new(["JPEG (.jpg)", "PNG (.png)"]))
+        self.settings_convert_combo.set_selected(
+            1 if self.settings.get("convert_format", "jpeg") == "png" else 0)
+        self.settings_convert_combo.set_sensitive(
+            self.settings.get("convert_heic", False))
+        self.settings_convert_combo.connect(
+            "notify::selected", self.on_convert_format_changed)
+        convert_group.add(self.settings_convert_combo)
+
+        import_box.append(convert_group)
+
         backup_group = Adw.PreferencesGroup()
         backup_group.set_title(_("Automatic backup"))
         backup_group.set_description(_("Backup to external USB drive after each import"))
@@ -8170,6 +8207,17 @@ class MainWindow(Adw.ApplicationWindow):
         if btn.get_active():
             self.settings["duplicate_threshold"] = value
             save_settings(self.settings)
+
+    def on_convert_switch_toggled(self, switch, _pspec):
+        active = switch.get_active()
+        self.settings["convert_heic"] = active
+        if hasattr(self, "settings_convert_combo"):
+            self.settings_convert_combo.set_sensitive(active)
+        save_settings(self.settings)
+
+    def on_convert_format_changed(self, combo, _pspec):
+        self.settings["convert_format"] = "png" if combo.get_selected() == 1 else "jpeg"
+        save_settings(self.settings)
 
     def on_dup_switch_toggled(self, switch, _pspec):
         # On = strict (1), Off = 0.

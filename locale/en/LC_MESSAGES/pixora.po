@@ -2503,3 +2503,19 @@ msgid_plural "Found %d duplicates to review. The first of each group is kept; ch
 msgstr[0] "Found %d duplicate to review. The original is kept; checked copies are deleted."
 msgstr[1] "Found %d duplicates to review. The first of each group is kept; checked copies are deleted."
 
+
+msgid "Convert HEIC photos"
+msgstr "Convert HEIC photos"
+
+msgid "Save iPhone HEIC photos in a format any app can open"
+msgstr "Save iPhone HEIC photos in a format any app can open"
+
+msgid "Convert HEIC on import"
+msgstr "Convert HEIC on import"
+
+msgid "HEIC photos are converted on import so they open outside Pixora too."
+msgstr "HEIC photos are converted on import so they open outside Pixora too."
+
+msgid "Convert to"
+msgstr "Convert to"
+
