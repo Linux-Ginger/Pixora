@@ -4354,11 +4354,20 @@ class MainWindow(Adw.ApplicationWindow):
         self._show_viewer_ui()
         return False
 
+    def _filmstrip_pad(self):
+        """Leading/trailing padding so even the first/last thumb can sit centered
+        in the viewport (otherwise the newest photo pins to the left edge)."""
+        adj = self.filmstrip_scroll.get_hadjustment()
+        page = adj.get_page_size() if adj else 0
+        cell = FILM_THUMB + 4
+        return max(0, (page - cell) / 2)
+
     def _update_filmstrip(self):
         """Filmstrip is always newest-left → oldest-right, regardless of grid sort."""
         n = len(self.photos)
-        w = n * (FILM_THUMB + 4)
-        self.filmstrip_area.set_size_request(max(w, FILM_THUMB + 4), FILM_THUMB + 8)
+        cell = FILM_THUMB + 4
+        w = n * cell + 2 * int(self._filmstrip_pad())
+        self.filmstrip_area.set_size_request(max(w, cell), FILM_THUMB + 8)
         # Memoized view-order; invalidated when self.photos is replaced.
         cache = self._filmstrip_order_cache
         if cache is not None and cache[0] == id(self.photos) and cache[1] == n:
@@ -4448,15 +4457,16 @@ class MainWindow(Adw.ApplicationWindow):
         adj = self.filmstrip_scroll.get_hadjustment()
         scroll_x = adj.get_value() if adj else 0
         visible_w = adj.get_page_size() if adj else width
-        first_visible = max(0, int(scroll_x / cell) - 1)
-        last_visible = min(n, int((scroll_x + visible_w) / cell) + 2)
+        pad = self._filmstrip_pad()
+        first_visible = max(0, int((scroll_x - pad) / cell) - 1)
+        last_visible = min(n, int((scroll_x - pad + visible_w) / cell) + 2)
         try:
             current_visual = view.index(self.current_index)
         except ValueError:
             current_visual = -1
         for vp in range(first_visible, last_visible):
             photo_idx = view[vp]
-            x = vp * cell + 2
+            x = int(pad) + vp * cell + 2
             y = (height - FILM_THUMB) // 2
             pb = self._filmstrip_thumbs.get(vp)
             if pb:
@@ -4501,7 +4511,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_filmstrip_click(self, gesture, n_press, x, y):
         cell = FILM_THUMB + 4
-        vp = int(x // cell)
+        vp = int((x - self._filmstrip_pad()) // cell)
         view = self._filmstrip_view_order
         if 0 <= vp < len(view):
             photo_idx = view[vp]
@@ -4537,9 +4547,15 @@ class MainWindow(Adw.ApplicationWindow):
             vp = view.index(self.current_index)
         except ValueError:
             vp = 0
-        center_of_current = vp * cell + cell / 2
+        # End-padding lets the first/last thumb reach the centre. Compute upper
+        # ourselves — the widget's adjustment lags a just-set size request.
+        pad = max(0, (page - cell) / 2)
+        self.filmstrip_area.set_size_request(
+            max(len(self.photos) * cell + 2 * int(pad), cell), FILM_THUMB + 8)
+        upper = len(self.photos) * cell + 2 * pad
+        center_of_current = pad + vp * cell + cell / 2
         target = center_of_current - page / 2
-        target = max(0, min(target, adj.get_upper() - page))
+        target = max(0, min(target, upper - page))
 
         if not bool(self.settings.get("animations_enabled", True)):
             adj.set_value(target)
