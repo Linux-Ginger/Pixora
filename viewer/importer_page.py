@@ -2110,18 +2110,29 @@ class ImporterPage(Gtk.Box):
         return card
 
     def _load_thumb(self, path: Path, w: int, h: int) -> Gtk.Widget:
+        # Use the HEIC-capable cached thumbnail (GdkPixbuf alone can't decode
+        # HEIC, which is why the cards showed "?"). Falls back to GdkPixbuf for
+        # formats load_select_thumb doesn't cache.
+        pixbuf = None
         try:
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(path), w, h, True)
+            pixbuf = load_select_thumb(path)
+        except Exception:
+            pixbuf = None
+        if pixbuf is None:
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(path), w, h, True)
+            except Exception:
+                pixbuf = None
+        if pixbuf is not None:
             pic = Gtk.Picture.new_for_pixbuf(pixbuf)
             pic.set_can_shrink(True)
-            pic.set_content_fit(Gtk.ContentFit.CONTAIN)
+            pic.set_content_fit(Gtk.ContentFit.COVER)
             pic.set_size_request(w, h)
             return pic
-        except Exception:
-            ph = Gtk.Image.new_from_icon_name("image-missing-symbolic")
-            ph.set_pixel_size(48)
-            ph.set_size_request(w, h)
-            return ph
+        ph = Gtk.Image.new_from_icon_name("image-missing-symbolic")
+        ph.set_pixel_size(48)
+        ph.set_size_request(w, h)
+        return ph
 
     def _on_skip_all(self, _btn):
         for iphone_path, _ in self.duplicates:
