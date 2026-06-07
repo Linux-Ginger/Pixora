@@ -6331,6 +6331,22 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         structure_group.add(reorganize_row)
 
+        dedup_btn = Gtk.Button(label=_("Find duplicates"))
+        dedup_btn.add_css_class("flat")
+        dedup_btn.set_valign(Gtk.Align.CENTER)
+        dedup_btn.connect("clicked", lambda b: self._prompt_find_duplicates())
+        dedup_row = Adw.ActionRow(
+            title=_("Clean up duplicates"),
+            subtitle=_("Scan your archive for duplicate photos (including edited copies) and review them with thumbnails before deleting."),
+        )
+        dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
+        dedup_row.add_suffix(dedup_btn)
+        try:
+            dedup_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        structure_group.add(dedup_row)
+
         silent_row = Adw.ActionRow(
             title=_("Auto-confirm"),
             subtitle=_("Starts right away when there's work to do, without interrupting."),
@@ -7390,6 +7406,231 @@ class MainWindow(Adw.ApplicationWindow):
                 reserved_targets.add(str(dst.resolve() if dst.exists() else dst))
                 moves.append((src, dst))
         return moves, dups
+
+    # ── Archive duplicate cleanup ─────────────────────────────────────────
+    @staticmethod
+    def _dup_base_name(path_str):
+        """Stem with a trailing _N counter stripped, lowercased."""
+        import re as _re
+        return _re.sub(r"_\d+$", "", os.path.splitext(os.path.basename(path_str))[0]).lower()
+
+    def _find_archive_duplicates(self):
+        """Group near-identical archive photos. Perceptual hash leads; a shared
+        base name (IMG_1234 vs IMG_1234_1) loosens the match as confirmation."""
+        try:
+            from importer_page import build_library_hashes, THRESHOLD_MAP, HAS_IMAGEHASH
+            import imagehash
+        except Exception:
+            return []
+        if not HAS_IMAGEHASH:
+            return []
+        photo_path = self.settings.get("photo_path") or os.path.join(
+            os.path.expanduser("~"), "Photos")
+        if not os.path.isdir(photo_path):
+            return []
+        hashes = build_library_hashes(photo_path)
+        threshold = THRESHOLD_MAP.get(self.settings.get("duplicate_threshold", 2), 6)
+        items = []
+        for p, h in hashes.items():
+            try:
+                items.append((p, imagehash.hex_to_hash(h)))
+            except Exception:
+                continue
+        used = set()
+        groups = []
+        for i in range(len(items)):
+            p1, h1 = items[i]
+            if p1 in used:
+                continue
+            group = [p1]
+            used.add(p1)
+            b1 = self._dup_base_name(p1)
+            for j in range(i + 1, len(items)):
+                p2, h2 = items[j]
+                if p2 in used:
+                    continue
+                d = h1 - h2
+                same_base = self._dup_base_name(p2) == b1
+                if d <= threshold or (same_base and d <= threshold + 6):
+                    group.append(p2)
+                    used.add(p2)
+            if len(group) > 1:
+                # Keeper first: prefer no _N suffix, then the largest file.
+                import re as _re
+
+                def _sortkey(p):
+                    has_suffix = bool(_re.search(r"_\d+$",
+                                                 os.path.splitext(os.path.basename(p))[0]))
+                    try:
+                        size = os.path.getsize(p)
+                    except OSError:
+                        size = 0
+                    return (has_suffix, -size)
+                group.sort(key=_sortkey)
+                groups.append(group)
+        return groups
+
+    def _prompt_find_duplicates(self, btn=None):
+        win = Adw.Window()
+        win.set_title(_("Clean up duplicates"))
+        # Parent to the settings window when it's open, else the main window,
+        # so it appears in front instead of behind.
+        win.set_transient_for(self._settings_dialog or self)
+        win.set_modal(True)
+        win.set_default_size(720, 640)
+        self._dup_win = win
+
+        tv = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        tv.add_top_bar(header)
+
+        self._dup_win_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self._dup_win_box.set_margin_top(12)
+        self._dup_win_box.set_margin_bottom(12)
+        self._dup_win_box.set_margin_start(16)
+        self._dup_win_box.set_margin_end(16)
+
+        spinner = Gtk.Spinner()
+        spinner.start()
+        spinner.set_size_request(-1, 60)
+        lbl = Gtk.Label(label=_("Scanning your archive for duplicates…"))
+        lbl.add_css_class("dim-label")
+        self._dup_win_box.append(spinner)
+        self._dup_win_box.append(lbl)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_child(self._dup_win_box)
+        tv.set_content(scroll)
+
+        bar = Gtk.ActionBar()
+        cancel = Gtk.Button(label=_("Cancel"))
+        cancel.connect("clicked", lambda b: win.close())
+        bar.pack_start(cancel)
+        self._dup_delete_btn = Gtk.Button(label=_("Delete selected"))
+        self._dup_delete_btn.add_css_class("destructive-action")
+        self._dup_delete_btn.set_sensitive(False)
+        self._dup_delete_btn.connect("clicked", self._on_delete_dupes)
+        bar.pack_end(self._dup_delete_btn)
+        tv.add_bottom_bar(bar)
+
+        win.set_content(tv)
+        win.present()
+        threading.Thread(target=self._scan_dupes_bg, daemon=True).start()
+
+    def _scan_dupes_bg(self):
+        groups = self._find_archive_duplicates()
+        GLib.idle_add(self._populate_dup_win, groups)
+
+    def _populate_dup_win(self, groups):
+        if not getattr(self, "_dup_win", None):
+            return False
+        while child := self._dup_win_box.get_first_child():
+            self._dup_win_box.remove(child)
+        self._dup_checks = {}  # path -> CheckButton (checked = delete)
+        if not groups:
+            empty = Adw.StatusPage()
+            empty.set_icon_name("emblem-ok-symbolic")
+            empty.set_title(_("No duplicates found"))
+            empty.set_description(_("Your archive looks clean."))
+            self._dup_win_box.append(empty)
+            return False
+        total_dupes = sum(len(g) - 1 for g in groups)
+        head = Gtk.Label()
+        head.add_css_class("dim-label")
+        head.set_xalign(0)
+        head.set_wrap(True)
+        head.set_text(ngettext(
+            "Found %d duplicate to review. The original is kept; checked copies are deleted.",
+            "Found %d duplicates to review. The first of each group is kept; checked copies are deleted.",
+            total_dupes) % total_dupes)
+        self._dup_win_box.append(head)
+        for group in groups:
+            self._dup_win_box.append(self._make_dup_group_card(group))
+        self._dup_delete_btn.set_sensitive(True)
+        return False
+
+    def _make_dup_group_card(self, group):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        card.add_css_class("card")
+        card.set_margin_bottom(4)
+
+        flow = Gtk.FlowBox()
+        flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        flow.set_max_children_per_line(4)
+        flow.set_min_children_per_line(2)
+        flow.set_column_spacing(8)
+        flow.set_row_spacing(8)
+        flow.set_margin_top(10)
+        flow.set_margin_bottom(10)
+        flow.set_margin_start(10)
+        flow.set_margin_end(10)
+
+        for idx, path in enumerate(group):
+            col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            try:
+                pb = load_thumbnail(path)
+            except Exception:
+                pb = None
+            if pb is not None:
+                pic = Gtk.Picture.new_for_pixbuf(pb)
+                pic.set_content_fit(Gtk.ContentFit.COVER)
+                pic.set_size_request(150, 150)
+                pic.set_overflow(Gtk.Overflow.HIDDEN)
+                pic.add_css_class("card")
+            else:
+                pic = Gtk.Image.new_from_icon_name("image-missing-symbolic")
+                pic.set_pixel_size(48)
+                pic.set_size_request(150, 150)
+            col.append(pic)
+
+            if idx == 0:
+                tag = Gtk.Label(label=_("✅ Keep (original)"))
+                tag.add_css_class("caption")
+                col.append(tag)
+            else:
+                chk = Gtk.CheckButton(label=_("Delete"))
+                chk.set_active(True)  # non-keepers default to delete
+                self._dup_checks[path] = chk
+                col.append(chk)
+            name = Gtk.Label(label=os.path.basename(path))
+            name.add_css_class("caption")
+            name.add_css_class("dim-label")
+            name.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+            name.set_max_width_chars(18)
+            col.append(name)
+            flow.append(col)
+
+        card.append(flow)
+        return card
+
+    def _on_delete_dupes(self, _btn):
+        to_delete = [p for p, chk in getattr(self, "_dup_checks", {}).items()
+                     if chk.get_active()]
+        if not to_delete:
+            if getattr(self, "_dup_win", None):
+                self._dup_win.close()
+            return
+        deleted = 0
+        for p in to_delete:
+            try:
+                os.remove(p)
+                deleted += 1
+                try:
+                    cache = get_cache_path(p)
+                    if os.path.exists(cache):
+                        os.remove(cache)
+                except Exception:
+                    pass
+                self._favorites.discard(p)
+            except Exception as e:
+                log_warn(_("Duplicate delete failed for {p}: {e}").format(p=p, e=e))
+        log_info(_("Duplicate cleanup: removed {n} files").format(n=deleted))
+        if getattr(self, "_dup_win", None):
+            self._dup_win.close()
+            self._dup_win = None
+        self.reload_photos()
 
     def _prompt_reorganize(self, from_startup=False):
         """Confirm dialog with counts. Silent if from_startup + nothing to do."""

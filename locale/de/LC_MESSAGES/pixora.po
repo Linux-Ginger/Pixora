@@ -2497,3 +2497,39 @@ msgid_plural "%d imported files look damaged. Choose per file whether to re-impo
 msgstr[0] "%d importierte Datei scheint beschädigt. Wähle, ob du sie neu vom Telefon importierst oder so behältst."
 msgstr[1] "%d importierte Dateien scheinen beschädigt. Wähle pro Datei, ob du sie neu vom Telefon importierst oder behältst, oder nutze die Schaltflächen unten."
 
+
+msgid "Find duplicates"
+msgstr "Duplikate finden"
+
+msgid "Clean up duplicates"
+msgstr "Duplikate aufräumen"
+
+msgid "Scan your archive for duplicate photos (including edited copies) and review them with thumbnails before deleting."
+msgstr "Durchsuche dein Archiv nach doppelten Fotos (auch bearbeiteten Kopien) und prüfe sie mit Vorschaubildern vor dem Löschen."
+
+msgid "Scanning your archive for duplicates…"
+msgstr "Archiv wird nach Duplikaten durchsucht…"
+
+msgid "Delete selected"
+msgstr "Ausgewählte löschen"
+
+msgid "No duplicates found"
+msgstr "Keine Duplikate gefunden"
+
+msgid "Your archive looks clean."
+msgstr "Dein Archiv sieht sauber aus."
+
+msgid "✅ Keep (original)"
+msgstr "✅ Behalten (Original)"
+
+msgid "Duplicate delete failed for {p}: {e}"
+msgstr "Löschen des Duplikats fehlgeschlagen für {p}: {e}"
+
+msgid "Duplicate cleanup: removed {n} files"
+msgstr "Duplikatbereinigung: {n} Dateien entfernt"
+
+msgid "Found %d duplicate to review. The original is kept; checked copies are deleted."
+msgid_plural "Found %d duplicates to review. The first of each group is kept; checked copies are deleted."
+msgstr[0] "%d Duplikat gefunden. Das Original bleibt erhalten; markierte Kopien werden gelöscht."
+msgstr[1] "%d Duplikate gefunden. Das erste jeder Gruppe bleibt erhalten; markierte Kopien werden gelöscht."
+

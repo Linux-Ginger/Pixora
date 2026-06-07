@@ -2485,3 +2485,39 @@ msgid_plural "%d imported files look damaged. Choose per file whether to re-impo
 msgstr[0] "%d geïmporteerd bestand lijkt beschadigd. Kies of je het opnieuw van je telefoon importeert of laat staan."
 msgstr[1] "%d geïmporteerde bestanden lijken beschadigd. Kies per bestand of je het opnieuw van je telefoon importeert of laat staan, of gebruik de knoppen hieronder."
 
+
+msgid "Find duplicates"
+msgstr "Duplicaten zoeken"
+
+msgid "Clean up duplicates"
+msgstr "Duplicaten opruimen"
+
+msgid "Scan your archive for duplicate photos (including edited copies) and review them with thumbnails before deleting."
+msgstr "Scan je archief op dubbele foto's (ook bewerkte kopieën) en bekijk ze met thumbnails voordat je ze verwijdert."
+
+msgid "Scanning your archive for duplicates…"
+msgstr "Je archief wordt op duplicaten gescand…"
+
+msgid "Delete selected"
+msgstr "Geselecteerde verwijderen"
+
+msgid "No duplicates found"
+msgstr "Geen duplicaten gevonden"
+
+msgid "Your archive looks clean."
+msgstr "Je archief ziet er schoon uit."
+
+msgid "✅ Keep (original)"
+msgstr "✅ Behouden (origineel)"
+
+msgid "Duplicate delete failed for {p}: {e}"
+msgstr "Verwijderen van duplicaat mislukt voor {p}: {e}"
+
+msgid "Duplicate cleanup: removed {n} files"
+msgstr "Duplicaten opruimen: {n} bestanden verwijderd"
+
+msgid "Found %d duplicate to review. The original is kept; checked copies are deleted."
+msgid_plural "Found %d duplicates to review. The first of each group is kept; checked copies are deleted."
+msgstr[0] "%d duplicaat gevonden om te bekijken. Het origineel blijft behouden; aangevinkte kopieën worden verwijderd."
+msgstr[1] "%d duplicaten gevonden om te bekijken. De eerste van elke groep blijft behouden; aangevinkte kopieën worden verwijderd."
+

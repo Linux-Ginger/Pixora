@@ -1643,3 +1643,39 @@ msgid_plural "%d imported files look damaged. Choose per file whether to re-impo
 msgstr[0] ""
 msgstr[1] ""
 
+
+msgid "Find duplicates"
+msgstr ""
+
+msgid "Clean up duplicates"
+msgstr ""
+
+msgid "Scan your archive for duplicate photos (including edited copies) and review them with thumbnails before deleting."
+msgstr ""
+
+msgid "Scanning your archive for duplicates…"
+msgstr ""
+
+msgid "Delete selected"
+msgstr ""
+
+msgid "No duplicates found"
+msgstr ""
+
+msgid "Your archive looks clean."
+msgstr ""
+
+msgid "✅ Keep (original)"
+msgstr ""
+
+msgid "Duplicate delete failed for {p}: {e}"
+msgstr ""
+
+msgid "Duplicate cleanup: removed {n} files"
+msgstr ""
+
+msgid "Found %d duplicate to review. The original is kept; checked copies are deleted."
+msgid_plural "Found %d duplicates to review. The first of each group is kept; checked copies are deleted."
+msgstr[0] ""
+msgstr[1] ""
+

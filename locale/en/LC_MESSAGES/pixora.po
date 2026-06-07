@@ -2467,3 +2467,39 @@ msgid_plural "%d imported files look damaged. Choose per file whether to re-impo
 msgstr[0] "%d imported file looks damaged. Choose whether to re-import it from your phone or keep it as is."
 msgstr[1] "%d imported files look damaged. Choose per file whether to re-import from your phone or keep them, or use the buttons below."
 
+
+msgid "Find duplicates"
+msgstr "Find duplicates"
+
+msgid "Clean up duplicates"
+msgstr "Clean up duplicates"
+
+msgid "Scan your archive for duplicate photos (including edited copies) and review them with thumbnails before deleting."
+msgstr "Scan your archive for duplicate photos (including edited copies) and review them with thumbnails before deleting."
+
+msgid "Scanning your archive for duplicates…"
+msgstr "Scanning your archive for duplicates…"
+
+msgid "Delete selected"
+msgstr "Delete selected"
+
+msgid "No duplicates found"
+msgstr "No duplicates found"
+
+msgid "Your archive looks clean."
+msgstr "Your archive looks clean."
+
+msgid "✅ Keep (original)"
+msgstr "✅ Keep (original)"
+
+msgid "Duplicate delete failed for {p}: {e}"
+msgstr "Duplicate delete failed for {p}: {e}"
+
+msgid "Duplicate cleanup: removed {n} files"
+msgstr "Duplicate cleanup: removed {n} files"
+
+msgid "Found %d duplicate to review. The original is kept; checked copies are deleted."
+msgid_plural "Found %d duplicates to review. The first of each group is kept; checked copies are deleted."
+msgstr[0] "Found %d duplicate to review. The original is kept; checked copies are deleted."
+msgstr[1] "Found %d duplicates to review. The first of each group is kept; checked copies are deleted."
+

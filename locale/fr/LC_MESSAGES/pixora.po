@@ -2513,3 +2513,39 @@ msgid_plural "%d imported files look damaged. Choose per file whether to re-impo
 msgstr[0] "%d fichier importé semble endommagé. Choisissez de le réimporter depuis votre téléphone ou de le garder tel quel."
 msgstr[1] "%d fichiers importés semblent endommagés. Choisissez par fichier de les réimporter depuis votre téléphone ou de les garder, ou utilisez les boutons ci-dessous."
 
+
+msgid "Find duplicates"
+msgstr "Trouver les doublons"
+
+msgid "Clean up duplicates"
+msgstr "Nettoyer les doublons"
+
+msgid "Scan your archive for duplicate photos (including edited copies) and review them with thumbnails before deleting."
+msgstr "Analysez votre archive à la recherche de photos en double (y compris les copies modifiées) et examinez-les avec des miniatures avant de les supprimer."
+
+msgid "Scanning your archive for duplicates…"
+msgstr "Analyse de votre archive à la recherche de doublons…"
+
+msgid "Delete selected"
+msgstr "Supprimer la sélection"
+
+msgid "No duplicates found"
+msgstr "Aucun doublon trouvé"
+
+msgid "Your archive looks clean."
+msgstr "Votre archive semble propre."
+
+msgid "✅ Keep (original)"
+msgstr "✅ Garder (original)"
+
+msgid "Duplicate delete failed for {p}: {e}"
+msgstr "Échec de la suppression du doublon pour {p} : {e}"
+
+msgid "Duplicate cleanup: removed {n} files"
+msgstr "Nettoyage des doublons : {n} fichiers supprimés"
+
+msgid "Found %d duplicate to review. The original is kept; checked copies are deleted."
+msgid_plural "Found %d duplicates to review. The first of each group is kept; checked copies are deleted."
+msgstr[0] "%d doublon trouvé à examiner. L'original est conservé ; les copies cochées sont supprimées."
+msgstr[1] "%d doublons trouvés à examiner. Le premier de chaque groupe est conservé ; les copies cochées sont supprimées."
+
