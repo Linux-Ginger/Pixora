@@ -4462,12 +4462,17 @@ class MainWindow(Adw.ApplicationWindow):
             if pb:
                 pw = pb.get_width()
                 ph = pb.get_height()
-                dx = x + (FILM_THUMB - pw) // 2
-                dy = y + (FILM_THUMB - ph) // 2
                 cr.save()
-                self._film_rounded_rect(cr, dx, dy, pw, ph, 6)
+                # Fill the square cell (cover-crop) with rounded corners, so
+                # every thumb is a uniform rounded square like the iOS filmstrip.
+                self._film_rounded_rect(cr, x, y, FILM_THUMB, FILM_THUMB, 6)
                 cr.clip()
-                Gdk.cairo_set_source_pixbuf(cr, pb, dx, dy)
+                scale = max(FILM_THUMB / pw, FILM_THUMB / ph) if pw and ph else 1
+                ox = x + (FILM_THUMB - pw * scale) / 2
+                oy = y + (FILM_THUMB - ph * scale) / 2
+                cr.translate(ox, oy)
+                cr.scale(scale, scale)
+                Gdk.cairo_set_source_pixbuf(cr, pb, 0, 0)
                 cr.paint()
                 cr.restore()
             else:
@@ -4501,6 +4506,13 @@ class MainWindow(Adw.ApplicationWindow):
         if 0 <= vp < len(view):
             photo_idx = view[vp]
             if 0 <= photo_idx < len(self.photos) and photo_idx != self.current_index:
+                # Slide in the direction clicked (right → next, left → prev),
+                # matching the arrow keys instead of a plain crossfade.
+                try:
+                    current_vp = view.index(self.current_index)
+                except ValueError:
+                    current_vp = vp
+                self._nav_direction = "next" if vp > current_vp else "prev"
                 self.current_index = photo_idx
                 self._viewer_load_id += 1
                 load_id = self._viewer_load_id
