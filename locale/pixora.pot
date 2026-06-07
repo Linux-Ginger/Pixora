@@ -1584,3 +1584,9 @@ msgstr ""
 
 msgid "{done} / {total}  ·  {fps}/s  ·  {mb} MB/s  ·  {eta} remaining"
 msgstr ""
+
+msgid "{done} / {total}  ·  {eta} remaining"
+msgstr ""
+
+msgid "{fps} photos/s  ·  {mb} MB/s"
+msgstr ""

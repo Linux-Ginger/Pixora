@@ -434,37 +434,66 @@ def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
         return []
 
     files: list[Path] = []
+    skipped_ext: dict[str, int] = {}
+    failed_dirs = 0
+    dirs_seen = 0
 
     def _walk(directory: Path) -> None:
-        for attempt in range(3):
+        nonlocal failed_dirs, dirs_seen
+        dirs_seen += 1
+        entries = None
+        for attempt in range(4):
             try:
                 entries = sorted(directory.iterdir())
                 break
             except OSError:
-                if attempt == 2:
-                    return
-                time.sleep(0.3)
-        else:
+                if attempt == 3:
+                    break
+                time.sleep(0.4)
+        if entries is None:
+            failed_dirs += 1
             return
 
         subdirs: list[Path] = []
         for entry in entries:
-            if entry.is_dir():
+            # is_dir() can transiently raise over FUSE; never let one bad entry
+            # abort the rest of the directory.
+            try:
+                is_dir = entry.is_dir()
+            except OSError:
+                is_dir = False
+            if is_dir:
                 if entry.name not in SKIP_DIRS:
                     subdirs.append(entry)
-            elif entry.is_file():
-                ext = entry.suffix.lower()
-                if ext in EXCLUDED_EXT:
-                    pass
-                elif ext in SUPPORTED_EXT:
-                    files.append(entry)
-                    if progress_cb:
-                        progress_cb(len(files))
+                continue
+            ext = entry.suffix.lower()
+            if ext in EXCLUDED_EXT:
+                continue
+            if ext in SUPPORTED_EXT:
+                files.append(entry)
+                if progress_cb:
+                    progress_cb(len(files))
+            else:
+                skipped_ext[ext] = skipped_ext.get(ext, 0) + 1
 
         for subdir in subdirs:
             _walk(subdir)
 
     _walk(dcim)
+
+    # Diagnostic: surfaces why the count may differ from the phone's tally.
+    try:
+        from main_window import log_info, log_warn
+        log_info("scan_dcim: %d media across %d dirs" % (len(files), dirs_seen))
+        if skipped_ext:
+            log_warn("scan_dcim skipped unsupported types: " + ", ".join(
+                f"{k or '<no-ext>'}={v}" for k, v in sorted(skipped_ext.items())))
+        if failed_dirs:
+            log_warn("scan_dcim: %d directories failed to list — media may be "
+                     "missing (USB/FUSE hiccup)" % failed_dirs)
+    except Exception:
+        pass
+
     return files
 
 
@@ -1790,10 +1819,11 @@ class ImporterPage(Gtk.Box):
             remaining = (total - done) / fps
         else:
             remaining = 0
-        text = _("{done} / {total}  ·  {fps}/s  ·  {mb} MB/s  ·  {eta} remaining").format(
-            done=done, total=total, fps=f"{fps:.1f}", mb=f"{mbps:.0f}",
-            eta=_format_eta(remaining))
-        return text, name
+        text = _("{done} / {total}  ·  {eta} remaining").format(
+            done=done, total=total, eta=_format_eta(remaining))
+        detail = _("{fps} photos/s  ·  {mb} MB/s").format(
+            fps=f"{fps:.1f}", mb=f"{mbps:.0f}")
+        return text, detail
 
     def _on_import_done(self):
         unmount_iphone(MOUNT_POINT)

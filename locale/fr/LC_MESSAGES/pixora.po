@@ -2454,3 +2454,9 @@ msgstr "🔌 iPhone déconnecté"
 
 msgid "{done} / {total}  ·  {fps}/s  ·  {mb} MB/s  ·  {eta} remaining"
 msgstr "{done} / {total}  ·  {fps}/s  ·  {mb} Mo/s  ·  {eta} restant"
+
+msgid "{done} / {total}  ·  {eta} remaining"
+msgstr "{done} / {total}  ·  {eta} restant"
+
+msgid "{fps} photos/s  ·  {mb} MB/s"
+msgstr "{fps} photos/s  ·  {mb} Mo/s"
