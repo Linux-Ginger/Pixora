@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
-"""Decode a HEIC the way Pixora does and save a JPEG copy, to tell whether a
-glitchy photo is a bad file (decoder output is wrong) or a display issue.
+"""Diagnose a glitchy HEIC: report bit depth, and compare the plain decode
+(what Pixora currently does) against an HDR-aware decode.
 
 Usage:  python3 tools/check_heic.py /path/to/IMG.heic
-Then open the saved *_check.jpg in a normal image viewer:
-        - JPEG looks green/broken  -> the file/decoder is the problem
-        - JPEG looks fine          -> Pixora's display pipeline is the problem
+Saves IMG_plain.jpg and IMG_hdr.jpg next to it, and prints each one's average
+colour. A green-dominant average (G ≫ R,B) means that decode is broken.
 """
 import sys
 from pathlib import Path
 
-try:
-    import pillow_heif
-    pillow_heif.register_heif_opener()
-except Exception as e:
-    print("pillow_heif not available:", e)
+import pillow_heif
 
 from PIL import Image, ImageOps
+
+print("pillow_heif version:", getattr(pillow_heif, "__version__", "?"))
+
+
+def avg(im):
+    s = im.convert("RGB").resize((64, 64))
+    px = list(s.getdata())
+    n = len(px)
+    return (sum(c[0] for c in px) / n,
+            sum(c[1] for c in px) / n,
+            sum(c[2] for c in px) / n)
 
 
 def main():
@@ -28,26 +34,41 @@ def main():
         print("not found:", p)
         return
 
-    im = Image.open(p)
-    print("format:", im.format, "| mode:", im.mode, "| size:", im.size)
+    print("file size:", p.stat().st_size, "bytes")
 
-    im = ImageOps.exif_transpose(im).convert("RGB")
-    im.load()
+    # Raw HEIF info: bit depth tells us if it's a 10-bit HDR image.
+    try:
+        hf = pillow_heif.open_heif(str(p), convert_hdr_to_8bit=False)
+        print("HEIF mode:", hf.mode, "| bit_depth:", getattr(hf, "bit_depth", "?"),
+              "| size:", hf.size)
+    except Exception as e:
+        print("open_heif(raw) failed:", e)
 
-    # Average channel values on a small sample — a strongly green-dominant
-    # average is a hint the decode produced garbage chroma planes.
-    small = im.resize((64, 64))
-    px = list(small.getdata())
-    n = len(px)
-    r = sum(c[0] for c in px) / n
-    g = sum(c[1] for c in px) / n
-    b = sum(c[2] for c in px) / n
-    print(f"avg colour  R={r:.0f}  G={g:.0f}  B={b:.0f}")
+    # Method 1 — plain Image.open (what Pixora does now, via register opener).
+    try:
+        pillow_heif.register_heif_opener()
+        im1 = ImageOps.exif_transpose(Image.open(str(p))).convert("RGB")
+        r, g, b = avg(im1)
+        print(f"[plain]  avg R={r:.0f} G={g:.0f} B={b:.0f}")
+        out1 = p.with_name(p.stem + "_plain.jpg")
+        im1.save(out1, "JPEG", quality=95)
+        print("  saved:", out1)
+    except Exception as e:
+        print("plain decode failed:", e)
 
-    out = p.with_name(p.stem + "_check.jpg")
-    im.save(out, "JPEG", quality=95)
-    print("saved:", out)
-    print("now run:  xdg-open", f'"{out}"')
+    # Method 2 — HDR-aware decode (convert 10-bit HDR down to 8-bit properly).
+    try:
+        hf2 = pillow_heif.open_heif(str(p), convert_hdr_to_8bit=True)
+        im2 = hf2.to_pillow() if hasattr(hf2, "to_pillow") else Image.frombytes(
+            hf2.mode, hf2.size, hf2.data, "raw", hf2.mode, hf2.stride)
+        im2 = ImageOps.exif_transpose(im2).convert("RGB")
+        r, g, b = avg(im2)
+        print(f"[hdr8]   avg R={r:.0f} G={g:.0f} B={b:.0f}")
+        out2 = p.with_name(p.stem + "_hdr.jpg")
+        im2.save(out2, "JPEG", quality=95)
+        print("  saved:", out2)
+    except Exception as e:
+        print("hdr-aware decode failed:", e)
 
 
 if __name__ == "__main__":
