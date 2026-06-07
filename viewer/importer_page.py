@@ -2024,17 +2024,8 @@ class ImporterPage(Gtk.Box):
                     if aae.exists() and dst.suffix.lower() in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng"):
                         apply_aae_edits(dst, aae)
 
-                # Live Photo: copy the movie half next to the still under the
-                # same stem, so the pair stays linked (and the gallery folds it).
-                motion = getattr(self, "_live_motion", {}).get(src)
-                if motion is not None:
-                    try:
-                        motion_dst = dst.parent / (dst.stem + motion.suffix)
-                        if not motion_dst.exists():
-                            shutil.copy2(motion, motion_dst)
-                            done_bytes += motion.stat().st_size
-                    except Exception:
-                        pass
+                # Live Photo: import only the still — the motion movie is
+                # skipped on purpose (cleaner archive, no stray video).
 
                 imported += 1
             except Exception:

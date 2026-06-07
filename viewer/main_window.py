@@ -3292,6 +3292,12 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.video_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.video_controls.add_css_class("osd")
+        self.video_controls.add_css_class("video-controls")
+        _vc_css = Gtk.CssProvider()
+        _vc_css.load_from_string(
+            "box.video-controls { border-radius: 14px; padding: 4px 8px; }")
+        self.video_controls.get_style_context().add_provider(
+            _vc_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.video_controls.set_halign(Gtk.Align.FILL)
         self.video_controls.set_valign(Gtk.Align.END)
         self.video_controls.set_margin_bottom(FILM_THUMB + 12 + 8)
@@ -4166,6 +4172,21 @@ class MainWindow(Adw.ApplicationWindow):
             self._ensure_viewer_transition_listener()
             return False
 
+        # Same photo already on screen (upgrading a thumbnail placeholder to
+        # full-res): swap the pixbuf in place — no second slide, no flash.
+        if (pixbuf is not None
+                and path == getattr(self, "_viewer_current_path", None)
+                and self.photo_picture.get_paintable() is not None):
+            self._viewer_pixbuf = pixbuf
+            self._viewer_zoom = 1.0
+            self._viewer_offset = [0.0, 0.0]
+            self.photo_picture.set_pixbuf(pixbuf)
+            if searching:
+                self._set_viewer_location("searching")
+            elif location:
+                self._set_viewer_location("done", f"📍 {location}")
+            return False
+
         self._stop_video()
         self._show_viewer_ui()   # reset fade state
         self.video_display.set_visible(False)
@@ -4314,15 +4335,19 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._preload_adjacent_photos)
                 return
 
-        # Cache miss: show thumbnail as placeholder.
-        try:
-            thumb_path = get_cache_path(path, THUMB_SIZE)
-            if os.path.exists(thumb_path):
-                thumb_pb = GdkPixbuf.Pixbuf.new_from_file(thumb_path)
-                if thumb_pb:
-                    self.photo_picture.set_pixbuf(thumb_pb)
-        except Exception:
-            pass
+        # Cache miss: slide to the thumbnail as a placeholder (single motion);
+        # the full-res load then sharpens it in place via _show_full_photo.
+        if not is_video(path):
+            try:
+                thumb_path = get_cache_path(path, THUMB_SIZE)
+                if os.path.exists(thumb_path):
+                    thumb_pb = GdkPixbuf.Pixbuf.new_from_file(thumb_path)
+                    if thumb_pb:
+                        initial, coords = self._determine_initial_location(path)
+                        self._show_full_photo(thumb_pb, path, initial,
+                                              searching=bool(coords))
+            except Exception:
+                pass
 
         self._nav_debounce_id = GLib.timeout_add(0, self._do_scheduled_load)
 
@@ -4661,7 +4686,60 @@ class MainWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._scroll_filmstrip_to_current)
         self._start_video_poll()
         self._reset_fade_timer()
+        # Pre-extract scrubber preview frames so hovering rarely shows a spinner.
+        threading.Thread(
+            target=self._preload_preview_frames,
+            args=(path, self._viewer_load_id),
+            daemon=True
+        ).start()
         return False
+
+    def _preload_preview_frames(self, path, load_id):
+        """One ffmpeg pass dumps the 2s-bin preview frames into the cache up
+        front, so timeline hover is instant; the spinner is just a fallback."""
+        import tempfile
+        import glob as _glob
+        try:
+            dur = get_video_duration(path)
+        except Exception:
+            dur = 0
+        if dur <= 0:
+            return
+        bin_s = 2
+        n = min(int(dur // bin_s) + 1, 300)   # cap work on very long videos
+        tmpdir = tempfile.mkdtemp(prefix="pixora_prev_")
+        try:
+            subprocess.run(
+                ["ffmpeg", "-i", path, "-an",
+                 "-vf", f"fps=1/{bin_s},scale=160:-1",
+                 "-frames:v", str(n),
+                 os.path.join(tmpdir, "o_%05d.jpg"), "-y"],
+                capture_output=True, timeout=120
+            )
+            if load_id != self._viewer_load_id:
+                return
+            for i, fp in enumerate(sorted(_glob.glob(os.path.join(tmpdir, "o_*.jpg")))):
+                if load_id != self._viewer_load_id:
+                    break
+                key = (path, i * bin_s)
+                if key in self._preview_cache:
+                    continue
+                try:
+                    self._preview_cache[key] = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                        fp, 160, 90, True)
+                except Exception:
+                    continue
+            # If the user is already hovering a now-ready frame, show it.
+            GLib.idle_add(self._service_pending_preview)
+        except Exception:
+            pass
+        finally:
+            try:
+                for fp in _glob.glob(os.path.join(tmpdir, "*")):
+                    os.unlink(fp)
+                os.rmdir(tmpdir)
+            except OSError:
+                pass
 
     def _stop_video(self):
         self._stop_video_poll()
@@ -4945,7 +5023,7 @@ class MainWindow(Adw.ApplicationWindow):
                 key = (path, ts_s)
                 self._preview_cache[key] = pb
                 self._preview_cache.move_to_end(key)
-                while len(self._preview_cache) > 40:
+                while len(self._preview_cache) > 400:
                     self._preview_cache.popitem(last=False)
                 GLib.idle_add(self._apply_preview_frame, key, load_id)
             try:
