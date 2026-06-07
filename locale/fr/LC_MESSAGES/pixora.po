@@ -2441,6 +2441,12 @@ msgstr "Tri et traitement…"
 msgid "Reading photo order from the device…"
 msgstr "Lecture de l'ordre des photos depuis l'appareil…"
 
+msgid "LIVE"
+msgstr "LIVE"
+
+msgid "Play Live Photo"
+msgstr "Lire la Live Photo"
+
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr "{done} / {total}  ·  {fps} éléments/s  ·  {mb} Mo/s"
 

@@ -247,27 +247,35 @@ VIDEO_EXTENSIONS = {".mp4", ".mov"}
 _STILL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif"}
 
 
-def drop_live_motion(paths):
-    """Hide the movie half of a Live Photo so each shows as one tile.
+def live_photo_pairs(paths):
+    """Return {still_path: motion_path} for Live Photos.
 
-    A video counts as a Live Photo's motion part when a still image with the
-    same stem sits in the same folder (IMG_1234.HEIC + IMG_1234.MOV). Standalone
-    videos — no matching still — are kept. Mirrors what the iOS Photos app does.
+    A video is a Live Photo's motion half when a still image with the same stem
+    sits in the same folder (IMG_1234.HEIC + IMG_1234.MOV). Standalone videos —
+    no matching still — are not paired.
     """
-    stills = set()
+    stills = {}
     for p in paths:
         if os.path.splitext(p)[1].lower() in _STILL_EXTENSIONS:
-            stills.add((os.path.dirname(p),
-                        os.path.splitext(os.path.basename(p))[0].lower()))
-    out = []
+            key = (os.path.dirname(p),
+                   os.path.splitext(os.path.basename(p))[0].lower())
+            stills[key] = p
+    pairs = {}
     for p in paths:
         if os.path.splitext(p)[1].lower() in VIDEO_EXTENSIONS:
             key = (os.path.dirname(p),
                    os.path.splitext(os.path.basename(p))[0].lower())
-            if key in stills:
-                continue  # Live Photo motion — folded into its still
-        out.append(p)
-    return out
+            still = stills.get(key)
+            if still is not None:
+                pairs[still] = p
+    return pairs
+
+
+def drop_live_motion(paths):
+    """Hide the movie half of each Live Photo so it shows as one tile, mirroring
+    the iOS Photos app. Standalone videos are kept."""
+    motions = set(live_photo_pairs(paths).values())
+    return [p for p in paths if p not in motions]
 
 
 def is_video(path):
@@ -1309,6 +1317,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._filmstrip_order_cache = None   # (id(photos), len(photos), [sorted_indices])
         self._video_media           = None
         self._video_poll_id         = None
+        self._live_pairs            = {}     # still_path -> motion_path
+        self._live_media            = None   # MediaFile while a Live Photo plays
+        self._current_live_motion   = None   # motion path for the shown photo
         self._video_scrubbing_lock  = False
         self._video_seek_pending_id = None
         self._preview_cache         = OrderedDict()  # LRU: timestamp_s -> pixbuf | None
@@ -3006,6 +3017,24 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_display.set_visible(False)
         viewer_area.add_overlay(self.video_display)
 
+        # "LIVE" badge — shown only on Live Photos; click plays the motion half.
+        self.live_badge = Gtk.Button()
+        self.live_badge.add_css_class("osd")
+        self.live_badge.add_css_class("pill")
+        self.live_badge.set_halign(Gtk.Align.START)
+        self.live_badge.set_valign(Gtk.Align.START)
+        self.live_badge.set_margin_top(16)
+        self.live_badge.set_margin_start(16)
+        self.live_badge.set_visible(False)
+        self.live_badge.set_tooltip_text(_("Play Live Photo"))
+        _live_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        _live_dot = Gtk.Image.new_from_icon_name("media-record-symbolic")
+        _live_box.append(_live_dot)
+        _live_box.append(Gtk.Label(label=_("LIVE")))
+        self.live_badge.set_child(_live_box)
+        self.live_badge.connect("clicked", self._play_live_motion)
+        viewer_area.add_overlay(self.live_badge)
+
         self.viewer_close_btn = Gtk.Button(icon_name="window-close-symbolic")
         self.viewer_close_btn.add_css_class("osd")
         self.viewer_close_btn.add_css_class("circular")
@@ -3455,6 +3484,7 @@ class MainWindow(Adw.ApplicationWindow):
                 for file in files:
                     if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
                         photos.append(os.path.join(root, file))
+            self._live_pairs = live_photo_pairs(photos)
             photos = drop_live_motion(photos)
             GLib.idle_add(self._on_photos_scanned, photos, photo_path)
 
@@ -4092,9 +4122,13 @@ class MainWindow(Adw.ApplicationWindow):
             return False
 
         self._stop_video()
+        self._stop_live_motion()
         self._show_viewer_ui()   # reset fade state
         self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
+        # Show the LIVE badge when this photo has a paired motion clip.
+        self._current_live_motion = self._live_pairs.get(path)
+        self.live_badge.set_visible(bool(self._current_live_motion))
         # Put new pixbuf in inactive slot, then flip stack for slide.
         incoming_slot = "b" if self._active_viewer_slot == "a" else "a"
         incoming_pic = (self._viewer_pic_b if incoming_slot == "b"
@@ -4286,6 +4320,8 @@ class MainWindow(Adw.ApplicationWindow):
     def close_viewer(self, btn=None):
         log_info(_("Viewer closed → back to grid"))
         self._stop_video()
+        self._stop_live_motion()
+        self.live_badge.set_visible(False)
         self._viewer_load_id += 1
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
@@ -4515,6 +4551,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_video(self, path, location="", searching=False):
         self._stop_video()
+        self._stop_live_motion()
+        self.live_badge.set_visible(False)
+        self._current_live_motion = None
         self._preview_cache = OrderedDict()
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
@@ -4570,6 +4609,53 @@ class MainWindow(Adw.ApplicationWindow):
         if self._video_media:
             self._video_media.pause()
             self._video_media = None
+
+    def _play_live_motion(self, *_):
+        """Play the motion half of the current Live Photo once, over the still."""
+        motion = self._current_live_motion
+        if not motion or not os.path.exists(motion):
+            return
+        self._stop_video()
+        self._stop_live_motion()
+        try:
+            media = Gtk.MediaFile.new_for_filename(motion)
+        except Exception:
+            return
+        media.set_loop(False)
+        self._live_media = media
+        self.video_display.set_paintable(media)
+        self.video_display.set_visible(True)
+        # Hide the badge while playing; restore it when the clip ends.
+        self.live_badge.set_visible(False)
+        media.connect("notify::ended", self._on_live_motion_ended)
+        media.play()
+
+    def _on_live_motion_ended(self, media, _param):
+        if not media.get_ended():
+            return
+        if self._live_media is media:
+            self.video_display.set_visible(False)
+            self.video_display.set_paintable(None)
+            self._live_media = None
+            # Bring the badge back if we're still on a Live Photo.
+            if self._current_live_motion:
+                self.live_badge.set_visible(True)
+        try:
+            media.pause()
+        except Exception:
+            pass
+
+    def _stop_live_motion(self):
+        if self._live_media is not None:
+            try:
+                self._live_media.pause()
+            except Exception:
+                pass
+            self._live_media = None
+            try:
+                self.video_display.set_paintable(None)
+            except Exception:
+                pass
 
     def _start_video_poll(self):
         self._stop_video_poll()
