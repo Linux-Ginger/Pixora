@@ -2392,6 +2392,9 @@ msgstr "Could not pair with the device. Unlock your iPhone, tap 'Trust', then tr
 msgid "Sorting and processing…"
 msgstr "Sorting and processing…"
 
+msgid "Reading photo order from the device…"
+msgstr "Reading photo order from the device…"
+
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 

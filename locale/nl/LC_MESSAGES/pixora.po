@@ -2410,6 +2410,9 @@ msgstr "Kon niet koppelen met het apparaat. Ontgrendel je iPhone, tik op 'Vertro
 msgid "Sorting and processing…"
 msgstr "Sorteren en verwerken…"
 
+msgid "Reading photo order from the device…"
+msgstr "Fotovolgorde van het apparaat lezen…"
+
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 

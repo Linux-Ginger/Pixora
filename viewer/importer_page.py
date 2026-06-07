@@ -532,6 +532,58 @@ def scan_cpl_assets(mountpoint: Path, progress_cb=None) -> list[Path]:
     return files
 
 
+# Core Data epoch (2001-01-01 UTC) → Unix epoch, for ZDATECREATED conversion.
+_COREDATA_EPOCH = 978307200.0
+
+
+def load_capture_dates(mountpoint: Path) -> dict:
+    """Read iOS's photo database for the authoritative capture date per asset.
+
+    PhotoData/Photos.sqlite is what the iOS Photos app sorts by, so matching
+    files against it makes Pixora's order identical to the phone — including
+    screenshots, edited photos and iCloud-library files that have no usable
+    EXIF date. Returns {relative_posix_path_lowercased: unix_timestamp};
+    empty on any failure so callers transparently fall back to EXIF/mtime.
+    """
+    db = mountpoint / "PhotoData" / "Photos.sqlite"
+    if not db.exists():
+        return {}
+
+    import sqlite3
+
+    tmp = Path(tempfile.mkdtemp(prefix="pixora_db_"))
+    try:
+        # Copy the DB + its WAL/SHM sidecars so sqlite sees a consistent file;
+        # opening the live file over FUSE read-write is unreliable.
+        for suffix in ("", "-wal", "-shm"):
+            s = mountpoint / "PhotoData" / ("Photos.sqlite" + suffix)
+            if s.exists():
+                shutil.copy2(s, tmp / s.name)
+        con = sqlite3.connect(f"file:{tmp / 'Photos.sqlite'}?mode=ro", uri=True)
+        dates: dict = {}
+        for zdir, zfn, zdate in con.execute(
+                "SELECT ZDIRECTORY, ZFILENAME, ZDATECREATED FROM ZASSET "
+                "WHERE ZFILENAME IS NOT NULL AND ZDATECREATED IS NOT NULL"):
+            key = (f"{zdir}/{zfn}" if zdir else zfn).lower()
+            dates[key] = float(zdate) + _COREDATA_EPOCH
+        con.close()
+        try:
+            from main_window import log_info
+            log_info("load_capture_dates: %d dates from Photos.sqlite" % len(dates))
+        except Exception:
+            pass
+        return dates
+    except Exception as e:
+        try:
+            from main_window import log_warn
+            log_warn("load_capture_dates failed: %r" % (e,))
+        except Exception:
+            pass
+        return {}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def load_hash_cache() -> dict:
     if HASH_CACHE.exists():
         try:
@@ -1372,6 +1424,21 @@ class ImporterPage(Gtk.Box):
             GLib.idle_add(self._on_scan_done, files)
             return
 
+        # iOS's own capture dates (Photos.sqlite) — the source of truth the
+        # Photos app sorts by. Keyed by path relative to the mount; used as the
+        # primary date so Pixora's order matches the phone exactly. Stored on
+        # self so the import phase can fold the same date into folders/names.
+        GLib.idle_add(self.progress_subtitle.set_text,
+                      _("Reading photo order from the device…"))
+        capture_dates = load_capture_dates(MOUNT_POINT)
+        self._capture_dates = capture_dates
+
+        def db_date(f):
+            try:
+                return capture_dates.get(f.relative_to(MOUNT_POINT).as_posix().lower())
+            except Exception:
+                return None
+
         # One determinate pass: read each file's date AND build its thumbnail,
         # so the bar fills smoothly with live stats and the selection grid is
         # pre-populated. Sorting happens at the end from the collected dates.
@@ -1386,10 +1453,14 @@ class ImporterPage(Gtk.Box):
             total_bytes += sizes[f]
 
         def process(f):
-            try:
-                d = get_photo_date(f)
-            except Exception:
-                d = 0
+            # Prefer the phone's own capture date; fall back to EXIF/mtime only
+            # for files the database doesn't list.
+            d = db_date(f)
+            if d is None:
+                try:
+                    d = get_photo_date(f)
+                except Exception:
+                    d = 0
             try:
                 load_select_thumb(f)
             except Exception:
@@ -1825,10 +1896,22 @@ class ImporterPage(Gtk.Box):
         start = time.monotonic()
         done_bytes = 0
 
+        capture_dates = getattr(self, "_capture_dates", {})
+
         for i, src in enumerate(self.to_import):
             copy_src = src
             try:
-                mtime = datetime.fromtimestamp(src.stat().st_mtime)
+                # Use the phone's own capture date for folders/naming so the
+                # archive matches what the Photos app shows; fall back to mtime.
+                ts = None
+                try:
+                    ts = capture_dates.get(
+                        src.relative_to(MOUNT_POINT).as_posix().lower())
+                except Exception:
+                    ts = None
+                if ts is None:
+                    ts = src.stat().st_mtime
+                mtime = datetime.fromtimestamp(ts)
 
                 # Prefer the phone-rendered edit so crops/filters come over
                 # exactly as shown on the device; fall back to the master.

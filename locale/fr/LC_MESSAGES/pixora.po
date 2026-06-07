@@ -2438,6 +2438,9 @@ msgstr "Impossible de jumeler l'appareil. Déverrouillez votre iPhone, touchez �
 msgid "Sorting and processing…"
 msgstr "Tri et traitement…"
 
+msgid "Reading photo order from the device…"
+msgstr "Lecture de l'ordre des photos depuis l'appareil…"
+
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr "{done} / {total}  ·  {fps} éléments/s  ·  {mb} Mo/s"
 

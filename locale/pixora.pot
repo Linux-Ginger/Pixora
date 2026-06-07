@@ -1568,6 +1568,9 @@ msgstr ""
 msgid "Sorting and processing…"
 msgstr ""
 
+msgid "Reading photo order from the device…"
+msgstr ""
+
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr ""
 

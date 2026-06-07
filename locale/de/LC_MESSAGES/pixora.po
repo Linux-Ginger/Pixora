@@ -2422,6 +2422,9 @@ msgstr "Kopplung mit dem Gerät fehlgeschlagen. Entsperre dein iPhone, tippe auf
 msgid "Sorting and processing…"
 msgstr "Sortieren und verarbeiten…"
 
+msgid "Reading photo order from the device…"
+msgstr "Fotoreihenfolge vom Gerät wird gelesen…"
+
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr "{done} / {total}  ·  {fps} Elemente/s  ·  {mb} MB/s"
 
