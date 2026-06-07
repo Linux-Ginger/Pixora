@@ -1710,6 +1710,12 @@ class ImporterPage(Gtk.Box):
     def _do_hashing(self, iphone_files: list[Path]):
         photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
         threshold_key = self.settings.get("duplicate_threshold", 2)
+        try:
+            from main_window import log_info, log_warn
+        except Exception:
+            log_info = log_warn = lambda *a, **k: None
+        log_info("dedup: imagehash=%s threshold=%s files=%d path=%s"
+                 % (HAS_IMAGEHASH, threshold_key, len(iphone_files), photo_path))
         # threshold 0 = detection off; treat everything as new.
         if threshold_key == 0:
             GLib.idle_add(self._on_hashing_done, [], list(iphone_files))
@@ -1723,10 +1729,13 @@ class ImporterPage(Gtk.Box):
 
         library_hashes = build_library_hashes(photo_path, lib_progress)
         self.library_hashes = library_hashes
+        log_info("dedup: %d archive hashes built" % len(library_hashes))
 
         duplicates: list[tuple[Path, Path]] = []
         new_files: list[Path] = []
         total = len(iphone_files)
+        hashed_ok = 0
+        hashed_none = 0
 
         for i, fp in enumerate(iphone_files):
             frac = 0.5 + (i / total) * 0.5 if total > 0 else 0.5
@@ -1734,14 +1743,18 @@ class ImporterPage(Gtk.Box):
                           _("Scanning device: {i}/{total}").format(i=i + 1, total=total), fp.name)
             ph = perceptual_hash(fp)
             if ph:
+                hashed_ok += 1
                 dup = find_duplicate(ph, library_hashes, max_dist)
                 if dup:
                     duplicates.append((fp, Path(dup)))
                 else:
                     new_files.append(fp)
             else:
+                hashed_none += 1
                 new_files.append(fp)
 
+        log_info("dedup: device hashed_ok=%d none=%d → %d duplicates, %d new"
+                 % (hashed_ok, hashed_none, len(duplicates), len(new_files)))
         GLib.idle_add(self._on_hashing_done, duplicates, new_files)
 
     def _on_hashing_done(self, duplicates: list, new_files: list):
@@ -1906,6 +1919,12 @@ class ImporterPage(Gtk.Box):
     def _on_selecting_continue(self, _btn):
         selected = [f for f in self.iphone_files if str(f) in self.selected_files]
         if not HAS_IMAGEHASH:
+            try:
+                from main_window import log_warn
+                log_warn("dedup SKIPPED: imagehash not installed — every selected "
+                         "file is treated as new (no duplicate detection)")
+            except Exception:
+                pass
             self.duplicates = []
             self.to_import = selected
             self._start_import()
