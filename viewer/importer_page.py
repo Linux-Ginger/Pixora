@@ -319,8 +319,12 @@ def _get_video_duration(path: Path) -> str | None:
     return None
 
 
-def get_photo_date(path: Path) -> float:
-    """Sort key: EXIF/ffprobe timestamp, else filename counter, else mtime."""
+def get_photo_date(path: Path, use_name_counter: bool = True) -> float:
+    """Sort key: EXIF/ffprobe timestamp, else filename counter, else mtime.
+
+    CPLAssets files are GUID-named, so their digits are meaningless as a
+    chronological counter — callers pass use_name_counter=False for those.
+    """
     ext = path.suffix.lower()
     if ext in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng", ".tiff", ".tif"):
         try:
@@ -339,9 +343,10 @@ def get_photo_date(path: Path) -> float:
         if ts:
             return ts
     # Fallback: iPhone names (IMG_1234) are chronological; counter beats mtime.
-    m = re.search(r'(\d{4,})', path.stem)
-    if m:
-        return float(m.group(1))
+    if use_name_counter:
+        m = re.search(r'(\d{4,})', path.stem)
+        if m:
+            return float(m.group(1))
     return path.stat().st_mtime
 
 
@@ -427,6 +432,53 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
     return False
 
 
+def _walk_media(directory: Path, files: list[Path], progress_cb, counters: dict) -> None:
+    """Recursively collect supported media under `directory`.
+
+    Robust to FUSE hiccups: retries iterdir, and never lets one bad entry
+    abort the rest of a directory. Shared by scan_dcim and scan_cpl_assets.
+    """
+    counters["dirs"] = counters.get("dirs", 0) + 1
+    entries = None
+    for attempt in range(4):
+        try:
+            entries = sorted(directory.iterdir())
+            break
+        except OSError:
+            if attempt == 3:
+                break
+            time.sleep(0.4)
+    if entries is None:
+        counters["failed"] = counters.get("failed", 0) + 1
+        return
+
+    subdirs: list[Path] = []
+    for entry in entries:
+        # is_dir() can transiently raise over FUSE; never let one bad entry
+        # abort the rest of the directory.
+        try:
+            is_dir = entry.is_dir()
+        except OSError:
+            is_dir = False
+        if is_dir:
+            if entry.name not in SKIP_DIRS:
+                subdirs.append(entry)
+            continue
+        ext = entry.suffix.lower()
+        if ext in EXCLUDED_EXT:
+            continue
+        if ext in SUPPORTED_EXT:
+            files.append(entry)
+            if progress_cb:
+                progress_cb(len(files))
+        else:
+            skipped = counters.setdefault("skipped", {})
+            skipped[ext] = skipped.get(ext, 0) + 1
+
+    for subdir in subdirs:
+        _walk_media(subdir, files, progress_cb, counters)
+
+
 def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
     """Recursively scan DCIM; skip SKIP_DIRS and AAE files."""
     dcim = mountpoint / "DCIM"
@@ -434,63 +486,45 @@ def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
         return []
 
     files: list[Path] = []
-    skipped_ext: dict[str, int] = {}
-    failed_dirs = 0
-    dirs_seen = 0
-
-    def _walk(directory: Path) -> None:
-        nonlocal failed_dirs, dirs_seen
-        dirs_seen += 1
-        entries = None
-        for attempt in range(4):
-            try:
-                entries = sorted(directory.iterdir())
-                break
-            except OSError:
-                if attempt == 3:
-                    break
-                time.sleep(0.4)
-        if entries is None:
-            failed_dirs += 1
-            return
-
-        subdirs: list[Path] = []
-        for entry in entries:
-            # is_dir() can transiently raise over FUSE; never let one bad entry
-            # abort the rest of the directory.
-            try:
-                is_dir = entry.is_dir()
-            except OSError:
-                is_dir = False
-            if is_dir:
-                if entry.name not in SKIP_DIRS:
-                    subdirs.append(entry)
-                continue
-            ext = entry.suffix.lower()
-            if ext in EXCLUDED_EXT:
-                continue
-            if ext in SUPPORTED_EXT:
-                files.append(entry)
-                if progress_cb:
-                    progress_cb(len(files))
-            else:
-                skipped_ext[ext] = skipped_ext.get(ext, 0) + 1
-
-        for subdir in subdirs:
-            _walk(subdir)
-
-    _walk(dcim)
+    counters: dict = {}
+    _walk_media(dcim, files, progress_cb, counters)
 
     # Diagnostic: surfaces why the count may differ from the phone's tally.
     try:
         from main_window import log_info, log_warn
-        log_info("scan_dcim: %d media across %d dirs" % (len(files), dirs_seen))
+        log_info("scan_dcim: %d media across %d dirs"
+                 % (len(files), counters.get("dirs", 0)))
+        skipped_ext = counters.get("skipped", {})
         if skipped_ext:
             log_warn("scan_dcim skipped unsupported types: " + ", ".join(
                 f"{k or '<no-ext>'}={v}" for k, v in sorted(skipped_ext.items())))
-        if failed_dirs:
+        if counters.get("failed"):
             log_warn("scan_dcim: %d directories failed to list — media may be "
-                     "missing (USB/FUSE hiccup)" % failed_dirs)
+                     "missing (USB/FUSE hiccup)" % counters["failed"])
+    except Exception:
+        pass
+
+    return files
+
+
+def scan_cpl_assets(mountpoint: Path, progress_cb=None) -> list[Path]:
+    """Scan PhotoData/CPLAssets — the iCloud-library originals that live on the
+    device but never land in DCIM (GUID-named files under group<NNN>/)."""
+    cpl = mountpoint / "PhotoData" / "CPLAssets"
+    if not cpl.exists():
+        return []
+
+    files: list[Path] = []
+    counters: dict = {}
+    _walk_media(cpl, files, progress_cb, counters)
+
+    try:
+        from main_window import log_info, log_warn
+        log_info("scan_cpl_assets: %d media across %d dirs"
+                 % (len(files), counters.get("dirs", 0)))
+        if counters.get("failed"):
+            log_warn("scan_cpl_assets: %d directories failed to list"
+                     % counters["failed"])
     except Exception:
         pass
 
@@ -1324,7 +1358,14 @@ class ImporterPage(Gtk.Box):
                 self.progress_subtitle.set_text,
                 ngettext("%d file found…", "%d files found…", count) % count,
             )
-        files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
+        dcim_files = scan_dcim(MOUNT_POINT, progress_cb=on_progress)
+        # Also pull the iCloud-library originals that never land in DCIM; keep
+        # the counter rising across both scans.
+        base = len(dcim_files)
+        cpl_files = scan_cpl_assets(
+            MOUNT_POINT, progress_cb=lambda n: on_progress(base + n))
+        cpl_set = set(cpl_files)
+        files = dcim_files + cpl_files
         total = len(files)
         if total == 0:
             GLib.idle_add(self._on_scan_done, files)
@@ -1345,7 +1386,8 @@ class ImporterPage(Gtk.Box):
 
         def process(f):
             try:
-                d = get_photo_date(f)
+                # CPLAssets files are GUID-named, so don't mine digits as a counter.
+                d = get_photo_date(f, use_name_counter=f not in cpl_set)
             except Exception:
                 d = 0
             try:
@@ -1373,6 +1415,31 @@ class ImporterPage(Gtk.Box):
                 text, detail = self._format_progress_stats(
                     done, total, done_bytes, total_bytes, start, f.name)
                 GLib.idle_add(self._update_progress, frac, text, detail)
+
+        # Drop CPL-library copies that are byte-identical to a DCIM photo
+        # (same size AND same capture time). Keep the DCIM master so its
+        # edits/AAE sidecar still apply on import.
+        if cpl_set:
+            dcim_sigs = {
+                (sizes.get(f, 0), int(date_cache.get(f, 0)))
+                for f in dcim_files
+            }
+            kept = []
+            dropped = 0
+            for f in files:
+                if f in cpl_set:
+                    sig = (sizes.get(f, 0), int(date_cache.get(f, 0)))
+                    if sig in dcim_sigs:
+                        dropped += 1
+                        continue
+                kept.append(f)
+            files = kept
+            try:
+                from main_window import log_info
+                log_info("scan: %d DCIM + %d CPL → %d after dedup (%d dups)"
+                         % (len(dcim_files), len(cpl_files), len(files), dropped))
+            except Exception:
+                pass
 
         files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
         GLib.idle_add(self._on_scan_done, files)
@@ -1768,7 +1835,12 @@ class ImporterPage(Gtk.Box):
                 render = find_edited_render(src)
                 if render is not None:
                     copy_src = render
-                out_name = src.stem + copy_src.suffix
+                # CPLAssets masters are GUID-named; give them a readable,
+                # date-based name instead of a meaningless UUID in the archive.
+                if "CPLAssets" in src.parts:
+                    out_name = "IMG_" + mtime.strftime("%Y%m%d_%H%M%S") + copy_src.suffix
+                else:
+                    out_name = src.stem + copy_src.suffix
                 dst = dest_path(photo_path, structure, out_name, mtime)
 
                 # "keep both" case: find a unique filename.
