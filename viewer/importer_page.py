@@ -1470,6 +1470,28 @@ class ImporterPage(Gtk.Box):
             except Exception:
                 return None
 
+        # CPLAssets also stores secondary resources — an iCloud Live Photo's
+        # movie has its own GUID (so DCIM-style name matching misses it) and is
+        # not a real library item. The DB lists only real assets, so drop CPL
+        # *videos* absent from it. Limited to videos: a still is never dropped,
+        # so no real photo can vanish even on a DB hiccup.
+        if capture_dates and cpl_files:
+            drop = set()
+            for f in cpl_files:
+                if f.suffix.lower() in _VIDEO_EXT and db_date(f) is None:
+                    drop.add(f)
+            if drop:
+                files = [f for f in files if f not in drop]
+                cpl_files = [f for f in cpl_files if f not in drop]
+                cpl_set = set(cpl_files)
+                total = len(files)
+                try:
+                    from main_window import log_info
+                    log_info("scan: dropped %d CPL Live Photo movie(s) not in DB"
+                             % len(drop))
+                except Exception:
+                    pass
+
         # One determinate pass: read each file's date AND build its thumbnail,
         # so the bar fills smoothly with live stats and the selection grid is
         # pre-populated. Sorting happens at the end from the collected dates.
