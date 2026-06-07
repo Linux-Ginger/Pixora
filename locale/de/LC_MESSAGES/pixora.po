@@ -2453,3 +2453,47 @@ msgstr "{done} / {total}  ·  noch {eta}"
 
 msgid "{fps} photos/s  ·  {mb} MB/s"
 msgstr "{fps} Fotos/s  ·  {mb} MB/s"
+
+msgid "Possibly damaged files"
+msgstr "Möglicherweise beschädigte Dateien"
+
+msgid "Keep all"
+msgstr "Alle behalten"
+
+msgid "Re-import all"
+msgstr "Alle neu importieren"
+
+msgid "Checking imported files…"
+msgstr "Importierte Dateien werden geprüft…"
+
+msgid "Verifying that everything copied over correctly."
+msgstr "Prüfen, ob alles korrekt kopiert wurde."
+
+msgid "⚠️ Still damaged after re-importing."
+msgstr "⚠️ Nach dem erneuten Import weiterhin beschädigt."
+
+msgid "⚠️ It looks like this image or video is damaged."
+msgstr "⚠️ Dieses Bild oder Video scheint beschädigt zu sein."
+
+msgid "Keep"
+msgstr "Behalten"
+
+msgid "Re-import"
+msgstr "Neu importieren"
+
+msgid "Re-importing…"
+msgstr "Wird neu importiert…"
+
+msgid "Copying fresh versions from your phone."
+msgstr "Frische Versionen vom Telefon werden kopiert."
+
+msgid "%d file is still damaged after re-importing — the original on your phone may be incomplete."
+msgid_plural "%d files are still damaged after re-importing — the originals on your phone may be incomplete."
+msgstr[0] "%d Datei ist nach dem erneuten Import weiterhin beschädigt — das Original auf deinem Telefon ist möglicherweise unvollständig."
+msgstr[1] "%d Dateien sind nach dem erneuten Import weiterhin beschädigt — die Originale auf deinem Telefon sind möglicherweise unvollständig."
+
+msgid "%d imported file looks damaged. Choose whether to re-import it from your phone or keep it as is."
+msgid_plural "%d imported files look damaged. Choose per file whether to re-import from your phone or keep them, or use the buttons below."
+msgstr[0] "%d importierte Datei scheint beschädigt. Wähle, ob du sie neu vom Telefon importierst oder so behältst."
+msgstr[1] "%d importierte Dateien scheinen beschädigt. Wähle pro Datei, ob du sie neu vom Telefon importierst oder behältst, oder nutze die Schaltflächen unten."
+

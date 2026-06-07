@@ -1599,3 +1599,47 @@ msgstr ""
 
 msgid "{fps} photos/s  ·  {mb} MB/s"
 msgstr ""
+
+msgid "Possibly damaged files"
+msgstr ""
+
+msgid "Keep all"
+msgstr ""
+
+msgid "Re-import all"
+msgstr ""
+
+msgid "Checking imported files…"
+msgstr ""
+
+msgid "Verifying that everything copied over correctly."
+msgstr ""
+
+msgid "⚠️ Still damaged after re-importing."
+msgstr ""
+
+msgid "⚠️ It looks like this image or video is damaged."
+msgstr ""
+
+msgid "Keep"
+msgstr ""
+
+msgid "Re-import"
+msgstr ""
+
+msgid "Re-importing…"
+msgstr ""
+
+msgid "Copying fresh versions from your phone."
+msgstr ""
+
+msgid "%d file is still damaged after re-importing — the original on your phone may be incomplete."
+msgid_plural "%d files are still damaged after re-importing — the originals on your phone may be incomplete."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "%d imported file looks damaged. Choose whether to re-import it from your phone or keep it as is."
+msgid_plural "%d imported files look damaged. Choose per file whether to re-import from your phone or keep them, or use the buttons below."
+msgstr[0] ""
+msgstr[1] ""
+

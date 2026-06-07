@@ -75,6 +75,7 @@ STATE_SELECTING = "selecting"
 STATE_HASHING   = "hashing"
 STATE_REVIEWING = "reviewing"
 STATE_IMPORTING = "importing"
+STATE_CORRUPT   = "corrupt"
 STATE_DONE      = "done"
 STATE_ERROR     = "error"
 
@@ -310,6 +311,56 @@ def pair_live_photos(files: list[Path]) -> tuple[list[Path], dict]:
 
     display = [f for f in files if f not in hidden]
     return display, motion_of
+
+
+def video_looks_corrupt(path: Path) -> bool:
+    """True if ffprobe can't find a valid video stream — a sign the file is
+    truncated/unplayable."""
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=codec_type,duration", "-of", "csv=p=0",
+             str(path)],
+            capture_output=True, text=True, timeout=15
+        )
+        if r.returncode != 0:
+            return True
+        return "video" not in (r.stdout or "")
+    except Exception:
+        return True
+
+
+def file_looks_corrupt(path: Path) -> bool:
+    """Heuristic post-import integrity check. Catches the common failure:
+    incomplete/truncated photos (e.g. half-synced iCloud files) that carry far
+    too little data for their pixel count and decode to garbage. Conservative
+    on purpose — the user confirms each hit in a review screen."""
+    ext = path.suffix.lower()
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return True
+    if size == 0:
+        return True
+    if ext in (".heic", ".heif", ".jpg", ".jpeg", ".dng"):
+        try:
+            from PIL import Image
+            with Image.open(path) as im:
+                w, h = im.size
+        except Exception:
+            return True  # header unreadable → corrupt
+        if w <= 0 or h <= 0:
+            return True
+        # Lossy full-res photos almost never fall below ~0.03 bytes/pixel; this
+        # one symptom reliably flags truncated iCloud downloads without tripping
+        # on normal images.
+        if size / (w * h) < 0.03:
+            return True
+        return False
+    if ext in _VIDEO_EXT:
+        return video_looks_corrupt(path)
+    return False
+
 
 def _get_video_date(path: Path) -> float | None:
     """Return video creation_time via ffprobe."""
@@ -866,6 +917,7 @@ class ImporterPage(Gtk.Box):
         self._build_progress_page()
         self._build_selecting_page()
         self._build_review_page()
+        self._build_corrupt_page()
         self._build_done_page()
         self._build_error_page()
 
@@ -1193,6 +1245,57 @@ class ImporterPage(Gtk.Box):
         outer.append(action_bar)
         self.stack.add_named(outer, "review")
 
+    def _build_corrupt_page(self):
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+
+        header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        header_box.set_margin_top(24)
+        header_box.set_margin_bottom(12)
+        header_box.set_margin_start(24)
+        header_box.set_margin_end(24)
+
+        title_lbl = Gtk.Label(label=_("Possibly damaged files"))
+        title_lbl.add_css_class("title-1")
+        title_lbl.set_halign(Gtk.Align.START)
+        header_box.append(title_lbl)
+
+        self.corrupt_subtitle = Gtk.Label()
+        self.corrupt_subtitle.add_css_class("dim-label")
+        self.corrupt_subtitle.set_halign(Gtk.Align.START)
+        self.corrupt_subtitle.set_wrap(True)
+        header_box.append(self.corrupt_subtitle)
+
+        outer.append(header_box)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        self.corrupt_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.corrupt_box.set_margin_start(24)
+        self.corrupt_box.set_margin_end(24)
+        self.corrupt_box.set_margin_bottom(12)
+        scroll.set_child(self.corrupt_box)
+        outer.append(scroll)
+
+        action_bar = Gtk.ActionBar()
+
+        keep_all_btn = Gtk.Button(label=_("Keep all"))
+        keep_all_btn.connect("clicked", self._on_corrupt_keep_all)
+        action_bar.pack_start(keep_all_btn)
+
+        reimport_all_btn = Gtk.Button(label=_("Re-import all"))
+        reimport_all_btn.connect("clicked", self._on_corrupt_reimport_all)
+        action_bar.pack_start(reimport_all_btn)
+
+        continue_btn = Gtk.Button(label=_("Continue"))
+        continue_btn.add_css_class("suggested-action")
+        continue_btn.connect("clicked", self._on_corrupt_continue)
+        action_bar.pack_end(continue_btn)
+
+        outer.append(action_bar)
+        self.stack.add_named(outer, "corrupt")
+
     def _build_done_page(self):
         self.done_status = Adw.StatusPage()
         self.done_status.set_icon_name("emblem-ok-symbolic")
@@ -1283,6 +1386,7 @@ class ImporterPage(Gtk.Box):
             STATE_HASHING:   "progress",
             STATE_REVIEWING: "review",
             STATE_IMPORTING: "progress",
+            STATE_CORRUPT:   "corrupt",
             STATE_DONE:      "done",
             STATE_ERROR:     "error",
         }
@@ -1944,6 +2048,133 @@ class ImporterPage(Gtk.Box):
                 self.to_import.append(iphone_path)
         self._start_import()
 
+    # ── Post-import integrity review ──────────────────────────────────────
+    def _show_corrupt(self, suspects, attempted=False):
+        """suspects: list of (phone_src, archive_dst). attempted=True means these
+        were already re-imported once and are still damaged."""
+        self._corrupt_suspects = suspects
+        self._corrupt_decisions = {}
+        n = len(suspects)
+        if attempted:
+            self.corrupt_subtitle.set_text(ngettext(
+                "%d file is still damaged after re-importing — the original on "
+                "your phone may be incomplete.",
+                "%d files are still damaged after re-importing — the originals on "
+                "your phone may be incomplete.", n) % n)
+        else:
+            self.corrupt_subtitle.set_text(ngettext(
+                "%d imported file looks damaged. Choose whether to re-import it "
+                "from your phone or keep it as is.",
+                "%d imported files look damaged. Choose per file whether to "
+                "re-import from your phone or keep them, or use the buttons below.",
+                n) % n)
+
+        while child := self.corrupt_box.get_first_child():
+            self.corrupt_box.remove(child)
+        for src, dst in suspects:
+            self._corrupt_decisions[str(dst)] = "keep"
+            self.corrupt_box.append(self._make_corrupt_card(src, dst, attempted))
+        self._show_state(STATE_CORRUPT)
+
+    def _make_corrupt_card(self, src: Path, dst: Path, attempted: bool) -> Gtk.Widget:
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        card.add_css_class("card")
+        card.set_margin_bottom(4)
+
+        name_lbl = Gtk.Label(label=dst.name)
+        name_lbl.add_css_class("heading")
+        name_lbl.set_halign(Gtk.Align.START)
+        name_lbl.set_margin_top(12)
+        name_lbl.set_margin_start(14)
+        card.append(name_lbl)
+
+        msg = Gtk.Label(label=(
+            _("⚠️ Still damaged after re-importing.") if attempted
+            else _("⚠️ It looks like this image or video is damaged.")))
+        msg.add_css_class("caption")
+        msg.set_halign(Gtk.Align.START)
+        msg.set_margin_start(14)
+        msg.set_margin_bottom(8)
+        card.append(msg)
+
+        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        btn_row.set_margin_start(12)
+        btn_row.set_margin_end(12)
+        btn_row.set_margin_bottom(12)
+        btn_row.set_homogeneous(True)
+
+        keep_btn = Gtk.ToggleButton(label=_("Keep"))
+        reimport_btn = Gtk.ToggleButton(label=_("Re-import"))
+        keep_btn.set_active(True)
+
+        def on_keep(b, d=dst):
+            if b.get_active():
+                reimport_btn.set_active(False)
+                self._corrupt_decisions[str(d)] = "keep"
+            elif not reimport_btn.get_active():
+                b.set_active(True)
+
+        def on_reimport(b, d=dst):
+            if b.get_active():
+                keep_btn.set_active(False)
+                self._corrupt_decisions[str(d)] = "reimport"
+            elif not keep_btn.get_active():
+                b.set_active(True)
+
+        keep_btn.connect("toggled", on_keep)
+        reimport_btn.connect("toggled", on_reimport)
+        btn_row.append(keep_btn)
+        btn_row.append(reimport_btn)
+        card.append(btn_row)
+        return card
+
+    def _on_corrupt_keep_all(self, _btn):
+        for _src, dst in getattr(self, "_corrupt_suspects", []):
+            self._corrupt_decisions[str(dst)] = "keep"
+        self._on_corrupt_continue(None)
+
+    def _on_corrupt_reimport_all(self, _btn):
+        for _src, dst in getattr(self, "_corrupt_suspects", []):
+            self._corrupt_decisions[str(dst)] = "reimport"
+        self._on_corrupt_continue(None)
+
+    def _on_corrupt_continue(self, _btn):
+        todo = [(src, dst) for src, dst in getattr(self, "_corrupt_suspects", [])
+                if self._corrupt_decisions.get(str(dst)) == "reimport"]
+        if not todo:
+            self._on_import_done()
+            return
+        self._set_progress(_("Re-importing…"),
+                           _("Copying fresh versions from your phone."))
+        self._show_state(STATE_IMPORTING)
+        threading.Thread(target=self._do_reimport, args=(todo,), daemon=True).start()
+
+    def _do_reimport(self, todo):
+        still_bad = []
+        total = len(todo)
+        for i, (src, dst) in enumerate(todo):
+            try:
+                if src.exists():
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dst)
+                # Re-check; a transfer glitch is fixed, an incomplete original
+                # on the device stays damaged.
+                if file_looks_corrupt(dst):
+                    still_bad.append((src, dst))
+            except Exception:
+                still_bad.append((src, dst))
+            if total:
+                GLib.idle_add(self._update_progress, (i + 1) / total,
+                              _("Re-importing…"), "")
+        GLib.idle_add(self._after_reimport, still_bad)
+
+    def _after_reimport(self, still_bad):
+        if still_bad:
+            self._show_corrupt(still_bad, attempted=True)
+        else:
+            self._on_import_done()
+        return False
+
     def _start_import(self):
         total = len(self.to_import)
         self._set_progress(
@@ -1975,6 +2206,9 @@ class ImporterPage(Gtk.Box):
         done_bytes = 0
 
         capture_dates = getattr(self, "_capture_dates", {})
+        # (phone source, archive destination) for each imported file, so the
+        # post-import integrity check can re-import a damaged one from the phone.
+        self._imported_pairs = []
 
         for i, src in enumerate(self.to_import):
             copy_src = src
@@ -2027,6 +2261,7 @@ class ImporterPage(Gtk.Box):
                 # Live Photo: import only the still — the motion movie is
                 # skipped on purpose (cleaner archive, no stray video).
 
+                self._imported_pairs.append((copy_src, dst))
                 imported += 1
             except Exception:
                 pass
@@ -2042,7 +2277,43 @@ class ImporterPage(Gtk.Box):
             GLib.idle_add(self._update_progress, frac, text, detail)
 
         self.import_count = imported
-        GLib.idle_add(self._on_import_done)
+        GLib.idle_add(self._begin_corrupt_scan)
+
+    def _begin_corrupt_scan(self):
+        """After importing, verify the copied files are readable; flag any that
+        look truncated/damaged for the user to review."""
+        pairs = getattr(self, "_imported_pairs", [])
+        if not pairs:
+            self._on_import_done()
+            return False
+        self._set_progress(_("Checking imported files…"),
+                           _("Verifying that everything copied over correctly."))
+        self._show_state(STATE_IMPORTING)
+        threading.Thread(target=self._do_corrupt_scan, args=(pairs,),
+                         daemon=True).start()
+        return False
+
+    def _do_corrupt_scan(self, pairs):
+        suspects = []
+        total = len(pairs)
+        for i, (src, dst) in enumerate(pairs):
+            try:
+                if file_looks_corrupt(dst):
+                    suspects.append((src, dst))
+            except Exception:
+                pass
+            if total:
+                frac = (i + 1) / total
+                GLib.idle_add(self._update_progress, frac,
+                              _("Checking imported files…"), "")
+        GLib.idle_add(self._on_corrupt_scan_done, suspects)
+
+    def _on_corrupt_scan_done(self, suspects):
+        if suspects:
+            self._show_corrupt(suspects, attempted=False)
+        else:
+            self._on_import_done()
+        return False
 
     def _format_progress_stats(self, done, total, done_bytes, total_bytes, start, name):
         """Return (subtitle, detail) with live items/s, MB/s and ETA."""

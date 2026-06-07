@@ -2441,3 +2441,47 @@ msgstr "{done} / {total}  ·  nog {eta}"
 
 msgid "{fps} photos/s  ·  {mb} MB/s"
 msgstr "{fps} foto's/s  ·  {mb} MB/s"
+
+msgid "Possibly damaged files"
+msgstr "Mogelijk beschadigde bestanden"
+
+msgid "Keep all"
+msgstr "Alles behouden"
+
+msgid "Re-import all"
+msgstr "Alles opnieuw importeren"
+
+msgid "Checking imported files…"
+msgstr "Geïmporteerde bestanden controleren…"
+
+msgid "Verifying that everything copied over correctly."
+msgstr "Controleren of alles goed is gekopieerd."
+
+msgid "⚠️ Still damaged after re-importing."
+msgstr "⚠️ Nog steeds beschadigd na opnieuw importeren."
+
+msgid "⚠️ It looks like this image or video is damaged."
+msgstr "⚠️ Het lijkt erop dat deze afbeelding of video beschadigd is."
+
+msgid "Keep"
+msgstr "Behouden"
+
+msgid "Re-import"
+msgstr "Opnieuw importeren"
+
+msgid "Re-importing…"
+msgstr "Opnieuw importeren…"
+
+msgid "Copying fresh versions from your phone."
+msgstr "Verse versies van je telefoon kopiëren."
+
+msgid "%d file is still damaged after re-importing — the original on your phone may be incomplete."
+msgid_plural "%d files are still damaged after re-importing — the originals on your phone may be incomplete."
+msgstr[0] "%d bestand is nog steeds beschadigd na opnieuw importeren — het origineel op je telefoon is mogelijk onvolledig."
+msgstr[1] "%d bestanden zijn nog steeds beschadigd na opnieuw importeren — de originelen op je telefoon zijn mogelijk onvolledig."
+
+msgid "%d imported file looks damaged. Choose whether to re-import it from your phone or keep it as is."
+msgid_plural "%d imported files look damaged. Choose per file whether to re-import from your phone or keep them, or use the buttons below."
+msgstr[0] "%d geïmporteerd bestand lijkt beschadigd. Kies of je het opnieuw van je telefoon importeert of laat staan."
+msgstr[1] "%d geïmporteerde bestanden lijken beschadigd. Kies per bestand of je het opnieuw van je telefoon importeert of laat staan, of gebruik de knoppen hieronder."
+
