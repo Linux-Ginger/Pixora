@@ -1301,54 +1301,51 @@ class ImporterPage(Gtk.Box):
             GLib.idle_add(self._on_scan_done, files)
             return
 
-        # Sort by date (metadata only — the quick part; keep the bar pulsing).
-        GLib.idle_add(
-            self.progress_subtitle.set_text,
-            ngettext(
-                "%d file found, sorting by date…",
-                "%d files found, sorting by date…",
-                total,
-            ) % total,
-        )
-        if total <= 500:
-            files.sort(key=get_photo_date, reverse=True)
-        else:
-            date_cache = {}
-            with ThreadPoolExecutor(max_workers=6) as pool:
-                futures = {pool.submit(get_photo_date, f): f for f in files}
-                for fut in as_completed(futures):
-                    f = futures[fut]
-                    try:
-                        date_cache[f] = fut.result()
-                    except Exception:
-                        date_cache[f] = 0
-            files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
-
-        # "Processing": build every thumbnail up front so the selection grid
-        # shows real photos immediately — no "…" placeholders, no waiting.
+        # One determinate pass: read each file's date AND build its thumbnail,
+        # so the bar fills smoothly with live stats and the selection grid is
+        # pre-populated. Sorting happens at the end from the collected dates.
         GLib.idle_add(self._begin_sort_progress, total)
         sizes = {}
         total_bytes = 0
         for f in files:
             try:
-                sz = f.stat().st_size
+                sizes[f] = f.stat().st_size
             except OSError:
-                sz = 0
-            sizes[f] = sz
-            total_bytes += sz
-        start = time.monotonic()
-        done_bytes = 0
-        for i, f in enumerate(files):
+                sizes[f] = 0
+            total_bytes += sizes[f]
+
+        def process(f):
+            try:
+                d = get_photo_date(f)
+            except Exception:
+                d = 0
             try:
                 load_select_thumb(f)
             except Exception:
                 pass
-            done_bytes += sizes.get(f, 0)
-            frac = (i + 1) / total
-            text, detail = self._format_progress_stats(
-                i + 1, total, done_bytes, total_bytes, start, f.name)
-            GLib.idle_add(self._update_progress, frac, text, detail)
+            return f, d
 
+        date_cache = {}
+        start = time.monotonic()
+        done = 0
+        done_bytes = 0
+        # Modest parallelism: faster than serial without thrashing USB/FUSE.
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = {pool.submit(process, f): f for f in files}
+            for fut in as_completed(futures):
+                try:
+                    f, d = fut.result()
+                except Exception:
+                    f, d = futures[fut], 0
+                date_cache[f] = d
+                done += 1
+                done_bytes += sizes.get(f, 0)
+                frac = done / total
+                text, detail = self._format_progress_stats(
+                    done, total, done_bytes, total_bytes, start, f.name)
+                GLib.idle_add(self._update_progress, frac, text, detail)
+
+        files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
         GLib.idle_add(self._on_scan_done, files)
 
     def _begin_sort_progress(self, total):
@@ -1793,11 +1790,10 @@ class ImporterPage(Gtk.Box):
             remaining = (total - done) / fps
         else:
             remaining = 0
-        text = _("{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s").format(
-            done=done, total=total, fps=f"{fps:.1f}", mb=f"{mbps:.0f}")
-        detail = _("about {eta} remaining  ·  {name}").format(
-            eta=_format_eta(remaining), name=name)
-        return text, detail
+        text = _("{done} / {total}  ·  {fps}/s  ·  {mb} MB/s  ·  {eta} remaining").format(
+            done=done, total=total, fps=f"{fps:.1f}", mb=f"{mbps:.0f}",
+            eta=_format_eta(remaining))
+        return text, name
 
     def _on_import_done(self):
         unmount_iphone(MOUNT_POINT)

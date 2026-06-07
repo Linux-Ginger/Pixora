@@ -1581,3 +1581,6 @@ msgstr[1] ""
 
 msgid "🔌 iPhone disconnected"
 msgstr ""
+
+msgid "{done} / {total}  ·  {fps}/s  ·  {mb} MB/s  ·  {eta} remaining"
+msgstr ""

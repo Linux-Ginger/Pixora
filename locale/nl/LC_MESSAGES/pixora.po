@@ -2423,3 +2423,6 @@ msgstr[1] "%d bestanden worden gekopieerd en voorbereid."
 
 msgid "🔌 iPhone disconnected"
 msgstr "🔌 iPhone losgekoppeld"
+
+msgid "{done} / {total}  ·  {fps}/s  ·  {mb} MB/s  ·  {eta} remaining"
+msgstr "{done} / {total}  ·  {fps}/s  ·  {mb} MB/s  ·  nog {eta}"
