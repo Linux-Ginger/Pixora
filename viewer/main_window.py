@@ -166,6 +166,14 @@ from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gdk, Pango, GObject
 gi.require_foreign("cairo")
 import cairo
 
+# Register HEIC/HEIF support in PIL so the viewer can decode iPhone photos even
+# when the GdkPixbuf stack has no HEIC loader (otherwise full images show black).
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except Exception:
+    pass
+
 try:
     from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
@@ -757,6 +765,42 @@ def load_thumbnail(photo_path, thumb_size=None):
             return None
 
 
+def decode_pixbuf(path, max_dim):
+    """Load a scaled GdkPixbuf, decoding HEIC/HEIF via PIL when GdkPixbuf can't.
+
+    The GNOME stack often ships no HEIC loader, so GdkPixbuf returns a black or
+    empty image for iPhone photos even though PIL (with pillow_heif) decodes
+    them fine. HEIC/HEIF go straight to PIL; other formats use the fast
+    GdkPixbuf path with a PIL fallback.
+    """
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in (".heic", ".heif"):
+        try:
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, max_dim, max_dim, True)
+            if pb is not None:
+                return pb
+        except Exception:
+            pass
+    try:
+        from PIL import Image, ImageOps
+        with Image.open(path) as img:
+            img = ImageOps.exif_transpose(img)
+            has_alpha = img.mode in ("RGBA", "LA", "PA") or (
+                img.mode == "P" and "transparency" in img.info)
+            img = img.convert("RGBA" if has_alpha else "RGB")
+            img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+            w, h = img.size
+            channels = 4 if has_alpha else 3
+            data = GLib.Bytes.new(img.tobytes())
+            return GdkPixbuf.Pixbuf.new_from_bytes(
+                data, GdkPixbuf.Colorspace.RGB, has_alpha, 8, w, h, w * channels)
+    except Exception:
+        try:
+            return GdkPixbuf.Pixbuf.new_from_file_at_scale(path, max_dim, max_dim, True)
+        except Exception:
+            return None
+
+
 class _FixedSizePaintable(GObject.GObject, Gdk.Paintable):
     # GTK4 Picture sizes the HeaderBar to the paintable's intrinsic size; this
     # wraps a hi-res Texture but reports a smaller intrinsic for layout while
@@ -1317,9 +1361,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._filmstrip_order_cache = None   # (id(photos), len(photos), [sorted_indices])
         self._video_media           = None
         self._video_poll_id         = None
-        self._live_pairs            = {}     # still_path -> motion_path
-        self._live_media            = None   # MediaFile while a Live Photo plays
-        self._current_live_motion   = None   # motion path for the shown photo
         self._video_scrubbing_lock  = False
         self._video_seek_pending_id = None
         self._preview_cache         = OrderedDict()  # LRU: timestamp_s -> pixbuf | None
@@ -3017,24 +3058,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_display.set_visible(False)
         viewer_area.add_overlay(self.video_display)
 
-        # "LIVE" badge — shown only on Live Photos; click plays the motion half.
-        self.live_badge = Gtk.Button()
-        self.live_badge.add_css_class("osd")
-        self.live_badge.add_css_class("pill")
-        self.live_badge.set_halign(Gtk.Align.START)
-        self.live_badge.set_valign(Gtk.Align.START)
-        self.live_badge.set_margin_top(16)
-        self.live_badge.set_margin_start(16)
-        self.live_badge.set_visible(False)
-        self.live_badge.set_tooltip_text(_("Play Live Photo"))
-        _live_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        _live_dot = Gtk.Image.new_from_icon_name("media-record-symbolic")
-        _live_box.append(_live_dot)
-        _live_box.append(Gtk.Label(label=_("LIVE")))
-        self.live_badge.set_child(_live_box)
-        self.live_badge.connect("clicked", self._play_live_motion)
-        viewer_area.add_overlay(self.live_badge)
-
         self.viewer_close_btn = Gtk.Button(icon_name="window-close-symbolic")
         self.viewer_close_btn.add_css_class("osd")
         self.viewer_close_btn.add_css_class("circular")
@@ -3484,7 +3507,6 @@ class MainWindow(Adw.ApplicationWindow):
                 for file in files:
                     if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
                         photos.append(os.path.join(root, file))
-            self._live_pairs = live_photo_pairs(photos)
             photos = drop_live_motion(photos)
             GLib.idle_add(self._on_photos_scanned, photos, photo_path)
 
@@ -4081,8 +4103,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._viewer_pixbuf_cache.move_to_end(path)
         else:
             try:
-                max_dim = 2560
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, max_dim, max_dim, True)
+                pixbuf = decode_pixbuf(path, 2560)
             except Exception:
                 pixbuf = None
             if pixbuf is not None:
@@ -4122,13 +4143,9 @@ class MainWindow(Adw.ApplicationWindow):
             return False
 
         self._stop_video()
-        self._stop_live_motion()
         self._show_viewer_ui()   # reset fade state
         self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
-        # Show the LIVE badge when this photo has a paired motion clip.
-        self._current_live_motion = self._live_pairs.get(path)
-        self.live_badge.set_visible(bool(self._current_live_motion))
         # Put new pixbuf in inactive slot, then flip stack for slide.
         incoming_slot = "b" if self._active_viewer_slot == "a" else "a"
         incoming_pic = (self._viewer_pic_b if incoming_slot == "b"
@@ -4296,7 +4313,7 @@ class MainWindow(Adw.ApplicationWindow):
                 continue
             def _bg_load(path=p):
                 try:
-                    pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 2560, 2560, True)
+                    pb = decode_pixbuf(path, 2560)
                 except Exception:
                     return
                 if pb is None:
@@ -4320,8 +4337,6 @@ class MainWindow(Adw.ApplicationWindow):
     def close_viewer(self, btn=None):
         log_info(_("Viewer closed → back to grid"))
         self._stop_video()
-        self._stop_live_motion()
-        self.live_badge.set_visible(False)
         self._viewer_load_id += 1
         self.header.set_visible(True)
         self.bottom_stack.set_visible(True)
@@ -4396,8 +4411,7 @@ class MainWindow(Adw.ApplicationWindow):
                             min(FILM_THUMB, pb.get_height()),
                             GdkPixbuf.InterpType.BILINEAR)
                 else:
-                    pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-                        path, FILM_THUMB, FILM_THUMB, True)
+                    pb = decode_pixbuf(path, FILM_THUMB)
             except Exception:
                 pb = None
             return vp, pb
@@ -4551,9 +4565,6 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_video(self, path, location="", searching=False):
         self._stop_video()
-        self._stop_live_motion()
-        self.live_badge.set_visible(False)
-        self._current_live_motion = None
         self._preview_cache = OrderedDict()
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
@@ -4609,53 +4620,6 @@ class MainWindow(Adw.ApplicationWindow):
         if self._video_media:
             self._video_media.pause()
             self._video_media = None
-
-    def _play_live_motion(self, *_):
-        """Play the motion half of the current Live Photo once, over the still."""
-        motion = self._current_live_motion
-        if not motion or not os.path.exists(motion):
-            return
-        self._stop_video()
-        self._stop_live_motion()
-        try:
-            media = Gtk.MediaFile.new_for_filename(motion)
-        except Exception:
-            return
-        media.set_loop(False)
-        self._live_media = media
-        self.video_display.set_paintable(media)
-        self.video_display.set_visible(True)
-        # Hide the badge while playing; restore it when the clip ends.
-        self.live_badge.set_visible(False)
-        media.connect("notify::ended", self._on_live_motion_ended)
-        media.play()
-
-    def _on_live_motion_ended(self, media, _param):
-        if not media.get_ended():
-            return
-        if self._live_media is media:
-            self.video_display.set_visible(False)
-            self.video_display.set_paintable(None)
-            self._live_media = None
-            # Bring the badge back if we're still on a Live Photo.
-            if self._current_live_motion:
-                self.live_badge.set_visible(True)
-        try:
-            media.pause()
-        except Exception:
-            pass
-
-    def _stop_live_motion(self):
-        if self._live_media is not None:
-            try:
-                self._live_media.pause()
-            except Exception:
-                pass
-            self._live_media = None
-            try:
-                self.video_display.set_paintable(None)
-            except Exception:
-                pass
 
     def _start_video_poll(self):
         self._stop_video_poll()
@@ -4943,9 +4907,13 @@ class MainWindow(Adw.ApplicationWindow):
         oy = self._viewer_offset[1]
         if not hasattr(self, '_viewer_css_provider'):
             self._viewer_css_provider = Gtk.CssProvider()
-            self.photo_picture.get_style_context().add_provider(
-                self._viewer_css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
-            )
+            # Attach to BOTH slide slots — self.photo_picture flips between
+            # pic_a/pic_b on every nav, so a provider on just one slot leaves
+            # zoom dead on half the photos (transform hits the hidden widget).
+            for _pic in (self._viewer_pic_a, self._viewer_pic_b):
+                _pic.get_style_context().add_provider(
+                    self._viewer_css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
+                )
         self._viewer_css_provider.load_from_string(f"""
             picture {{
                 transform: scale({z}) translate({ox}px, {oy}px);

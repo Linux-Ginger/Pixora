@@ -2413,12 +2413,6 @@ msgstr "Sorteren en verwerken…"
 msgid "Reading photo order from the device…"
 msgstr "Fotovolgorde van het apparaat lezen…"
 
-msgid "LIVE"
-msgstr "LIVE"
-
-msgid "Play Live Photo"
-msgstr "Live Photo afspelen"
-
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 

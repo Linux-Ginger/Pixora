@@ -1571,12 +1571,6 @@ msgstr ""
 msgid "Reading photo order from the device…"
 msgstr ""
 
-msgid "LIVE"
-msgstr ""
-
-msgid "Play Live Photo"
-msgstr ""
-
 msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
 msgstr ""
 
