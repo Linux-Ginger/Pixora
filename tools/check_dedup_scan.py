@@ -17,10 +17,12 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "viewer"))
 
+import re
 from pathlib import Path
 import imagehash
 from importer_page import (
     load_settings, perceptual_hash, SUPPORTED_EXT, THRESHOLD_MAP, _VIDEO_EXT,
+    build_library_hashes,
 )
 
 sub = (sys.argv[1] if len(sys.argv) > 1 else "").lower()
@@ -72,3 +74,61 @@ if sub:
     elif len(hashed) < 2:
         print("\n    Fewer than 2 of these files have a hash -> can't be paired,"
               " so dedup can't flag them.")
+
+# ── Replicate EXACTLY what the app does: cached build_library_hashes + grouping
+print("\n" + "=" * 60)
+print("Replicating the app (cache-based hashes + grouping):")
+app_hashes = build_library_hashes(Path(photo_path))
+print(f"   build_library_hashes returned {len(app_hashes)} hashes")
+
+
+def base_name(p):
+    return re.sub(r"_\d+$", "", os.path.splitext(os.path.basename(p))[0]).lower()
+
+
+items = []
+for p, h in app_hashes.items():
+    try:
+        items.append((p, imagehash.hex_to_hash(h)))
+    except Exception:
+        pass
+
+# Show the app's hash for the matching files (vs the fresh hash above).
+if sub:
+    print(f"\n   App/cache hashes for '{sub}':")
+    found_in_app = False
+    for p, h in app_hashes.items():
+        if sub in os.path.basename(p).lower():
+            found_in_app = True
+            print(f"      {os.path.basename(p)}   app_hash={h}")
+    if not found_in_app:
+        print(f"      (none matching '{sub}' are in the app's hash index!)")
+
+used = set()
+groups = []
+for i in range(len(items)):
+    p1, h1 = items[i]
+    if p1 in used:
+        continue
+    group = [p1]
+    used.add(p1)
+    b1 = base_name(p1)
+    for j in range(i + 1, len(items)):
+        p2, h2 = items[j]
+        if p2 in used:
+            continue
+        d = h1 - h2
+        same_base = base_name(p2) == b1
+        if d <= threshold or (same_base and d <= threshold + 6):
+            group.append(p2)
+            used.add(p2)
+    if len(group) > 1:
+        groups.append(group)
+
+print(f"\n   Groups the app would show: {len(groups)}")
+for gi, g in enumerate(groups, 1):
+    mark = "  <-- contains your search" if sub and any(
+        sub in os.path.basename(p).lower() for p in g) else ""
+    print(f"   Group {gi}{mark}:")
+    for p in g:
+        print(f"        {os.path.basename(p)}")
