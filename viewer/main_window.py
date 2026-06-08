@@ -5212,12 +5212,49 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             self._favorites.add(path)
             log_info(_("Favorite added: {p}").format(p=path))
+            self._play_favorite_animation()
         self._schedule_save_favorites()
         self._update_favorite_btn()
         # Refresh thumb badge if visible.
         widget = self.thumb_widgets.get(self.current_index)
         if widget:
             self._refresh_thumb_favorite(self.current_index)
+
+    def _play_favorite_animation(self):
+        """Quick heart that pops up and fades out over the photo."""
+        area = getattr(self, "viewer_area", None)
+        if area is None:
+            return
+        heart = Gtk.Label(label="♥")
+        heart.set_halign(Gtk.Align.CENTER)
+        heart.set_valign(Gtk.Align.CENTER)
+        heart.set_can_target(False)  # never intercept clicks
+        css = Gtk.CssProvider()
+        heart.add_css_class("fav-burst")
+        heart.get_style_context().add_provider(
+            css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        area.add_overlay(heart)
+        state = {"i": 0}
+        frames = 16
+
+        def _step():
+            t = state["i"] / frames
+            if t >= 1.0:
+                try:
+                    area.remove_overlay(heart)
+                except Exception:
+                    pass
+                return False
+            scale = 0.6 + 1.3 * t          # 0.6 -> ~1.9
+            css.load_from_string(
+                ".fav-burst { color: #ff3b6b; font-size: 110px;"
+                " text-shadow: 0 2px 14px rgba(0,0,0,0.45);"
+                f" transform: scale({scale:.3f}); }}")
+            heart.set_opacity(max(0.0, 1.0 - t))
+            state["i"] += 1
+            return True
+
+        GLib.timeout_add(28, _step)
 
     def _refresh_thumb_favorite(self, index):
         entry = self.thumb_widgets.get(index)
@@ -7608,14 +7645,7 @@ class MainWindow(Adw.ApplicationWindow):
         for i in range(n):
             comps.setdefault(_find(i), []).append(items[i][0])
 
-        def _sortkey(p):
-            has_suffix = bool(_re.search(r"_\d+$",
-                                         os.path.splitext(os.path.basename(p))[0]))
-            try:
-                size = os.path.getsize(p)
-            except OSError:
-                size = 0
-            return (has_suffix, -size)
+        _sortkey = self._dup_rank  # keeper first: least copy-like name
 
         groups = []
         for members in comps.values():
@@ -7797,14 +7827,28 @@ class MainWindow(Adw.ApplicationWindow):
         self._dup_deselall_btn.set_sensitive(True)
         return False
 
-    def _dup_group_keeper(self, group):
-        """The 'main' photo is the one without a _<number> suffix."""
+    def _dup_rank(self, path):
+        """Lower = more likely the original. Copy markers (kopie/copy, a _N or
+        (N) suffix) push a name down; ties broken by larger size, then shorter
+        name. Used to pick the keeper and order each group."""
         import re as _re
-        for p in group:
-            stem = os.path.splitext(os.path.basename(p))[0]
-            if not _re.search(r"_\d+$", stem):
-                return p
-        return group[0]
+        stem = os.path.splitext(os.path.basename(path))[0].lower()
+        score = 0
+        if _re.search(r"_\d+$", stem):
+            score += 2                       # IMG_1234_1
+        if _re.search(r"\(\d+\)\s*$", stem):
+            score += 2                       # name (1)
+        if "kopie" in stem or "copy" in stem or "copia" in stem:
+            score += 3                       # file-manager copy
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            size = 0
+        return (score, -size, len(stem))
+
+    def _dup_group_keeper(self, group):
+        """The 'main' file is the least copy-like name (see _dup_rank)."""
+        return min(group, key=self._dup_rank)
 
     def _make_dup_group_card(self, group, title):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
