@@ -6306,6 +6306,19 @@ class MainWindow(Adw.ApplicationWindow):
         structure_group.set_description(
             _("Controls how Pixora saves imported photos in your library.")
         )
+
+        structure_info_row = Adw.ActionRow(
+            title=_("How it works"),
+            subtitle=_("When you import, Pixora files each photo by its capture date into the layout you pick below — so your library stays sorted automatically."),
+        )
+        structure_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
+        structure_info_row.set_activatable(False)
+        try:
+            structure_info_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        structure_group.add(structure_info_row)
+
         current_structure = self.settings.get("structure", "year_month")
 
         self.radio_flat = Gtk.CheckButton()
@@ -6431,6 +6444,18 @@ class MainWindow(Adw.ApplicationWindow):
               "— visually lossless, with the original date and location kept "
               "intact."))
 
+        convert_info_row = Adw.ActionRow(
+            title=_("How it works"),
+            subtitle=_("Each HEIC is decoded and re-saved as a JPEG at maximum quality and full color — visually lossless — keeping the date and location. The original HEIC is replaced by the JPEG."),
+        )
+        convert_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
+        convert_info_row.set_activatable(False)
+        try:
+            convert_info_row.set_subtitle_lines(4)
+        except Exception:
+            pass
+        convert_group.add(convert_info_row)
+
         self.settings_convert_switch = Gtk.Switch()
         self.settings_convert_switch.set_valign(Gtk.Align.CENTER)
         self.settings_convert_switch.set_active(
@@ -6438,8 +6463,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_convert_switch.connect(
             "notify::active", self.on_convert_switch_toggled)
         convert_row = Adw.ActionRow(
-            title=_("Convert HEIC to JPEG on import"),
-            subtitle=_("HEIC photos are converted on import so they open outside Pixora too."))
+            title=_("Convert HEIC to JPEG on import"))
         convert_row.add_prefix(Gtk.Image.new_from_icon_name("image-x-generic-symbolic"))
         convert_row.add_suffix(self._recommended_badge())
         convert_row.add_suffix(self.settings_convert_switch)
@@ -6451,8 +6475,7 @@ class MainWindow(Adw.ApplicationWindow):
         convert_group.add(convert_row)
 
         convert_now_row = Adw.ActionRow(
-            title=_("Convert existing library now"),
-            subtitle=_("Convert HEIC photos already in your library right now: each one becomes a visually-lossless JPEG, the original HEIC is replaced, and the date/location is kept. Runs in the background with a progress donut — you can keep using Pixora. Pixora also sweeps for leftover HEICs automatically."))
+            title=_("Convert existing library now"))
         convert_now_row.add_prefix(
             Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
         self._convert_lib_btn = Gtk.Button(label=_("Run now"))
@@ -6482,6 +6505,18 @@ class MainWindow(Adw.ApplicationWindow):
             backup_group.set_description(
                 _("Drive not connected — plug in the USB drive to back up.")
             )
+
+        backup_info_row = Adw.ActionRow(
+            title=_("How it works"),
+            subtitle=_("After each import Pixora copies your new photos to the USB drive, so you always have a second copy. Plug the drive in and it backs up in the background."),
+        )
+        backup_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
+        backup_info_row.set_activatable(False)
+        try:
+            backup_info_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        backup_group.add(backup_info_row)
 
         self.settings_backup_switch = Gtk.Switch()
         self.settings_backup_switch.set_valign(Gtk.Align.CENTER)
@@ -8291,7 +8326,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not active:
             dlg = Adw.AlertDialog(
                 heading=_("Turn off HEIC conversion?"),
-                body=_("New imports will be kept as the original HEIC files. HEIC saves space but can't be opened on Windows, the web, or many older programs. Photos already converted to JPEG are not changed back."))
+                body=_("New imports will be kept as the original HEIC files. HEIC opens fine in Pixora, but can't easily be opened outside it — many other apps and devices don't support it. Photos already converted to JPEG are not changed back."))
             dlg.add_response("keep", _("Keep on"))
             dlg.add_response("off", _("Turn off"))
             dlg.set_response_appearance("off", Adw.ResponseAppearance.DESTRUCTIVE)

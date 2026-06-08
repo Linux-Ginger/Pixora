@@ -2640,8 +2640,8 @@ msgstr "Wandle HEIC-Fotos, die bereits in deiner Bibliothek sind, jetzt sofort u
 msgid "Turn off HEIC conversion?"
 msgstr "HEIC-Umwandlung ausschalten?"
 
-msgid "New imports will be kept as the original HEIC files. HEIC saves space but can't be opened on Windows, the web, or many older programs. Photos already converted to JPEG are not changed back."
-msgstr "Neue Importe bleiben als originale HEIC-Dateien. HEIC spart Speicherplatz, kann aber unter Windows, im Web oder in vielen älteren Programmen nicht geöffnet werden. Bereits in JPEG umgewandelte Fotos werden nicht zurückgewandelt."
+msgid "New imports will be kept as the original HEIC files. HEIC opens fine in Pixora, but can't easily be opened outside it — many other apps and devices don't support it. Photos already converted to JPEG are not changed back."
+msgstr "Neue Importe bleiben als originale HEIC-Dateien. HEIC öffnet sich problemlos in Pixora, lässt sich aber außerhalb kaum öffnen — viele andere Apps und Geräte unterstützen es nicht. Bereits in JPEG umgewandelte Fotos werden nicht zurückgewandelt."
 
 msgid "Keep on"
 msgstr "Anlassen"
@@ -2672,3 +2672,12 @@ msgstr "Werksreset: Einstellungen gelöscht, Neustart…"
 
 msgid "Factory reset error: {err}"
 msgstr "Werksreset-Fehler: {err}"
+
+msgid "Each HEIC is decoded and re-saved as a JPEG at maximum quality and full color — visually lossless — keeping the date and location. The original HEIC is replaced by the JPEG."
+msgstr "Jedes HEIC wird dekodiert und als JPEG in maximaler Qualität und voller Farbe neu gespeichert — visuell verlustfrei — unter Beibehaltung von Datum und Ort. Die originale HEIC-Datei wird durch das JPEG ersetzt."
+
+msgid "When you import, Pixora files each photo by its capture date into the layout you pick below — so your library stays sorted automatically."
+msgstr "Beim Importieren legt Pixora jedes Foto nach Aufnahmedatum in das unten gewählte Layout — so bleibt deine Bibliothek automatisch sortiert."
+
+msgid "After each import Pixora copies your new photos to the USB drive, so you always have a second copy. Plug the drive in and it backs up in the background."
+msgstr "Nach jedem Import kopiert Pixora deine neuen Fotos auf den USB-Stick, damit du immer eine zweite Kopie hast. Stick anschließen und die Sicherung läuft im Hintergrund."
