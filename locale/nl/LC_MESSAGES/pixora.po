@@ -2540,3 +2540,52 @@ msgstr "HEIC-foto's worden bij import omgezet zodat ze ook buiten Pixora openen.
 msgid "Convert to"
 msgstr "Omzetten naar"
 
+
+msgid "Convert existing library now"
+msgstr "Bestaande bibliotheek nu omzetten"
+
+msgid "Find every HEIC photo already in your library and convert it to JPEG, replacing the originals. Runs in the background — you can keep using Pixora."
+msgstr "Vind elke HEIC-foto die al in je bibliotheek staat en zet 'm om naar JPEG, ter vervanging van de originelen. Draait op de achtergrond — je kunt Pixora gewoon blijven gebruiken."
+
+msgid "Run now"
+msgstr "Voer nu uit"
+
+msgid "Converting…"
+msgstr "Bezig met omzetten…"
+
+msgid "No HEIC photos found"
+msgstr "Geen HEIC-foto's gevonden"
+
+msgid "Your library has no HEIC photos left to convert."
+msgstr "Je bibliotheek heeft geen HEIC-foto's meer om om te zetten."
+
+msgid "Convert library to JPEG?"
+msgstr "Bibliotheek omzetten naar JPEG?"
+
+msgid "Convert %d HEIC photo to JPEG? The original HEIC file is replaced — this can't be undone."
+msgid_plural "Convert %d HEIC photos to JPEG? The original HEIC files are replaced — this can't be undone."
+msgstr[0] "%d HEIC-foto omzetten naar JPEG? Het originele HEIC-bestand wordt vervangen — dit kan niet ongedaan worden gemaakt."
+msgstr[1] "%d HEIC-foto's omzetten naar JPEG? De originele HEIC-bestanden worden vervangen — dit kan niet ongedaan worden gemaakt."
+
+msgid "Convert"
+msgstr "Omzetten"
+
+msgid "Converting HEIC to JPEG…"
+msgstr "HEIC naar JPEG omzetten…"
+
+msgid "Conversion complete"
+msgstr "Omzetten voltooid"
+
+msgid "Converted %(c)d of %(t)d photos. %(f)d could not be converted and were left as HEIC."
+msgstr "%(c)d van %(t)d foto's omgezet. %(f)d kon niet worden omgezet en bleef HEIC."
+
+msgid "Converted %d photo to JPEG."
+msgid_plural "Converted %d photos to JPEG."
+msgstr[0] "%d foto omgezet naar JPEG."
+msgstr[1] "%d foto's omgezet naar JPEG."
+
+msgid "HEIC library conversion started: {n} files"
+msgstr "HEIC-bibliotheekconversie gestart: {n} bestanden"
+
+msgid "HEIC library conversion done: {c} converted, {f} failed"
+msgstr "HEIC-bibliotheekconversie klaar: {c} omgezet, {f} mislukt"

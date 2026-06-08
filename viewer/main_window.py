@@ -1391,6 +1391,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_deduping  = False
         self._orphan_reviewing = False
         self._backup_scan_phase = 0.0
+        # HEIC→JPEG library conversion state (purple donut).
+        self._heic_converting = False
+        self._heic_fraction = 0.0
+        self._heic_detail = ""
+        self._heic_startup_done = False
         # Orphan state: files on USB not in Pixora. Warn after silent backup.
         self._last_scan_orphan_count = 0
         self._last_scan_orphan_rels = []
@@ -6437,6 +6442,22 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         convert_group.add(convert_row)
 
+        convert_now_row = Adw.ActionRow(
+            title=_("Convert existing library now"),
+            subtitle=_("Find every HEIC photo already in your library and convert it to JPEG, replacing the originals. Runs in the background — you can keep using Pixora."))
+        convert_now_row.add_prefix(
+            Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+        self._convert_lib_btn = Gtk.Button(label=_("Run now"))
+        self._convert_lib_btn.add_css_class("flat")
+        self._convert_lib_btn.set_valign(Gtk.Align.CENTER)
+        self._convert_lib_btn.connect("clicked", self._on_convert_library_clicked)
+        convert_now_row.add_suffix(self._convert_lib_btn)
+        try:
+            convert_now_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        convert_group.add(convert_now_row)
+
         import_box.append(convert_group)
 
         backup_group = Adw.PreferencesGroup()
@@ -8134,6 +8155,8 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         self._structure_startup_scanned = True
         self._periodic_scan()
+        # Sweep leftover HEICs a bit later so it doesn't fight the startup load.
+        GLib.timeout_add_seconds(8, self._maybe_auto_convert_library)
         return False
 
     def _trigger_structure_scan(self):
@@ -8239,6 +8262,173 @@ class MainWindow(Adw.ApplicationWindow):
         badge.get_style_context().add_provider(
             css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         return badge
+
+    # ── HEIC → JPEG library conversion ───────────────────────────────
+    def _collect_library_heics(self):
+        """Every .heic/.heif file currently in the photo library."""
+        from pathlib import Path as _P
+        photo_path = self.settings.get("photo_path") or os.path.join(
+            os.path.expanduser("~"), "Photos")
+        out = []
+        if not os.path.isdir(photo_path):
+            return out
+        for root, _dirs, fnames in os.walk(photo_path):
+            for fn in fnames:
+                if os.path.splitext(fn)[1].lower() in (".heic", ".heif"):
+                    out.append(_P(root) / fn)
+        return out
+
+    def _on_convert_library_clicked(self, btn):
+        if self._heic_converting:
+            return
+        files = self._collect_library_heics()
+        if not files:
+            dlg = Adw.AlertDialog(
+                heading=_("No HEIC photos found"),
+                body=_("Your library has no HEIC photos left to convert."))
+            dlg.add_response("ok", _("OK"))
+            dlg.set_default_response("ok")
+            dlg.set_close_response("ok")
+            self._present_dialog(dlg)
+            return
+        n = len(files)
+        dlg = Adw.AlertDialog(
+            heading=_("Convert library to JPEG?"),
+            body=ngettext(
+                "Convert %d HEIC photo to JPEG? The original HEIC file is replaced — this can't be undone.",
+                "Convert %d HEIC photos to JPEG? The original HEIC files are replaced — this can't be undone.",
+                n) % n)
+        dlg.add_response("cancel", _("Cancel"))
+        dlg.add_response("go", _("Convert"))
+        dlg.set_response_appearance("go", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("go")
+        dlg.set_close_response("cancel")
+        dlg.connect(
+            "response",
+            lambda d, r: self._start_library_conversion(files, silent=False)
+            if r == "go" else None)
+        self._present_dialog(dlg)
+
+    def _maybe_auto_convert_library(self):
+        """Startup sweep: if conversion is on, convert any leftover HEICs."""
+        if self._heic_startup_done or self._heic_converting:
+            return False
+        self._heic_startup_done = True
+        if not self.settings.get("convert_heic", False):
+            return False
+        threading.Thread(
+            target=self._auto_convert_scan_thread, daemon=True).start()
+        return False
+
+    def _auto_convert_scan_thread(self):
+        files = self._collect_library_heics()
+        if files:
+            GLib.idle_add(self._start_library_conversion, files, True)
+
+    def _start_library_conversion(self, files, silent=False):
+        if self._heic_converting or not files:
+            return False
+        self._heic_converting = True
+        self._heic_fraction = 0.0
+        self._heic_detail = ""
+        if hasattr(self, "_convert_lib_btn"):
+            self._convert_lib_btn.set_sensitive(False)
+            self._convert_lib_btn.set_label(_("Converting…"))
+        tip = _("Converting HEIC to JPEG…")
+        if hasattr(self, "_backup_donut_btn"):
+            self._set_donuts_visible(True)
+            self._backup_donut_btn.set_tooltip_text(tip)
+        if hasattr(self, "_viewer_donut_btn"):
+            self._viewer_donut_btn.set_tooltip_text(tip)
+        self._redraw_donuts()
+        log_info(_("HEIC library conversion started: {n} files").format(n=len(files)))
+        threading.Thread(
+            target=self._convert_library_thread,
+            args=(files, silent), daemon=True).start()
+        return False
+
+    def _set_heic_progress(self, done, total, name):
+        self._heic_fraction = (done / total) if total else 0.0
+        self._heic_detail = name or ""
+        if hasattr(self, "_backup_donut"):
+            self._redraw_donuts()
+        self._refresh_donut_popover()
+        return False
+
+    def _convert_library_thread(self, files, silent):
+        from importer_page import convert_image
+        total = len(files)
+        done = converted = failed = 0
+        for fp in files:
+            try:
+                ts = fp.stat().st_mtime
+            except OSError:
+                ts = None
+            dst = fp.with_suffix(".jpg")
+            # Don't clobber an existing JPEG that shares the stem.
+            if dst.exists():
+                stem, parent, n = dst.stem, dst.parent, 1
+                while dst.exists():
+                    dst = parent / ("%s_%d.jpg" % (stem, n))
+                    n += 1
+            ok = False
+            try:
+                ok = convert_image(fp, dst, "jpeg")
+            except Exception:
+                ok = False
+            if ok and dst.exists():
+                if ts is not None:
+                    try:
+                        os.utime(dst, (ts, ts))
+                    except OSError:
+                        pass
+                try:
+                    fp.unlink()  # replace the original, per user's choice
+                except OSError:
+                    pass
+                converted += 1
+            else:
+                try:
+                    if dst.exists():
+                        dst.unlink()
+                except OSError:
+                    pass
+                failed += 1
+            done += 1
+            GLib.idle_add(self._set_heic_progress, done, total, fp.name)
+        GLib.idle_add(self._finish_library_conversion, converted, failed, silent)
+
+    def _finish_library_conversion(self, converted, failed, silent):
+        self._heic_converting = False
+        self._heic_fraction = 0.0
+        self._heic_detail = ""
+        if hasattr(self, "_convert_lib_btn"):
+            self._convert_lib_btn.set_sensitive(True)
+            self._convert_lib_btn.set_label(_("Run now"))
+        if hasattr(self, "_backup_donut_btn"):
+            self._set_donuts_visible(self._backup_running)
+        self._redraw_donuts()
+        log_info(_("HEIC library conversion done: {c} converted, {f} failed").format(
+            c=converted, f=failed))
+        try:
+            self.reload_photos()
+        except Exception:
+            pass
+        if not silent and (converted + failed) > 0:
+            if failed:
+                body = _("Converted %(c)d of %(t)d photos. %(f)d could not be converted and were left as HEIC.") % {
+                    "c": converted, "t": converted + failed, "f": failed}
+            else:
+                body = ngettext(
+                    "Converted %d photo to JPEG.",
+                    "Converted %d photos to JPEG.",
+                    converted) % converted
+            dlg = Adw.AlertDialog(heading=_("Conversion complete"), body=body)
+            dlg.add_response("ok", _("OK"))
+            dlg.set_default_response("ok")
+            dlg.set_close_response("ok")
+            self._present_dialog(dlg)
+        return False
 
     def on_dup_switch_toggled(self, switch, _pspec):
         # On = strict (1), Off = 0.
@@ -9358,8 +9548,10 @@ class MainWindow(Adw.ApplicationWindow):
             cr.arc_negative(cx, cy, r_inner, 2 * math.pi, 0)
             cr.fill()
 
-            # Orange = backup-related; dark blue = structure/reorg.
-            if (self._backup_scanning or self._backup_running
+            # Purple = HEIC conversion; orange = backup; dark blue = structure.
+            if self._heic_converting:
+                color = (0.55, 0.20, 0.75)  # purple
+            elif (self._backup_scanning or self._backup_running
                     or self._orphan_reviewing):
                 color = (0.914, 0.329, 0.125)  # orange
             else:
@@ -9383,6 +9575,8 @@ class MainWindow(Adw.ApplicationWindow):
             # Progress: reorganize wins priority.
             if self._reorganize_moving:
                 frac = max(0.0, min(1.0, self._reorganize_fraction))
+            elif self._heic_converting:
+                frac = max(0.0, min(1.0, self._heic_fraction))
             else:
                 frac = max(0.0, min(1.0, self._backup_fraction))
             if frac > 0.001:
@@ -9448,6 +9642,10 @@ class MainWindow(Adw.ApplicationWindow):
             pct_val = int(max(0.0, min(1.0, self._reorganize_fraction)) * 100)
             pct = f"{pct_val}%"
             detail = self._reorganize_current_name or ""
+        elif self._heic_converting:
+            title = _("Converting HEIC to JPEG…")
+            pct = f"{int(max(0.0, min(1.0, self._heic_fraction)) * 100)}%"
+            detail = (self._heic_detail or "").strip()
         elif self._structure_scanning:
             title = _("Checking folder structure…")
             pct = ""

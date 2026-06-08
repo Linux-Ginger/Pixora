@@ -1698,3 +1698,52 @@ msgstr ""
 msgid "Convert to"
 msgstr ""
 
+
+msgid "Convert existing library now"
+msgstr ""
+
+msgid "Find every HEIC photo already in your library and convert it to JPEG, replacing the originals. Runs in the background — you can keep using Pixora."
+msgstr ""
+
+msgid "Run now"
+msgstr ""
+
+msgid "Converting…"
+msgstr ""
+
+msgid "No HEIC photos found"
+msgstr ""
+
+msgid "Your library has no HEIC photos left to convert."
+msgstr ""
+
+msgid "Convert library to JPEG?"
+msgstr ""
+
+msgid "Convert %d HEIC photo to JPEG? The original HEIC file is replaced — this can't be undone."
+msgid_plural "Convert %d HEIC photos to JPEG? The original HEIC files are replaced — this can't be undone."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Convert"
+msgstr ""
+
+msgid "Converting HEIC to JPEG…"
+msgstr ""
+
+msgid "Conversion complete"
+msgstr ""
+
+msgid "Converted %(c)d of %(t)d photos. %(f)d could not be converted and were left as HEIC."
+msgstr ""
+
+msgid "Converted %d photo to JPEG."
+msgid_plural "Converted %d photos to JPEG."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "HEIC library conversion started: {n} files"
+msgstr ""
+
+msgid "HEIC library conversion done: {c} converted, {f} failed"
+msgstr ""

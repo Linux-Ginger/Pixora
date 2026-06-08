@@ -2568,3 +2568,52 @@ msgstr "Les photos HEIC sont converties à l'import pour s'ouvrir aussi en dehor
 msgid "Convert to"
 msgstr "Convertir en"
 
+
+msgid "Convert existing library now"
+msgstr "Convertir la bibliothèque existante maintenant"
+
+msgid "Find every HEIC photo already in your library and convert it to JPEG, replacing the originals. Runs in the background — you can keep using Pixora."
+msgstr "Trouve chaque photo HEIC déjà dans votre bibliothèque et la convertit en JPEG, en remplaçant les originaux. S'exécute en arrière-plan — vous pouvez continuer à utiliser Pixora."
+
+msgid "Run now"
+msgstr "Exécuter maintenant"
+
+msgid "Converting…"
+msgstr "Conversion en cours…"
+
+msgid "No HEIC photos found"
+msgstr "Aucune photo HEIC trouvée"
+
+msgid "Your library has no HEIC photos left to convert."
+msgstr "Votre bibliothèque n'a plus de photos HEIC à convertir."
+
+msgid "Convert library to JPEG?"
+msgstr "Convertir la bibliothèque en JPEG ?"
+
+msgid "Convert %d HEIC photo to JPEG? The original HEIC file is replaced — this can't be undone."
+msgid_plural "Convert %d HEIC photos to JPEG? The original HEIC files are replaced — this can't be undone."
+msgstr[0] "Convertir %d photo HEIC en JPEG ? Le fichier HEIC original est remplacé — cette action est irréversible."
+msgstr[1] "Convertir %d photos HEIC en JPEG ? Les fichiers HEIC originaux sont remplacés — cette action est irréversible."
+
+msgid "Convert"
+msgstr "Convertir"
+
+msgid "Converting HEIC to JPEG…"
+msgstr "Conversion du HEIC en JPEG…"
+
+msgid "Conversion complete"
+msgstr "Conversion terminée"
+
+msgid "Converted %(c)d of %(t)d photos. %(f)d could not be converted and were left as HEIC."
+msgstr "%(c)d photos sur %(t)d converties. %(f)d n'ont pas pu être converties et sont restées en HEIC."
+
+msgid "Converted %d photo to JPEG."
+msgid_plural "Converted %d photos to JPEG."
+msgstr[0] "%d photo convertie en JPEG."
+msgstr[1] "%d photos converties en JPEG."
+
+msgid "HEIC library conversion started: {n} files"
+msgstr "Conversion de la bibliothèque HEIC démarrée : {n} fichiers"
+
+msgid "HEIC library conversion done: {c} converted, {f} failed"
+msgstr "Conversion de la bibliothèque HEIC terminée : {c} converties, {f} échouées"

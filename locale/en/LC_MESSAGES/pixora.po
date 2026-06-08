@@ -2522,3 +2522,52 @@ msgstr "HEIC photos are converted on import so they open outside Pixora too."
 msgid "Convert to"
 msgstr "Convert to"
 
+
+msgid "Convert existing library now"
+msgstr "Convert existing library now"
+
+msgid "Find every HEIC photo already in your library and convert it to JPEG, replacing the originals. Runs in the background — you can keep using Pixora."
+msgstr "Find every HEIC photo already in your library and convert it to JPEG, replacing the originals. Runs in the background — you can keep using Pixora."
+
+msgid "Run now"
+msgstr "Run now"
+
+msgid "Converting…"
+msgstr "Converting…"
+
+msgid "No HEIC photos found"
+msgstr "No HEIC photos found"
+
+msgid "Your library has no HEIC photos left to convert."
+msgstr "Your library has no HEIC photos left to convert."
+
+msgid "Convert library to JPEG?"
+msgstr "Convert library to JPEG?"
+
+msgid "Convert %d HEIC photo to JPEG? The original HEIC file is replaced — this can't be undone."
+msgid_plural "Convert %d HEIC photos to JPEG? The original HEIC files are replaced — this can't be undone."
+msgstr[0] "Convert %d HEIC photo to JPEG? The original HEIC file is replaced — this can't be undone."
+msgstr[1] "Convert %d HEIC photos to JPEG? The original HEIC files are replaced — this can't be undone."
+
+msgid "Convert"
+msgstr "Convert"
+
+msgid "Converting HEIC to JPEG…"
+msgstr "Converting HEIC to JPEG…"
+
+msgid "Conversion complete"
+msgstr "Conversion complete"
+
+msgid "Converted %(c)d of %(t)d photos. %(f)d could not be converted and were left as HEIC."
+msgstr "Converted %(c)d of %(t)d photos. %(f)d could not be converted and were left as HEIC."
+
+msgid "Converted %d photo to JPEG."
+msgid_plural "Converted %d photos to JPEG."
+msgstr[0] "Converted %d photo to JPEG."
+msgstr[1] "Converted %d photos to JPEG."
+
+msgid "HEIC library conversion started: {n} files"
+msgstr "HEIC library conversion started: {n} files"
+
+msgid "HEIC library conversion done: {c} converted, {f} failed"
+msgstr "HEIC library conversion done: {c} converted, {f} failed"
