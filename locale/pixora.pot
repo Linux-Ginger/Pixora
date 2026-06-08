@@ -1827,3 +1827,31 @@ msgstr ""
 
 msgid "After each import Pixora copies your new photos to the USB drive, so you always have a second copy. Plug the drive in and it backs up in the background."
 msgstr ""
+
+msgid "Review duplicates"
+msgstr ""
+
+msgid "Photo {n}"
+msgstr ""
+
+msgid "While tidying up, Pixora found photos that look like duplicates. Nothing has been deleted — pick which copies to remove. The original is always kept."
+msgstr ""
+
+msgid "Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above. Possible duplicates are shown for review — never deleted automatically. Pixora also does this in the background."
+msgstr ""
+
+msgid "Silent reorganize started: {m} moves, {d} possible duplicates"
+msgstr ""
+
+msgid "Reorganize: {m} moved, {d} possible duplicates to review, {e} errors"
+msgstr ""
+
+msgid "Found %d possible duplicate. The original (the one without a _number) is kept; checked copies are deleted."
+msgid_plural "Found %d possible duplicates. The original (the one without a _number) of each set is kept; checked copies are deleted."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "%d possible duplicate will be shown afterwards so you can review it — nothing is deleted automatically."
+msgid_plural "%d possible duplicates will be shown afterwards so you can review them — nothing is deleted automatically."
+msgstr[0] ""
+msgstr[1] ""

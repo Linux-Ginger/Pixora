@@ -2681,3 +2681,31 @@ msgstr "Beim Importieren legt Pixora jedes Foto nach Aufnahmedatum in das unten 
 
 msgid "After each import Pixora copies your new photos to the USB drive, so you always have a second copy. Plug the drive in and it backs up in the background."
 msgstr "Nach jedem Import kopiert Pixora deine neuen Fotos auf den USB-Stick, damit du immer eine zweite Kopie hast. Stick anschließen und die Sicherung läuft im Hintergrund."
+
+msgid "Review duplicates"
+msgstr "Duplikate überprüfen"
+
+msgid "Photo {n}"
+msgstr "Foto {n}"
+
+msgid "While tidying up, Pixora found photos that look like duplicates. Nothing has been deleted — pick which copies to remove. The original is always kept."
+msgstr "Beim Aufräumen hat Pixora Fotos gefunden, die wie Duplikate aussehen. Es wurde nichts gelöscht — wähle, welche Kopien entfernt werden sollen. Das Original bleibt immer erhalten."
+
+msgid "Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above. Possible duplicates are shown for review — never deleted automatically. Pixora also does this in the background."
+msgstr "Führe das Ordner-Aufräumen jetzt sofort aus: durchsucht deine Bibliothek und verschiebt Fotos in die oben gewählte Struktur. Mögliche Duplikate werden zur Überprüfung angezeigt — nie automatisch gelöscht. Pixora macht das auch im Hintergrund."
+
+msgid "Silent reorganize started: {m} moves, {d} possible duplicates"
+msgstr "Stille Reorganisation gestartet: {m} Verschiebungen, {d} mögliche Duplikate"
+
+msgid "Reorganize: {m} moved, {d} possible duplicates to review, {e} errors"
+msgstr "Reorganisation: {m} verschoben, {d} mögliche Duplikate zur Überprüfung, {e} Fehler"
+
+msgid "Found %d possible duplicate. The original (the one without a _number) is kept; checked copies are deleted."
+msgid_plural "Found %d possible duplicates. The original (the one without a _number) of each set is kept; checked copies are deleted."
+msgstr[0] "%d mögliches Duplikat gefunden. Das Original (das ohne _Nummer) bleibt erhalten; angehakte Kopien werden gelöscht."
+msgstr[1] "%d mögliche Duplikate gefunden. Das Original (das ohne _Nummer) jeder Gruppe bleibt erhalten; angehakte Kopien werden gelöscht."
+
+msgid "%d possible duplicate will be shown afterwards so you can review it — nothing is deleted automatically."
+msgid_plural "%d possible duplicates will be shown afterwards so you can review them — nothing is deleted automatically."
+msgstr[0] "%d mögliches Duplikat wird danach angezeigt, damit du es überprüfen kannst — es wird nichts automatisch gelöscht."
+msgstr[1] "%d mögliche Duplikate werden danach angezeigt, damit du sie überprüfen kannst — es wird nichts automatisch gelöscht."

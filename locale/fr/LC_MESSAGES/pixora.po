@@ -2697,3 +2697,31 @@ msgstr "Lors de l'import, Pixora classe chaque photo par date de prise de vue da
 
 msgid "After each import Pixora copies your new photos to the USB drive, so you always have a second copy. Plug the drive in and it backs up in the background."
 msgstr "Après chaque import, Pixora copie vos nouvelles photos sur la clé USB, pour que vous ayez toujours une deuxième copie. Branchez la clé et la sauvegarde se fait en arrière-plan."
+
+msgid "Review duplicates"
+msgstr "Vérifier les doublons"
+
+msgid "Photo {n}"
+msgstr "Photo {n}"
+
+msgid "While tidying up, Pixora found photos that look like duplicates. Nothing has been deleted — pick which copies to remove. The original is always kept."
+msgstr "Pendant le rangement, Pixora a trouvé des photos qui ressemblent à des doublons. Rien n'a été supprimé — choisissez les copies à retirer. L'original est toujours conservé."
+
+msgid "Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above. Possible duplicates are shown for review — never deleted automatically. Pixora also does this in the background."
+msgstr "Lancez le rangement des dossiers maintenant : analyse votre bibliothèque et déplace les photos dans la structure choisie ci-dessus. Les doublons possibles sont présentés pour vérification — jamais supprimés automatiquement. Pixora le fait aussi en arrière-plan."
+
+msgid "Silent reorganize started: {m} moves, {d} possible duplicates"
+msgstr "Réorganisation silencieuse démarrée : {m} déplacements, {d} doublons possibles"
+
+msgid "Reorganize: {m} moved, {d} possible duplicates to review, {e} errors"
+msgstr "Réorganisation : {m} déplacés, {d} doublons possibles à vérifier, {e} erreurs"
+
+msgid "Found %d possible duplicate. The original (the one without a _number) is kept; checked copies are deleted."
+msgid_plural "Found %d possible duplicates. The original (the one without a _number) of each set is kept; checked copies are deleted."
+msgstr[0] "%d doublon possible trouvé. L'original (celui sans _numéro) est conservé ; les copies cochées sont supprimées."
+msgstr[1] "%d doublons possibles trouvés. L'original (celui sans _numéro) de chaque ensemble est conservé ; les copies cochées sont supprimées."
+
+msgid "%d possible duplicate will be shown afterwards so you can review it — nothing is deleted automatically."
+msgid_plural "%d possible duplicates will be shown afterwards so you can review them — nothing is deleted automatically."
+msgstr[0] "%d doublon possible sera affiché ensuite pour que vous puissiez le vérifier — rien n'est supprimé automatiquement."
+msgstr[1] "%d doublons possibles seront affichés ensuite pour que vous puissiez les vérifier — rien n'est supprimé automatiquement."

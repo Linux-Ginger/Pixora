@@ -2669,3 +2669,31 @@ msgstr "Bij het importeren plaatst Pixora elke foto op opnamedatum in de indelin
 
 msgid "After each import Pixora copies your new photos to the USB drive, so you always have a second copy. Plug the drive in and it backs up in the background."
 msgstr "Na elke import kopieert Pixora je nieuwe foto's naar de USB-stick, zodat je altijd een tweede kopie hebt. Sluit de stick aan en het back-uppen gebeurt op de achtergrond."
+
+msgid "Review duplicates"
+msgstr "Duplicaten controleren"
+
+msgid "Photo {n}"
+msgstr "Foto {n}"
+
+msgid "While tidying up, Pixora found photos that look like duplicates. Nothing has been deleted — pick which copies to remove. The original is always kept."
+msgstr "Tijdens het opruimen vond Pixora foto's die op duplicaten lijken. Er is niets verwijderd — kies welke kopieën weg mogen. Het origineel blijft altijd behouden."
+
+msgid "Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above. Possible duplicates are shown for review — never deleted automatically. Pixora also does this in the background."
+msgstr "Voer de mapopruiming nu direct uit: scant je bibliotheek en verplaatst foto's naar de hierboven gekozen structuur. Mogelijke duplicaten worden ter controle getoond — nooit automatisch verwijderd. Pixora doet dit ook op de achtergrond."
+
+msgid "Silent reorganize started: {m} moves, {d} possible duplicates"
+msgstr "Stille reorganisatie gestart: {m} verplaatsingen, {d} mogelijke duplicaten"
+
+msgid "Reorganize: {m} moved, {d} possible duplicates to review, {e} errors"
+msgstr "Reorganisatie: {m} verplaatst, {d} mogelijke duplicaten ter controle, {e} fouten"
+
+msgid "Found %d possible duplicate. The original (the one without a _number) is kept; checked copies are deleted."
+msgid_plural "Found %d possible duplicates. The original (the one without a _number) of each set is kept; checked copies are deleted."
+msgstr[0] "%d mogelijke duplicaat gevonden. Het origineel (die zonder _nummer) blijft behouden; aangevinkte kopieën worden verwijderd."
+msgstr[1] "%d mogelijke duplicaten gevonden. Het origineel (die zonder _nummer) van elke set blijft behouden; aangevinkte kopieën worden verwijderd."
+
+msgid "%d possible duplicate will be shown afterwards so you can review it — nothing is deleted automatically."
+msgid_plural "%d possible duplicates will be shown afterwards so you can review them — nothing is deleted automatically."
+msgstr[0] "%d mogelijke duplicaat wordt daarna getoond zodat je het kunt controleren — er wordt niets automatisch verwijderd."
+msgstr[1] "%d mogelijke duplicaten worden daarna getoond zodat je ze kunt controleren — er wordt niets automatisch verwijderd."

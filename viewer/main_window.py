@@ -6367,12 +6367,10 @@ class MainWindow(Adw.ApplicationWindow):
         reorganize_btn = Gtk.Button(label=_("Tidy up"))
         reorganize_btn.add_css_class("flat")
         reorganize_btn.set_valign(Gtk.Align.CENTER)
-        reorganize_btn.connect(
-            "clicked", lambda b: self._prompt_reorganize(from_startup=False)
-        )
+        reorganize_btn.connect("clicked", lambda b: self._reorganize_now())
         reorganize_row = Adw.ActionRow(
             title=_("Reorganize folders now"),
-            subtitle=_("Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above, removing bit-identical duplicates. Pixora also does this automatically in the background."),
+            subtitle=_("Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above. Possible duplicates are shown for review — never deleted automatically. Pixora also does this in the background."),
         )
         reorganize_row.add_prefix(Gtk.Image.new_from_icon_name("view-refresh-symbolic"))
         reorganize_row.add_suffix(reorganize_btn)
@@ -7529,7 +7527,8 @@ class MainWindow(Adw.ApplicationWindow):
                             dst_st = dst.stat()
                             if dst_st.st_size == st.st_size \
                                     and int(dst_st.st_mtime) == int(st.st_mtime):
-                                dups.append(src)
+                                # Keeper = the file already filed correctly (dst).
+                                dups.append((dst, src))
                                 continue
                     except OSError:
                         pass
@@ -7611,19 +7610,19 @@ class MainWindow(Adw.ApplicationWindow):
                 groups.append(group)
         return groups
 
-    def _prompt_find_duplicates(self, btn=None):
+    def _open_dup_window(self, scanning=False):
+        """Build the duplicate-review window shell. Shared by the manual
+        cleanup and the background tidy-up — nothing is ever deleted without
+        the user picking copies here first."""
         win = Adw.Window()
-        win.set_title(_("Clean up duplicates"))
-        # Parent to the settings window when it's open, else the main window,
-        # so it appears in front instead of behind.
+        win.set_title(_("Review duplicates"))
         win.set_transient_for(self._settings_dialog or self)
         win.set_modal(True)
-        win.set_default_size(720, 640)
+        win.set_default_size(760, 680)
         self._dup_win = win
 
         tv = Adw.ToolbarView()
-        header = Adw.HeaderBar()
-        tv.add_top_bar(header)
+        tv.add_top_bar(Adw.HeaderBar())
 
         self._dup_win_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self._dup_win_box.set_margin_top(12)
@@ -7631,13 +7630,14 @@ class MainWindow(Adw.ApplicationWindow):
         self._dup_win_box.set_margin_start(16)
         self._dup_win_box.set_margin_end(16)
 
-        spinner = Gtk.Spinner()
-        spinner.start()
-        spinner.set_size_request(-1, 60)
-        lbl = Gtk.Label(label=_("Scanning your archive for duplicates…"))
-        lbl.add_css_class("dim-label")
-        self._dup_win_box.append(spinner)
-        self._dup_win_box.append(lbl)
+        if scanning:
+            sp = Gtk.Spinner()
+            sp.start()
+            sp.set_size_request(-1, 60)
+            lbl = Gtk.Label(label=_("Scanning your archive for duplicates…"))
+            lbl.add_css_class("dim-label")
+            self._dup_win_box.append(sp)
+            self._dup_win_box.append(lbl)
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
@@ -7646,9 +7646,17 @@ class MainWindow(Adw.ApplicationWindow):
         tv.set_content(scroll)
 
         bar = Gtk.ActionBar()
+        self._dup_selall_btn = Gtk.Button(label=_("Select all"))
+        self._dup_selall_btn.set_sensitive(False)
+        self._dup_selall_btn.connect("clicked", lambda b: self._dup_set_all(True))
+        self._dup_deselall_btn = Gtk.Button(label=_("Deselect all"))
+        self._dup_deselall_btn.set_sensitive(False)
+        self._dup_deselall_btn.connect("clicked", lambda b: self._dup_set_all(False))
+        bar.pack_start(self._dup_selall_btn)
+        bar.pack_start(self._dup_deselall_btn)
         cancel = Gtk.Button(label=_("Cancel"))
         cancel.connect("clicked", lambda b: win.close())
-        bar.pack_start(cancel)
+        bar.pack_end(cancel)
         self._dup_delete_btn = Gtk.Button(label=_("Delete selected"))
         self._dup_delete_btn.add_css_class("destructive-action")
         self._dup_delete_btn.set_sensitive(False)
@@ -7658,13 +7666,39 @@ class MainWindow(Adw.ApplicationWindow):
 
         win.set_content(tv)
         win.present()
+
+    def _prompt_find_duplicates(self, btn=None):
+        self._open_dup_window(scanning=True)
         threading.Thread(target=self._scan_dupes_bg, daemon=True).start()
 
     def _scan_dupes_bg(self):
         groups = self._find_archive_duplicates()
-        GLib.idle_add(self._populate_dup_win, groups)
+        GLib.idle_add(self._render_dup_groups, groups, None)
 
-    def _populate_dup_win(self, groups):
+    def _review_reorganize_dups(self, pairs):
+        """Open the review window for (keeper, duplicate) pairs found by tidy-up."""
+        if not pairs:
+            return False
+        by_keeper = {}
+        order = []
+        for keeper, dup in pairs:
+            k = str(keeper)
+            if k not in by_keeper:
+                by_keeper[k] = [str(keeper)]
+                order.append(k)
+            by_keeper[k].append(str(dup))
+        groups = [by_keeper[k] for k in order]
+        self._open_dup_window(scanning=False)
+        self._render_dup_groups(
+            groups,
+            _("While tidying up, Pixora found photos that look like duplicates. Nothing has been deleted — pick which copies to remove. The original is always kept."))
+        return False
+
+    def _dup_set_all(self, active):
+        for chk in getattr(self, "_dup_checks", {}).values():
+            chk.set_active(active)
+
+    def _render_dup_groups(self, groups, intro):
         if not getattr(self, "_dup_win", None):
             return False
         while child := self._dup_win_box.get_first_child():
@@ -7677,25 +7711,46 @@ class MainWindow(Adw.ApplicationWindow):
             empty.set_description(_("Your archive looks clean."))
             self._dup_win_box.append(empty)
             return False
-        total_dupes = sum(len(g) - 1 for g in groups)
         head = Gtk.Label()
         head.add_css_class("dim-label")
         head.set_xalign(0)
         head.set_wrap(True)
-        head.set_text(ngettext(
-            "Found %d duplicate to review. The original is kept; checked copies are deleted.",
-            "Found %d duplicates to review. The first of each group is kept; checked copies are deleted.",
-            total_dupes) % total_dupes)
+        if intro:
+            head.set_text(intro)
+        else:
+            total = sum(len(g) - 1 for g in groups)
+            head.set_text(ngettext(
+                "Found %d possible duplicate. The original (the one without a _number) is kept; checked copies are deleted.",
+                "Found %d possible duplicates. The original (the one without a _number) of each set is kept; checked copies are deleted.",
+                total) % total)
         self._dup_win_box.append(head)
-        for group in groups:
-            self._dup_win_box.append(self._make_dup_group_card(group))
+        for i, group in enumerate(groups, 1):
+            self._dup_win_box.append(self._make_dup_group_card(group, i))
         self._dup_delete_btn.set_sensitive(True)
+        self._dup_selall_btn.set_sensitive(True)
+        self._dup_deselall_btn.set_sensitive(True)
         return False
 
-    def _make_dup_group_card(self, group):
+    def _dup_group_keeper(self, group):
+        """The 'main' photo is the one without a _<number> suffix."""
+        import re as _re
+        for p in group:
+            stem = os.path.splitext(os.path.basename(p))[0]
+            if not _re.search(r"_\d+$", stem):
+                return p
+        return group[0]
+
+    def _make_dup_group_card(self, group, index):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         card.add_css_class("card")
-        card.set_margin_bottom(4)
+        card.set_margin_bottom(8)
+
+        header = Gtk.Label(label=_("Photo {n}").format(n=index))
+        header.add_css_class("heading")
+        header.set_xalign(0)
+        header.set_margin_top(10)
+        header.set_margin_start(12)
+        card.append(header)
 
         flow = Gtk.FlowBox()
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -7703,12 +7758,13 @@ class MainWindow(Adw.ApplicationWindow):
         flow.set_min_children_per_line(2)
         flow.set_column_spacing(8)
         flow.set_row_spacing(8)
-        flow.set_margin_top(10)
+        flow.set_margin_top(6)
         flow.set_margin_bottom(10)
         flow.set_margin_start(10)
         flow.set_margin_end(10)
 
-        for idx, path in enumerate(group):
+        keeper = self._dup_group_keeper(group)
+        for path in group:
             col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
             try:
                 pb = load_thumbnail(path)
@@ -7724,23 +7780,29 @@ class MainWindow(Adw.ApplicationWindow):
                 pic = Gtk.Image.new_from_icon_name("image-missing-symbolic")
                 pic.set_pixel_size(48)
                 pic.set_size_request(150, 150)
-            col.append(pic)
-
-            if idx == 0:
+            if path == keeper:
+                col.append(pic)
                 tag = Gtk.Label(label=_("✅ Keep (original)"))
                 tag.add_css_class("caption")
                 col.append(tag)
             else:
-                chk = Gtk.CheckButton(label=_("Delete"))
-                chk.set_active(True)  # non-keepers default to delete
+                # Tick to pick — same feel as choosing photos during import.
+                # Checked = delete.
+                overlay = Gtk.Overlay()
+                overlay.set_child(pic)
+                chk = Gtk.CheckButton()
+                chk.set_active(True)
+                chk.set_halign(Gtk.Align.START)
+                chk.set_valign(Gtk.Align.START)
+                chk.set_margin_top(6)
+                chk.set_margin_start(6)
                 self._dup_checks[path] = chk
-                col.append(chk)
-            name = Gtk.Label(label=os.path.basename(path))
-            name.add_css_class("caption")
-            name.add_css_class("dim-label")
-            name.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
-            name.set_max_width_chars(18)
-            col.append(name)
+                overlay.add_overlay(chk)
+                col.append(overlay)
+                tag = Gtk.Label(label=_("Delete"))
+                tag.add_css_class("caption")
+                tag.add_css_class("dim-label")
+                col.append(tag)
             flow.append(col)
 
         card.append(flow)
@@ -7773,6 +7835,12 @@ class MainWindow(Adw.ApplicationWindow):
             self._dup_win = None
         self.reload_photos()
 
+    def _reorganize_now(self):
+        """Dev 'run now' button: tidy up without a confirmation popup (moves run
+        silently; duplicates still always go through the review window)."""
+        self._reorganize_from_button = True
+        self._prompt_reorganize(from_startup=False)
+
     def _prompt_reorganize(self, from_startup=False):
         """Confirm dialog with counts. Silent if from_startup + nothing to do."""
         self._reorganize_active = True
@@ -7794,10 +7862,19 @@ class MainWindow(Adw.ApplicationWindow):
                 dlg.set_close_response("ok")
                 self._present_dialog(dlg)
             return False
-        # Silent mode: no popup/fullscreen. Applies to auto + manual click.
-        if self.settings.get("reorganize_silent", False):
+        # Duplicates are NEVER auto-deleted — always reviewed. Moves may be
+        # silent (auto-confirm or a dev "run now" click); duplicates skip to
+        # the review window regardless.
+        from_button = getattr(self, "_reorganize_from_button", False)
+        self._reorganize_from_button = False
+        silent_moves = self.settings.get("reorganize_silent", False) or from_button
+        if not moves:
+            self._reorganize_active = False
+            self._review_reorganize_dups(dups)
+            return False
+        if silent_moves:
             self._reorganize_silent_run = True
-            log_info(_("Silent reorganize started: {m} moves, {d} dups").format(
+            log_info(_("Silent reorganize started: {m} moves, {d} possible duplicates").format(
                 m=len(moves), d=len(dups)))
             threading.Thread(
                 target=self._do_reorganize, args=(moves, dups),
@@ -7819,9 +7896,10 @@ class MainWindow(Adw.ApplicationWindow):
             body_lines.append(_("{c} will be moved to the right folder.").format(
                 c=self._format_media_counts(ph, vi)))
         if dups:
-            ph, vi = self._count_media(dups)
-            body_lines.append(_("{c} are exact duplicates and will be removed.").format(
-                c=self._format_media_counts(ph, vi)))
+            body_lines.append(ngettext(
+                "%d possible duplicate will be shown afterwards so you can review it — nothing is deleted automatically.",
+                "%d possible duplicates will be shown afterwards so you can review them — nothing is deleted automatically.",
+                len(dups)) % len(dups))
         dlg = Adw.AlertDialog(
             heading=_("Reorganize folder structure?"),
             body="\n".join(body_lines),
@@ -7909,7 +7987,7 @@ class MainWindow(Adw.ApplicationWindow):
                 sz = 0
             sizes_moves.append(sz)
             total_bytes += sz
-        for dup in dups:
+        for _keeper, dup in dups:
             try:
                 sz = dup.stat().st_size
             except OSError:
@@ -7926,8 +8004,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._reorganize_current_name = ""
         tot_ph = sum(1 for s, _d in moves if not is_video(str(s)))
         tot_vi = sum(1 for s, _d in moves if is_video(str(s)))
-        tot_ph += sum(1 for d in dups if not is_video(str(d)))
-        tot_vi += sum(1 for d in dups if is_video(str(d)))
+        tot_ph += sum(1 for _k, d in dups if not is_video(str(d)))
+        tot_vi += sum(1 for _k, d in dups if is_video(str(d)))
         self._reorganize_total_label = self._format_media_counts(tot_ph, tot_vi)
         # Silent mode: donut only, no fullscreen.
         if self._reorganize_silent_run:
@@ -7962,21 +8040,10 @@ class MainWindow(Adw.ApplicationWindow):
             self._reorganize_done_count = done
             self._reorganize_done_bytes += sz
             self._reorganize_fraction = done / total
-        for dup, sz in zip(dups, sizes_dups):
+        # Duplicates are NOT deleted here anymore — they're handed to the review
+        # window so the user decides. We only advance the progress bar past them.
+        for (_keeper, dup), sz in zip(dups, sizes_dups):
             self._reorganize_current_name = dup.name
-            is_vid = is_video(str(dup))
-            try:
-                dup.unlink()
-                removed += 1
-                if is_vid:
-                    removed_videos += 1
-                else:
-                    removed_photos += 1
-            except OSError as e:
-                errors.append(f"{dup.name}: {e}")
-                if not first_err_logged:
-                    log_info(f"Reorganize unlink failed: {dup}: {e}")
-                    first_err_logged = True
             done += 1
             self._reorganize_done_count = done
             self._reorganize_done_bytes += sz
@@ -7990,14 +8057,17 @@ class MainWindow(Adw.ApplicationWindow):
                     os.rmdir(root)
             except OSError:
                 pass
-        log_info(_("Reorganize: {m} moved, {r} duplicates removed, {e} errors").format(
-            m=moved, r=removed, e=len(errors),
+        log_info(_("Reorganize: {m} moved, {d} possible duplicates to review, {e} errors").format(
+            m=moved, d=len(dups), e=len(errors),
         ))
         GLib.idle_add(
             self._reorganize_done,
             moved, removed, errors,
             moved_photos, moved_videos, removed_photos, removed_videos,
         )
+        # Hand any possible duplicates to the review window (never auto-deleted).
+        if dups:
+            GLib.idle_add(self._review_reorganize_dups, dups)
 
     def _reorganize_done(self, moved, removed, errors,
                          moved_photos=0, moved_videos=0,
@@ -8402,35 +8472,16 @@ class MainWindow(Adw.ApplicationWindow):
         return out
 
     def _on_convert_library_clicked(self, btn):
+        # No confirmation popup (same feel as the update button): just start,
+        # with the donut showing progress. Scan off-thread to keep the UI snappy.
         if self._heic_converting:
             return
-        files = self._collect_library_heics()
-        if not files:
-            dlg = Adw.AlertDialog(
-                heading=_("No HEIC photos found"),
-                body=_("Your library has no HEIC photos left to convert."))
-            dlg.add_response("ok", _("OK"))
-            dlg.set_default_response("ok")
-            dlg.set_close_response("ok")
-            self._present_dialog(dlg)
-            return
-        n = len(files)
-        dlg = Adw.AlertDialog(
-            heading=_("Convert library to JPEG?"),
-            body=ngettext(
-                "Convert %d HEIC photo to JPEG? The original HEIC file is replaced — this can't be undone.",
-                "Convert %d HEIC photos to JPEG? The original HEIC files are replaced — this can't be undone.",
-                n) % n)
-        dlg.add_response("cancel", _("Cancel"))
-        dlg.add_response("go", _("Convert"))
-        dlg.set_response_appearance("go", Adw.ResponseAppearance.SUGGESTED)
-        dlg.set_default_response("go")
-        dlg.set_close_response("cancel")
-        dlg.connect(
-            "response",
-            lambda d, r: self._start_library_conversion(files, silent=False)
-            if r == "go" else None)
-        self._present_dialog(dlg)
+        self._heic_sweep_dismissed = False
+
+        def _scan():
+            files = self._collect_library_heics()
+            GLib.idle_add(self._start_library_conversion, files, True)
+        threading.Thread(target=_scan, daemon=True).start()
 
     def _maybe_run_heic_sweep(self):
         """Periodic/startup sweep: convert leftover library HEICs. Defers while
@@ -9060,7 +9111,9 @@ class MainWindow(Adw.ApplicationWindow):
         # Defer donut visibility — else it flickers between scan-end and backup-start.
         manual_requested = self._manual_scan_requested
         self._manual_scan_requested = False
-        silent = bool(self.settings.get("backup_silent"))
+        # The dev "Check now" button runs update-style: no confirmation dialog,
+        # just back up if there's work to do.
+        silent = bool(self.settings.get("backup_silent")) or manual_requested
         if result is None:
             log_warn(_("Backup scan did not complete"))
             if hasattr(self, "_backup_donut_btn"):
