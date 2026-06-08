@@ -2537,17 +2537,20 @@ msgstr[1] "%d Duplikate gefunden. Das erste jeder Gruppe bleibt erhalten; markie
 msgid "Convert HEIC photos"
 msgstr "HEIC-Fotos umwandeln"
 
-msgid "HEIC is the photo format Apple uses on the iPhone. It saves space, but almost nothing outside Apple devices can open it. Convert to JPEG or PNG to view your photos anywhere — Windows, the web, older programs.\n\nJPEG is recommended: just as widely supported as PNG, but much smaller and it keeps the date and location info. PNG is lossless but makes photos 3–5× larger and drops that info."
-msgstr "HEIC ist das Fotoformat, das Apple auf dem iPhone verwendet. Es spart Speicherplatz, aber außerhalb von Apple-Geräten kann es kaum etwas öffnen. Konvertiere in JPEG oder PNG, um deine Fotos überall anzusehen — Windows, das Web, ältere Programme.\n\nJPEG wird empfohlen: genauso weit unterstützt wie PNG, aber deutlich kleiner und es behält Datum- und Ortsangaben. PNG ist verlustfrei, macht Fotos aber 3–5× größer und verliert diese Angaben."
+msgid "HEIC is the photo format Apple uses on the iPhone. It saves space, but almost nothing outside Apple devices can open it. When this is on, Pixora converts imported HEIC photos to JPEG so you can open them anywhere — Windows, the web, older programs — while keeping the date and location info."
+msgstr "HEIC ist das Fotoformat, das Apple auf dem iPhone verwendet. Es spart Speicherplatz, aber außerhalb von Apple-Geräten kann es kaum etwas öffnen. Wenn dies aktiviert ist, konvertiert Pixora importierte HEIC-Fotos in JPEG, damit du sie überall öffnen kannst — Windows, das Web, ältere Programme — und behält dabei Datum- und Ortsangaben."
 
-msgid "Recommended: small files, opens everywhere, keeps date/location."
-msgstr "Empfohlen: kleine Dateien, überall zu öffnen, behält Datum/Ort."
+msgid "Convert HEIC to JPEG on import"
+msgstr "HEIC beim Import in JPEG umwandeln"
 
-msgid "Lossless, but larger files and the date/location info is lost."
-msgstr "Verlustfrei, aber größere Dateien und Datum/Ort gehen verloren."
+msgid "Automatic (Recommended)"
+msgstr "Automatisch (Empfohlen)"
 
-msgid "Convert HEIC on import"
-msgstr "HEIC beim Import umwandeln"
+msgid "By year and month (Recommended)"
+msgstr "Pro Jahr und Monat (Empfohlen)"
+
+msgid "Duplicate detection (Recommended)"
+msgstr "Duplikat-Erkennung (Empfohlen)"
 
 msgid "HEIC photos are converted on import so they open outside Pixora too."
 msgstr "HEIC-Fotos werden beim Import umgewandelt, damit sie auch außerhalb von Pixora öffnen."

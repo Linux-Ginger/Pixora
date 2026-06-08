@@ -6193,7 +6193,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Renderer dropdown applies via GSK_RENDERER — requires restart (sentinel).
         self._gsk_codes  = ["auto", "gl", "cairo"]
-        self._gsk_labels = [_("Automatic"), _("GPU (GL)"), _("Software (Cairo)")]
+        self._gsk_labels = [_("Automatic (Recommended)"), _("GPU (GL)"), _("Software (Cairo)")]
         gsk_model = Gtk.StringList()
         for lbl in self._gsk_labels:
             gsk_model.append(lbl)
@@ -6305,7 +6305,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_month.set_active(current_structure == "year_month")
         self.radio_month.connect("toggled", lambda b: self.on_structure_changed("year_month", b))
         month_row = Adw.ActionRow(
-            title=_("By year and month"),
+            title=_("By year and month (Recommended)"),
             subtitle=_("Year folder with month subfolders — e.g. 2024/2024-03/."),
         )
         month_row.add_prefix(Gtk.Image.new_from_icon_name("view-list-symbolic"))
@@ -6390,7 +6390,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dup_switch.set_valign(Gtk.Align.CENTER)
         self.settings_dup_switch.set_active(dup_on)
         self.settings_dup_switch.connect("notify::active", self.on_dup_switch_toggled)
-        dup_row = Adw.ActionRow(title=_("Duplicate detection"))
+        dup_row = Adw.ActionRow(title=_("Duplicate detection (Recommended)"))
         dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
         dup_row.add_suffix(self.settings_dup_switch)
         dup_row.set_activatable_widget(self.settings_dup_switch)
@@ -6403,11 +6403,9 @@ class MainWindow(Adw.ApplicationWindow):
         convert_group.set_description(
             _("HEIC is the photo format Apple uses on the iPhone. It saves "
               "space, but almost nothing outside Apple devices can open it. "
-              "Convert to JPEG or PNG to view your photos anywhere — Windows, "
-              "the web, older programs.\n\n"
-              "JPEG is recommended: just as widely supported as PNG, but much "
-              "smaller and it keeps the date and location info. PNG is "
-              "lossless but makes photos 3–5× larger and drops that info."))
+              "When this is on, Pixora converts imported HEIC photos to JPEG "
+              "so you can open them anywhere — Windows, the web, older "
+              "programs — while keeping the date and location info."))
 
         self.settings_convert_switch = Gtk.Switch()
         self.settings_convert_switch.set_valign(Gtk.Align.CENTER)
@@ -6416,7 +6414,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_convert_switch.connect(
             "notify::active", self.on_convert_switch_toggled)
         convert_row = Adw.ActionRow(
-            title=_("Convert HEIC on import"),
+            title=_("Convert HEIC to JPEG on import"),
             subtitle=_("HEIC photos are converted on import so they open outside Pixora too."))
         convert_row.add_prefix(Gtk.Image.new_from_icon_name("image-x-generic-symbolic"))
         convert_row.add_suffix(self.settings_convert_switch)
@@ -6426,23 +6424,6 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         convert_group.add(convert_row)
-
-        self.settings_convert_combo = Adw.ComboRow()
-        self.settings_convert_combo.set_title(_("Convert to"))
-        self.settings_convert_combo.set_model(
-            Gtk.StringList.new(["JPEG (.jpg)", "PNG (.png)"]))
-        self.settings_convert_combo.set_selected(
-            1 if self.settings.get("convert_format", "jpeg") == "png" else 0)
-        self._update_convert_combo_subtitle()
-        try:
-            self.settings_convert_combo.set_subtitle_lines(2)
-        except Exception:
-            pass
-        self.settings_convert_combo.set_sensitive(
-            self.settings.get("convert_heic", False))
-        self.settings_convert_combo.connect(
-            "notify::selected", self.on_convert_format_changed)
-        convert_group.add(self.settings_convert_combo)
 
         import_box.append(convert_group)
 
@@ -8222,24 +8203,9 @@ class MainWindow(Adw.ApplicationWindow):
     def on_convert_switch_toggled(self, switch, _pspec):
         active = switch.get_active()
         self.settings["convert_heic"] = active
-        if hasattr(self, "settings_convert_combo"):
-            self.settings_convert_combo.set_sensitive(active)
+        # PNG was dropped: conversion is always JPEG now.
+        self.settings["convert_format"] = "jpeg"
         save_settings(self.settings)
-
-    def on_convert_format_changed(self, combo, _pspec):
-        self.settings["convert_format"] = "png" if combo.get_selected() == 1 else "jpeg"
-        self._update_convert_combo_subtitle()
-        save_settings(self.settings)
-
-    def _update_convert_combo_subtitle(self):
-        if not hasattr(self, "settings_convert_combo"):
-            return
-        if self.settings_convert_combo.get_selected() == 1:
-            self.settings_convert_combo.set_subtitle(
-                _("Lossless, but larger files and the date/location info is lost."))
-        else:
-            self.settings_convert_combo.set_subtitle(
-                _("Recommended: small files, opens everywhere, keeps date/location."))
 
     def on_dup_switch_toggled(self, switch, _pspec):
         # On = strict (1), Off = 0.

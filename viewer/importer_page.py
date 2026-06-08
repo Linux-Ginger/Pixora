@@ -2361,9 +2361,7 @@ class ImporterPage(Gtk.Box):
                 # Optionally convert HEIC to a universally-viewable format.
                 convert = (self.settings.get("convert_heic", False)
                            and copy_src.suffix.lower() in (".heic", ".heif"))
-                conv_fmt = self.settings.get("convert_format", "jpeg")
-                out_ext = (("." + ("png" if conv_fmt == "png" else "jpg"))
-                           if convert else copy_src.suffix)
+                out_ext = ".jpg" if convert else copy_src.suffix
                 # CPLAssets masters are GUID-named; give them a readable,
                 # date-based name instead of a meaningless UUID in the archive.
                 if "CPLAssets" in src.parts:
@@ -2387,7 +2385,7 @@ class ImporterPage(Gtk.Box):
                     tmp = dst.parent / (dst.stem + "_src" + copy_src.suffix)
                     try:
                         shutil.copy2(copy_src, tmp)
-                        if convert_image(tmp, dst, conv_fmt):
+                        if convert_image(tmp, dst, "jpeg"):
                             try:
                                 os.utime(dst, (ts, ts))
                             except OSError:

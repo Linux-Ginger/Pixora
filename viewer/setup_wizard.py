@@ -393,7 +393,7 @@ class SetupWizard(Adw.Window):
         self.radio_month.connect("toggled",
             lambda b: self._on_structure_radio("year_month", b))
         month_row = Adw.ActionRow(
-            title=_("By year and month"),
+            title=_("By year and month (Recommended)"),
             subtitle=_("Year folder with month subfolders — e.g. 2024/2024-03/."),
         )
         month_row.add_prefix(Gtk.Image.new_from_icon_name("view-list-symbolic"))
@@ -602,7 +602,7 @@ class SetupWizard(Adw.Window):
         self.dup_switch.set_valign(Gtk.Align.CENTER)
         self.dup_switch.set_active(True)
         dup_row = Adw.ActionRow(
-            title=_("Duplicate detection"),
+            title=_("Duplicate detection (Recommended)"),
             subtitle=_("Strict check for near-identical photos"),
         )
         dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
