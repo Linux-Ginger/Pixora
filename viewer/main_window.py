@@ -5140,6 +5140,12 @@ class MainWindow(Adw.ApplicationWindow):
         z  = self._viewer_zoom
         ox = self._viewer_offset[0]
         oy = self._viewer_offset[1]
+        # Skip the CSS reparse when nothing actually moved (e.g. dragging past a
+        # clamp edge) — saves redundant work while panning.
+        applied = (round(z, 4), round(ox, 2), round(oy, 2))
+        if getattr(self, "_last_applied_transform", None) == applied:
+            return False
+        self._last_applied_transform = applied
         if not hasattr(self, '_viewer_css_provider'):
             self._viewer_css_provider = Gtk.CssProvider()
             # Attach to BOTH slide slots — self.photo_picture flips between
@@ -5165,10 +5171,25 @@ class MainWindow(Adw.ApplicationWindow):
     def on_viewer_scroll(self, ctrl, dx, dy):
         if self.main_stack.get_visible_child_name() != "viewer":
             return False
+        old_z = self._viewer_zoom
         factor = 0.9 if dy > 0 else 1.1
-        self._viewer_zoom = max(1.0, min(8.0, self._viewer_zoom * factor))
-        if self._viewer_zoom == 1.0:
+        new_z = max(1.0, min(8.0, old_z * factor))
+        if new_z == old_z:
+            return True
+        if new_z == 1.0:
             self._viewer_offset = [0.0, 0.0]
+        else:
+            # Zoom toward the cursor (like the map): keep the content point
+            # under the pointer fixed. screen = z·(point + offset), so
+            # offset' = offset + cursor_from_centre · (1/z' − 1/z).
+            ptr = getattr(self, "_last_viewer_mouse", None)
+            W = self.viewer_area.get_width()
+            H = self.viewer_area.get_height()
+            if ptr and W > 0 and H > 0:
+                d = (1.0 / new_z) - (1.0 / old_z)
+                self._viewer_offset[0] += (ptr[0] - W / 2.0) * d
+                self._viewer_offset[1] += (ptr[1] - H / 2.0) * d
+        self._viewer_zoom = new_z
         self._apply_viewer_transform()
         return True
 
@@ -5181,7 +5202,9 @@ class MainWindow(Adw.ApplicationWindow):
             _, _, ox, oy = self._viewer_drag
             self._viewer_offset[0] = ox + dx / self._viewer_zoom
             self._viewer_offset[1] = oy + dy / self._viewer_zoom
-            self._apply_viewer_transform()
+            # Apply straight away (no idle_add hop) so panning tracks the cursor
+            # without a frame of lag.
+            self._do_apply_viewer_transform()
 
     def on_viewer_drag_end(self, gesture, dx, dy):
         self._viewer_drag = None
