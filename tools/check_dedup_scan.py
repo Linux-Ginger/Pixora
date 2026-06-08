@@ -132,6 +132,45 @@ for i in range(n):
     comps.setdefault(_find(i), []).append(items[i][0])
 groups = [g for g in comps.values() if len(g) > 1]
 
+# Exact-duplicate pass (videos + any unhashed file), via content signature.
+import hashlib
+
+
+def _content_sig(p):
+    try:
+        size = os.path.getsize(p)
+    except OSError:
+        return None
+    h = hashlib.sha1()
+    h.update(str(size).encode())
+    chunk = 2 * 1024 * 1024
+    try:
+        with open(p, "rb") as f:
+            h.update(f.read(chunk))
+            if size > 2 * chunk:
+                f.seek(-chunk, os.SEEK_END)
+                h.update(f.read(chunk))
+    except OSError:
+        return None
+    return h.hexdigest()
+
+
+hashed = set(app_hashes.keys())
+sigs = {}
+for root, _dirs, fns in os.walk(photo_path):
+    for fn in fns:
+        if Path(fn).suffix.lower() not in SUPPORTED_EXT:
+            continue
+        p = str(Path(root) / fn)
+        if p in hashed:
+            continue
+        sg = _content_sig(p)
+        if sg:
+            sigs.setdefault(sg, []).append(p)
+for members in sigs.values():
+    if len(members) > 1:
+        groups.append(members)
+
 print(f"\n   Groups the app would show: {len(groups)}")
 for gi, g in enumerate(groups, 1):
     mark = "  <-- contains your search" if sub and any(

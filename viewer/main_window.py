@@ -7558,7 +7558,8 @@ class MainWindow(Adw.ApplicationWindow):
         """Group near-identical archive photos. Perceptual hash leads; a shared
         base name (IMG_1234 vs IMG_1234_1) loosens the match as confirmation."""
         try:
-            from importer_page import build_library_hashes, THRESHOLD_MAP, HAS_IMAGEHASH
+            from importer_page import (
+                build_library_hashes, THRESHOLD_MAP, HAS_IMAGEHASH, SUPPORTED_EXT)
             import imagehash
         except Exception:
             return []
@@ -7621,7 +7622,51 @@ class MainWindow(Adw.ApplicationWindow):
             if len(members) > 1:
                 members.sort(key=_sortkey)  # keeper first: no _N suffix, largest
                 groups.append(members)
+
+        # Exact-duplicate pass for everything that has no perceptual hash —
+        # videos (never perceptually hashed) and the odd photo that failed to
+        # decode. Byte-identical files share a content signature, so a copied
+        # video is caught here. 100% safe: only exact copies match.
+        from pathlib import Path as _P
+        hashed = set(hashes.keys())
+        sigs = {}
+        for root, _dirs, fns in os.walk(photo_path):
+            for fn in fns:
+                if _P(fn).suffix.lower() not in SUPPORTED_EXT:
+                    continue
+                p = str(_P(root) / fn)
+                if p in hashed:
+                    continue  # already covered by the perceptual pass
+                sig = self._content_signature(p)
+                if sig:
+                    sigs.setdefault(sig, []).append(p)
+        for members in sigs.values():
+            if len(members) > 1:
+                members.sort(key=_sortkey)
+                groups.append(members)
         return groups
+
+    def _content_signature(self, path):
+        """Fast fingerprint for exact-duplicate detection (size + head/tail
+        bytes). Byte-identical files match; distinct files practically never do.
+        Used for videos and any file without a perceptual hash."""
+        import hashlib
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            return None
+        h = hashlib.sha1()
+        h.update(str(size).encode())
+        chunk = 2 * 1024 * 1024
+        try:
+            with open(path, "rb") as f:
+                h.update(f.read(chunk))
+                if size > 2 * chunk:
+                    f.seek(-chunk, os.SEEK_END)
+                    h.update(f.read(chunk))
+        except OSError:
+            return None
+        return h.hexdigest()
 
     def _open_dup_window(self, scanning=False):
         """Build the duplicate-review window shell. Shared by the manual
