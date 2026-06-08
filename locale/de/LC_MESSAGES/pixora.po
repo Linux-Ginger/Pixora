@@ -2537,8 +2537,14 @@ msgstr[1] "%d Duplikate gefunden. Das erste jeder Gruppe bleibt erhalten; markie
 msgid "Convert HEIC photos"
 msgstr "HEIC-Fotos umwandeln"
 
-msgid "Save iPhone HEIC photos in a format any app can open"
-msgstr "iPhone-HEIC-Fotos in einem Format speichern, das jede App öffnen kann"
+msgid "HEIC is the photo format Apple uses on the iPhone. It saves space, but almost nothing outside Apple devices can open it. Convert to JPEG or PNG to view your photos anywhere — Windows, the web, older programs.\n\nJPEG is recommended: just as widely supported as PNG, but much smaller and it keeps the date and location info. PNG is lossless but makes photos 3–5× larger and drops that info."
+msgstr "HEIC ist das Fotoformat, das Apple auf dem iPhone verwendet. Es spart Speicherplatz, aber außerhalb von Apple-Geräten kann es kaum etwas öffnen. Konvertiere in JPEG oder PNG, um deine Fotos überall anzusehen — Windows, das Web, ältere Programme.\n\nJPEG wird empfohlen: genauso weit unterstützt wie PNG, aber deutlich kleiner und es behält Datum- und Ortsangaben. PNG ist verlustfrei, macht Fotos aber 3–5× größer und verliert diese Angaben."
+
+msgid "Recommended: small files, opens everywhere, keeps date/location."
+msgstr "Empfohlen: kleine Dateien, überall zu öffnen, behält Datum/Ort."
+
+msgid "Lossless, but larger files and the date/location info is lost."
+msgstr "Verlustfrei, aber größere Dateien und Datum/Ort gehen verloren."
 
 msgid "Convert HEIC on import"
 msgstr "HEIC beim Import umwandeln"

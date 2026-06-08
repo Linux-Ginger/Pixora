@@ -6401,7 +6401,13 @@ class MainWindow(Adw.ApplicationWindow):
         convert_group = Adw.PreferencesGroup()
         convert_group.set_title(_("Convert HEIC photos"))
         convert_group.set_description(
-            _("Save iPhone HEIC photos in a format any app can open"))
+            _("HEIC is the photo format Apple uses on the iPhone. It saves "
+              "space, but almost nothing outside Apple devices can open it. "
+              "Convert to JPEG or PNG to view your photos anywhere — Windows, "
+              "the web, older programs.\n\n"
+              "JPEG is recommended: just as widely supported as PNG, but much "
+              "smaller and it keeps the date and location info. PNG is "
+              "lossless but makes photos 3–5× larger and drops that info."))
 
         self.settings_convert_switch = Gtk.Switch()
         self.settings_convert_switch.set_valign(Gtk.Align.CENTER)
@@ -6427,6 +6433,11 @@ class MainWindow(Adw.ApplicationWindow):
             Gtk.StringList.new(["JPEG (.jpg)", "PNG (.png)"]))
         self.settings_convert_combo.set_selected(
             1 if self.settings.get("convert_format", "jpeg") == "png" else 0)
+        self._update_convert_combo_subtitle()
+        try:
+            self.settings_convert_combo.set_subtitle_lines(2)
+        except Exception:
+            pass
         self.settings_convert_combo.set_sensitive(
             self.settings.get("convert_heic", False))
         self.settings_convert_combo.connect(
@@ -8217,7 +8228,18 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_convert_format_changed(self, combo, _pspec):
         self.settings["convert_format"] = "png" if combo.get_selected() == 1 else "jpeg"
+        self._update_convert_combo_subtitle()
         save_settings(self.settings)
+
+    def _update_convert_combo_subtitle(self):
+        if not hasattr(self, "settings_convert_combo"):
+            return
+        if self.settings_convert_combo.get_selected() == 1:
+            self.settings_convert_combo.set_subtitle(
+                _("Lossless, but larger files and the date/location info is lost."))
+        else:
+            self.settings_convert_combo.set_subtitle(
+                _("Recommended: small files, opens everywhere, keeps date/location."))
 
     def on_dup_switch_toggled(self, switch, _pspec):
         # On = strict (1), Off = 0.

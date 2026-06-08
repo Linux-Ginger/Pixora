@@ -1683,7 +1683,13 @@ msgstr[1] ""
 msgid "Convert HEIC photos"
 msgstr ""
 
-msgid "Save iPhone HEIC photos in a format any app can open"
+msgid "HEIC is the photo format Apple uses on the iPhone. It saves space, but almost nothing outside Apple devices can open it. Convert to JPEG or PNG to view your photos anywhere — Windows, the web, older programs.\n\nJPEG is recommended: just as widely supported as PNG, but much smaller and it keeps the date and location info. PNG is lossless but makes photos 3–5× larger and drops that info."
+msgstr ""
+
+msgid "Recommended: small files, opens everywhere, keeps date/location."
+msgstr ""
+
+msgid "Lossless, but larger files and the date/location info is lost."
 msgstr ""
 
 msgid "Convert HEIC on import"
