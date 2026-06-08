@@ -6633,10 +6633,10 @@ class MainWindow(Adw.ApplicationWindow):
         auto_group = Adw.PreferencesGroup()
         auto_group.set_title(_("Background tasks"))
         auto_group.set_description(
-            _("About every 5 minutes Pixora quietly checks your library: it "
-              "tidies the folder structure, backs up to your USB drive, and "
-              "converts leftover HEIC photos. By default it asks before "
-              "starting each one."))
+            _("Every few minutes Pixora quietly runs the background tasks "
+              "you've set up — tidying the folder structure, backing up to "
+              "your USB drive, and converting HEIC photos. Each one only runs "
+              "when it's enabled. By default Pixora asks before starting."))
         self._auto_confirm_switch = Gtk.Switch()
         self._auto_confirm_switch.set_valign(Gtk.Align.CENTER)
         self._auto_confirm_switch.set_active(bool(

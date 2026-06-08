@@ -2605,8 +2605,8 @@ msgstr "HEIC-Bibliotheksumwandlung fertig: {c} umgewandelt, {f} fehlgeschlagen"
 msgid "Background tasks"
 msgstr "Hintergrundaufgaben"
 
-msgid "About every 5 minutes Pixora quietly checks your library: it tidies the folder structure, backs up to your USB drive, and converts leftover HEIC photos. By default it asks before starting each one."
-msgstr "Etwa alle 5 Minuten prüft Pixora ruhig deine Bibliothek: Es ordnet die Ordnerstruktur, sichert auf deinen USB-Stick und wandelt übrige HEIC-Fotos um. Standardmäßig fragt es, bevor es etwas startet."
+msgid "Every few minutes Pixora quietly runs the background tasks you've set up — tidying the folder structure, backing up to your USB drive, and converting HEIC photos. Each one only runs when it's enabled. By default Pixora asks before starting."
+msgstr "Alle paar Minuten führt Pixora ruhig die Hintergrundaufgaben aus, die du eingerichtet hast — die Ordnerstruktur ordnen, auf deinen USB-Stick sichern und HEIC-Fotos umwandeln. Jede läuft nur, wenn sie aktiviert ist. Standardmäßig fragt Pixora zuerst."
 
 msgid "Run automatically without asking"
 msgstr "Automatisch ausführen, ohne zu fragen"

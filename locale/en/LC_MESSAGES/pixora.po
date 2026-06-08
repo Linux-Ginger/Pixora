@@ -2575,8 +2575,8 @@ msgstr "HEIC library conversion done: {c} converted, {f} failed"
 msgid "Background tasks"
 msgstr "Background tasks"
 
-msgid "About every 5 minutes Pixora quietly checks your library: it tidies the folder structure, backs up to your USB drive, and converts leftover HEIC photos. By default it asks before starting each one."
-msgstr "About every 5 minutes Pixora quietly checks your library: it tidies the folder structure, backs up to your USB drive, and converts leftover HEIC photos. By default it asks before starting each one."
+msgid "Every few minutes Pixora quietly runs the background tasks you've set up — tidying the folder structure, backing up to your USB drive, and converting HEIC photos. Each one only runs when it's enabled. By default Pixora asks before starting."
+msgstr "Every few minutes Pixora quietly runs the background tasks you've set up — tidying the folder structure, backing up to your USB drive, and converting HEIC photos. Each one only runs when it's enabled. By default Pixora asks before starting."
 
 msgid "Run automatically without asking"
 msgstr "Run automatically without asking"

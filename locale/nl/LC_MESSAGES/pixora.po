@@ -2593,8 +2593,8 @@ msgstr "HEIC-bibliotheekconversie klaar: {c} omgezet, {f} mislukt"
 msgid "Background tasks"
 msgstr "Achtergrondtaken"
 
-msgid "About every 5 minutes Pixora quietly checks your library: it tidies the folder structure, backs up to your USB drive, and converts leftover HEIC photos. By default it asks before starting each one."
-msgstr "Ongeveer elke 5 minuten controleert Pixora rustig je bibliotheek: het ordent de mapstructuur, maakt een back-up naar je USB-stick en zet resterende HEIC-foto's om. Standaard vraagt het eerst voordat het ergens aan begint."
+msgid "Every few minutes Pixora quietly runs the background tasks you've set up — tidying the folder structure, backing up to your USB drive, and converting HEIC photos. Each one only runs when it's enabled. By default Pixora asks before starting."
+msgstr "Elke paar minuten voert Pixora rustig de achtergrondtaken uit die je hebt ingesteld — de mapstructuur ordenen, back-uppen naar je USB-stick en HEIC-foto's omzetten. Elk daarvan draait alleen als het is ingeschakeld. Standaard vraagt Pixora het eerst."
 
 msgid "Run automatically without asking"
 msgstr "Automatisch uitvoeren zonder te vragen"
