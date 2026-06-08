@@ -2621,3 +2621,54 @@ msgid "Pixora found %d HEIC photo to convert to JPEG. Convert it now?"
 msgid_plural "Pixora found %d HEIC photos to convert to JPEG. Convert them now?"
 msgstr[0] "Pixora hat %d HEIC-Foto zum Umwandeln in JPEG gefunden. Jetzt umwandeln?"
 msgstr[1] "Pixora hat %d HEIC-Fotos zum Umwandeln in JPEG gefunden. Jetzt umwandeln?"
+
+msgid "Reorganize folders now"
+msgstr "Ordner jetzt neu ordnen"
+
+msgid "Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above, removing bit-identical duplicates. Pixora also does this automatically in the background."
+msgstr "Führe das Ordner-Aufräumen jetzt sofort aus: durchsucht deine Bibliothek und verschiebt Fotos in die oben gewählte Struktur, wobei bit-identische Duplikate entfernt werden. Pixora macht das auch automatisch im Hintergrund."
+
+msgid "Clean up now"
+msgstr "Jetzt aufräumen"
+
+msgid "Scan photos already in your archive for duplicates — including lightly edited copies and same-photo files — and review them with thumbnails before you delete any. The original is always kept."
+msgstr "Durchsuche bereits in deinem Archiv vorhandene Fotos nach Duplikaten — einschließlich leicht bearbeiteter Kopien und gleicher Fotodateien — und sieh sie dir mit Vorschaubildern an, bevor du etwas löschst. Das Original bleibt immer erhalten."
+
+msgid "Convert HEIC photos already in your library right now: each one becomes a visually-lossless JPEG, the original HEIC is replaced, and the date/location is kept. Runs in the background with a progress donut — you can keep using Pixora. Pixora also sweeps for leftover HEICs automatically."
+msgstr "Wandle HEIC-Fotos, die bereits in deiner Bibliothek sind, jetzt sofort um: jedes wird ein visuell verlustfreies JPEG, die originale HEIC-Datei wird ersetzt und Datum/Ort bleiben erhalten. Läuft im Hintergrund mit einem Fortschritts-Donut — du kannst Pixora weiter benutzen. Pixora sucht auch automatisch nach übrigen HEICs."
+
+msgid "Turn off HEIC conversion?"
+msgstr "HEIC-Umwandlung ausschalten?"
+
+msgid "New imports will be kept as the original HEIC files. HEIC saves space but can't be opened on Windows, the web, or many older programs. Photos already converted to JPEG are not changed back."
+msgstr "Neue Importe bleiben als originale HEIC-Dateien. HEIC spart Speicherplatz, kann aber unter Windows, im Web oder in vielen älteren Programmen nicht geöffnet werden. Bereits in JPEG umgewandelte Fotos werden nicht zurückgewandelt."
+
+msgid "Keep on"
+msgstr "Anlassen"
+
+msgid "Turn off duplicate detection?"
+msgstr "Duplikaterkennung ausschalten?"
+
+msgid "During import Pixora will no longer warn you about photos you already have, so the same photo can be imported twice. Photos already in your library are not affected."
+msgstr "Beim Import warnt Pixora dich nicht mehr vor Fotos, die du bereits hast, sodass dasselbe Foto doppelt importiert werden kann. Bereits in deiner Bibliothek vorhandene Fotos sind nicht betroffen."
+
+msgid "Reset"
+msgstr "Zurücksetzen"
+
+msgid "Reset to factory settings"
+msgstr "Auf Werkseinstellungen zurücksetzen"
+
+msgid "Clear all Pixora settings — chosen folder, backup, language and switches — and restart in the setup wizard. Your photos and library on disk are NOT touched."
+msgstr "Alle Pixora-Einstellungen löschen — gewählter Ordner, Backup, Sprache und Schalter — und im Einrichtungsassistenten neu starten. Deine Fotos und Bibliothek auf der Festplatte werden NICHT angetastet."
+
+msgid "Reset to factory settings?"
+msgstr "Auf Werkseinstellungen zurücksetzen?"
+
+msgid "This clears all your Pixora settings — chosen folder, backup setup, language and switches — and restarts Pixora in the setup wizard.\n\nYour photos and library on disk are NOT touched."
+msgstr "Dies löscht alle deine Pixora-Einstellungen — gewählter Ordner, Backup-Einrichtung, Sprache und Schalter — und startet Pixora im Einrichtungsassistenten neu.\n\nDeine Fotos und Bibliothek auf der Festplatte werden NICHT angetastet."
+
+msgid "Factory reset: settings cleared, restarting…"
+msgstr "Werksreset: Einstellungen gelöscht, Neustart…"
+
+msgid "Factory reset error: {err}"
+msgstr "Werksreset-Fehler: {err}"

@@ -1767,3 +1767,54 @@ msgid "Pixora found %d HEIC photo to convert to JPEG. Convert it now?"
 msgid_plural "Pixora found %d HEIC photos to convert to JPEG. Convert them now?"
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Reorganize folders now"
+msgstr ""
+
+msgid "Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above, removing bit-identical duplicates. Pixora also does this automatically in the background."
+msgstr ""
+
+msgid "Clean up now"
+msgstr ""
+
+msgid "Scan photos already in your archive for duplicates — including lightly edited copies and same-photo files — and review them with thumbnails before you delete any. The original is always kept."
+msgstr ""
+
+msgid "Convert HEIC photos already in your library right now: each one becomes a visually-lossless JPEG, the original HEIC is replaced, and the date/location is kept. Runs in the background with a progress donut — you can keep using Pixora. Pixora also sweeps for leftover HEICs automatically."
+msgstr ""
+
+msgid "Turn off HEIC conversion?"
+msgstr ""
+
+msgid "New imports will be kept as the original HEIC files. HEIC saves space but can't be opened on Windows, the web, or many older programs. Photos already converted to JPEG are not changed back."
+msgstr ""
+
+msgid "Keep on"
+msgstr ""
+
+msgid "Turn off duplicate detection?"
+msgstr ""
+
+msgid "During import Pixora will no longer warn you about photos you already have, so the same photo can be imported twice. Photos already in your library are not affected."
+msgstr ""
+
+msgid "Reset"
+msgstr ""
+
+msgid "Reset to factory settings"
+msgstr ""
+
+msgid "Clear all Pixora settings — chosen folder, backup, language and switches — and restart in the setup wizard. Your photos and library on disk are NOT touched."
+msgstr ""
+
+msgid "Reset to factory settings?"
+msgstr ""
+
+msgid "This clears all your Pixora settings — chosen folder, backup setup, language and switches — and restarts Pixora in the setup wizard.\n\nYour photos and library on disk are NOT touched."
+msgstr ""
+
+msgid "Factory reset: settings cleared, restarting…"
+msgstr ""
+
+msgid "Factory reset error: {err}"
+msgstr ""

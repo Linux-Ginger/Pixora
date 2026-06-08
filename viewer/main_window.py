@@ -6282,6 +6282,25 @@ class MainWindow(Adw.ApplicationWindow):
         dev_group.add(dev_row)
         advanced_box.append(dev_group)
 
+        reset_group = Adw.PreferencesGroup()
+        reset_group.set_title(_("Reset"))
+        reset_btn = Gtk.Button(label=_("Reset"))
+        reset_btn.add_css_class("destructive-action")
+        reset_btn.set_valign(Gtk.Align.CENTER)
+        reset_btn.connect("clicked", self._on_factory_reset_clicked)
+        reset_row = Adw.ActionRow(
+            title=_("Reset to factory settings"),
+            subtitle=_("Clear all Pixora settings — chosen folder, backup, language and switches — and restart in the setup wizard. Your photos and library on disk are NOT touched."),
+        )
+        reset_row.add_prefix(Gtk.Image.new_from_icon_name("edit-clear-all-symbolic"))
+        reset_row.add_suffix(reset_btn)
+        try:
+            reset_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        reset_group.add(reset_row)
+        advanced_box.append(reset_group)
+
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title(_("Folder structure"))
         structure_group.set_description(
@@ -6328,6 +6347,10 @@ class MainWindow(Adw.ApplicationWindow):
         month_row.set_activatable_widget(self.radio_month)
         structure_group.add(month_row)
 
+        # "Run now" buttons duplicate what the background pass does, so they're
+        # only shown in developer mode.
+        dev_mode = bool(self.settings.get("dev_mode", False))
+
         reorganize_btn = Gtk.Button(label=_("Tidy up"))
         reorganize_btn.add_css_class("flat")
         reorganize_btn.set_valign(Gtk.Align.CENTER)
@@ -6335,32 +6358,17 @@ class MainWindow(Adw.ApplicationWindow):
             "clicked", lambda b: self._prompt_reorganize(from_startup=False)
         )
         reorganize_row = Adw.ActionRow(
-            title=_("Reorganize current folders"),
-            subtitle=_("Scan the photo folder and move photos to match the chosen structure. Bit-identical duplicates are removed."),
+            title=_("Reorganize folders now"),
+            subtitle=_("Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above, removing bit-identical duplicates. Pixora also does this automatically in the background."),
         )
         reorganize_row.add_prefix(Gtk.Image.new_from_icon_name("view-refresh-symbolic"))
         reorganize_row.add_suffix(reorganize_btn)
+        reorganize_row.set_visible(dev_mode)
         try:
-            reorganize_row.set_subtitle_lines(3)
+            reorganize_row.set_subtitle_lines(4)
         except Exception:
             pass
         structure_group.add(reorganize_row)
-
-        dedup_btn = Gtk.Button(label=_("Find duplicates"))
-        dedup_btn.add_css_class("flat")
-        dedup_btn.set_valign(Gtk.Align.CENTER)
-        dedup_btn.connect("clicked", lambda b: self._prompt_find_duplicates())
-        dedup_row = Adw.ActionRow(
-            title=_("Clean up duplicates"),
-            subtitle=_("Scan your archive for duplicate photos (including edited copies) and review them with thumbnails before deleting."),
-        )
-        dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
-        dedup_row.add_suffix(dedup_btn)
-        try:
-            dedup_row.set_subtitle_lines(3)
-        except Exception:
-            pass
-        structure_group.add(dedup_row)
 
         import_box.append(structure_group)
 
@@ -6392,6 +6400,24 @@ class MainWindow(Adw.ApplicationWindow):
         dup_row.add_suffix(self.settings_dup_switch)
         dup_row.set_activatable_widget(self.settings_dup_switch)
         dup_group.add(dup_row)
+
+        self._dedup_btn = Gtk.Button(label=_("Clean up now"))
+        self._dedup_btn.add_css_class("flat")
+        self._dedup_btn.set_valign(Gtk.Align.CENTER)
+        self._dedup_btn.set_sensitive(dup_on)
+        self._dedup_btn.connect("clicked", lambda b: self._prompt_find_duplicates())
+        dedup_row = Adw.ActionRow(
+            title=_("Clean up duplicates"),
+            subtitle=_("Scan photos already in your archive for duplicates — including lightly edited copies and same-photo files — and review them with thumbnails before you delete any. The original is always kept."),
+        )
+        dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
+        dedup_row.add_suffix(self._dedup_btn)
+        dedup_row.set_visible(dev_mode)
+        try:
+            dedup_row.set_subtitle_lines(4)
+        except Exception:
+            pass
+        dup_group.add(dedup_row)
 
         import_box.append(dup_group)
 
@@ -6426,16 +6452,19 @@ class MainWindow(Adw.ApplicationWindow):
 
         convert_now_row = Adw.ActionRow(
             title=_("Convert existing library now"),
-            subtitle=_("Find every HEIC photo already in your library and convert it to JPEG, replacing the originals. Runs in the background — you can keep using Pixora."))
+            subtitle=_("Convert HEIC photos already in your library right now: each one becomes a visually-lossless JPEG, the original HEIC is replaced, and the date/location is kept. Runs in the background with a progress donut — you can keep using Pixora. Pixora also sweeps for leftover HEICs automatically."))
         convert_now_row.add_prefix(
             Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
         self._convert_lib_btn = Gtk.Button(label=_("Run now"))
         self._convert_lib_btn.add_css_class("flat")
         self._convert_lib_btn.set_valign(Gtk.Align.CENTER)
+        self._convert_lib_btn.set_sensitive(
+            bool(self.settings.get("convert_heic", False)))
         self._convert_lib_btn.connect("clicked", self._on_convert_library_clicked)
         convert_now_row.add_suffix(self._convert_lib_btn)
+        convert_now_row.set_visible(dev_mode)
         try:
-            convert_now_row.set_subtitle_lines(3)
+            convert_now_row.set_subtitle_lines(5)
         except Exception:
             pass
         convert_group.add(convert_now_row)
@@ -6623,6 +6652,7 @@ class MainWindow(Adw.ApplicationWindow):
         manual_scan_row.add_prefix(Gtk.Image.new_from_icon_name("system-search-symbolic"))
         manual_scan_row.add_suffix(self.settings_manual_scan_btn)
         manual_scan_row.set_sensitive(backup_on and drive_present)
+        manual_scan_row.set_visible(dev_mode)
         self.settings_manual_scan_row = manual_scan_row
         backup_group.add(manual_scan_row)
 
@@ -6646,16 +6676,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._auto_confirm_switch.connect(
             "notify::active", self._on_auto_confirm_toggle)
         auto_row = Adw.ActionRow(
-            title=_("Run automatically without asking"),
-            subtitle=_("Skip the confirmation popups and just run these tasks in the background. Pixora won't interrupt you."))
+            title=_("Run automatically without asking"))
         auto_row.add_prefix(
             Gtk.Image.new_from_icon_name("emblem-ok-symbolic"))
         auto_row.add_suffix(self._auto_confirm_switch)
         auto_row.set_activatable_widget(self._auto_confirm_switch)
-        try:
-            auto_row.set_subtitle_lines(3)
-        except Exception:
-            pass
         auto_group.add(auto_row)
         import_box.append(auto_group)
 
@@ -7310,6 +7335,34 @@ class MainWindow(Adw.ApplicationWindow):
         row.set_subtitle(_("Active") if target else _("Inactive"))
         btn.set_label(_("Deactivate") if target else _("Activate"))
         # Restart the app.
+        GLib.timeout_add(300, self._restart_app)
+
+    def _on_factory_reset_clicked(self, btn):
+        dlg = Adw.AlertDialog(
+            heading=_("Reset to factory settings?"),
+            body=_("This clears all your Pixora settings — chosen folder, backup setup, language and switches — and restarts Pixora in the setup wizard.\n\nYour photos and library on disk are NOT touched."))
+        dlg.add_response("cancel", _("Cancel"))
+        dlg.add_response("reset", _("Reset"))
+        dlg.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE)
+        dlg.set_default_response("cancel")
+        dlg.set_close_response("cancel")
+        dlg.connect("response", self._do_factory_reset)
+        self._present_dialog(dlg)
+
+    def _do_factory_reset(self, dlg, response):
+        if response != "reset":
+            return
+        # Delete settings.json so the next start is a clean first-run (wizard).
+        try:
+            self.settings = {}
+            for p in (CONFIG_PATH, CONFIG_PATH + ".tmp"):
+                try:
+                    os.remove(p)
+                except FileNotFoundError:
+                    pass
+            log_info(_("Factory reset: settings cleared, restarting…"))
+        except Exception as e:
+            log_error(_("Factory reset error: {err}").format(err=e))
         GLib.timeout_add(300, self._restart_app)
 
     def _restart_app(self):
@@ -8235,13 +8288,38 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_convert_switch_toggled(self, switch, _pspec):
         active = switch.get_active()
-        self.settings["convert_heic"] = active
+        if not active:
+            dlg = Adw.AlertDialog(
+                heading=_("Turn off HEIC conversion?"),
+                body=_("New imports will be kept as the original HEIC files. HEIC saves space but can't be opened on Windows, the web, or many older programs. Photos already converted to JPEG are not changed back."))
+            dlg.add_response("keep", _("Keep on"))
+            dlg.add_response("off", _("Turn off"))
+            dlg.set_response_appearance("off", Adw.ResponseAppearance.DESTRUCTIVE)
+            dlg.set_default_response("keep")
+            dlg.set_close_response("keep")
+
+            def _resp(d, r):
+                if r == "off":
+                    self.settings["convert_heic"] = False
+                    self.settings["convert_format"] = "jpeg"
+                    save_settings(self.settings)
+                    if hasattr(self, "_convert_lib_btn"):
+                        self._convert_lib_btn.set_sensitive(False)
+                else:
+                    switch.handler_block_by_func(self.on_convert_switch_toggled)
+                    switch.set_active(True)
+                    switch.handler_unblock_by_func(self.on_convert_switch_toggled)
+            dlg.connect("response", _resp)
+            self._present_dialog(dlg)
+            return
+        self.settings["convert_heic"] = True
         # PNG was dropped: conversion is always JPEG now.
         self.settings["convert_format"] = "jpeg"
         # Turning conversion back on → allow the sweep to re-check this session.
-        if active:
-            self._heic_sweep_dismissed = False
+        self._heic_sweep_dismissed = False
         save_settings(self.settings)
+        if hasattr(self, "_convert_lib_btn"):
+            self._convert_lib_btn.set_sensitive(True)
 
     def _on_auto_confirm_toggle(self, switch, _pspec):
         """One master switch drives the per-task silent flags, so the existing
@@ -8476,6 +8554,29 @@ class MainWindow(Adw.ApplicationWindow):
     def on_dup_switch_toggled(self, switch, _pspec):
         # On = strict (1), Off = 0.
         active = switch.get_active()
+        if not active:
+            dlg = Adw.AlertDialog(
+                heading=_("Turn off duplicate detection?"),
+                body=_("During import Pixora will no longer warn you about photos you already have, so the same photo can be imported twice. Photos already in your library are not affected."))
+            dlg.add_response("keep", _("Keep on"))
+            dlg.add_response("off", _("Turn off"))
+            dlg.set_response_appearance("off", Adw.ResponseAppearance.DESTRUCTIVE)
+            dlg.set_default_response("keep")
+            dlg.set_close_response("keep")
+
+            def _resp(d, r):
+                if r == "off":
+                    self._apply_dup_detection(False)
+                else:
+                    switch.handler_block_by_func(self.on_dup_switch_toggled)
+                    switch.set_active(True)
+                    switch.handler_unblock_by_func(self.on_dup_switch_toggled)
+            dlg.connect("response", _resp)
+            self._present_dialog(dlg)
+            return
+        self._apply_dup_detection(True)
+
+    def _apply_dup_detection(self, active):
         self.settings["duplicate_threshold"] = 1 if active else 0
         if not active and self.settings.get("backup_dedup"):
             # Main detection off → USB-dedup off too.
@@ -8487,6 +8588,8 @@ class MainWindow(Adw.ApplicationWindow):
             backup_on = bool(self.settings.get("backup_enabled"))
             drive_present = self._backup_drive_mountpoint() is not None
             self.settings_dedup_row.set_sensitive(backup_on and drive_present and active)
+        if hasattr(self, "_dedup_btn"):
+            self._dedup_btn.set_sensitive(active)
 
     def on_settings_backup_toggle(self, switch, _pspec):
         active = switch.get_active()

@@ -287,7 +287,7 @@ class PixoraApp(Adw.Application):
     def on_activate(self, app):
         settings = load_settings()
 
-        if settings is None:
+        if not settings:  # None or empty (e.g. after a factory reset)
             from setup_wizard import SetupWizard
             win = SetupWizard(app)
         else:

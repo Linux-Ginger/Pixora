@@ -2591,3 +2591,54 @@ msgid "Pixora found %d HEIC photo to convert to JPEG. Convert it now?"
 msgid_plural "Pixora found %d HEIC photos to convert to JPEG. Convert them now?"
 msgstr[0] "Pixora found %d HEIC photo to convert to JPEG. Convert it now?"
 msgstr[1] "Pixora found %d HEIC photos to convert to JPEG. Convert them now?"
+
+msgid "Reorganize folders now"
+msgstr "Reorganize folders now"
+
+msgid "Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above, removing bit-identical duplicates. Pixora also does this automatically in the background."
+msgstr "Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above, removing bit-identical duplicates. Pixora also does this automatically in the background."
+
+msgid "Clean up now"
+msgstr "Clean up now"
+
+msgid "Scan photos already in your archive for duplicates — including lightly edited copies and same-photo files — and review them with thumbnails before you delete any. The original is always kept."
+msgstr "Scan photos already in your archive for duplicates — including lightly edited copies and same-photo files — and review them with thumbnails before you delete any. The original is always kept."
+
+msgid "Convert HEIC photos already in your library right now: each one becomes a visually-lossless JPEG, the original HEIC is replaced, and the date/location is kept. Runs in the background with a progress donut — you can keep using Pixora. Pixora also sweeps for leftover HEICs automatically."
+msgstr "Convert HEIC photos already in your library right now: each one becomes a visually-lossless JPEG, the original HEIC is replaced, and the date/location is kept. Runs in the background with a progress donut — you can keep using Pixora. Pixora also sweeps for leftover HEICs automatically."
+
+msgid "Turn off HEIC conversion?"
+msgstr "Turn off HEIC conversion?"
+
+msgid "New imports will be kept as the original HEIC files. HEIC saves space but can't be opened on Windows, the web, or many older programs. Photos already converted to JPEG are not changed back."
+msgstr "New imports will be kept as the original HEIC files. HEIC saves space but can't be opened on Windows, the web, or many older programs. Photos already converted to JPEG are not changed back."
+
+msgid "Keep on"
+msgstr "Keep on"
+
+msgid "Turn off duplicate detection?"
+msgstr "Turn off duplicate detection?"
+
+msgid "During import Pixora will no longer warn you about photos you already have, so the same photo can be imported twice. Photos already in your library are not affected."
+msgstr "During import Pixora will no longer warn you about photos you already have, so the same photo can be imported twice. Photos already in your library are not affected."
+
+msgid "Reset"
+msgstr "Reset"
+
+msgid "Reset to factory settings"
+msgstr "Reset to factory settings"
+
+msgid "Clear all Pixora settings — chosen folder, backup, language and switches — and restart in the setup wizard. Your photos and library on disk are NOT touched."
+msgstr "Clear all Pixora settings — chosen folder, backup, language and switches — and restart in the setup wizard. Your photos and library on disk are NOT touched."
+
+msgid "Reset to factory settings?"
+msgstr "Reset to factory settings?"
+
+msgid "This clears all your Pixora settings — chosen folder, backup setup, language and switches — and restarts Pixora in the setup wizard.\n\nYour photos and library on disk are NOT touched."
+msgstr "This clears all your Pixora settings — chosen folder, backup setup, language and switches — and restarts Pixora in the setup wizard.\n\nYour photos and library on disk are NOT touched."
+
+msgid "Factory reset: settings cleared, restarting…"
+msgstr "Factory reset: settings cleared, restarting…"
+
+msgid "Factory reset error: {err}"
+msgstr "Factory reset error: {err}"
