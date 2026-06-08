@@ -5313,7 +5313,7 @@ class MainWindow(Adw.ApplicationWindow):
         area = getattr(self, "viewer_area", None)
         if area is None:
             return
-        heart = Gtk.Label(label="♥")
+        heart = Gtk.Label(label="★")
         heart.set_halign(Gtk.Align.CENTER)
         heart.set_valign(Gtk.Align.CENTER)
         heart.set_can_target(False)  # never intercept clicks
@@ -5335,8 +5335,8 @@ class MainWindow(Adw.ApplicationWindow):
                 return False
             scale = 0.6 + 1.3 * t          # 0.6 -> ~1.9
             css.load_from_string(
-                ".fav-burst { color: #ff3b6b; font-size: 110px;"
-                " text-shadow: 0 2px 14px rgba(0,0,0,0.45);"
+                ".fav-burst { color: #ffcc33; font-size: 110px;"
+                " text-shadow: 0 2px 14px rgba(0,0,0,0.5);"
                 f" transform: scale({scale:.3f}); }}")
             heart.set_opacity(max(0.0, 1.0 - t))
             state["i"] += 1
