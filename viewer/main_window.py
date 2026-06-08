@@ -6193,7 +6193,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Renderer dropdown applies via GSK_RENDERER — requires restart (sentinel).
         self._gsk_codes  = ["auto", "gl", "cairo"]
-        self._gsk_labels = [_("Automatic (Recommended)"), _("GPU (GL)"), _("Software (Cairo)")]
+        self._gsk_labels = [_("Automatic"), _("GPU (GL)"), _("Software (Cairo)")]
         gsk_model = Gtk.StringList()
         for lbl in self._gsk_labels:
             gsk_model.append(lbl)
@@ -6212,21 +6212,29 @@ class MainWindow(Adw.ApplicationWindow):
                 orientation=Gtk.Orientation.HORIZONTAL, spacing=6,
             )
             lbl = Gtk.Label(xalign=0)
-            lbl.set_hexpand(True)
+            badge = self._recommended_badge()
+            badge.set_visible(False)
+            spacer = Gtk.Box(hexpand=True)
             icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
             icon.add_css_class("warning")
             icon.set_visible(False)
             box.append(lbl)
+            box.append(badge)
+            box.append(spacer)
             box.append(icon)
             list_item.set_child(box)
         def _gsk_row_bind(_f, list_item):
             box = list_item.get_child()
             lbl = box.get_first_child()
-            icon = lbl.get_next_sibling()
+            badge = lbl.get_next_sibling()
+            spacer = badge.get_next_sibling()
+            icon = spacer.get_next_sibling()
             item = list_item.get_item()
             lbl.set_text(item.get_string() if item is not None else "")
             pos = list_item.get_position()
             code = self._gsk_codes[pos] if 0 <= pos < len(self._gsk_codes) else ""
+            # "auto" is the recommended backend.
+            badge.set_visible(code == "auto")
             bl = self.settings.get("gsk_renderer_crashed") or []
             icon.set_visible(code in bl)
         list_factory.connect("setup", _gsk_row_setup)
@@ -6305,11 +6313,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.radio_month.set_active(current_structure == "year_month")
         self.radio_month.connect("toggled", lambda b: self.on_structure_changed("year_month", b))
         month_row = Adw.ActionRow(
-            title=_("By year and month (Recommended)"),
+            title=_("By year and month"),
             subtitle=_("Year folder with month subfolders — e.g. 2024/2024-03/."),
         )
         month_row.add_prefix(Gtk.Image.new_from_icon_name("view-list-symbolic"))
         month_row.add_prefix(self.radio_month)
+        month_row.add_suffix(self._recommended_badge())
         month_row.set_activatable_widget(self.radio_month)
         structure_group.add(month_row)
 
@@ -6390,8 +6399,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dup_switch.set_valign(Gtk.Align.CENTER)
         self.settings_dup_switch.set_active(dup_on)
         self.settings_dup_switch.connect("notify::active", self.on_dup_switch_toggled)
-        dup_row = Adw.ActionRow(title=_("Duplicate detection (Recommended)"))
+        dup_row = Adw.ActionRow(title=_("Duplicate detection"))
         dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
+        dup_row.add_suffix(self._recommended_badge())
         dup_row.add_suffix(self.settings_dup_switch)
         dup_row.set_activatable_widget(self.settings_dup_switch)
         dup_group.add(dup_row)
@@ -6401,11 +6411,12 @@ class MainWindow(Adw.ApplicationWindow):
         convert_group = Adw.PreferencesGroup()
         convert_group.set_title(_("Convert HEIC photos"))
         convert_group.set_description(
-            _("HEIC is the photo format Apple uses on the iPhone. It saves "
-              "space, but almost nothing outside Apple devices can open it. "
-              "When this is on, Pixora converts imported HEIC photos to JPEG "
-              "so you can open them anywhere — Windows, the web, older "
-              "programs — while keeping the date and location info."))
+            _("HEIC is the photo format Apple uses on the iPhone — great "
+              "compression, but almost nothing outside Apple can open it. "
+              "Pixora sets them free: our high-fidelity conversion engine "
+              "rebuilds every HEIC as a JPEG at maximum quality and full color "
+              "— visually lossless, with the original date and location kept "
+              "intact."))
 
         self.settings_convert_switch = Gtk.Switch()
         self.settings_convert_switch.set_valign(Gtk.Align.CENTER)
@@ -6417,6 +6428,7 @@ class MainWindow(Adw.ApplicationWindow):
             title=_("Convert HEIC to JPEG on import"),
             subtitle=_("HEIC photos are converted on import so they open outside Pixora too."))
         convert_row.add_prefix(Gtk.Image.new_from_icon_name("image-x-generic-symbolic"))
+        convert_row.add_suffix(self._recommended_badge())
         convert_row.add_suffix(self.settings_convert_switch)
         convert_row.set_activatable_widget(self.settings_convert_switch)
         try:
@@ -8206,6 +8218,27 @@ class MainWindow(Adw.ApplicationWindow):
         # PNG was dropped: conversion is always JPEG now.
         self.settings["convert_format"] = "jpeg"
         save_settings(self.settings)
+
+    def _recommended_badge(self):
+        """Small blue accent pill marking the recommended choice on an option."""
+        badge = Gtk.Label(label=_("Recommended"))
+        badge.set_valign(Gtk.Align.CENTER)
+        badge.add_css_class("recommended-badge")
+        css = Gtk.CssProvider()
+        css.load_from_string(
+            ".recommended-badge {"
+            " background-color: @accent_bg_color;"
+            " color: @accent_fg_color;"
+            " border-radius: 9999px;"
+            " padding: 1px 9px;"
+            " font-size: 0.72em;"
+            " font-weight: 800;"
+            " letter-spacing: 0.4px;"
+            "}"
+        )
+        badge.get_style_context().add_provider(
+            css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        return badge
 
     def on_dup_switch_toggled(self, switch, _pspec):
         # On = strict (1), Off = 0.

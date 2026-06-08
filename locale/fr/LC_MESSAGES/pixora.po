@@ -2553,20 +2553,14 @@ msgstr[1] "%d doublons trouvés à examiner. Le premier de chaque groupe est con
 msgid "Convert HEIC photos"
 msgstr "Convertir les photos HEIC"
 
-msgid "HEIC is the photo format Apple uses on the iPhone. It saves space, but almost nothing outside Apple devices can open it. When this is on, Pixora converts imported HEIC photos to JPEG so you can open them anywhere — Windows, the web, older programs — while keeping the date and location info."
-msgstr "HEIC est le format photo qu'Apple utilise sur l'iPhone. Il économise de l'espace, mais presque rien en dehors des appareils Apple ne peut l'ouvrir. Lorsque cette option est activée, Pixora convertit les photos HEIC importées en JPEG pour que vous puissiez les ouvrir partout — Windows, le web, les anciens logiciels — tout en conservant la date et le lieu."
+msgid "HEIC is the photo format Apple uses on the iPhone — great compression, but almost nothing outside Apple can open it. Pixora sets them free: our high-fidelity conversion engine rebuilds every HEIC as a JPEG at maximum quality and full color — visually lossless, with the original date and location kept intact."
+msgstr "HEIC est le format photo qu'Apple utilise sur l'iPhone — excellente compression, mais presque rien en dehors d'Apple ne peut l'ouvrir. Pixora les libère : notre moteur de conversion haute fidélité reconstruit chaque HEIC en JPEG à qualité maximale et en couleur intégrale — visuellement sans perte, avec la date et le lieu d'origine intacts."
 
 msgid "Convert HEIC to JPEG on import"
 msgstr "Convertir le HEIC en JPEG à l'import"
 
-msgid "Automatic (Recommended)"
-msgstr "Automatique (Recommandé)"
-
-msgid "By year and month (Recommended)"
-msgstr "Par année et mois (Recommandé)"
-
-msgid "Duplicate detection (Recommended)"
-msgstr "Détection de doublons (Recommandé)"
+msgid "Recommended"
+msgstr "Recommandé"
 
 msgid "HEIC photos are converted on import so they open outside Pixora too."
 msgstr "Les photos HEIC sont converties à l'import pour s'ouvrir aussi en dehors de Pixora."

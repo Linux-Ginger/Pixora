@@ -534,26 +534,23 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
     return False
 
 
-def convert_image(src: Path, dst: Path, fmt: str) -> bool:
-    """Decode src (e.g. HEIC) and write it as JPEG or PNG. JPEG keeps the
-    original EXIF (date + orientation) so sorting and rotation survive; PNG can't
-    carry EXIF, so orientation is baked into the pixels instead. src must be a
-    local file — decoding straight off the phone's FUSE mount is unreliable."""
+def convert_image(src: Path, dst: Path, fmt: str = "jpeg") -> bool:
+    """Decode src (e.g. HEIC) and write it as a visually-lossless JPEG.
+
+    Quality 100 with no chroma subsampling (4:4:4) keeps every pixel the eye can
+    see — the only loss is JPEG's own re-encode, which at these settings is
+    imperceptible. The original EXIF (date + location + orientation) is carried
+    over so sorting and rotation survive. src must be a local file — decoding
+    straight off the phone's FUSE mount is unreliable."""
     try:
-        from PIL import Image, ImageOps
+        from PIL import Image
         with Image.open(src) as img:
-            if fmt == "png":
-                img = ImageOps.exif_transpose(img)
-                has_alpha = img.mode in ("RGBA", "LA", "PA") or (
-                    img.mode == "P" and "transparency" in img.info)
-                img.convert("RGBA" if has_alpha else "RGB").save(dst, "PNG")
-            else:
-                exif = img.info.get("exif")
-                rgb = img.convert("RGB")
-                if exif:
-                    rgb.save(dst, "JPEG", quality=95, exif=exif)
-                else:
-                    rgb.save(dst, "JPEG", quality=95)
+            exif = img.info.get("exif")
+            rgb = img.convert("RGB")
+            save_kw = {"quality": 100, "subsampling": 0, "optimize": True}
+            if exif:
+                save_kw["exif"] = exif
+            rgb.save(dst, "JPEG", **save_kw)
         return True
     except Exception:
         return False

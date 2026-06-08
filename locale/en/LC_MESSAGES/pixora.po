@@ -2507,20 +2507,14 @@ msgstr[1] "Found %d duplicates to review. The first of each group is kept; check
 msgid "Convert HEIC photos"
 msgstr "Convert HEIC photos"
 
-msgid "HEIC is the photo format Apple uses on the iPhone. It saves space, but almost nothing outside Apple devices can open it. When this is on, Pixora converts imported HEIC photos to JPEG so you can open them anywhere — Windows, the web, older programs — while keeping the date and location info."
-msgstr "HEIC is the photo format Apple uses on the iPhone. It saves space, but almost nothing outside Apple devices can open it. When this is on, Pixora converts imported HEIC photos to JPEG so you can open them anywhere — Windows, the web, older programs — while keeping the date and location info."
+msgid "HEIC is the photo format Apple uses on the iPhone — great compression, but almost nothing outside Apple can open it. Pixora sets them free: our high-fidelity conversion engine rebuilds every HEIC as a JPEG at maximum quality and full color — visually lossless, with the original date and location kept intact."
+msgstr "HEIC is the photo format Apple uses on the iPhone — great compression, but almost nothing outside Apple can open it. Pixora sets them free: our high-fidelity conversion engine rebuilds every HEIC as a JPEG at maximum quality and full color — visually lossless, with the original date and location kept intact."
 
 msgid "Convert HEIC to JPEG on import"
 msgstr "Convert HEIC to JPEG on import"
 
-msgid "Automatic (Recommended)"
-msgstr "Automatic (Recommended)"
-
-msgid "By year and month (Recommended)"
-msgstr "By year and month (Recommended)"
-
-msgid "Duplicate detection (Recommended)"
-msgstr "Duplicate detection (Recommended)"
+msgid "Recommended"
+msgstr "Recommended"
 
 msgid "HEIC photos are converted on import so they open outside Pixora too."
 msgstr "HEIC photos are converted on import so they open outside Pixora too."

@@ -45,6 +45,28 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, Gio
 
+
+def _recommended_badge():
+    """Small blue accent pill marking the recommended choice on an option."""
+    badge = Gtk.Label(label=_("Recommended"))
+    badge.set_valign(Gtk.Align.CENTER)
+    badge.add_css_class("recommended-badge")
+    css = Gtk.CssProvider()
+    css.load_from_string(
+        ".recommended-badge {"
+        " background-color: @accent_bg_color;"
+        " color: @accent_fg_color;"
+        " border-radius: 9999px;"
+        " padding: 1px 9px;"
+        " font-size: 0.72em;"
+        " font-weight: 800;"
+        " letter-spacing: 0.4px;"
+        "}"
+    )
+    badge.get_style_context().add_provider(
+        css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+    return badge
+
 try:
     gi.require_version("GUdev", "1.0")
     from gi.repository import GUdev
@@ -393,11 +415,12 @@ class SetupWizard(Adw.Window):
         self.radio_month.connect("toggled",
             lambda b: self._on_structure_radio("year_month", b))
         month_row = Adw.ActionRow(
-            title=_("By year and month (Recommended)"),
+            title=_("By year and month"),
             subtitle=_("Year folder with month subfolders — e.g. 2024/2024-03/."),
         )
         month_row.add_prefix(Gtk.Image.new_from_icon_name("view-list-symbolic"))
         month_row.add_prefix(self.radio_month)
+        month_row.add_suffix(_recommended_badge())
         month_row.set_activatable_widget(self.radio_month)
         group.add(month_row)
 
@@ -602,10 +625,11 @@ class SetupWizard(Adw.Window):
         self.dup_switch.set_valign(Gtk.Align.CENTER)
         self.dup_switch.set_active(True)
         dup_row = Adw.ActionRow(
-            title=_("Duplicate detection (Recommended)"),
+            title=_("Duplicate detection"),
             subtitle=_("Strict check for near-identical photos"),
         )
         dup_row.add_prefix(Gtk.Image.new_from_icon_name("security-high-symbolic"))
+        dup_row.add_suffix(_recommended_badge())
         dup_row.add_suffix(self.dup_switch)
         dup_row.set_activatable_widget(self.dup_switch)
         group.add(dup_row)

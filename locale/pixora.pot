@@ -1683,19 +1683,13 @@ msgstr[1] ""
 msgid "Convert HEIC photos"
 msgstr ""
 
-msgid "HEIC is the photo format Apple uses on the iPhone. It saves space, but almost nothing outside Apple devices can open it. When this is on, Pixora converts imported HEIC photos to JPEG so you can open them anywhere — Windows, the web, older programs — while keeping the date and location info."
+msgid "HEIC is the photo format Apple uses on the iPhone — great compression, but almost nothing outside Apple can open it. Pixora sets them free: our high-fidelity conversion engine rebuilds every HEIC as a JPEG at maximum quality and full color — visually lossless, with the original date and location kept intact."
 msgstr ""
 
 msgid "Convert HEIC to JPEG on import"
 msgstr ""
 
-msgid "Automatic (Recommended)"
-msgstr ""
-
-msgid "By year and month (Recommended)"
-msgstr ""
-
-msgid "Duplicate detection (Recommended)"
+msgid "Recommended"
 msgstr ""
 
 msgid "HEIC photos are converted on import so they open outside Pixora too."
