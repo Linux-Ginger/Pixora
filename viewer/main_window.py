@@ -3435,6 +3435,16 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_spinner.set_visible(False)
         viewer_area.add_overlay(self.video_spinner)
 
+        # Shown while a full-res photo is still decoding (cache miss), so the
+        # user sees a loader instead of a black gap or a blurry thumbnail.
+        self._photo_spinner = Gtk.Spinner()
+        self._photo_spinner.set_size_request(56, 56)
+        self._photo_spinner.set_halign(Gtk.Align.CENTER)
+        self._photo_spinner.set_valign(Gtk.Align.CENTER)
+        self._photo_spinner.set_visible(False)
+        self._photo_spinner.set_can_target(False)
+        viewer_area.add_overlay(self._photo_spinner)
+
         return viewer_area
 
     def build_bottombar(self):
@@ -4059,6 +4069,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._set_toolbars_revealed(False)
         self._stop_video()
         self.photo_picture.set_pixbuf(None)
+        if not is_video(path) and hasattr(self, "_photo_spinner"):
+            self._photo_spinner.set_visible(True)
+            self._photo_spinner.start()
         self._set_viewer_location("empty")
         self.main_stack.set_visible_child_name("viewer")
         self._filmstrip_thumbs = {}
@@ -4162,6 +4175,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _show_full_photo(self, pixbuf, path, location="", searching=False):
+        self._hide_photo_spinner()  # load finished (or failed): stop the loader
         # Queue while a previous slide is still running — starting a new
         # transition mid-flight makes GtkStack snap to the old target first,
         # causing a visible jump. On completion the latest stashed target fires.
@@ -4319,6 +4333,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._set_viewer_location("empty")
         self.filmstrip_area.queue_draw()
         self._scroll_filmstrip_to_current()
+        # Re-prioritise filmstrip thumbs around the new position so jumping
+        # doesn't leave grey/empty cells where it scrolled to.
+        if getattr(self, "_filmstrip_reprio_id", None):
+            GLib.source_remove(self._filmstrip_reprio_id)
+        self._filmstrip_reprio_id = GLib.timeout_add(
+            120, self._reprioritize_filmstrip)
 
         if hasattr(self, '_nav_debounce_id') and self._nav_debounce_id:
             GLib.source_remove(self._nav_debounce_id)
@@ -4341,21 +4361,32 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._preload_adjacent_photos)
                 return
 
-        # Cache miss: slide to the thumbnail as a placeholder (single motion);
-        # the full-res load then sharpens it in place via _show_full_photo.
+        # Cache miss: show a loader and keep the previous frame until the
+        # full-res image is ready — no black gap, no blurry thumbnail flash.
         if not is_video(path):
-            try:
-                thumb_path = get_cache_path(path, THUMB_SIZE)
-                if os.path.exists(thumb_path):
-                    thumb_pb = GdkPixbuf.Pixbuf.new_from_file(thumb_path)
-                    if thumb_pb:
-                        initial, coords = self._determine_initial_location(path)
-                        self._show_full_photo(thumb_pb, path, initial,
-                                              searching=bool(coords))
-            except Exception:
-                pass
+            self._photo_spinner.set_visible(True)
+            self._photo_spinner.start()
 
         self._nav_debounce_id = GLib.timeout_add(0, self._do_scheduled_load)
+
+    def _reprioritize_filmstrip(self):
+        self._filmstrip_reprio_id = None
+        if not self.photos or not getattr(self, "_filmstrip_view_order", None):
+            return False
+        self._filmstrip_load_id += 1
+        load_id = self._filmstrip_load_id
+        threading.Thread(
+            target=self._load_filmstrip_bg,
+            args=(list(self.photos), list(self._filmstrip_view_order), load_id),
+            daemon=True
+        ).start()
+        return False
+
+    def _hide_photo_spinner(self):
+        sp = getattr(self, "_photo_spinner", None)
+        if sp is not None:
+            sp.set_visible(False)
+            sp.stop()
 
     def _preload_adjacent_photos(self):
         if not hasattr(self, "current_index") or not self.photos:
@@ -4392,6 +4423,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def close_viewer(self, btn=None):
         log_info(_("Viewer closed → back to grid"))
+        self._hide_photo_spinner()
         self._stop_video()
         self._viewer_load_id += 1
         self.header.set_visible(True)
@@ -4645,6 +4677,7 @@ class MainWindow(Adw.ApplicationWindow):
         return True
 
     def _show_video(self, path, location="", searching=False):
+        self._hide_photo_spinner()
         self._stop_video()
         self._preview_cache = OrderedDict()
         self._preview_pending = None

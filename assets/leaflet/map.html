@@ -105,6 +105,21 @@
   });
   tileLayer.addTo(map);
 
+  // Met zoomAnimation/updateWhenZooming uit vraagt Leaflet na een zoom soms
+  // niet alle tegels op, waardoor er lege vlakken blijven tot je opnieuw
+  // zoomt. Nudge de tegel-grid na elke zoom/move zodat ontbrekende tegels
+  // alsnog geladen worden (bestaande tegels blijven staan — geen flikkering).
+  function nudgeTiles() {
+    if (tileLayer && tileLayer._update) {
+      try { tileLayer._update(); } catch (e) {}
+    }
+  }
+  map.on('zoomend', function() {
+    setTimeout(nudgeTiles, 0);
+    setTimeout(nudgeTiles, 200);
+  });
+  map.on('moveend', function() { setTimeout(nudgeTiles, 0); });
+
   // Laat Pixora weten wanneer de eerste tiles klaar zijn, zodat de
   // spinner kan wisselen naar de kaart.
   let firstTileLoaded = false;
