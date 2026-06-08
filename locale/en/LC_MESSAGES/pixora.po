@@ -2682,3 +2682,6 @@ msgstr[1] "%d possible duplicates will be shown afterwards so you can review the
 
 msgid "Video {n}"
 msgstr "Video {n}"
+
+msgid "Deleting…"
+msgstr "Deleting…"

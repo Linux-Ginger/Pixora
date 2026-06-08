@@ -2712,3 +2712,6 @@ msgstr[1] "%d mögliche Duplikate werden danach angezeigt, damit du sie überpr�
 
 msgid "Video {n}"
 msgstr "Video {n}"
+
+msgid "Deleting…"
+msgstr "Wird gelöscht…"

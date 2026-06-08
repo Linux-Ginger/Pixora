@@ -2728,3 +2728,6 @@ msgstr[1] "%d doublons possibles seront affichés ensuite pour que vous puissiez
 
 msgid "Video {n}"
 msgstr "Vidéo {n}"
+
+msgid "Deleting…"
+msgstr "Suppression en cours…"

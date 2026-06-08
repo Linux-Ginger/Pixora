@@ -1858,3 +1858,6 @@ msgstr[1] ""
 
 msgid "Video {n}"
 msgstr ""
+
+msgid "Deleting…"
+msgstr ""

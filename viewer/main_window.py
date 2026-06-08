@@ -7881,6 +7881,26 @@ class MainWindow(Adw.ApplicationWindow):
             if getattr(self, "_dup_win", None):
                 self._dup_win.close()
             return
+        # Show a "deleting…" spinner and run the removal off-thread so the
+        # window doesn't freeze while many (large) files are deleted.
+        for b in (getattr(self, "_dup_delete_btn", None),
+                  getattr(self, "_dup_selall_btn", None),
+                  getattr(self, "_dup_deselall_btn", None)):
+            if b is not None:
+                b.set_sensitive(False)
+        while child := self._dup_win_box.get_first_child():
+            self._dup_win_box.remove(child)
+        sp = Gtk.Spinner()
+        sp.start()
+        sp.set_size_request(-1, 60)
+        lbl = Gtk.Label(label=_("Deleting…"))
+        lbl.add_css_class("dim-label")
+        self._dup_win_box.append(sp)
+        self._dup_win_box.append(lbl)
+        threading.Thread(
+            target=self._delete_dupes_thread, args=(to_delete,), daemon=True).start()
+
+    def _delete_dupes_thread(self, to_delete):
         deleted = 0
         for p in to_delete:
             try:
@@ -7892,14 +7912,19 @@ class MainWindow(Adw.ApplicationWindow):
                         os.remove(cache)
                 except Exception:
                     pass
-                self._favorites.discard(p)
             except Exception as e:
                 log_warn(_("Duplicate delete failed for {p}: {e}").format(p=p, e=e))
+        GLib.idle_add(self._after_delete_dupes, to_delete, deleted)
+
+    def _after_delete_dupes(self, to_delete, deleted):
+        for p in to_delete:
+            self._favorites.discard(p)
         log_info(_("Duplicate cleanup: removed {n} files").format(n=deleted))
         if getattr(self, "_dup_win", None):
             self._dup_win.close()
             self._dup_win = None
         self.reload_photos()
+        return False
 
     def _reorganize_now(self):
         """Dev 'run now' button: tidy up without a confirmation popup (moves run

@@ -2700,3 +2700,6 @@ msgstr[1] "%d mogelijke duplicaten worden daarna getoond zodat je ze kunt contro
 
 msgid "Video {n}"
 msgstr "Video {n}"
+
+msgid "Deleting…"
+msgstr "Bezig met verwijderen…"
