@@ -1395,7 +1395,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._heic_converting = False
         self._heic_fraction = 0.0
         self._heic_detail = ""
-        self._heic_startup_done = False
+        # Stop re-checking/nagging this session once swept clean or dismissed.
+        self._heic_sweep_dismissed = False
         # Orphan state: files on USB not in Pixora. Warn after silent backup.
         self._last_scan_orphan_count = 0
         self._last_scan_orphan_rels = []
@@ -6361,25 +6362,6 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         structure_group.add(dedup_row)
 
-        silent_row = Adw.ActionRow(
-            title=_("Auto-confirm"),
-            subtitle=_("Starts right away when there's work to do, without interrupting."),
-        )
-        silent_row.add_prefix(
-            Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-        silent_switch = Gtk.Switch()
-        silent_switch.set_valign(Gtk.Align.CENTER)
-        silent_switch.set_active(
-            bool(self.settings.get("reorganize_silent", False)))
-        silent_switch.connect("notify::active", self._on_reorganize_silent_toggle)
-        silent_row.add_suffix(silent_switch)
-        silent_row.set_activatable_widget(silent_switch)
-        try:
-            silent_row.set_subtitle_lines(3)
-        except Exception:
-            pass
-        structure_group.add(silent_row)
-
         import_box.append(structure_group)
 
         dup_group = Adw.PreferencesGroup()
@@ -6606,26 +6588,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dedup_row = dedup_row
         backup_group.add(dedup_row)
 
-        # Silent-mode: auto-start backup, skip scan dialog. Errors still popup.
-        self.settings_silent_switch = Gtk.Switch()
-        self.settings_silent_switch.set_valign(Gtk.Align.CENTER)
-        self.settings_silent_switch.set_active(bool(self.settings.get("backup_silent")))
-        self.settings_silent_switch.connect("notify::active", self.on_backup_silent_toggle)
-        silent_row = Adw.ActionRow(
-            title=_("Auto-confirm"),
-            subtitle=_("Starts right away when there's work to do, without interrupting."),
-        )
-        silent_row.add_prefix(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-        silent_row.add_suffix(self.settings_silent_switch)
-        silent_row.set_activatable_widget(self.settings_silent_switch)
-        silent_row.set_sensitive(backup_on and drive_present)
-        try:
-            silent_row.set_subtitle_lines(3)
-        except Exception:
-            pass
-        self.settings_silent_row = silent_row
-        backup_group.add(silent_row)
-
         self.settings_manual_scan_btn = Gtk.Button()
         self.settings_manual_scan_btn.add_css_class("flat")
         self.settings_manual_scan_btn.set_valign(Gtk.Align.CENTER)
@@ -6667,6 +6629,35 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_backup_group = backup_group
 
         import_box.append(backup_group)
+
+        auto_group = Adw.PreferencesGroup()
+        auto_group.set_title(_("Background tasks"))
+        auto_group.set_description(
+            _("About every 5 minutes Pixora quietly checks your library: it "
+              "tidies the folder structure, backs up to your USB drive, and "
+              "converts leftover HEIC photos. By default it asks before "
+              "starting each one."))
+        self._auto_confirm_switch = Gtk.Switch()
+        self._auto_confirm_switch.set_valign(Gtk.Align.CENTER)
+        self._auto_confirm_switch.set_active(bool(
+            self.settings.get("auto_confirm")
+            or self.settings.get("reorganize_silent")
+            or self.settings.get("backup_silent")))
+        self._auto_confirm_switch.connect(
+            "notify::active", self._on_auto_confirm_toggle)
+        auto_row = Adw.ActionRow(
+            title=_("Run automatically without asking"),
+            subtitle=_("Skip the confirmation popups and just run these tasks in the background. Pixora won't interrupt you."))
+        auto_row.add_prefix(
+            Gtk.Image.new_from_icon_name("emblem-ok-symbolic"))
+        auto_row.add_suffix(self._auto_confirm_switch)
+        auto_row.set_activatable_widget(self._auto_confirm_switch)
+        try:
+            auto_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        auto_group.add(auto_row)
+        import_box.append(auto_group)
 
         about_group = Adw.PreferencesGroup()
         about_group.set_title(_("About"))
@@ -8156,12 +8147,14 @@ class MainWindow(Adw.ApplicationWindow):
         self._structure_startup_scanned = True
         self._periodic_scan()
         # Sweep leftover HEICs a bit later so it doesn't fight the startup load.
-        GLib.timeout_add_seconds(8, self._maybe_auto_convert_library)
+        GLib.timeout_add_seconds(8, self._maybe_run_heic_sweep)
         return False
 
     def _trigger_structure_scan(self):
         """Silent threaded structure-scan; on mismatch shows reorg popup."""
         if self._structure_scanning:
+            return
+        if self._heic_converting:
             return
         self._structure_scanning = True
         self._backup_scan_phase = 0.0
@@ -8204,12 +8197,17 @@ class MainWindow(Adw.ApplicationWindow):
             self._on_reorganize_scan_done(moves, dups, True)
             return False
         self._maybe_trigger_backup_now()
+        # Last step of the maintenance pass: convert leftover HEICs, but only
+        # once backup isn't running — so it's one donut at a time.
+        if not self._backup_scanning and not self._backup_running:
+            self._maybe_run_heic_sweep()
         return False
 
     def _maybe_trigger_backup_now(self):
         """Start backup-scan if idle + configured. Cooldown skips re-scanning if synced."""
         try:
-            if self._backup_running or self._backup_scanning:
+            if self._backup_running or self._backup_scanning \
+                    or self._heic_converting:
                 return
             if self._reorganize_active \
                     or time.time() < self._reorganize_block_until:
@@ -8240,6 +8238,18 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings["convert_heic"] = active
         # PNG was dropped: conversion is always JPEG now.
         self.settings["convert_format"] = "jpeg"
+        # Turning conversion back on → allow the sweep to re-check this session.
+        if active:
+            self._heic_sweep_dismissed = False
+        save_settings(self.settings)
+
+    def _on_auto_confirm_toggle(self, switch, _pspec):
+        """One master switch drives the per-task silent flags, so the existing
+        backup/structure logic keeps reading its own keys unchanged."""
+        val = bool(switch.get_active())
+        self.settings["auto_confirm"] = val
+        self.settings["reorganize_silent"] = val
+        self.settings["backup_silent"] = val
         save_settings(self.settings)
 
     def _recommended_badge(self):
@@ -8309,21 +8319,54 @@ class MainWindow(Adw.ApplicationWindow):
             if r == "go" else None)
         self._present_dialog(dlg)
 
-    def _maybe_auto_convert_library(self):
-        """Startup sweep: if conversion is on, convert any leftover HEICs."""
-        if self._heic_startup_done or self._heic_converting:
+    def _maybe_run_heic_sweep(self):
+        """Periodic/startup sweep: convert leftover library HEICs. Defers while
+        other maintenance runs; prompts first unless auto-confirm is on."""
+        if (self._heic_converting or self._heic_sweep_dismissed
+                or self._structure_scanning or self._backup_scanning
+                or self._backup_running or self._reorganize_active):
             return False
-        self._heic_startup_done = True
         if not self.settings.get("convert_heic", False):
             return False
         threading.Thread(
-            target=self._auto_convert_scan_thread, daemon=True).start()
+            target=self._heic_sweep_scan_thread, daemon=True).start()
         return False
 
-    def _auto_convert_scan_thread(self):
+    def _heic_sweep_scan_thread(self):
         files = self._collect_library_heics()
-        if files:
-            GLib.idle_add(self._start_library_conversion, files, True)
+        GLib.idle_add(self._on_heic_sweep_scanned, files)
+
+    def _on_heic_sweep_scanned(self, files):
+        if not files:
+            # Clean — stop walking the library every cycle this session.
+            self._heic_sweep_dismissed = True
+            return False
+        if self._heic_converting:
+            return False
+        if self.settings.get("auto_confirm"):
+            self._start_library_conversion(files, silent=True)
+            return False
+        n = len(files)
+        dlg = Adw.AlertDialog(
+            heading=_("Convert HEIC photos?"),
+            body=ngettext(
+                "Pixora found %d HEIC photo to convert to JPEG. Convert it now?",
+                "Pixora found %d HEIC photos to convert to JPEG. Convert them now?",
+                n) % n)
+        dlg.add_response("later", _("Later"))
+        dlg.add_response("go", _("Convert"))
+        dlg.set_response_appearance("go", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("go")
+        dlg.set_close_response("later")
+
+        def _resp(d, r):
+            if r == "go":
+                self._start_library_conversion(files, silent=False)
+            else:
+                self._heic_sweep_dismissed = True  # don't nag again this session
+        dlg.connect("response", _resp)
+        self._present_dialog(dlg)
+        return False
 
     def _start_library_conversion(self, files, silent=False):
         if self._heic_converting or not files:
@@ -9185,7 +9228,8 @@ class MainWindow(Adw.ApplicationWindow):
                     or time.time() < self._reorganize_block_until:
                 return True
             if self._structure_scanning \
-                    or self._backup_scanning or self._backup_running:
+                    or self._backup_scanning or self._backup_running \
+                    or self._heic_converting:
                 return True
             self._trigger_structure_scan()
         except Exception:
@@ -9548,10 +9592,9 @@ class MainWindow(Adw.ApplicationWindow):
             cr.arc_negative(cx, cy, r_inner, 2 * math.pi, 0)
             cr.fill()
 
-            # Purple = HEIC conversion; orange = backup; dark blue = structure.
-            if self._heic_converting:
-                color = (0.55, 0.20, 0.75)  # purple
-            elif (self._backup_scanning or self._backup_running
+            # Orange = backup (kept recognizable); dark blue = routine
+            # maintenance (structure check + HEIC conversion).
+            if (self._backup_scanning or self._backup_running
                     or self._orphan_reviewing):
                 color = (0.914, 0.329, 0.125)  # orange
             else:

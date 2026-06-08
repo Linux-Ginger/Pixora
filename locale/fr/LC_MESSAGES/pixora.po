@@ -2617,3 +2617,23 @@ msgstr "Conversion de la bibliothèque HEIC démarrée : {n} fichiers"
 
 msgid "HEIC library conversion done: {c} converted, {f} failed"
 msgstr "Conversion de la bibliothèque HEIC terminée : {c} converties, {f} échouées"
+
+msgid "Background tasks"
+msgstr "Tâches en arrière-plan"
+
+msgid "About every 5 minutes Pixora quietly checks your library: it tidies the folder structure, backs up to your USB drive, and converts leftover HEIC photos. By default it asks before starting each one."
+msgstr "Environ toutes les 5 minutes, Pixora vérifie discrètement votre bibliothèque : il range la structure des dossiers, sauvegarde sur votre clé USB et convertit les photos HEIC restantes. Par défaut, il demande avant de lancer chaque tâche."
+
+msgid "Run automatically without asking"
+msgstr "Exécuter automatiquement sans demander"
+
+msgid "Skip the confirmation popups and just run these tasks in the background. Pixora won't interrupt you."
+msgstr "Ignorez les fenêtres de confirmation et exécutez simplement ces tâches en arrière-plan. Pixora ne vous interrompt pas."
+
+msgid "Convert HEIC photos?"
+msgstr "Convertir les photos HEIC ?"
+
+msgid "Pixora found %d HEIC photo to convert to JPEG. Convert it now?"
+msgid_plural "Pixora found %d HEIC photos to convert to JPEG. Convert them now?"
+msgstr[0] "Pixora a trouvé %d photo HEIC à convertir en JPEG. Convertir maintenant ?"
+msgstr[1] "Pixora a trouvé %d photos HEIC à convertir en JPEG. Convertir maintenant ?"
