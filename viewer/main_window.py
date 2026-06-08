@@ -7576,38 +7576,51 @@ class MainWindow(Adw.ApplicationWindow):
                 items.append((p, imagehash.hex_to_hash(h)))
             except Exception:
                 continue
-        used = set()
-        groups = []
-        for i in range(len(items)):
-            p1, h1 = items[i]
-            if p1 in used:
-                continue
-            group = [p1]
-            used.add(p1)
-            b1 = self._dup_base_name(p1)
-            for j in range(i + 1, len(items)):
-                p2, h2 = items[j]
-                if p2 in used:
-                    continue
-                d = h1 - h2
-                same_base = self._dup_base_name(p2) == b1
-                if d <= threshold or (same_base and d <= threshold + 6):
-                    group.append(p2)
-                    used.add(p2)
-            if len(group) > 1:
-                # Keeper first: prefer no _N suffix, then the largest file.
-                import re as _re
+        # Deterministic clustering via union-find: every pair within the
+        # threshold (or sharing a base name, loosened) is an edge, and each
+        # connected component becomes one group. This is order-independent —
+        # the old greedy pass could "absorb" a copy into the wrong group or
+        # drop it, so the same photo was sometimes missed.
+        import re as _re
+        n = len(items)
+        parent = list(range(n))
 
-                def _sortkey(p):
-                    has_suffix = bool(_re.search(r"_\d+$",
-                                                 os.path.splitext(os.path.basename(p))[0]))
-                    try:
-                        size = os.path.getsize(p)
-                    except OSError:
-                        size = 0
-                    return (has_suffix, -size)
-                group.sort(key=_sortkey)
-                groups.append(group)
+        def _find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def _union(a, b):
+            ra, rb = _find(a), _find(b)
+            if ra != rb:
+                parent[ra] = rb
+
+        bases = [self._dup_base_name(p) for p, _h in items]
+        for i in range(n):
+            for j in range(i + 1, n):
+                d = items[i][1] - items[j][1]
+                if d <= threshold or (bases[i] == bases[j] and d <= threshold + 6):
+                    _union(i, j)
+
+        comps = {}
+        for i in range(n):
+            comps.setdefault(_find(i), []).append(items[i][0])
+
+        def _sortkey(p):
+            has_suffix = bool(_re.search(r"_\d+$",
+                                         os.path.splitext(os.path.basename(p))[0]))
+            try:
+                size = os.path.getsize(p)
+            except OSError:
+                size = 0
+            return (has_suffix, -size)
+
+        groups = []
+        for members in comps.values():
+            if len(members) > 1:
+                members.sort(key=_sortkey)  # keeper first: no _N suffix, largest
+                groups.append(members)
         return groups
 
     def _open_dup_window(self, scanning=False):

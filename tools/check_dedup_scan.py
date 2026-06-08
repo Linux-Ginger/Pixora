@@ -104,26 +104,33 @@ if sub:
     if not found_in_app:
         print(f"      (none matching '{sub}' are in the app's hash index!)")
 
-used = set()
-groups = []
-for i in range(len(items)):
-    p1, h1 = items[i]
-    if p1 in used:
-        continue
-    group = [p1]
-    used.add(p1)
-    b1 = base_name(p1)
-    for j in range(i + 1, len(items)):
-        p2, h2 = items[j]
-        if p2 in used:
-            continue
-        d = h1 - h2
-        same_base = base_name(p2) == b1
-        if d <= threshold or (same_base and d <= threshold + 6):
-            group.append(p2)
-            used.add(p2)
-    if len(group) > 1:
-        groups.append(group)
+n = len(items)
+parent = list(range(n))
+
+
+def _find(x):
+    while parent[x] != x:
+        parent[x] = parent[parent[x]]
+        x = parent[x]
+    return x
+
+
+def _union(a, b):
+    ra, rb = _find(a), _find(b)
+    if ra != rb:
+        parent[ra] = rb
+
+
+bases = [base_name(p) for p, _h in items]
+for i in range(n):
+    for j in range(i + 1, n):
+        d = items[i][1] - items[j][1]
+        if d <= threshold or (bases[i] == bases[j] and d <= threshold + 6):
+            _union(i, j)
+comps = {}
+for i in range(n):
+    comps.setdefault(_find(i), []).append(items[i][0])
+groups = [g for g in comps.values() if len(g) > 1]
 
 print(f"\n   Groups the app would show: {len(groups)}")
 for gi, g in enumerate(groups, 1):
