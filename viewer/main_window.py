@@ -4579,16 +4579,13 @@ class MainWindow(Adw.ApplicationWindow):
                 except ValueError:
                     current_vp = vp
                 self._nav_direction = "next" if vp > current_vp else "prev"
+                # Use the exact same path as the arrow keys: stop any video,
+                # then schedule the load (placeholder + dispatch photo/video).
+                # The old direct _load_full_photo call left the video playing
+                # and the main view out of sync with the filmstrip.
+                self._stop_video()
                 self.current_index = photo_idx
-                self._viewer_load_id += 1
-                load_id = self._viewer_load_id
-                self._set_viewer_location("empty")
-                self.filmstrip_area.queue_draw()
-                threading.Thread(
-                    target=self._load_full_photo,
-                    args=(self.photos[photo_idx], load_id),
-                    daemon=True
-                ).start()
+                self._schedule_photo_load()
 
     def _scroll_filmstrip_to_current(self):
         """Center current photo; clamp keeps first/last at edges."""
@@ -4669,6 +4666,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_spinner.start()
         self._video_media = Gtk.MediaFile.new_for_filename(path)
         self._video_media.set_loop(False)
+        # Reset cleanly at end-of-stream instead of hanging on a spinner.
+        self._video_ended_hid = self._video_media.connect(
+            "notify::ended", self._on_video_ended)
         self.video_display.set_paintable(self._video_media)
         self._video_media.play()
         self.video_play_btn.set_icon_name("media-playback-pause-symbolic")
@@ -4759,6 +4759,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_spinner.set_visible(False)
         self.video_spinner.stop()
         if self._video_media:
+            hid = getattr(self, "_video_ended_hid", None)
+            if hid is not None:
+                try:
+                    self._video_media.disconnect(hid)
+                except Exception:
+                    pass
+                self._video_ended_hid = None
             self._video_media.pause()
             self._video_media = None
 
@@ -4799,6 +4806,25 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         return True
 
+    def _on_video_ended(self, media, _pspec):
+        """At end-of-stream: rewind to the start and pause, so the video shows
+        its first frame and the play button works — never an endless spinner."""
+        if not media.get_ended():
+            return
+        try:
+            media.seek(0)
+            media.pause()
+        except Exception:
+            pass
+        self._stop_video_poll()
+        self.video_play_btn.set_icon_name("media-playback-start-symbolic")
+        self.video_spinner.set_visible(False)
+        self.video_spinner.stop()
+        self._video_scrubbing_lock = True
+        self.video_scrubber.set_value(0.0)
+        self._video_scrubbing_lock = False
+        self._show_viewer_ui()  # keep controls visible to replay
+
     def _on_video_play_pause(self, btn):
         if not self._video_media:
             return
@@ -4812,6 +4838,12 @@ class MainWindow(Adw.ApplicationWindow):
             self._cancel_fade()
             self._show_viewer_ui()
         else:
+            # Replaying after it ended: rewind first, else play() is a no-op.
+            if self._video_media.get_ended():
+                try:
+                    self._video_media.seek(0)
+                except Exception:
+                    pass
             self._video_media.play()
             if btn:
                 btn.set_icon_name("media-playback-pause-symbolic")
