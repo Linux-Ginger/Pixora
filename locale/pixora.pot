@@ -1855,3 +1855,6 @@ msgid "%d possible duplicate will be shown afterwards so you can review it — n
 msgid_plural "%d possible duplicates will be shown afterwards so you can review them — nothing is deleted automatically."
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Video {n}"
+msgstr ""

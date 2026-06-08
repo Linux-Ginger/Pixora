@@ -7782,8 +7782,16 @@ class MainWindow(Adw.ApplicationWindow):
                 "Found %d possible duplicates. The original (the one without a _number) of each set is kept; checked copies are deleted.",
                 total) % total)
         self._dup_win_box.append(head)
-        for i, group in enumerate(groups, 1):
-            self._dup_win_box.append(self._make_dup_group_card(group, i))
+        photo_n = 0
+        video_n = 0
+        for group in groups:
+            if all(is_video(p) for p in group):
+                video_n += 1
+                title = _("Video {n}").format(n=video_n)
+            else:
+                photo_n += 1
+                title = _("Photo {n}").format(n=photo_n)
+            self._dup_win_box.append(self._make_dup_group_card(group, title))
         self._dup_delete_btn.set_sensitive(True)
         self._dup_selall_btn.set_sensitive(True)
         self._dup_deselall_btn.set_sensitive(True)
@@ -7798,12 +7806,12 @@ class MainWindow(Adw.ApplicationWindow):
                 return p
         return group[0]
 
-    def _make_dup_group_card(self, group, index):
+    def _make_dup_group_card(self, group, title):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         card.add_css_class("card")
         card.set_margin_bottom(8)
 
-        header = Gtk.Label(label=_("Photo {n}").format(n=index))
+        header = Gtk.Label(label=title)
         header.add_css_class("heading")
         header.set_xalign(0)
         header.set_margin_top(10)
