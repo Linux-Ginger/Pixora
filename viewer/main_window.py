@@ -1535,16 +1535,6 @@ class MainWindow(Adw.ApplicationWindow):
         splash_icon.set_halign(Gtk.Align.CENTER)
         splash_icon.get_style_context().add_provider(splash_css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
-        try:
-            _logo_pb = GdkPixbuf.Pixbuf.new_from_file_at_size(
-                get_logo_path(self.is_dark()), 880, 224)
-            splash_logo = Gtk.Picture.new_for_paintable(
-                _FixedSizePaintable(Gdk.Texture.new_for_pixbuf(_logo_pb), 220, 56))
-        except Exception:
-            splash_logo = Gtk.Label(label="Pixora")
-            splash_logo.add_css_class("title-1")
-        splash_logo.set_halign(Gtk.Align.CENTER)
-
         splash_lbl = Gtk.Label(label=_("Pixora is starting…"))
         splash_lbl.add_css_class("dim-label")
 
@@ -1556,7 +1546,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._splash_bar.get_style_context().add_provider(splash_css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
         splash_inner.append(splash_icon)
-        splash_inner.append(splash_logo)
         splash_inner.append(self._splash_bar)
         splash_inner.append(splash_lbl)
         splash.append(splash_inner)
@@ -6449,7 +6438,7 @@ class MainWindow(Adw.ApplicationWindow):
         dev_group = Adw.PreferencesGroup()
         dev_group.set_title(_("Advanced"))
         dev_group.set_description(
-            _("Developer mode shows Pixora with terminal output and uses the terminal updater. Only enable if you know what you're doing.")
+            _("Shows terminal output and extra task buttons. Only enable if you know what you're doing.")
         )
         current_dev = bool(self.settings.get("dev_mode", False))
         dev_row = Adw.ActionRow(
@@ -6475,7 +6464,7 @@ class MainWindow(Adw.ApplicationWindow):
         reset_btn.connect("clicked", self._on_factory_reset_clicked)
         reset_row = Adw.ActionRow(
             title=_("Reset to factory settings"),
-            subtitle=_("Clear all Pixora settings — chosen folder, backup, language and switches — and restart in the setup wizard. Your photos and library on disk are NOT touched."),
+            subtitle=_("Clears all settings and restarts in the setup wizard. Your photos are NOT touched."),
         )
         reset_row.add_prefix(Gtk.Image.new_from_icon_name("edit-clear-all-symbolic"))
         reset_row.add_suffix(reset_btn)
@@ -6489,12 +6478,12 @@ class MainWindow(Adw.ApplicationWindow):
         structure_group = Adw.PreferencesGroup()
         structure_group.set_title(_("Folder structure"))
         structure_group.set_description(
-            _("Controls how Pixora saves imported photos in your library.")
+            _("How imported photos are saved in your library.")
         )
 
         structure_info_row = Adw.ActionRow(
             title=_("How it works"),
-            subtitle=_("When you import, Pixora files each photo by its capture date into the layout you pick below — so your library stays sorted automatically."),
+            subtitle=_("Each photo is filed by capture date into the layout below — your library stays sorted automatically."),
         )
         structure_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
         structure_info_row.set_activatable(False)
@@ -6555,7 +6544,7 @@ class MainWindow(Adw.ApplicationWindow):
         reorganize_btn.connect("clicked", lambda b: self._reorganize_now())
         reorganize_row = Adw.ActionRow(
             title=_("Reorganize folders now"),
-            subtitle=_("Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above. Possible duplicates are shown for review — never deleted automatically. Pixora also does this in the background."),
+            subtitle=_("Moves your library into the structure chosen above. Possible duplicates are shown for review — never deleted automatically."),
         )
         reorganize_row.add_prefix(Gtk.Image.new_from_icon_name("view-refresh-symbolic"))
         reorganize_row.add_suffix(reorganize_btn)
@@ -6604,7 +6593,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._dedup_btn.connect("clicked", lambda b: self._prompt_find_duplicates())
         dedup_row = Adw.ActionRow(
             title=_("Clean up duplicates"),
-            subtitle=_("Scan photos already in your archive for duplicates — including lightly edited copies and same-photo files — and review them with thumbnails before you delete any. The original is always kept."),
+            subtitle=_("Finds duplicates already in your library, including edited copies. You review everything first — the original is always kept."),
         )
         dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
         dedup_row.add_suffix(self._dedup_btn)
@@ -6620,16 +6609,13 @@ class MainWindow(Adw.ApplicationWindow):
         convert_group = Adw.PreferencesGroup()
         convert_group.set_title(_("Convert HEIC photos"))
         convert_group.set_description(
-            _("HEIC is the photo format Apple uses on the iPhone — great "
-              "compression, but almost nothing outside Apple can open it. "
-              "Pixora sets them free: our high-fidelity conversion engine "
-              "rebuilds every HEIC as a JPEG at maximum quality and full color "
-              "— visually lossless, with the original date and location kept "
-              "intact."))
+            _("HEIC is Apple's iPhone photo format — hard to open outside "
+              "Apple. Pixora converts each one to a maximum-quality JPEG: "
+              "visually lossless, with date and location kept."))
 
         convert_info_row = Adw.ActionRow(
             title=_("How it works"),
-            subtitle=_("Each HEIC is decoded and re-saved as a JPEG at maximum quality and full color — visually lossless — keeping the date and location. The original HEIC is replaced by the JPEG."),
+            subtitle=_("Each HEIC is re-saved as a maximum-quality JPEG that replaces the original. Date and location are kept."),
         )
         convert_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
         convert_info_row.set_activatable(False)
@@ -6691,7 +6677,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         backup_info_row = Adw.ActionRow(
             title=_("How it works"),
-            subtitle=_("After each import Pixora copies your new photos to the USB drive, so you always have a second copy. Plug the drive in and it backs up in the background."),
+            subtitle=_("After each import your new photos are copied to the USB drive in the background — so you always have a second copy."),
         )
         backup_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
         backup_info_row.set_activatable(False)
@@ -6796,7 +6782,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         mode_sync_row = Adw.ActionRow(
             title=_("Sync"),
-            subtitle=_("Exact mirror of your Pixora library. Photos you delete in Pixora are also removed from the USB on the next backup."),
+            subtitle=_("Exact mirror: photos you delete in Pixora are also removed from the USB on the next backup."),
         )
         mode_sync_row.add_prefix(Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic"))
         mode_sync_row.add_prefix(self.radio_mode_sync)
@@ -6822,7 +6808,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_dedup_switch.connect("notify::active", self.on_backup_dedup_toggle)
         dedup_row = Adw.ActionRow(
             title=_("Backup duplicate detector"),
-            subtitle=_("Skips photos already on the USB, even if they are stored there under a different name or folder. Requires duplicate detection above to be enabled."),
+            subtitle=_("Skips photos already on the USB, even under a different name or folder. Requires duplicate detection."),
         )
         dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
         dedup_row.add_suffix(self.settings_dedup_switch)
@@ -6881,10 +6867,9 @@ class MainWindow(Adw.ApplicationWindow):
         auto_group = Adw.PreferencesGroup()
         auto_group.set_title(_("Background tasks"))
         auto_group.set_description(
-            _("Every few minutes Pixora quietly runs the background tasks "
-              "you've set up — tidying the folder structure, backing up to "
-              "your USB drive, and converting HEIC photos. Each one only runs "
-              "when it's enabled. By default Pixora asks before starting."))
+            _("Every few minutes Pixora runs the tasks you've enabled — "
+              "folder tidy-up, USB backup and HEIC conversion. By default "
+              "it asks first."))
         self._auto_confirm_switch = Gtk.Switch()
         self._auto_confirm_switch.set_valign(Gtk.Align.CENTER)
         self._auto_confirm_switch.set_active(bool(

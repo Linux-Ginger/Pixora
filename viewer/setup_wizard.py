@@ -527,7 +527,7 @@ class SetupWizard(Adw.Window):
         )
         self._mode_sync_row = Adw.ActionRow(
             title=_("Sync"),
-            subtitle=_("Exact mirror of your Pixora library. Photos you delete in Pixora are also removed from the USB on the next backup."),
+            subtitle=_("Exact mirror: photos you delete in Pixora are also removed from the USB on the next backup."),
         )
         self._mode_sync_row.add_prefix(Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic"))
         self._mode_sync_row.add_prefix(self.radio_mode_sync)
@@ -548,7 +548,7 @@ class SetupWizard(Adw.Window):
         )
         self._dedup_row = Adw.ActionRow(
             title=_("Backup duplicate detector"),
-            subtitle=_("Skips photos already on the USB, even if they are stored there under a different name or folder. Requires duplicate detection above to be enabled."),
+            subtitle=_("Skips photos already on the USB, even under a different name or folder. Requires duplicate detection."),
         )
         self._dedup_row.add_prefix(Gtk.Image.new_from_icon_name("edit-copy-symbolic"))
         self._dedup_row.add_suffix(self.backup_dedup_switch)
