@@ -1501,31 +1501,77 @@ class MainWindow(Adw.ApplicationWindow):
         splash.set_halign(Gtk.Align.FILL)
         splash.set_valign(Gtk.Align.FILL)
         splash_css = Gtk.CssProvider()
-        splash_css.load_from_string("box.splash { background-color: @window_bg_color; }")
+        splash_css.load_from_string("""
+            box.splash { background-color: @window_bg_color; }
+            @keyframes splash-rotate {
+                from { transform: rotate(0deg); }
+                to   { transform: rotate(360deg); }
+            }
+            picture.splash-icon { animation: splash-rotate 24s linear infinite; }
+            progressbar.splash-progress trough,
+            progressbar.splash-progress progress {
+                min-height: 6px;
+                border-radius: 9999px;
+            }
+        """)
         splash.add_css_class("splash")
         splash.get_style_context().add_provider(splash_css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
-        splash_inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        splash_inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
         splash_inner.set_halign(Gtk.Align.CENTER)
         splash_inner.set_valign(Gtk.Align.CENTER)
         splash_inner.set_vexpand(True)
 
-        splash_spinner = Gtk.Spinner()
-        splash_spinner.set_size_request(48, 48)
-        splash_spinner.set_halign(Gtk.Align.CENTER)
-        splash_spinner.start()
+        # Hi-res render + fixed intrinsic keeps the SVG crisp at 128px.
+        try:
+            _icon_pb = GdkPixbuf.Pixbuf.new_from_file_at_size(
+                os.path.join(ASSETS_DIR, "pixora-icon.svg"), 512, 512)
+            splash_icon = Gtk.Picture.new_for_paintable(
+                _FixedSizePaintable(Gdk.Texture.new_for_pixbuf(_icon_pb), 128, 128))
+        except Exception:
+            splash_icon = Gtk.Image.new_from_icon_name("image-x-generic-symbolic")
+            splash_icon.set_pixel_size(96)
+        splash_icon.add_css_class("splash-icon")
+        splash_icon.set_halign(Gtk.Align.CENTER)
+        splash_icon.get_style_context().add_provider(splash_css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+
+        try:
+            _logo_pb = GdkPixbuf.Pixbuf.new_from_file_at_size(
+                get_logo_path(self.is_dark()), 880, 224)
+            splash_logo = Gtk.Picture.new_for_paintable(
+                _FixedSizePaintable(Gdk.Texture.new_for_pixbuf(_logo_pb), 220, 56))
+        except Exception:
+            splash_logo = Gtk.Label(label="Pixora")
+            splash_logo.add_css_class("title-1")
+        splash_logo.set_halign(Gtk.Align.CENTER)
 
         splash_lbl = Gtk.Label(label=_("Pixora is starting…"))
-        splash_lbl.add_css_class("title-2")
+        splash_lbl.add_css_class("dim-label")
 
         self._splash_bar = Gtk.ProgressBar()
-        self._splash_bar.set_size_request(280, -1)
+        self._splash_bar.set_size_request(300, -1)
         self._splash_bar.set_halign(Gtk.Align.CENTER)
+        self._splash_bar.set_margin_top(10)
+        self._splash_bar.add_css_class("splash-progress")
+        self._splash_bar.get_style_context().add_provider(splash_css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
-        splash_inner.append(splash_spinner)
-        splash_inner.append(splash_lbl)
+        splash_inner.append(splash_icon)
+        splash_inner.append(splash_logo)
         splash_inner.append(self._splash_bar)
+        splash_inner.append(splash_lbl)
         splash.append(splash_inner)
+
+        try:
+            with open(VERSION_FILE) as _vf:
+                _splash_ver = _vf.read().strip()
+        except Exception:
+            _splash_ver = ""
+        if _splash_ver:
+            splash_ver_lbl = Gtk.Label(label=f"Pixora {_splash_ver}")
+            splash_ver_lbl.add_css_class("dim-label")
+            splash_ver_lbl.add_css_class("caption")
+            splash_ver_lbl.set_margin_bottom(16)
+            splash.append(splash_ver_lbl)
 
         root_overlay.add_overlay(splash)
         self._splash = splash
@@ -1976,15 +2022,29 @@ class MainWindow(Adw.ApplicationWindow):
             # Fill bar quickly then close.
             self._splash_bar.set_fraction(min(elapsed / min_time, 1.0))
             if elapsed >= min_time:
-                self._splash.set_visible(False)
+                self._fade_out_splash()
                 return False
         else:
             # Pulse toward ~80%; last 20% reserved for prewarm completion.
             self._splash_bar.set_fraction(min(elapsed / max_time * 0.8, 0.8))
             if elapsed >= max_time:
-                self._splash.set_visible(False)
+                self._fade_out_splash()
                 return False
         return True
+
+    def _fade_out_splash(self):
+        if getattr(self, "_splash_fading", False):
+            return
+        self._splash_fading = True
+
+        def _step():
+            op = self._splash.get_opacity() - 0.06
+            if op <= 0.0:
+                self._splash.set_visible(False)
+                return False
+            self._splash.set_opacity(op)
+            return True
+        GLib.timeout_add(16, _step)
 
     def _check_for_update(self):
         threading.Thread(target=self._do_update_check, daemon=True).start()
