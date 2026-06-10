@@ -795,9 +795,18 @@ def decode_pixbuf(path, max_dim):
         # raw RGB data aren't 4-byte aligned when width isn't a multiple of 4,
         # which makes cairo render garbled glitches. PNG decode is always aligned.
         loader = GdkPixbuf.PixbufLoader.new_with_type("png")
-        loader.write(buf.getvalue())
-        loader.close()
-        return loader.get_pixbuf()
+        try:
+            loader.write(buf.getvalue())
+        finally:
+            # Always close, else GdkPixbuf leaks the loader after a failed write.
+            try:
+                loader.close()
+            except Exception:
+                pass
+        pb = loader.get_pixbuf()
+        if pb is None:
+            raise RuntimeError("png decode failed")
+        return pb
     except Exception:
         try:
             return GdkPixbuf.Pixbuf.new_from_file_at_scale(path, max_dim, max_dim, True)
@@ -1369,6 +1378,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._video_seek_pending_id = None
         self._preview_cache         = OrderedDict()  # LRU: (path, ts_s) -> pixbuf
         self._viewer_pixbuf_cache   = OrderedDict()  # LRU: path -> pixbuf, max 3
+        # Both LRUs are rebalanced from preload/preview threads and the main
+        # thread at once; OrderedDict mutation isn't atomic.
+        self._pixbuf_cache_lock     = threading.Lock()
         self._preview_debounce_id   = None
         self._preview_extracting    = False
         self._preview_pending       = None           # (path, ts_s) wanted next
@@ -2574,8 +2586,9 @@ class MainWindow(Adw.ApplicationWindow):
             self.thumb_widgets = {}
             self.date_widgets = {}
             self._filmstrip_thumbs = {}
-            self._preview_cache.clear()
-            self._viewer_pixbuf_cache.clear()
+            with self._pixbuf_cache_lock:
+                self._preview_cache.clear()
+                self._viewer_pixbuf_cache.clear()
             self._photo_location.clear()
             if hasattr(self, "_viewer_pixbuf"):
                 self._viewer_pixbuf = None
@@ -3627,12 +3640,14 @@ class MainWindow(Adw.ApplicationWindow):
             count_text = _("{count} (favorites)").format(count=count_text)
         self.photo_count_label.set_text(count_text)
         self.start_watcher(photo_path)
-        threading.Thread(target=self._sort_then_load, daemon=True).start()
-        return False
-
-    def _sort_then_load(self):
+        # Read the combo here (main thread) — GTK isn't thread-safe.
         sort_idx = (self.sort_combo.get_selected()
                     if hasattr(self, "sort_combo") else 0)
+        threading.Thread(target=self._sort_then_load, args=(sort_idx,),
+                         daemon=True).start()
+        return False
+
+    def _sort_then_load(self, sort_idx):
         photos = list(self.photos)
         if photos:
             with ThreadPoolExecutor(max_workers=4) as pool:
@@ -4196,18 +4211,20 @@ class MainWindow(Adw.ApplicationWindow):
             if coords:
                 self._start_geocode_upgrade(path, coords, load_id)
             return
-        pixbuf = self._viewer_pixbuf_cache.get(path)
-        if pixbuf is not None:
-            self._viewer_pixbuf_cache.move_to_end(path)
-        else:
+        with self._pixbuf_cache_lock:
+            pixbuf = self._viewer_pixbuf_cache.get(path)
+            if pixbuf is not None:
+                self._viewer_pixbuf_cache.move_to_end(path)
+        if pixbuf is None:
             try:
                 pixbuf = decode_pixbuf(path, 2560)
             except Exception:
                 pixbuf = None
             if pixbuf is not None:
-                self._viewer_pixbuf_cache[path] = pixbuf
-                while len(self._viewer_pixbuf_cache) > 3:
-                    self._viewer_pixbuf_cache.popitem(last=False)
+                with self._pixbuf_cache_lock:
+                    self._viewer_pixbuf_cache[path] = pixbuf
+                    while len(self._viewer_pixbuf_cache) > 3:
+                        self._viewer_pixbuf_cache.popitem(last=False)
         initial, coords = self._determine_initial_location(path)
         searching = bool(coords)
         if load_id == self._viewer_load_id:
@@ -4399,9 +4416,11 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Cache hit → show instantly, no debounce.
         if not is_video(path):
-            cached = self._viewer_pixbuf_cache.get(path)
+            with self._pixbuf_cache_lock:
+                cached = self._viewer_pixbuf_cache.get(path)
+                if cached is not None:
+                    self._viewer_pixbuf_cache.move_to_end(path)
             if cached is not None:
-                self._viewer_pixbuf_cache.move_to_end(path)
                 # Resolve location — else label vanishes on prev/next through cached photos.
                 initial, coords = self._determine_initial_location(path)
                 self._show_full_photo(cached, path, initial, searching=bool(coords))
@@ -4454,9 +4473,10 @@ class MainWindow(Adw.ApplicationWindow):
                     return
                 if pb is None:
                     return
-                self._viewer_pixbuf_cache[path] = pb
-                while len(self._viewer_pixbuf_cache) > 3:
-                    self._viewer_pixbuf_cache.popitem(last=False)
+                with self._pixbuf_cache_lock:
+                    self._viewer_pixbuf_cache[path] = pb
+                    while len(self._viewer_pixbuf_cache) > 3:
+                        self._viewer_pixbuf_cache.popitem(last=False)
             threading.Thread(target=_bg_load, daemon=True).start()
         return False
 
@@ -4813,10 +4833,11 @@ class MainWindow(Adw.ApplicationWindow):
                 if key in self._preview_cache:
                     continue
                 try:
-                    self._preview_cache[key] = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-                        fp, 160, 90, True)
+                    pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(fp, 160, 90, True)
                 except Exception:
                     continue
+                with self._pixbuf_cache_lock:
+                    self._preview_cache[key] = pb
             # If the user is already hovering a now-ready frame, show it.
             GLib.idle_add(self._service_pending_preview)
         except Exception:
@@ -5141,10 +5162,11 @@ class MainWindow(Adw.ApplicationWindow):
             if load_id == self._viewer_load_id:
                 pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(tmp, 160, 90, True)
                 key = (path, ts_s)
-                self._preview_cache[key] = pb
-                self._preview_cache.move_to_end(key)
-                while len(self._preview_cache) > 400:
-                    self._preview_cache.popitem(last=False)
+                with self._pixbuf_cache_lock:
+                    self._preview_cache[key] = pb
+                    self._preview_cache.move_to_end(key)
+                    while len(self._preview_cache) > 400:
+                        self._preview_cache.popitem(last=False)
                 GLib.idle_add(self._apply_preview_frame, key, load_id)
             try:
                 os.unlink(tmp)
@@ -5177,9 +5199,11 @@ class MainWindow(Adw.ApplicationWindow):
         # Skip stale frames: only show the one currently being hovered.
         if self._preview_pending is not None and key != self._preview_pending:
             return False
-        pb = self._preview_cache.get(key)
+        with self._pixbuf_cache_lock:
+            pb = self._preview_cache.get(key)
+            if pb:
+                self._preview_cache.move_to_end(key)
         if pb:
-            self._preview_cache.move_to_end(key)
             if self._preview_popover.get_visible():
                 self._preview_spinner.stop()
                 self._preview_spinner.set_visible(False)
@@ -5652,8 +5676,9 @@ class MainWindow(Adw.ApplicationWindow):
                     img = img.convert("RGBA")
                 ext = os.path.splitext(path)[1].lower()
                 is_jpeg = ext in (".jpg", ".jpeg")
+                is_png  = ext == ".png"
 
-                exif = img.getexif() if is_jpeg else None
+                exif = img.getexif() if not is_png else None
 
                 # Normalize EXIF orientation (align PIL and GdkPixbuf).
                 img = ImageOps.exif_transpose(img)
@@ -5663,31 +5688,57 @@ class MainWindow(Adw.ApplicationWindow):
                 if crop_box:
                     img = img.crop(crop_box)
 
+                out_path = path
                 if is_jpeg:
                     # Reset orientation to 1 — pixels are now physically correct.
                     if exif is not None:
                         exif[0x0112] = 1
                     img.save(path, "JPEG", quality=95,
                              exif=exif.tobytes() if exif is not None else b"")
-                else:
+                elif is_png:
                     img.save(path, "PNG")
+                else:
+                    # PIL can't write HEIC & co. — saving PNG bytes under the old
+                    # extension corrupts the file. Replace with a max-quality JPEG
+                    # (date/GPS kept), matching the JPEG-only HEIC policy.
+                    out_path = os.path.splitext(path)[0] + ".jpg"
+                    counter = 1
+                    while os.path.exists(out_path):
+                        out_path = os.path.splitext(path)[0] + f"_{counter}.jpg"
+                        counter += 1
+                    if img.mode not in ("RGB", "L"):
+                        img = img.convert("RGB")
+                    if exif is not None:
+                        exif[0x0112] = 1
+                    img.save(out_path, "JPEG", quality=95,
+                             exif=exif.tobytes() if exif is not None else b"")
+                    os.remove(path)
                 if os.path.exists(old_cache):
                     os.remove(old_cache)
-                os.utime(path, (original_mtime, original_mtime))
-                GLib.idle_add(_after_save)
+                os.utime(out_path, (original_mtime, original_mtime))
+                GLib.idle_add(_after_save, out_path)
             except Exception as e:
                 log_error(_("Editor save failed: {err}").format(err=e))
                 GLib.idle_add(_save_error, str(e))
 
-        def _after_save():
+        def _after_save(new_path):
+            if new_path != path:
+                # Extension changed (e.g. HEIC → JPG): move every reference over.
+                self.photos = [new_path if p == path else p for p in self.photos]
+                self._filmstrip_order_cache = None
+                if path in self._favorites:
+                    self._favorites.discard(path)
+                    self._favorites.add(new_path)
+                    self._schedule_save_favorites()
             self._viewer_load_id += 1
             load_id = self._viewer_load_id
             threading.Thread(
                 target=self._load_full_photo,
-                args=(path, load_id),
+                args=(new_path, load_id),
                 daemon=True
             ).start()
             GLib.timeout_add(300, self.start_load)
+            return False
 
         def _save_error(msg):
             dialog = Adw.MessageDialog(
@@ -5881,6 +5932,11 @@ class MainWindow(Adw.ApplicationWindow):
     def _finish_delete_after_shred(self, path):
         """Post-animation: delete + navigate."""
         n_before = len(self.photos)
+        # Cache key uses the file's mtime, so resolve it before the remove.
+        try:
+            cache_path = get_cache_path(path)
+        except OSError:
+            cache_path = None
         try:
             os.remove(path)
             log_info(_("Photo deleted: {p}").format(p=path))
@@ -5892,10 +5948,9 @@ class MainWindow(Adw.ApplicationWindow):
             self._shredding = False
             return
         try:
-            cache_path = get_cache_path(path)
-            if os.path.exists(cache_path):
+            if cache_path and os.path.exists(cache_path):
                 os.remove(cache_path)
-        except Exception:
+        except OSError:
             pass
         self._cleanup_empty_parent_dirs(path)
         if path in self._favorites:
@@ -5963,13 +6018,21 @@ class MainWindow(Adw.ApplicationWindow):
         paths_to_delete = [self.photos[i] for i in self._selected if i < len(self.photos)]
         fav_changed = False
         for path in paths_to_delete:
+            # Cache key uses the file's mtime, so resolve it before the remove.
+            try:
+                cache_path = get_cache_path(path)
+            except OSError:
+                cache_path = None
             try:
                 os.remove(path)
-                cache_path = get_cache_path(path)
-                if os.path.exists(cache_path):
-                    os.remove(cache_path)
             except Exception as e:
                 log_error(_("Delete failed: {err}").format(err=e))
+                cache_path = None
+            try:
+                if cache_path and os.path.exists(cache_path):
+                    os.remove(cache_path)
+            except OSError:
+                pass
             if path in self._favorites:
                 self._favorites.discard(path)
                 fav_changed = True
@@ -8080,15 +8143,16 @@ class MainWindow(Adw.ApplicationWindow):
     def _delete_dupes_thread(self, to_delete):
         deleted = 0
         for p in to_delete:
+            # Cache key uses the file's mtime, so resolve it before the remove.
+            try:
+                cache = get_cache_path(p)
+            except OSError:
+                cache = None
             try:
                 os.remove(p)
                 deleted += 1
-                try:
-                    cache = get_cache_path(p)
-                    if os.path.exists(cache):
-                        os.remove(cache)
-                except Exception:
-                    pass
+                if cache and os.path.exists(cache):
+                    os.remove(cache)
             except Exception as e:
                 log_warn(_("Duplicate delete failed for {p}: {e}").format(p=p, e=e))
         GLib.idle_add(self._after_delete_dupes, to_delete, deleted)
@@ -9966,7 +10030,8 @@ class MainWindow(Adw.ApplicationWindow):
         excluded = excluded or set()
         try:
             all_src = []
-            for root, _, files in os.walk(src):
+            # Never name this `_` — it would shadow gettext in the except below.
+            for root, _dirs, files in os.walk(src):
                 for fn in files:
                     all_src.append(os.path.join(root, fn))
             total = len(all_src)
