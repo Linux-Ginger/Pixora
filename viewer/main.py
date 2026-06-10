@@ -8,14 +8,11 @@
 import sys
 import os
 import json
-import time
 import signal
 import shutil
-import threading
 import subprocess
 
 CONFIG_PATH = os.path.expanduser("~/.config/pixora/settings.json")
-LOG_PATH = os.path.expanduser("~/.cache/pixora/pixora.log")
 
 PIXORA_DEV_MODE = False
 _PIXORA_APP = None
@@ -262,7 +259,7 @@ if __name__ == "__main__":
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, Gio
+from gi.repository import Adw, Gio
 
 
 class PixoraApp(Adw.Application):

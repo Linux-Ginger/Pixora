@@ -9,29 +9,7 @@ import os
 
 # ── i18n ─────────────────────────────────────────────────────────────
 import gettext as _gt
-import json as _json_i18n
-
-def _detect_system_lang():
-    """Map env locale to one of nl/en/de/fr. Fallback: en."""
-    for _var in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        _val = os.environ.get(_var, "")
-        if _val:
-            _code = _val.split(":")[0].split(".")[0].split("_")[0].lower()
-            if _code in ("nl", "en", "de", "fr"):
-                return _code
-    return "en"
-
-_SYS_LANG = _detect_system_lang()
-try:
-    _lang = _json_i18n.load(open(os.path.expanduser("~/.config/pixora/settings.json"))).get("language", _SYS_LANG)
-except Exception:
-    _lang = _SYS_LANG
-_t = _gt.translation(
-    "pixora",
-    localedir=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "locale")),
-    languages=[_lang], fallback=True
-)
-_ = _t.gettext
+from pixora_i18n import LANG as _lang, _
 
 import datetime
 import json
@@ -43,7 +21,7 @@ import urllib.request
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, Gio
+from gi.repository import Gtk, Adw, GLib
 
 
 def _recommended_badge():

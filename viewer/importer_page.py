@@ -4,26 +4,13 @@
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gio, Gdk, Pango
+from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gdk, Pango
 
 import os
 
 # i18n
-import gettext as _gt
-import json as _json_i18n
-try:
-    _lang = _json_i18n.load(open(os.path.expanduser("~/.config/pixora/settings.json"))).get("language", "nl")
-except Exception:
-    _lang = "nl"
-_t = _gt.translation(
-    "pixora",
-    localedir=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "locale")),
-    languages=[_lang], fallback=True
-)
-_ = _t.gettext
-ngettext = _t.ngettext
+from pixora_i18n import _, ngettext
 
-import sys
 import json
 import shutil
 import hashlib
@@ -31,7 +18,6 @@ import subprocess
 import threading
 import tempfile
 import time
-import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import datetime
@@ -841,31 +827,6 @@ def find_duplicate(ph_str: str, library_hashes: dict, max_dist: int) -> str | No
     except Exception:
         pass
     return None
-
-
-def get_backup_mountpoint(uuid: str) -> Path | None:
-    try:
-        result = subprocess.run(
-            ["lsblk", "-o", "UUID,MOUNTPOINT", "-J"],
-            capture_output=True, text=True, timeout=5
-        )
-        data = json.loads(result.stdout)
-
-        def search(devices):
-            for dev in devices:
-                if (dev.get("uuid") or "").strip() == uuid:
-                    mp = (dev.get("mountpoint") or "").strip()
-                    if mp:
-                        return Path(mp)
-                for child in dev.get("children") or []:
-                    r = search([child])
-                    if r:
-                        return r
-            return None
-
-        return search(data.get("blockdevices", []))
-    except Exception:
-        return None
 
 
 def _import_cache_path(photo_path: Path) -> Path:

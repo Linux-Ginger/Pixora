@@ -8,18 +8,7 @@
 import os
 
 # ── i18n ─────────────────────────────────────────────────────────────
-import gettext as _gt
-import json as _json_i18n
-try:
-    _lang = _json_i18n.load(open(os.path.expanduser("~/.config/pixora/settings.json"))).get("language", "nl")
-except Exception:
-    _lang = "nl"
-_t = _gt.translation(
-    "pixora",
-    localedir=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "locale")),
-    languages=[_lang], fallback=True
-)
-_ = _t.gettext
+from pixora_i18n import _
 
 import re
 import shutil

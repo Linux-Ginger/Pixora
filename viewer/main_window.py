@@ -20,31 +20,8 @@ from collections import defaultdict, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 # ── i18n (gettext) ───────────────────────────────────────────────────
-import gettext as _gettext_mod
-_LOCALE_DIR = os.path.abspath(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "..", "locale"
-))
-def _detect_system_lang():
-    """Map env locale to one of nl/en/de/fr. Fallback: en."""
-    for _var in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        _val = os.environ.get(_var, "")
-        if _val:
-            _code = _val.split(":")[0].split(".")[0].split("_")[0].lower()
-            if _code in ("nl", "en", "de", "fr"):
-                return _code
-    return "en"
-
-_SYS_LANG = _detect_system_lang()
-try:
-    with open(os.path.expanduser("~/.config/pixora/settings.json"), "r") as _sf:
-        _lang = json.load(_sf).get("language", _SYS_LANG)
-except Exception:
-    _lang = _SYS_LANG
-_translation = _gettext_mod.translation(
-    "pixora", localedir=_LOCALE_DIR, languages=[_lang], fallback=True
-)
-_ = _translation.gettext
-ngettext = _translation.ngettext
+from pixora_i18n import (LOCALE_DIR as _LOCALE_DIR, LANG as _lang,
+                         translation as _translation, _, ngettext)
 _translation.install()  # makes _() available as a builtin
 
 _MO_PATH = os.path.join(_LOCALE_DIR, _lang, "LC_MESSAGES", "pixora.mo")
@@ -249,7 +226,6 @@ def _low_ram_system():
         return False
 
 THUMB_WORKERS = 2 if _low_ram_system() else 4
-TILE_SIZE        = 256
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
 VIDEO_EXTENSIONS = {".mp4", ".mov"}
 _STILL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif"}
@@ -290,14 +266,6 @@ def is_video(path):
     return os.path.splitext(path)[1].lower() in VIDEO_EXTENSIONS
 BACKUP_FSTYPES   = {"ext4","ext3","ext2","ntfs","exfat","fuseblk","btrfs","xfs","vfat"}
 
-MONTHS_NL_FULL = [
-    "", "januari", "februari", "maart", "april", "mei", "juni",
-    "juli", "augustus", "september", "oktober", "november", "december"
-]
-MONTHS_NL = [
-    "", "jan", "feb", "mrt", "apr", "mei", "jun",
-    "jul", "aug", "sep", "okt", "nov", "dec"
-]
 
 
 def get_logo_path(dark_mode):
@@ -630,13 +598,6 @@ def _reverse_geocode_raw(lat, lon):
     except Exception:
         return ""
 
-def lat_lon_to_tile_float(lat, lon, zoom):
-    n     = 2 ** zoom
-    x     = (lon + 180) / 360 * n
-    lat_r = math.radians(lat)
-    y     = (1 - math.log(math.tan(lat_r) + 1 / math.cos(lat_r)) / math.pi) / 2 * n
-    return x, y
-
 _EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, DateTimeDigitized, DateTime
 
 def get_photo_date(path: str) -> float:
@@ -675,6 +636,39 @@ def get_cache_path(photo_path, thumb_size=None):
     mtime = str(os.path.getmtime(photo_path))
     key   = hashlib.md5((photo_path + mtime + str(thumb_size) + CACHE_VERSION).encode()).hexdigest()
     return os.path.join(CACHE_DIR, key + ".png")
+
+
+def _walk_rel_files(base):
+    """Yield (abs_path, rel_path) for every file under base."""
+    base = str(base)
+    for root, _dirs, files in os.walk(base):
+        for fn in files:
+            fp = os.path.join(root, fn)
+            yield fp, os.path.relpath(fp, base)
+
+
+INSTALLED_VERSION_FILE = os.path.expanduser("~/.config/pixora/installed_version")
+
+
+def _fetch_versions():
+    """(local, remote) version strings; raises on network failure."""
+    local_version = ""
+    if os.path.exists(INSTALLED_VERSION_FILE):
+        with open(INSTALLED_VERSION_FILE) as f:
+            local_version = f.read().strip()
+    # Cache-bust: raw.githubusercontent.com is Fastly-cached ~5 min.
+    req = urllib.request.Request(
+        f"https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt?t={int(time.time())}",
+        headers={
+            "User-Agent": "Pixora/1.0",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        remote_version = resp.read().decode().strip()
+    return local_version, remote_version
+
 
 def get_video_duration(path):
     cached = _cache_fresh("video_duration", path)
@@ -861,100 +855,6 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
     def on_moved(self, event):
         self._schedule_reload()
-
-
-class TimelineBar(Gtk.DrawingArea):
-    """Right-side timeline bar. Entries (label, y_px, is_year) stay in sync via max_scroll."""
-    _ORANGE = (0.914, 0.329, 0.125)
-
-    def __init__(self, scroll_cb, style_manager=None):
-        super().__init__()
-        self._scroll_cb    = scroll_cb
-        self.style_manager = style_manager
-        self._entries      = []   # [(label, y_px, is_year), ...] sorted by y_px
-        self._active       = 0
-        self._scroll_val   = 0.0
-        self._max_scroll   = 1.0
-
-        self.set_size_request(52, -1)
-        self.set_vexpand(True)
-        self.set_draw_func(self._draw)
-
-        click = Gtk.GestureClick()
-        click.connect("pressed", self._on_click)
-        self.add_controller(click)
-
-    def set_data(self, entries, max_scroll):
-        self._entries    = entries
-        self._max_scroll = max(max_scroll, 1.0)
-        self._recalc()
-        self.queue_draw()
-
-    def update_scroll(self, value, max_scroll):
-        self._scroll_val = value
-        self._max_scroll = max(max_scroll, 1.0)
-        self._recalc()
-
-    def _recalc(self):
-        if not self._entries:
-            return
-        new_active = 0
-        for i, (_, y_px, _) in enumerate(self._entries):
-            if y_px <= self._scroll_val:
-                new_active = i
-        if new_active != self._active:
-            self._active = new_active
-            self.queue_draw()
-
-    def _draw(self, area, cr, width, height):
-        if not self._entries or height == 0:
-            return
-        is_dark    = self.style_manager and self.style_manager.get_dark()
-        last_bot   = -99.0
-        n          = len(self._entries)
-        max_scroll = max(self._max_scroll, 1.0)
-
-        for i, (label, y_px, is_year) in enumerate(self._entries):
-            active = (i == self._active)
-
-            # Font
-            if active or is_year:
-                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-                font_size = 10 if active else 8
-            else:
-                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-                font_size = 9
-
-            cr.set_font_size(font_size)
-            ext = cr.text_extents(label)
-
-            # Ideal position proportional to y_px in the grid
-            ideal_y = min(y_px / max_scroll, 1.0) * height
-            ty = max(last_bot + 2, ideal_y)
-            ty = max(ext.height, min(height - 2, ty))
-
-            # Skip crowded labels except the very last one
-            if ty >= height - 2 and i < n - 1:
-                continue
-
-            # Colour
-            if active:
-                cr.set_source_rgb(*self._ORANGE)
-            elif is_year:
-                v = 0.85 if is_dark else 0.3
-                cr.set_source_rgba(v, v, v, 0.8)
-            else:
-                v = 0.75 if is_dark else 0.4
-                cr.set_source_rgba(v, v, v, 0.65)
-
-            cr.move_to(max(2, width - ext.width - 4), ty)
-            cr.show_text(label)
-            last_bot = ty + font_size + 1
-
-    def _on_click(self, gesture, n_press, x, y):
-        height = self.get_height()
-        if height > 0:
-            self._scroll_cb((y / height) * self._max_scroll)
 
 
 class MapWidget(Gtk.Box):
@@ -2069,24 +1969,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _do_update_check(self):
         try:
-            local_version_file = os.path.join(
-                os.path.expanduser("~"), ".config", "pixora", "installed_version"
-            )
-            if not os.path.exists(local_version_file):
+            # Dev runs have no installed_version — skip the network round-trip.
+            if not os.path.exists(INSTALLED_VERSION_FILE):
                 return
-            with open(local_version_file) as f:
-                local_version = f.read().strip()
-            # Cache-bust: raw.githubusercontent.com is Fastly-cached ~5 min.
-            req = urllib.request.Request(
-                f"https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt?t={int(time.time())}",
-                headers={
-                    "User-Agent": "Pixora/1.0",
-                    "Cache-Control": "no-cache",
-                    "Pragma": "no-cache",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                remote_version = resp.read().decode().strip()
+            local_version, remote_version = _fetch_versions()
             if remote_version and remote_version != local_version:
                 self._pending_update_version = remote_version
                 GLib.idle_add(self._maybe_show_update_popup)
@@ -2415,24 +2301,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _do_settings_update_check(self):
         try:
-            local_version_file = os.path.join(
-                os.path.expanduser("~"), ".config", "pixora", "installed_version"
-            )
-            local_version = ""
-            if os.path.exists(local_version_file):
-                with open(local_version_file) as _lvf:
-                    local_version = _lvf.read().strip()
-            # Cache-bust: see _do_update_check.
-            req = urllib.request.Request(
-                f"https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt?t={int(time.time())}",
-                headers={
-                    "User-Agent": "Pixora/1.0",
-                    "Cache-Control": "no-cache",
-                    "Pragma": "no-cache",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                remote_version = resp.read().decode().strip()
+            local_version, remote_version = _fetch_versions()
         except Exception:
             GLib.idle_add(self._settings_update_result, None, None)
             return
@@ -7279,101 +7148,6 @@ class MainWindow(Adw.ApplicationWindow):
             self._thumb_apply_btn.set_sensitive(False)
         self.load_photos()
 
-    def _on_reset_usbmuxd(self, btn):
-        log_info(_("Reset usbmuxd invoked (settings)"))
-        btn.set_sensitive(False)
-        btn.set_label(_("Working…"))
-
-        def do():
-            result_msg = ""
-            ok = False
-            try:
-                r = subprocess.run(
-                    ["pkexec", "sh", "-c",
-                     "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
-                    capture_output=True, text=True, timeout=30
-                )
-                if r.returncode == 0:
-                    ok = True
-                    result_msg = _("usbmuxd restarted. Connect your iPhone and tap Trust.")
-                elif r.returncode == 126 or r.returncode == 127:
-                    result_msg = _("Password cancelled or pkexec unavailable.")
-                else:
-                    result_msg = _("Restart failed (code {code}).\n{err}").format(
-                        code=r.returncode, err=r.stderr.strip()[:200]
-                    )
-            except FileNotFoundError:
-                result_msg = _("pkexec not found. Run manually:\n  sudo killall usbmuxd; sudo usbmuxd")
-            except subprocess.TimeoutExpired:
-                result_msg = _("Restart timed out.")
-            except Exception as e:
-                result_msg = _("Unexpected error: {err}").format(err=e)
-            GLib.idle_add(self._after_usbmuxd_reset, btn, ok, result_msg)
-
-        threading.Thread(target=do, daemon=True).start()
-
-    def _after_usbmuxd_reset(self, btn, ok, msg):
-        btn.set_label(_("Restart"))
-        btn.set_sensitive(True)
-        dialog = Adw.MessageDialog(
-            transient_for=self,
-            heading=_("USB connection restarted") if ok else _("Restart failed"),
-            body=msg
-        )
-        dialog.add_response("ok", _("OK"))
-        dialog.present()
-        if ok:
-            GLib.timeout_add(500, self._poll_import_device_once)
-        return False
-
-    def _on_clear_pair_records(self, btn):
-        log_info(_("Clear pair records — confirmation requested"))
-        confirm = Adw.MessageDialog(
-            transient_for=self,
-            heading=_("Clear pair records?"),
-            body=_("This removes all existing iPhone pairings in /var/lib/lockdown/. Your iPhone will ask for Trust again next time.")
-        )
-        confirm.add_response("cancel", _("Cancel"))
-        confirm.add_response("clear", _("Clear"))
-        confirm.set_response_appearance("clear", Adw.ResponseAppearance.DESTRUCTIVE)
-        confirm.set_default_response("cancel")
-        confirm.connect("response", self._do_clear_pair_records)
-        confirm.present()
-
-    def _do_clear_pair_records(self, dialog, response):
-        if response != "clear":
-            return
-
-        def do():
-            result_msg = ""
-            ok = False
-            try:
-                r = subprocess.run(
-                    ["pkexec", "sh", "-c",
-                     "rm -rf /var/lib/lockdown/* && "
-                     "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
-                    capture_output=True, text=True, timeout=30
-                )
-                if r.returncode == 0:
-                    ok = True
-                    result_msg = _("Pair records cleared and usbmuxd restarted. Connect your iPhone and tap Trust.")
-                else:
-                    result_msg = _("Clear failed (code {code}).").format(code=r.returncode)
-            except FileNotFoundError:
-                result_msg = _("pkexec not found.")
-            except Exception as e:
-                result_msg = _("Error: {err}").format(err=e)
-            GLib.idle_add(self._show_info_dialog,
-                          _("Done") if ok else _("Failed"), result_msg)
-
-        threading.Thread(target=do, daemon=True).start()
-
-    def _show_info_dialog(self, heading, body):
-        d = Adw.MessageDialog(transient_for=self, heading=heading, body=body)
-        d.add_response("ok", _("OK"))
-        d.present()
-        return False
-
     def _on_language_changed(self, combo, _pspec):
         idx = combo.get_selected()
         if not (0 <= idx < len(self._lang_codes)):
@@ -7391,6 +7165,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Overlay text in the NEW language so user sees the switch already.
         try:
+            import gettext as _gettext_mod
             new_trans = _gettext_mod.translation(
                 "pixora", localedir=_LOCALE_DIR,
                 languages=[new_lang], fallback=True
@@ -7665,10 +7440,6 @@ class MainWindow(Adw.ApplicationWindow):
         if btn.get_active():
             self.settings["structure"] = value
             save_settings(self.settings)
-
-    def _on_reorganize_silent_toggle(self, switch, _pspec):
-        self.settings["reorganize_silent"] = bool(switch.get_active())
-        save_settings(self.settings)
 
     def _count_media(self, paths):
         """(photos, videos). Accepts Paths or (src, dst) tuples."""
@@ -8734,40 +8505,39 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
-    def on_threshold_changed(self, value, btn):
-        if btn.get_active():
-            self.settings["duplicate_threshold"] = value
-            save_settings(self.settings)
+    def _confirm_switch_off(self, switch, handler, heading, body, apply_off):
+        """Destructive-off confirm: revert the switch unless the user confirms."""
+        dlg = Adw.AlertDialog(heading=heading, body=body)
+        dlg.add_response("keep", _("Keep on"))
+        dlg.add_response("off", _("Turn off"))
+        dlg.set_response_appearance("off", Adw.ResponseAppearance.DESTRUCTIVE)
+        dlg.set_default_response("keep")
+        dlg.set_close_response("keep")
+
+        def _resp(d, r):
+            if r == "off":
+                apply_off()
+            else:
+                switch.handler_block_by_func(handler)
+                switch.set_active(True)
+                switch.handler_unblock_by_func(handler)
+        dlg.connect("response", _resp)
+        self._present_dialog(dlg)
 
     def on_convert_switch_toggled(self, switch, _pspec):
-        active = switch.get_active()
-        if not active:
-            dlg = Adw.AlertDialog(
-                heading=_("Turn off HEIC conversion?"),
-                body=_("New imports will be kept as the original HEIC files. HEIC opens fine in Pixora, but can't easily be opened outside it — many other apps and devices don't support it. Photos already converted to JPEG are not changed back."))
-            dlg.add_response("keep", _("Keep on"))
-            dlg.add_response("off", _("Turn off"))
-            dlg.set_response_appearance("off", Adw.ResponseAppearance.DESTRUCTIVE)
-            dlg.set_default_response("keep")
-            dlg.set_close_response("keep")
-
-            def _resp(d, r):
-                if r == "off":
-                    self.settings["convert_heic"] = False
-                    self.settings["convert_format"] = "jpeg"
-                    save_settings(self.settings)
-                    if hasattr(self, "_convert_lib_btn"):
-                        self._convert_lib_btn.set_sensitive(False)
-                else:
-                    switch.handler_block_by_func(self.on_convert_switch_toggled)
-                    switch.set_active(True)
-                    switch.handler_unblock_by_func(self.on_convert_switch_toggled)
-            dlg.connect("response", _resp)
-            self._present_dialog(dlg)
+        if not switch.get_active():
+            def _off():
+                self.settings["convert_heic"] = False
+                save_settings(self.settings)
+                if hasattr(self, "_convert_lib_btn"):
+                    self._convert_lib_btn.set_sensitive(False)
+            self._confirm_switch_off(
+                switch, self.on_convert_switch_toggled,
+                _("Turn off HEIC conversion?"),
+                _("New imports will be kept as the original HEIC files. HEIC opens fine in Pixora, but can't easily be opened outside it — many other apps and devices don't support it. Photos already converted to JPEG are not changed back."),
+                _off)
             return
         self.settings["convert_heic"] = True
-        # PNG was dropped: conversion is always JPEG now.
-        self.settings["convert_format"] = "jpeg"
         # Turning conversion back on → allow the sweep to re-check this session.
         self._heic_sweep_dismissed = False
         save_settings(self.settings)
@@ -8987,26 +8757,12 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_dup_switch_toggled(self, switch, _pspec):
         # On = strict (1), Off = 0.
-        active = switch.get_active()
-        if not active:
-            dlg = Adw.AlertDialog(
-                heading=_("Turn off duplicate detection?"),
-                body=_("During import Pixora will no longer warn you about photos you already have, so the same photo can be imported twice. Photos already in your library are not affected."))
-            dlg.add_response("keep", _("Keep on"))
-            dlg.add_response("off", _("Turn off"))
-            dlg.set_response_appearance("off", Adw.ResponseAppearance.DESTRUCTIVE)
-            dlg.set_default_response("keep")
-            dlg.set_close_response("keep")
-
-            def _resp(d, r):
-                if r == "off":
-                    self._apply_dup_detection(False)
-                else:
-                    switch.handler_block_by_func(self.on_dup_switch_toggled)
-                    switch.set_active(True)
-                    switch.handler_unblock_by_func(self.on_dup_switch_toggled)
-            dlg.connect("response", _resp)
-            self._present_dialog(dlg)
+        if not switch.get_active():
+            self._confirm_switch_off(
+                switch, self.on_dup_switch_toggled,
+                _("Turn off duplicate detection?"),
+                _("During import Pixora will no longer warn you about photos you already have, so the same photo can be imported twice. Photos already in your library are not affected."),
+                lambda: self._apply_dup_detection(False))
             return
         self._apply_dup_detection(True)
 
@@ -9409,14 +9165,11 @@ class MainWindow(Adw.ApplicationWindow):
         # Dedup runs in backup thread so scan stays fast.
         src_files = {}
         try:
-            for root, _dirs, files in os.walk(str(photo_path)):
-                for fn in files:
-                    sf = os.path.join(root, fn)
-                    rel = os.path.relpath(sf, str(photo_path))
-                    try:
-                        src_files[rel] = os.path.getsize(sf)
-                    except OSError:
-                        src_files[rel] = 0
+            for sf, rel in _walk_rel_files(photo_path):
+                try:
+                    src_files[rel] = os.path.getsize(sf)
+                except OSError:
+                    src_files[rel] = 0
         except Exception as e:
             log_error(_("Scan error: {err}").format(err=e))
             GLib.idle_add(self._handle_scan_result, None)
@@ -9425,10 +9178,7 @@ class MainWindow(Adw.ApplicationWindow):
         dest_rels = set()
         if backup_dest.is_dir():
             try:
-                for root, _dirs, files in os.walk(str(backup_dest)):
-                    for fn in files:
-                        df = os.path.join(root, fn)
-                        dest_rels.add(os.path.relpath(df, str(backup_dest)))
+                dest_rels = {rel for _fp, rel in _walk_rel_files(backup_dest)}
             except Exception:
                 pass  # partial walk → missing treated as "new"
 
@@ -9846,21 +9596,14 @@ class MainWindow(Adw.ApplicationWindow):
             return []
 
         # Dedup only on files not already on USB.
-        src_rels = set()
         try:
-            for root, _dirs, files in os.walk(str(photo_path)):
-                for fn in files:
-                    src_rels.add(os.path.relpath(
-                        os.path.join(root, fn), str(photo_path)))
+            src_rels = {rel for _fp, rel in _walk_rel_files(photo_path)}
         except Exception:
             return []
         dest_rels = set()
         if backup_dest.is_dir():
             try:
-                for root, _dirs, files in os.walk(str(backup_dest)):
-                    for fn in files:
-                        dest_rels.add(os.path.relpath(
-                            os.path.join(root, fn), str(backup_dest)))
+                dest_rels = {rel for _fp, rel in _walk_rel_files(backup_dest)}
             except Exception:
                 pass
         to_check = sorted(src_rels - dest_rels)
@@ -10045,16 +9788,11 @@ class MainWindow(Adw.ApplicationWindow):
         """Fallback manual copy; delete_extraneous=sync mode; excluded=dedup skips."""
         excluded = excluded or set()
         try:
-            all_src = []
-            # Never name this `_` — it would shadow gettext in the except below.
-            for root, _dirs, files in os.walk(src):
-                for fn in files:
-                    all_src.append(os.path.join(root, fn))
+            all_src = list(_walk_rel_files(src))
             total = len(all_src)
             self._backup_total = total
             src_rels = set()
-            for i, sf in enumerate(all_src):
-                rel = os.path.relpath(sf, str(src))
+            for i, (sf, rel) in enumerate(all_src):
                 src_rels.add(rel)
                 if rel in excluded:
                     continue
@@ -10068,15 +9806,12 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._update_backup_progress, frac,
                               f"{i + 1} / {total}")
             if delete_extraneous:
-                for root, _dirs, files in os.walk(str(dst)):
-                    for fn in files:
-                        df = os.path.join(root, fn)
-                        rel = os.path.relpath(df, str(dst))
-                        if rel not in src_rels:
-                            try:
-                                os.remove(df)
-                            except Exception:
-                                pass
+                for df, rel in _walk_rel_files(dst):
+                    if rel not in src_rels:
+                        try:
+                            os.remove(df)
+                        except Exception:
+                            pass
             return True
         except Exception as e:
             log_error(_("Backup error: {err}").format(err=e))
