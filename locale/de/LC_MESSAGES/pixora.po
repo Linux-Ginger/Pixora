@@ -2755,3 +2755,6 @@ msgid "%d file failed — see pixora.log"
 msgid_plural "%d files failed — see pixora.log"
 msgstr[0] "%d Datei fehlgeschlagen — siehe pixora.log"
 msgstr[1] "%d Dateien fehlgeschlagen — siehe pixora.log"
+
+msgid "Loading map…"
+msgstr "Karte wird geladen…"

@@ -1004,13 +1004,22 @@ class MapWidget(Gtk.Box):
         try:
             # WebKit 6.0 API
             if hasattr(WebKit2, "NetworkSession"):
+                # Own session with a persistent cache: tiles load from disk on
+                # re-open instead of re-downloading from OSM every time.
                 try:
-                    network_session = WebKit2.NetworkSession.get_default()
+                    os.makedirs(TILE_CACHE_DIR, exist_ok=True)
+                    network_session = WebKit2.NetworkSession.new(
+                        os.path.join(TILE_CACHE_DIR, "data"), TILE_CACHE_DIR)
                 except Exception:
+                    network_session = None
+                if network_session is None:
                     try:
-                        network_session = WebKit2.NetworkSession.new_ephemeral()
+                        network_session = WebKit2.NetworkSession.get_default()
                     except Exception:
-                        network_session = None
+                        try:
+                            network_session = WebKit2.NetworkSession.new_ephemeral()
+                        except Exception:
+                            network_session = None
                 if network_session and hasattr(network_session, "set_sandbox_enabled"):
                     network_session.set_sandbox_enabled(False)
         except Exception as e:
@@ -1042,6 +1051,11 @@ class MapWidget(Gtk.Box):
             wk_settings.set_enable_javascript(True)
             wk_settings.set_javascript_can_access_clipboard(False)
             wk_settings.set_enable_developer_extras(False)
+            # OSM's tile policy requires apps to identify themselves; the
+            # default WebKit UA risks being rate-limited (slow tiles).
+            if hasattr(wk_settings, "set_user_agent"):
+                wk_settings.set_user_agent(
+                    "Pixora/1.0 (+https://github.com/Linux-Ginger/Pixora)")
         except Exception as e:
             log_warn(_("WebView settings not fully applied: {err}").format(err=e))
 
@@ -1102,6 +1116,8 @@ class MapWidget(Gtk.Box):
             "clickCluster": _("Click cluster to view filtered"),
             "clickOpen": _("Click to open"),
             "offline": _("⚠ No internet connection — map tiles cannot be loaded"),
+            "retry": _("Try again"),
+            "loadingTiles": _("Loading map…"),
         }
         js = (
             f"if(window.pixoraSetLabels){{window.pixoraSetLabels({json.dumps(labels)});}}"

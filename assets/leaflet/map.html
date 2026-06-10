@@ -13,6 +13,23 @@
     border-radius: 8px; font-size: 13px; display: none; z-index: 1000;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   }
+  #retry-btn {
+    margin-left: 10px; background: #e95420; color: #fff; border: none;
+    border-radius: 6px; padding: 5px 12px; font-size: 13px; cursor: pointer;
+  }
+  #retry-btn:hover { background: #f06a3a; }
+  #tiles-loading {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: rgba(30,30,30,0.85); color: #fff; padding: 6px 14px;
+    border-radius: 9999px; font-size: 12px; display: none; z-index: 1000;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  #tiles-loading .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #e95420; margin-right: 7px;
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
   .pixora-marker {
     background: #e95420; border: 2px solid #fff; border-radius: 50%;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
@@ -38,7 +55,8 @@
 </head>
 <body>
 <div id="map"></div>
-<div id="offline-banner">⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden</div>
+<div id="offline-banner"><span id="offline-text">⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden</span><button id="retry-btn">Opnieuw proberen</button></div>
+<div id="tiles-loading"><span class="dot"></span><span id="tiles-loading-text">Kaart laden…</span></div>
 
 <script src="leaflet.js"></script>
 <script src="markercluster.js"></script>
@@ -120,6 +138,18 @@
   });
   map.on('moveend', function() { setTimeout(nudgeTiles, 0); });
 
+  function showBanner() {
+    document.getElementById('offline-banner').style.display = 'block';
+  }
+  function hideBanner() {
+    document.getElementById('offline-banner').style.display = 'none';
+  }
+  const tilesLoadingEl = document.getElementById('tiles-loading');
+
+  // Subtiele "kaart laden"-pil zolang er tile-requests open staan.
+  tileLayer.on('loading', function() { tilesLoadingEl.style.display = 'block'; });
+  tileLayer.on('load', function() { tilesLoadingEl.style.display = 'none'; });
+
   // Laat Pixora weten wanneer de eerste tiles klaar zijn, zodat de
   // spinner kan wisselen naar de kaart.
   let firstTileLoaded = false;
@@ -131,48 +161,68 @@
   });
 
   // Directe offline-check: als browser al zegt offline → meld dat meteen.
-  // Anders: 6s geen enkele tile binnen → meld offline.
+  // Anders: 4s geen enkele tile binnen → meld offline.
   if (!navigator.onLine) {
     setTimeout(function() {
-      document.getElementById('offline-banner').style.display = 'block';
+      showBanner();
       sendToPixora({ type: 'map-offline' });
     }, 200);
   } else {
     setTimeout(function() {
       if (!firstTileLoaded) {
-        document.getElementById('offline-banner').style.display = 'block';
+        showBanner();
         sendToPixora({ type: 'map-offline' });
       }
-    }, 6000);
+    }, 4000);
   }
 
   let tileErrorCount = 0;
   let offlineNotified = false;
-  tileLayer.on('tileerror', function() {
+  tileLayer.on('tileerror', function(e) {
+    // Eén automatische retry per tile: tijdelijke netwerk-hiccups herstellen
+    // zichzelf zonder dat de gebruiker grijze vlakken ziet.
+    if (e && e.tile && !e.tile._pixoraRetried && navigator.onLine) {
+      e.tile._pixoraRetried = true;
+      const src = e.tile.src;
+      setTimeout(function() { e.tile.src = src; }, 1500);
+      return;
+    }
     tileErrorCount += 1;
-    if ((tileErrorCount > 4 || !navigator.onLine) && !offlineNotified) {
+    if ((tileErrorCount > 2 || !navigator.onLine) && !offlineNotified) {
       offlineNotified = true;
-      document.getElementById('offline-banner').style.display = 'block';
+      showBanner();
       sendToPixora({ type: 'map-offline' });
     }
   });
   tileLayer.on('tileload', function() {
     tileErrorCount = 0;
     offlineNotified = false;
-    document.getElementById('offline-banner').style.display = 'none';
+    hideBanner();
   });
 
   window.addEventListener('offline', function() {
-    document.getElementById('offline-banner').style.display = 'block';
+    showBanner();
     if (!offlineNotified) {
       offlineNotified = true;
       sendToPixora({ type: 'map-offline' });
     }
   });
   window.addEventListener('online', function() {
-    document.getElementById('offline-banner').style.display = 'none';
+    hideBanner();
     offlineNotified = false;
+    retryTiles();
   });
+
+  // "Opnieuw proberen": reset de fout-status en vraag alle zichtbare tiles
+  // opnieuw op — de gebruiker hoeft de kaart niet te sluiten en heropenen.
+  function retryTiles() {
+    hideBanner();
+    tileErrorCount = 0;
+    offlineNotified = false;
+    try { tileLayer.redraw(); } catch (e) {}
+    setTimeout(nudgeTiles, 0);
+  }
+  document.getElementById('retry-btn').addEventListener('click', retryTiles);
 
   // Dedicated canvas renderer voor betere performance bij veel markers
   const canvasRenderer = L.canvas({ padding: 0.5 });
@@ -242,11 +292,15 @@
     otherInCluster: "andere foto's in deze cluster",
     clickCluster: "Klik cluster om gefilterd te bekijken",
     clickOpen: "Klik om te openen",
-    offline: "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden"
+    offline: "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden",
+    retry: "Opnieuw proberen",
+    loadingTiles: "Kaart laden…"
   };
   window.pixoraSetLabels = function(labels) {
     Object.assign(LBL, labels);
-    document.getElementById('offline-banner').textContent = LBL.offline;
+    document.getElementById('offline-text').textContent = LBL.offline;
+    document.getElementById('retry-btn').textContent = LBL.retry;
+    document.getElementById('tiles-loading-text').textContent = LBL.loadingTiles;
   };
 
   function buildPopupHtml(m, count) {
