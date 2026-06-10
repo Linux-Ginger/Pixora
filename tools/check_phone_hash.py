@@ -44,12 +44,9 @@ def ph_bytes(p):
 
 
 def find_render(mount, fp):
-    parts = fp.parts
-    if "DCIM" not in parts:
-        return None
-    i = parts.index("DCIM")
-    rel = Path(*parts[i + 1:])
-    adj = mount / "PhotoData" / "Mutations" / "DCIM" / rel.parent / fp.stem / "Adjustments"
+    # Mutations mirrors the asset's own path (DCIM/... or PhotoData/CPLAssets/...).
+    rel = fp.relative_to(mount)
+    adj = mount / "PhotoData" / "Mutations" / rel.parent / fp.stem / "Adjustments"
     try:
         if adj.is_dir():
             for c in sorted(adj.iterdir()):
@@ -87,6 +84,9 @@ def main():
 
     try:
         matches = list((mp / "DCIM").rglob(name))
+        cpl = mp / "PhotoData" / "CPLAssets"
+        if cpl.is_dir():
+            matches += list(cpl.rglob(name))
         print(f"found {len(matches)} copy/copies of {name}\n")
         for fp in matches:
             direct = ph_direct(fp)

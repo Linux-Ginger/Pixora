@@ -2764,3 +2764,11 @@ msgstr "Vidéo {n}"
 
 msgid "Deleting…"
 msgstr "Suppression en cours…"
+
+msgid "Duplicate check failed: {err}"
+msgstr "Échec de la vérification des doublons : {err}"
+
+msgid "%d file failed — see pixora.log"
+msgid_plural "%d files failed — see pixora.log"
+msgstr[0] "%d fichier en échec — voir pixora.log"
+msgstr[1] "%d fichiers en échec — voir pixora.log"

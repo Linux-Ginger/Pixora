@@ -261,20 +261,25 @@ def pair_attempt(udid: str) -> str:
 
 
 def find_edited_render(src: Path) -> Path | None:
-    """Return the phone-rendered edit for a DCIM file, if one exists.
+    """Return the phone-rendered edit for a device file, if one exists.
 
-    iOS keeps the master in DCIM and stores the rendered edit (crop, filters,
-    markup) under PhotoData/Mutations/DCIM/<sub>/<STEM>/Adjustments/
-    FullSizeRender.*. Importing that render gives exactly what the phone shows.
+    iOS keeps the master in DCIM or PhotoData/CPLAssets and stores the rendered
+    edit (crop, filters, markup) under PhotoData/Mutations/<asset path>/<STEM>/
+    Adjustments/FullSizeRender.* — Mutations mirrors the asset's own path, so
+    CPLAssets edits live under Mutations/PhotoData/CPLAssets/….
     """
     try:
         parts = src.parts
-        if "DCIM" not in parts:
+        # Both asset roots sit directly under the AFC mount.
+        for marker in ("DCIM", "PhotoData"):
+            if marker in parts:
+                i = parts.index(marker)
+                break
+        else:
             return None
-        i = parts.index("DCIM")
         mount = Path(*parts[:i]) if i > 0 else Path(src.anchor)
-        rel = Path(*parts[i + 1:])  # e.g. 100APPLE/IMG_0001.HEIC
-        adj = (mount / "PhotoData" / "Mutations" / "DCIM"
+        rel = src.relative_to(mount)  # e.g. DCIM/100APPLE/IMG_0001.HEIC
+        adj = (mount / "PhotoData" / "Mutations"
                / rel.parent / src.stem / "Adjustments")
         try:
             if not adj.is_dir():
@@ -683,13 +688,15 @@ def load_capture_dates(mountpoint: Path) -> dict:
             if s.exists():
                 shutil.copy2(s, tmp / s.name)
         con = sqlite3.connect(f"file:{tmp / 'Photos.sqlite'}?mode=ro", uri=True)
-        dates: dict = {}
-        for zdir, zfn, zdate in con.execute(
-                "SELECT ZDIRECTORY, ZFILENAME, ZDATECREATED FROM ZASSET "
-                "WHERE ZFILENAME IS NOT NULL AND ZDATECREATED IS NOT NULL"):
-            key = (f"{zdir}/{zfn}" if zdir else zfn).lower()
-            dates[key] = float(zdate) + _COREDATA_EPOCH
-        con.close()
+        try:
+            dates: dict = {}
+            for zdir, zfn, zdate in con.execute(
+                    "SELECT ZDIRECTORY, ZFILENAME, ZDATECREATED FROM ZASSET "
+                    "WHERE ZFILENAME IS NOT NULL AND ZDATECREATED IS NOT NULL"):
+                key = (f"{zdir}/{zfn}" if zdir else zfn).lower()
+                dates[key] = float(zdate) + _COREDATA_EPOCH
+        finally:
+            con.close()
         try:
             from main_window import log_info
             log_info("load_capture_dates: %d dates from Photos.sqlite" % len(dates))
@@ -718,9 +725,13 @@ def load_hash_cache() -> dict:
 
 
 def save_hash_cache(cache: dict):
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    with open(HASH_CACHE, "w") as f:
-        json.dump(cache, f)
+    # Cache only — on failure (disk full, permissions) we just re-hash next time.
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with open(HASH_CACHE, "w") as f:
+            json.dump(cache, f)
+    except OSError:
+        pass
 
 
 def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
@@ -1797,6 +1808,20 @@ class ImporterPage(Gtk.Box):
         threading.Thread(target=self._do_hashing, args=(files,), daemon=True).start()
 
     def _do_hashing(self, iphone_files: list[Path]):
+        # Any uncaught error here would kill the thread and leave the wizard
+        # stuck on the progress page forever — surface it instead.
+        try:
+            self._hash_worker(iphone_files)
+        except Exception as e:
+            try:
+                from main_window import log_warn
+                log_warn("duplicate check crashed: %r" % (e,))
+            except Exception:
+                pass
+            GLib.idle_add(self._show_error,
+                          _("Duplicate check failed: {err}").format(err=e), False)
+
+    def _hash_worker(self, iphone_files: list[Path]):
         photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
         threshold_key = self.settings.get("duplicate_threshold", 2)
         try:
@@ -2334,6 +2359,7 @@ class ImporterPage(Gtk.Box):
         # (phone source, archive destination) for each imported file, so the
         # post-import integrity check can re-import a damaged one from the phone.
         self._imported_pairs = []
+        failed: list[str] = []
 
         for i, src in enumerate(self.to_import):
             copy_src = src
@@ -2412,8 +2438,15 @@ class ImporterPage(Gtk.Box):
 
                 self._imported_pairs.append((copy_src, dst))
                 imported += 1
-            except Exception:
-                pass
+            except Exception as e:
+                # AFC/FUSE reads can fail per file; never let one bad file end
+                # the import, but do tell the user instead of under-counting.
+                failed.append(src.name)
+                try:
+                    from main_window import log_warn
+                    log_warn("import failed for %s: %r" % (src, e))
+                except Exception:
+                    pass
 
             try:
                 done_bytes += copy_src.stat().st_size
@@ -2426,6 +2459,7 @@ class ImporterPage(Gtk.Box):
             GLib.idle_add(self._update_progress, frac, text, detail)
 
         self.import_count = imported
+        self.import_failed = len(failed)
         GLib.idle_add(self._begin_corrupt_scan)
 
     def _begin_corrupt_scan(self):
@@ -2501,6 +2535,12 @@ class ImporterPage(Gtk.Box):
         if skipped:
             desc_parts.append(
                 ngettext("%d skipped", "%d skipped", skipped) % skipped
+            )
+        failed = getattr(self, "import_failed", 0)
+        if failed:
+            desc_parts.append(
+                ngettext("%d file failed — see pixora.log",
+                         "%d files failed — see pixora.log", failed) % failed
             )
         if note:
             desc_parts.append(note)

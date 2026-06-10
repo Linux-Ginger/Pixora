@@ -1877,3 +1877,11 @@ msgstr ""
 
 msgid "Deleting…"
 msgstr ""
+
+msgid "Duplicate check failed: {err}"
+msgstr ""
+
+msgid "%d file failed — see pixora.log"
+msgid_plural "%d files failed — see pixora.log"
+msgstr[0] ""
+msgstr[1] ""

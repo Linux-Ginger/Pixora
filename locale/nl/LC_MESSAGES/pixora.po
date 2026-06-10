@@ -2736,3 +2736,11 @@ msgstr "Video {n}"
 
 msgid "Deleting…"
 msgstr "Bezig met verwijderen…"
+
+msgid "Duplicate check failed: {err}"
+msgstr "Duplicaatcontrole mislukt: {err}"
+
+msgid "%d file failed — see pixora.log"
+msgid_plural "%d files failed — see pixora.log"
+msgstr[0] "%d bestand mislukt — zie pixora.log"
+msgstr[1] "%d bestanden mislukt — zie pixora.log"
