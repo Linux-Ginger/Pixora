@@ -2899,3 +2899,6 @@ msgstr "Alleen favorieten"
 
 msgid "Only home"
 msgstr "Alleen thuis"
+
+msgid "Your address is looked up once via OpenStreetMap to get its coordinates, then stored only on this computer — never shared. Place names shown on the map and in the viewer are likewise fetched once from OpenStreetMap and cached locally."
+msgstr "Je adres wordt één keer via OpenStreetMap opgezocht om de coördinaten te krijgen en daarna alleen op deze computer bewaard — nooit gedeeld. Plaatsnamen op de kaart en in de viewer worden net zo één keer bij OpenStreetMap opgehaald en lokaal bewaard."

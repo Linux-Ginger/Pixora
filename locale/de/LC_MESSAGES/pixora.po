@@ -2910,3 +2910,6 @@ msgstr "Nur Favoriten"
 
 msgid "Only home"
 msgstr "Nur Zuhause"
+
+msgid "Your address is looked up once via OpenStreetMap to get its coordinates, then stored only on this computer — never shared. Place names shown on the map and in the viewer are likewise fetched once from OpenStreetMap and cached locally."
+msgstr "Deine Adresse wird einmal über OpenStreetMap nachgeschlagen, um die Koordinaten zu erhalten, und danach nur auf diesem Computer gespeichert — niemals geteilt. Ortsnamen auf der Karte und im Betrachter werden ebenso einmal über OpenStreetMap abgerufen und lokal gespeichert."

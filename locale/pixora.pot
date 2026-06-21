@@ -2040,3 +2040,6 @@ msgstr ""
 
 msgid "Only home"
 msgstr ""
+
+msgid "Your address is looked up once via OpenStreetMap to get its coordinates, then stored only on this computer — never shared. Place names shown on the map and in the viewer are likewise fetched once from OpenStreetMap and cached locally."
+msgstr ""

@@ -6900,8 +6900,10 @@ class MainWindow(Adw.ApplicationWindow):
         home_group = Adw.PreferencesGroup()
         home_group.set_title(_("Home location"))
         home_group.set_description(
-            _("Shown as a pin on the map and used by the home button. Stored "
-              "only on this computer."))
+            _("Your address is looked up once via OpenStreetMap to get its "
+              "coordinates, then stored only on this computer — never shared. "
+              "Place names shown on the map and in the viewer are likewise "
+              "fetched once from OpenStreetMap and cached locally."))
         self.home_row = Adw.ActionRow(title=_("Home address"))
         self.home_row.set_subtitle(self._home_address_text())
         remove_home_btn = Gtk.Button(label=_("Remove"))
