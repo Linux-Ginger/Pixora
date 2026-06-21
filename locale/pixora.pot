@@ -1888,3 +1888,24 @@ msgstr[1] ""
 
 msgid "Loading map…"
 msgstr ""
+
+msgid "Home"
+msgstr ""
+
+msgid "Go to my home"
+msgstr ""
+
+msgid "Set current view as home"
+msgstr ""
+
+msgid "No home set yet"
+msgstr ""
+
+msgid "Open the map where you live, then choose “Set current view as home”."
+msgstr ""
+
+msgid "Home saved"
+msgstr ""
+
+msgid "This map spot is now your home. It’s stored only on this computer and never shared."
+msgstr ""

@@ -81,9 +81,11 @@
     markerZoomAnimation: true,
     inertia: true,
     preferCanvas: true,
-    // Fijnere muiswiel-stappen + korte tween = vloeiend zoomen i.p.v. springen.
-    wheelDebounceTime: 40,
-    wheelPxPerZoomLevel: 120,
+    // Snelheidsgevoelig zoomen: hoe harder je scrollt, hoe meer er per keer
+    // wordt ingezoomd (Leaflet telt de scroll-delta binnen het debounce-venster
+    // op). Lage waarden = sneller reagerend.
+    wheelDebounceTime: 20,
+    wheelPxPerZoomLevel: 55,
     zoomSnap: 0.25,
     zoomDelta: 0.5,
     minZoom: 2,
@@ -135,7 +137,10 @@
     updateWhenIdle: false,
     updateWhenZooming: false,
     keepBuffer: 4,
-    noWrap: true
+    noWrap: true,
+    // Beperk tot de echte wereld-bounds: voorkomt tile-requests boven/onder de
+    // wereld (bij ver uitzoomen) die anders 404 geven → valse "offline".
+    bounds: [[-85.0511, -180.0], [85.0511, 180.0]]
   };
   let firstTileLoaded = false;
   let tileErrorCount = 0;
@@ -389,6 +394,16 @@
       updateMinZoom();
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
     }
+  };
+
+  // Home: Pixora bewaart de locatie lokaal en stuurt 'm hierheen om naartoe
+  // te vliegen, of vraagt het huidige middelpunt op om als huis op te slaan.
+  window.pixoraGoHome = function(lat, lon, zoom) {
+    map.flyTo([lat, lon], zoom || 15, { duration: 1.2 });
+  };
+  window.pixoraSendCenter = function() {
+    const c = map.getCenter();
+    sendToPixora({ type: 'map-center', lat: c.lat, lon: c.lng, zoom: map.getZoom() });
   };
 
   window.pixoraReady = true;

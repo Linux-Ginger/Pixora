@@ -2775,3 +2775,24 @@ msgstr[1] "%d fichiers en échec — voir pixora.log"
 
 msgid "Loading map…"
 msgstr "Chargement de la carte…"
+
+msgid "Home"
+msgstr "Domicile"
+
+msgid "Go to my home"
+msgstr "Aller à mon domicile"
+
+msgid "Set current view as home"
+msgstr "Définir la vue actuelle comme domicile"
+
+msgid "No home set yet"
+msgstr "Aucun domicile défini"
+
+msgid "Open the map where you live, then choose “Set current view as home”."
+msgstr "Ouvre la carte là où tu habites, puis choisis « Définir la vue actuelle comme domicile »."
+
+msgid "Home saved"
+msgstr "Domicile enregistré"
+
+msgid "This map spot is now your home. It’s stored only on this computer and never shared."
+msgstr "Cet endroit sur la carte est désormais ton domicile. Il est stocké uniquement sur cet ordinateur et jamais partagé."

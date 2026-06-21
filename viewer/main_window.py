@@ -858,12 +858,14 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
 
 class MapWidget(Gtk.Box):
-    def __init__(self, markers, open_photo_cb, status_cb=None, tile_url=None):
+    def __init__(self, markers, open_photo_cb, status_cb=None, tile_url=None,
+                 center_cb=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.markers = markers
         self.open_photo_cb = open_photo_cb
         self.status_cb = status_cb
         self._tile_url = tile_url
+        self.center_cb = center_cb
         self.set_vexpand(True)
         self.set_hexpand(True)
         self._pending_markers = list(markers) if markers else []
@@ -1029,18 +1031,30 @@ class MapWidget(Gtk.Box):
             + f"if(window.pixoraSetLabels){{window.pixoraSetLabels({json.dumps(labels)});}}"
             f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers({json.dumps(data)});}}"
         )
-        ran = False
+        self._run_js(js)
+        return False
+
+    def _run_js(self, js):
+        """Run JS in the map, across both WebKit API generations."""
+        if not getattr(self, "web", None):
+            return
         try:
             self.web.evaluate_javascript(js, -1, None, None, None, None, None)
-            ran = True
+            return
         except Exception:
             pass
-        if not ran:
-            try:
-                self.web.run_javascript(js, None, None, None)
-            except Exception as e:
-                log_error(_("JS push error: {err}").format(err=e))
-        return False
+        try:
+            self.web.run_javascript(js, None, None, None)
+        except Exception as e:
+            log_error(_("JS run error: {err}").format(err=e))
+
+    def go_home(self, lat, lon, zoom=None):
+        z = int(zoom) if zoom else 15
+        self._run_js(f"if(window.pixoraGoHome)"
+                     f"{{window.pixoraGoHome({float(lat)},{float(lon)},{z});}}")
+
+    def request_center(self):
+        self._run_js("if(window.pixoraSendCenter){window.pixoraSendCenter();}")
 
     def _on_js_message(self, ucm, message):
         try:
@@ -1070,6 +1084,10 @@ class MapWidget(Gtk.Box):
             log_warn(_("Map → offline / tile errors"))
             if self.status_cb:
                 GLib.idle_add(self.status_cb, "offline")
+        elif msg_type == "map-center":
+            if self.center_cb:
+                GLib.idle_add(self.center_cb, payload.get("lat"),
+                              payload.get("lon"), payload.get("zoom"))
 
 
 class BackupFolderPicker(Adw.Dialog):
@@ -2717,6 +2735,31 @@ class MainWindow(Adw.ApplicationWindow):
         self.map_title_label.add_css_class("dim-label")
         map_header.set_title_widget(self.map_title_label)
 
+        # Home button: fly to a saved home spot, or save the current view as one.
+        home_btn = Gtk.MenuButton(icon_name="go-home-symbolic")
+        home_btn.add_css_class("flat")
+        home_btn.set_tooltip_text(_("Home"))
+        pop = Gtk.Popover()
+        vb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        for m in (6,):
+            vb.set_margin_top(m); vb.set_margin_bottom(m)
+            vb.set_margin_start(m); vb.set_margin_end(m)
+        go = Gtk.Button(label=_("Go to my home"))
+        go.add_css_class("flat")
+        go.set_halign(Gtk.Align.FILL)
+        go.get_child().set_halign(Gtk.Align.START)
+        go.connect("clicked", self._on_go_home, pop)
+        setb = Gtk.Button(label=_("Set current view as home"))
+        setb.add_css_class("flat")
+        setb.set_halign(Gtk.Align.FILL)
+        setb.get_child().set_halign(Gtk.Align.START)
+        setb.connect("clicked", self._on_set_home, pop)
+        vb.append(go)
+        vb.append(setb)
+        pop.set_child(vb)
+        home_btn.set_popover(pop)
+        map_header.pack_end(home_btn)
+
         box.append(map_header)
 
         self.map_container = Gtk.Stack()
@@ -2840,7 +2883,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._map_widget = MapWidget(
             markers, self._open_photo_from_map,
-            status_cb=self._on_map_status, tile_url=tile_url
+            status_cb=self._on_map_status, tile_url=tile_url,
+            center_cb=self._on_map_center
         )
         self.map_content.append(self._map_widget)
         # Wait for map-ready; 12s fallback prevents hang.
@@ -2888,6 +2932,49 @@ class MainWindow(Adw.ApplicationWindow):
             self.map_container.set_visible_child_name("map")
         except Exception:
             pass
+        return False
+
+    def _on_go_home(self, btn, pop):
+        pop.popdown()
+        lat = self.settings.get("home_lat")
+        lon = self.settings.get("home_lon")
+        if lat is None or lon is None:
+            dlg = Adw.MessageDialog(
+                transient_for=self,
+                heading=_("No home set yet"),
+                body=_("Open the map where you live, then choose “Set current "
+                       "view as home”."))
+            dlg.add_response("ok", _("OK"))
+            dlg.present()
+            return
+        if self._map_widget:
+            self._map_widget.go_home(lat, lon, self.settings.get("home_zoom"))
+
+    def _on_set_home(self, btn, pop):
+        pop.popdown()
+        if self._map_widget:
+            self._map_widget.request_center()
+
+    def _on_map_center(self, lat, lon, zoom):
+        # Home is stored only in the local 0600 settings file — never sent out.
+        if lat is None or lon is None:
+            return False
+        self.settings["home_lat"] = lat
+        self.settings["home_lon"] = lon
+        if zoom:
+            self.settings["home_zoom"] = zoom
+        try:
+            save_settings(self.settings)
+        except Exception as e:
+            log_error(_("Could not save home: {err}").format(err=e))
+            return False
+        dlg = Adw.MessageDialog(
+            transient_for=self,
+            heading=_("Home saved"),
+            body=_("This map spot is now your home. It’s stored only on this "
+                   "computer and never shared."))
+        dlg.add_response("ok", _("OK"))
+        dlg.present()
         return False
 
     def _open_photo_from_map(self, paths):

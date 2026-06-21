@@ -2747,3 +2747,24 @@ msgstr[1] "%d bestanden mislukt — zie pixora.log"
 
 msgid "Loading map…"
 msgstr "Kaart laden…"
+
+msgid "Home"
+msgstr "Thuis"
+
+msgid "Go to my home"
+msgstr "Ga naar mijn huis"
+
+msgid "Set current view as home"
+msgstr "Huidige weergave als mijn huis instellen"
+
+msgid "No home set yet"
+msgstr "Nog geen huis ingesteld"
+
+msgid "Open the map where you live, then choose “Set current view as home”."
+msgstr "Ga op de kaart naar waar je woont en kies daarna “Huidige weergave als mijn huis instellen”."
+
+msgid "Home saved"
+msgstr "Huis opgeslagen"
+
+msgid "This map spot is now your home. It’s stored only on this computer and never shared."
+msgstr "Deze plek op de kaart is nu je huis. Het wordt alleen op deze computer bewaard en nooit gedeeld."

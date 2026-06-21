@@ -2758,3 +2758,24 @@ msgstr[1] "%d Dateien fehlgeschlagen — siehe pixora.log"
 
 msgid "Loading map…"
 msgstr "Karte wird geladen…"
+
+msgid "Home"
+msgstr "Zuhause"
+
+msgid "Go to my home"
+msgstr "Zu meinem Zuhause"
+
+msgid "Set current view as home"
+msgstr "Aktuelle Ansicht als Zuhause festlegen"
+
+msgid "No home set yet"
+msgstr "Noch kein Zuhause festgelegt"
+
+msgid "Open the map where you live, then choose “Set current view as home”."
+msgstr "Öffne die Karte dort, wo du wohnst, und wähle dann „Aktuelle Ansicht als Zuhause festlegen“."
+
+msgid "Home saved"
+msgstr "Zuhause gespeichert"
+
+msgid "This map spot is now your home. It’s stored only on this computer and never shared."
+msgstr "Dieser Kartenpunkt ist jetzt dein Zuhause. Er wird nur auf diesem Computer gespeichert und niemals geteilt."
