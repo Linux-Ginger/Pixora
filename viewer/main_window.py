@@ -3575,7 +3575,9 @@ class MainWindow(Adw.ApplicationWindow):
         _editbar_css.load_from_string(
             ".pixora-editbar { background-color: rgba(28,28,30,0.94);"
             " border-radius: 16px; padding: 6px 8px;"
-            " box-shadow: 0 2px 12px rgba(0,0,0,0.45); }")
+            " box-shadow: 0 2px 12px rgba(0,0,0,0.45); }"
+            # Flat buttons on the dark bar need light icons (else they look grey).
+            ".pixora-editbar button { color: #ffffff; }")
         self.editor_bar.add_css_class("pixora-editbar")
         self.editor_bar.get_style_context().add_provider(
             _editbar_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
@@ -5451,6 +5453,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_viewer_ui(self):
         self._cancel_fade()
+        # In the editor only the edit toolbar is shown — don't let mouse motion
+        # bring the filmstrip/arrows/etc. back over it.
+        if getattr(self, "_editor_active", False):
+            for w in self._video_fade_widgets():
+                w.set_visible(False)
+            self.editor_bar.set_visible(True)
+            return
         for w in self._video_fade_widgets():
             w.set_visible(True)
             w.set_opacity(1.0)
@@ -5950,6 +5959,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_rect_origin      = None
         self.crop_toggle_btn.set_active(False)
         self.crop_overlay_area.set_visible(False)
+        # Clean editor mode: hide all normal viewer chrome (filmstrip, counter,
+        # arrows, edit/fav/close/delete) so only the photo + edit toolbar show.
+        self._cancel_fade()
+        for w in self._video_fade_widgets():
+            w.set_visible(False)
         self.editor_bar.set_visible(True)
         self.prev_btn.set_sensitive(False)
         self.next_btn.set_sensitive(False)
@@ -5971,6 +5985,9 @@ class MainWindow(Adw.ApplicationWindow):
             self._apply_viewer_transform()
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
+        # Bring the normal viewer chrome back.
+        self._show_viewer_ui()
+        self._reset_fade_timer()
 
     def _reset_crop(self):
         self._editor_crop_mode = False
