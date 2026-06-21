@@ -2134,6 +2134,14 @@ class MainWindow(Adw.ApplicationWindow):
         self._settings_pulse_op = 1.0
         self._settings_pulse_dir = -1
         self._settings_pulse_update_icon = False
+        # Orange tint for the update icon (display-level so it reaches the icon).
+        if not getattr(self, "_settings_pulse_css", None):
+            self._settings_pulse_css = Gtk.CssProvider()
+            self._settings_pulse_css.load_from_string(
+                ".pixora-update-flash { color: #e95420; }")
+            Gtk.StyleContext.add_provider_for_display(
+                Gdk.Display.get_default(), self._settings_pulse_css,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
         def _tick():
             self._settings_pulse_op += self._settings_pulse_dir * 0.05
@@ -2143,10 +2151,13 @@ class MainWindow(Adw.ApplicationWindow):
                 # Swap at the trough → reads as a crossfade between the two icons.
                 self._settings_pulse_update_icon = not self._settings_pulse_update_icon
                 try:
-                    self.settings_btn.set_icon_name(
-                        "software-update-available-symbolic"
-                        if self._settings_pulse_update_icon
-                        else "preferences-system-symbolic")
+                    if self._settings_pulse_update_icon:
+                        self.settings_btn.set_icon_name(
+                            "software-update-available-symbolic")
+                        self.settings_btn.add_css_class("pixora-update-flash")
+                    else:
+                        self.settings_btn.set_icon_name("preferences-system-symbolic")
+                        self.settings_btn.remove_css_class("pixora-update-flash")
                 except Exception:
                     pass
             elif self._settings_pulse_op >= 1.0:
@@ -2176,9 +2187,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_update_dialog_response(self, dlg, response, new_version):
         if response == "bijwerken":
             self._open_installer()
-        else:
-            self.update_banner.set_title(_("Update available: {v}").format(v=new_version))
-            self.update_banner.set_revealed(True)
+        # On "later" we no longer show the top banner — the flashing settings
+        # icon is the persistent reminder.
 
     def _on_update_banner_clicked(self, banner):
         self._open_installer()
@@ -2707,7 +2717,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.header.pack_start(self.sort_combo)
 
         # Filters grouped in one menu so the header doesn't overflow.
-        filter_btn = Gtk.MenuButton(icon_name="funnel-symbolic")
+        filter_btn = Gtk.MenuButton()
+        filter_btn.set_label(_("Filter"))   # icon themes vary; a label always shows
         filter_btn.add_css_class("flat")
         filter_btn.set_tooltip_text(_("Filter"))
         _filter_pop = Gtk.Popover()
@@ -3608,8 +3619,11 @@ class MainWindow(Adw.ApplicationWindow):
             # Flat buttons on the dark bar need light icons (else they look grey).
             ".pixora-editbar button { color: #ffffff; }")
         self.editor_bar.add_css_class("pixora-editbar")
-        self.editor_bar.get_style_context().add_provider(
-            _editbar_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        # Display-level: a per-widget provider on the box would NOT reach the
+        # child buttons, so the icons stayed grey.
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(), _editbar_css,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
         def _edit_btn(icon, tip, cb, toggle=False):
             b = Gtk.ToggleButton() if toggle else Gtk.Button()
@@ -3651,8 +3665,6 @@ class MainWindow(Adw.ApplicationWindow):
         save_btn.connect("clicked", self.on_editor_save)
         self.editor_bar.append(save_btn)
 
-        viewer_area.add_overlay(self.editor_bar)
-
         self.crop_overlay_area = Gtk.DrawingArea()
         self.crop_overlay_area.set_draw_func(self.on_crop_draw)
         self.crop_overlay_area.set_vexpand(True)
@@ -3665,6 +3677,9 @@ class MainWindow(Adw.ApplicationWindow):
         crop_drag.connect("drag-end",    self.on_crop_drag_end)
         self.crop_overlay_area.add_controller(crop_drag)
         viewer_area.add_overlay(self.crop_overlay_area)
+        # Editor toolbar must sit ABOVE the crop overlay, else the overlay eats
+        # the button clicks (couldn't exit crop / cancel did nothing).
+        viewer_area.add_overlay(self.editor_bar)
 
         self.viewer_title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self.viewer_title_box.add_css_class("osd")
@@ -4055,11 +4070,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_photos_scanned(self, photos, photo_path):
         log_info(_("load_photos: {n} files found").format(n=len(photos)))
-        if self._favorites_only:
-            photos = [p for p in photos if p in self._favorites]
-        if self._home_only:
-            photos = [p for p in photos if self._photo_near_home(p)]
         filtering = self._favorites_only or self._home_only
+        if filtering:
+            # Union: each checked filter ADDS its photos (favorites and/or home),
+            # so turning both on shows more, not fewer.
+            photos = [p for p in photos if
+                      (self._favorites_only and p in self._favorites) or
+                      (self._home_only and self._photo_near_home(p))]
         if not photos:
             if filtering:
                 self._show_empty_favorites()
