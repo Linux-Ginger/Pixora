@@ -95,6 +95,10 @@
     } catch (_) {}
   }
 
+  // Whole init wrapped so a startup throw is reported WITH details (instead of
+  // a masked "Script error") — a throw here leaves pixoraSetMarkers/GoHome/
+  // SetHome undefined, which is exactly the markers+home bug.
+  try {
   // Soepel in-/uitzoomen en pannen (GPU-versnelling op de main pc aanwezig).
   // fadeAnimation laat tegels invloeien i.p.v. hard inklappen.
   const map = L.map('map', {
@@ -104,7 +108,6 @@
     fadeAnimation: true,
     markerZoomAnimation: true,
     inertia: true,
-    preferCanvas: true,
     // Snelheidsgevoelig zoomen: hoe harder je scrollt, hoe meer er per keer
     // wordt ingezoomd (Leaflet telt de scroll-delta binnen het debounce-venster
     // op). Lage waarden = sneller reagerend.
@@ -157,7 +160,6 @@
   let tileLayer = null;
   const TILE_OPTS = {
     maxZoom: 19,
-    crossOrigin: true,
     // Load tiles continu tijdens pannen — voorkomt grijze vlakken wanneer
     // de gebruiker de muis vasthoudt zonder te bewegen.
     updateWhenIdle: false,
@@ -455,6 +457,7 @@
   };
 
   window.pixoraReady = true;
+  } catch (e) { _report('INIT', e); }
 })();
 </script>
 </body>
