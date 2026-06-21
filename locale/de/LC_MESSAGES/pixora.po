@@ -2833,3 +2833,51 @@ msgstr "Diese Adresse wurde nicht gefunden. Überprüfe die Felder und versuche 
 
 msgid "Map → go home ({lat}, {lon})"
 msgstr "Karte → nach Hause ({lat}, {lon})"
+
+msgid "Skip"
+msgstr "Überspringen"
+
+msgid "Got it"
+msgstr "Verstanden"
+
+msgid "Welcome"
+msgstr "Willkommen"
+
+msgid "Home location"
+msgstr "Zuhause-Standort"
+
+msgid "Home address"
+msgstr "Heimatadresse"
+
+msgid "Not set"
+msgstr "Nicht festgelegt"
+
+msgid "Welcome to Pixora"
+msgstr "Willkommen bei Pixora"
+
+msgid "Your photos and videos, neatly organised and private on your own computer."
+msgstr "Deine Fotos und Videos, ordentlich sortiert und privat auf deinem eigenen Computer."
+
+msgid "Connect your iPhone or iPad and import photos and videos. Edits come over too, and duplicates are detected automatically."
+msgstr "Schließe dein iPhone oder iPad an und importiere Fotos und Videos. Bearbeitungen kommen mit, und Duplikate werden automatisch erkannt."
+
+msgid "Automatically organised"
+msgstr "Automatisch sortiert"
+
+msgid "Pixora files every photo by date. HEIC photos are converted to JPEG so they open everywhere — your originals stay intact."
+msgstr "Pixora ordnet jedes Foto nach Datum. HEIC-Fotos werden in JPEG umgewandelt, damit sie überall geöffnet werden können — deine Originale bleiben erhalten."
+
+msgid "Map"
+msgstr "Karte"
+
+msgid "See where your photos were taken, and set your home so you can jump back to it anytime."
+msgstr "Sieh, wo deine Fotos aufgenommen wurden, und lege dein Zuhause fest, um jederzeit dorthin zu springen."
+
+msgid "Connect a USB drive for automatic backups, so you always have a second copy of your photos."
+msgstr "Schließe ein USB-Laufwerk für automatische Backups an, damit du immer eine zweite Kopie deiner Fotos hast."
+
+msgid "You’re all set"
+msgstr "Alles bereit"
+
+msgid "You can change everything later in Settings. Enjoy Pixora!"
+msgstr "Du kannst alles später in den Einstellungen ändern. Viel Spaß mit Pixora!"

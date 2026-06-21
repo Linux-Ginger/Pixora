@@ -2822,3 +2822,51 @@ msgstr "Dat adres is niet gevonden. Controleer de velden en probeer opnieuw."
 
 msgid "Map → go home ({lat}, {lon})"
 msgstr "Kaart → ga naar huis ({lat}, {lon})"
+
+msgid "Skip"
+msgstr "Overslaan"
+
+msgid "Got it"
+msgstr "Begrepen"
+
+msgid "Welcome"
+msgstr "Welkom"
+
+msgid "Home location"
+msgstr "Thuislocatie"
+
+msgid "Home address"
+msgstr "Huisadres"
+
+msgid "Not set"
+msgstr "Niet ingesteld"
+
+msgid "Welcome to Pixora"
+msgstr "Welkom bij Pixora"
+
+msgid "Your photos and videos, neatly organised and private on your own computer."
+msgstr "Je foto's en video's, netjes geordend en privé op je eigen computer."
+
+msgid "Connect your iPhone or iPad and import photos and videos. Edits come over too, and duplicates are detected automatically."
+msgstr "Sluit je iPhone of iPad aan en importeer foto's en video's. Bewerkingen komen mee en duplicaten worden automatisch herkend."
+
+msgid "Automatically organised"
+msgstr "Automatisch geordend"
+
+msgid "Pixora files every photo by date. HEIC photos are converted to JPEG so they open everywhere — your originals stay intact."
+msgstr "Pixora ordent elke foto op datum. HEIC-foto's worden omgezet naar JPEG zodat ze overal openen — je originelen blijven behouden."
+
+msgid "Map"
+msgstr "Kaart"
+
+msgid "See where your photos were taken, and set your home so you can jump back to it anytime."
+msgstr "Zie waar je foto's gemaakt zijn en stel je huis in zodat je er altijd snel naartoe kunt."
+
+msgid "Connect a USB drive for automatic backups, so you always have a second copy of your photos."
+msgstr "Sluit een USB-schijf aan voor automatische back-ups, zodat je altijd een tweede kopie van je foto's hebt."
+
+msgid "You’re all set"
+msgstr "Je bent klaar"
+
+msgid "You can change everything later in Settings. Enjoy Pixora!"
+msgstr "Je kunt alles later wijzigen in Instellingen. Veel plezier met Pixora!"

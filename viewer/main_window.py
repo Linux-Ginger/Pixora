@@ -1638,6 +1638,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_resizable(False)
         log_info(_("Startup phase 4: loading photos scheduled via idle_add"))
         GLib.idle_add(self.load_photos)
+        # First run after setup: show the welcome tour once.
+        if not self.settings.get("welcome_shown"):
+            GLib.timeout_add(600, self._show_welcome)
         self.connect("close-request", self.on_close)
         GLib.idle_add(self._check_for_update)
         threading.Thread(target=self._start_services, daemon=True).start()
@@ -2840,33 +2843,14 @@ class MainWindow(Adw.ApplicationWindow):
         self.map_title_label.add_css_class("dim-label")
         map_header.set_title_widget(self.map_title_label)
 
-        # Home button: fly to a saved home, or set it by typing your address.
-        home_btn = Gtk.MenuButton(icon_name="go-home-symbolic")
+        # Home button: one click flies to your home. Set/change the address in
+        # Settings (or it opens the form the first time if no home exists yet).
+        home_btn = Gtk.Button(icon_name="go-home-symbolic")
         home_btn.add_css_class("flat")
-        home_btn.set_tooltip_text(_("Home"))
-        pop = Gtk.Popover()
-        vb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        vb.set_margin_top(6); vb.set_margin_bottom(6)
-        vb.set_margin_start(6); vb.set_margin_end(6)
-        go = Gtk.Button(label=_("Go to my home"))
-        go.add_css_class("flat")
-        go.set_halign(Gtk.Align.FILL)
-        go.get_child().set_halign(Gtk.Align.START)
-        go.connect("clicked", self._on_go_home, pop)
-        # Greyed out until a home is actually set.
-        self._go_home_item = go
-        go.set_sensitive(self.settings.get("home_lat") is not None)
-        setb = Gtk.Button(label=_("Set home address…"))
-        setb.add_css_class("flat")
-        setb.set_halign(Gtk.Align.FILL)
-        setb.get_child().set_halign(Gtk.Align.START)
-        setb.connect("clicked", self._on_set_home, pop)
-        vb.append(go)
-        vb.append(setb)
-        pop.set_child(vb)
-        home_btn.set_popover(pop)
+        home_btn.set_tooltip_text(_("Go to my home"))
+        home_btn.connect("clicked", self._on_home_clicked)
 
-        # Refresh button: reload the map tiles.
+        # Refresh button: rescan photos and reload the map.
         refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
         refresh_btn.add_css_class("flat")
         refresh_btn.set_tooltip_text(_("Refresh map"))
@@ -2905,7 +2889,6 @@ class MainWindow(Adw.ApplicationWindow):
 
     def open_map(self, btn=None):
         log_info(_("Map opened ({n} photos going to GPS scan)").format(n=len(self.photos)))
-        self._refresh_home_menu()
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
         self._set_toolbars_revealed(False)
@@ -2997,17 +2980,19 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_warn(_("Tile proxy unavailable, using OSM directly: {err}").format(err=e))
 
-        # Initial camera: saved home → else the densest photo area → else fit all.
+        # Initial camera: show the photos (densest area) so they're always
+        # visible; only fall back to home when there are no GPS photos. Home is
+        # still shown as a pin and reachable via the home button.
         initial_view = None
         hlat = self.settings.get("home_lat")
         hlon = self.settings.get("home_lon")
-        if hlat is not None and hlon is not None:
-            initial_view = {"center": [hlat, hlon],
-                            "zoom": self.settings.get("home_zoom") or 13}
-        elif markers:
+        if markers:
             b = _densest_photo_bounds(markers)
             if b:
                 initial_view = {"bounds": b}
+        elif hlat is not None and hlon is not None:
+            initial_view = {"center": [hlat, hlon],
+                            "zoom": self.settings.get("home_zoom") or 13}
 
         home = ([hlat, hlon] if hlat is not None and hlon is not None else None)
         self._map_widget = MapWidget(
@@ -3063,27 +3048,143 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         return False
 
-    def _refresh_home_menu(self):
-        if hasattr(self, "_go_home_item"):
-            self._go_home_item.set_sensitive(
-                self.settings.get("home_lat") is not None)
-
     def _on_refresh_map(self, btn):
-        if self._map_widget:
-            self._map_widget.refresh()
+        # Full refresh: rescan photos + rebuild the map (reloads tiles too).
+        self.map_container.set_visible_child_name("loading")
+        try:
+            self.map_spinner.start()
+        except Exception:
+            pass
+        threading.Thread(target=self._load_gps_and_show_map, daemon=True).start()
 
-    def _on_go_home(self, btn, pop):
-        pop.popdown()
+    def _on_home_clicked(self, btn):
         lat = self.settings.get("home_lat")
         lon = self.settings.get("home_lon")
         if lat is None or lon is None:
+            # No home yet → open the address form so it's easy to set.
+            self._open_home_address_dialog()
             return
         if self._map_widget:
             log_info(_("Map → go home ({lat}, {lon})").format(lat=lat, lon=lon))
             self._map_widget.go_home(lat, lon, self.settings.get("home_zoom"))
 
-    def _on_set_home(self, btn, pop):
-        pop.popdown()
+    def _show_welcome(self):
+        pages = [
+            ("🎉", _("Welcome to Pixora"),
+             _("Your photos and videos, neatly organised and private on your "
+               "own computer.")),
+            ("📥", _("Import"),
+             _("Connect your iPhone or iPad and import photos and videos. "
+               "Edits come over too, and duplicates are detected automatically.")),
+            ("🗂️", _("Automatically organised"),
+             _("Pixora files every photo by date. HEIC photos are converted to "
+               "JPEG so they open everywhere — your originals stay intact.")),
+            ("🗺️", _("Map"),
+             _("See where your photos were taken, and set your home so you can "
+               "jump back to it anytime.")),
+            ("💾", _("Backup"),
+             _("Connect a USB drive for automatic backups, so you always have a "
+               "second copy of your photos.")),
+            ("✨", _("You’re all set"),
+             _("You can change everything later in Settings. Enjoy Pixora!")),
+        ]
+
+        win = Adw.Window()
+        win.set_title(_("Welcome"))
+        win.set_transient_for(self)
+        win.set_modal(True)
+        win.set_default_size(460, 480)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        carousel = Adw.Carousel()
+        carousel.set_vexpand(True)
+        page_widgets = []
+        for emoji, title, body in pages:
+            pg = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+            pg.set_valign(Gtk.Align.CENTER)
+            pg.set_halign(Gtk.Align.CENTER)
+            pg.set_margin_start(36); pg.set_margin_end(36)
+            icon = Gtk.Label(label=emoji)
+            ic_css = Gtk.CssProvider()
+            ic_css.load_from_string("label { font-size: 64px; }")
+            icon.get_style_context().add_provider(
+                ic_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            ttl = Gtk.Label(label=title)
+            ttl.add_css_class("title-1")
+            ttl.set_justify(Gtk.Justification.CENTER)
+            ttl.set_wrap(True)
+            txt = Gtk.Label(label=body)
+            txt.add_css_class("dim-label")
+            txt.set_justify(Gtk.Justification.CENTER)
+            txt.set_wrap(True)
+            pg.append(icon); pg.append(ttl); pg.append(txt)
+            carousel.append(pg)
+            page_widgets.append(pg)
+        outer.append(carousel)
+
+        dots = Adw.CarouselIndicatorDots()
+        dots.set_carousel(carousel)
+        dots.set_margin_top(8)
+        outer.append(dots)
+
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        bar.set_margin_top(12); bar.set_margin_bottom(16)
+        bar.set_margin_start(16); bar.set_margin_end(16)
+        skip_btn = Gtk.Button(label=_("Skip"))
+        skip_btn.add_css_class("flat")
+        skip_btn.connect("clicked", lambda b: self._finish_welcome(win))
+        spacer = Gtk.Box(); spacer.set_hexpand(True)
+        next_btn = Gtk.Button(label=_("Next"))
+        next_btn.add_css_class("suggested-action")
+
+        def _on_next(_b):
+            idx = int(carousel.get_position())
+            if idx >= len(page_widgets) - 1:
+                self._finish_welcome(win)
+            else:
+                carousel.scroll_to(page_widgets[idx + 1], True)
+        next_btn.connect("clicked", _on_next)
+
+        def _on_page(_c, _i):
+            last = int(carousel.get_position()) >= len(page_widgets) - 1
+            next_btn.set_label(_("Got it") if last else _("Next"))
+            skip_btn.set_visible(not last)
+        carousel.connect("page-changed", _on_page)
+
+        bar.append(skip_btn); bar.append(spacer); bar.append(next_btn)
+        outer.append(bar)
+
+        win.set_content(outer)
+        win.present()
+        return False
+
+    def _finish_welcome(self, win):
+        self.settings["welcome_shown"] = True
+        try:
+            save_settings(self.settings)
+        except Exception:
+            pass
+        try:
+            win.close()
+        except Exception:
+            pass
+
+    def _home_address_text(self):
+        parts = []
+        street = (f"{self.settings.get('home_street','')} "
+                  f"{self.settings.get('home_addition','')}").strip()
+        if street:
+            parts.append(street)
+        pc_city = (f"{self.settings.get('home_postcode','')} "
+                   f"{self.settings.get('home_city','')}").strip()
+        if pc_city:
+            parts.append(pc_city)
+        country = self.settings.get("home_country", "")
+        if country:
+            parts.append(country)
+        return ", ".join(parts) if parts else _("Not set")
+
+    def _open_home_address_dialog(self):
         dlg = Adw.MessageDialog(
             transient_for=self,
             heading=_("Set home address"),
@@ -3171,7 +3272,11 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_error(_("Could not save home: {err}").format(err=e))
             return False
-        self._refresh_home_menu()
+        if getattr(self, "home_row", None) is not None:
+            try:
+                self.home_row.set_subtitle(self._home_address_text())
+            except Exception:
+                pass
         if self._map_widget:
             self._map_widget.set_home(lat, lon)
             self._map_widget.go_home(lat, lon, 16)
@@ -6509,6 +6614,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._settings_dialog = None
             self._settings_stack = None
             self._settings_tabs_bar = None
+            self.home_row = None
             if hasattr(self, "settings_btn"):
                 self.settings_btn.set_sensitive(True)
             return False
@@ -6535,6 +6641,21 @@ class MainWindow(Adw.ApplicationWindow):
         self.folder_row.add_suffix(change_folder_btn)
         folder_group.add(self.folder_row)
         display_box.append(folder_group)
+
+        home_group = Adw.PreferencesGroup()
+        home_group.set_title(_("Home location"))
+        home_group.set_description(
+            _("Shown as a pin on the map and used by the home button. Stored "
+              "only on this computer."))
+        self.home_row = Adw.ActionRow(title=_("Home address"))
+        self.home_row.set_subtitle(self._home_address_text())
+        edit_home_btn = Gtk.Button(label=_("Change"))
+        edit_home_btn.add_css_class("flat")
+        edit_home_btn.set_valign(Gtk.Align.CENTER)
+        edit_home_btn.connect("clicked", lambda b: self._open_home_address_dialog())
+        self.home_row.add_suffix(edit_home_btn)
+        home_group.add(self.home_row)
+        display_box.append(home_group)
 
         display_group = Adw.PreferencesGroup()
         display_group.set_title(_("Display"))

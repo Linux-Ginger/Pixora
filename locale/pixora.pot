@@ -1963,3 +1963,51 @@ msgstr ""
 
 msgid "Map → go home ({lat}, {lon})"
 msgstr ""
+
+msgid "Skip"
+msgstr ""
+
+msgid "Got it"
+msgstr ""
+
+msgid "Welcome"
+msgstr ""
+
+msgid "Home location"
+msgstr ""
+
+msgid "Home address"
+msgstr ""
+
+msgid "Not set"
+msgstr ""
+
+msgid "Welcome to Pixora"
+msgstr ""
+
+msgid "Your photos and videos, neatly organised and private on your own computer."
+msgstr ""
+
+msgid "Connect your iPhone or iPad and import photos and videos. Edits come over too, and duplicates are detected automatically."
+msgstr ""
+
+msgid "Automatically organised"
+msgstr ""
+
+msgid "Pixora files every photo by date. HEIC photos are converted to JPEG so they open everywhere — your originals stay intact."
+msgstr ""
+
+msgid "Map"
+msgstr ""
+
+msgid "See where your photos were taken, and set your home so you can jump back to it anytime."
+msgstr ""
+
+msgid "Connect a USB drive for automatic backups, so you always have a second copy of your photos."
+msgstr ""
+
+msgid "You’re all set"
+msgstr ""
+
+msgid "You can change everything later in Settings. Enjoy Pixora!"
+msgstr ""
