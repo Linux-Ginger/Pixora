@@ -3565,52 +3565,59 @@ class MainWindow(Adw.ApplicationWindow):
         viewer_area.add_overlay(self.favorite_btn)
 
         # Editor toolbar (hidden until editor mode opens).
-        self.editor_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        # One cohesive rounded toolbar (Pixora style) instead of loose OSD
+        # circles, with consistent symbolic icons and an accent Save pill.
+        self.editor_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         self.editor_bar.set_halign(Gtk.Align.CENTER)
         self.editor_bar.set_valign(Gtk.Align.END)
         self.editor_bar.set_margin_bottom(FILM_THUMB + 12 + 16)
         self.editor_bar.set_visible(False)
+        _editbar_css = Gtk.CssProvider()
+        _editbar_css.load_from_string(
+            ".pixora-editbar { background-color: rgba(28,28,30,0.94);"
+            " border-radius: 16px; padding: 6px 8px;"
+            " box-shadow: 0 2px 12px rgba(0,0,0,0.45); }")
+        self.editor_bar.add_css_class("pixora-editbar")
+        self.editor_bar.get_style_context().add_provider(
+            _editbar_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
-        rot_left_btn = Gtk.Button(icon_name="object-rotate-left-symbolic")
-        rot_left_btn.add_css_class("osd")
-        rot_left_btn.add_css_class("circular")
-        rot_left_btn.set_size_request(48, 48)
-        rot_left_btn.set_tooltip_text(_("Rotate left"))
-        rot_left_btn.connect("clicked", self.on_editor_rotate_left)
+        def _edit_btn(icon, tip, cb, toggle=False):
+            b = Gtk.ToggleButton() if toggle else Gtk.Button()
+            b.set_icon_name(icon)
+            b.add_css_class("flat")
+            b.add_css_class("circular")
+            b.set_size_request(42, 42)
+            b.set_tooltip_text(tip)
+            b.connect("toggled" if toggle else "clicked", cb)
+            return b
+
+        rot_left_btn = _edit_btn("object-rotate-left-symbolic",
+                                 _("Rotate left"), self.on_editor_rotate_left)
+        rot_right_btn = _edit_btn("object-rotate-right-symbolic",
+                                  _("Rotate right"), self.on_editor_rotate_right)
+        self.crop_toggle_btn = _edit_btn("edit-cut-symbolic", _("Crop"),
+                                         self.on_editor_toggle_crop, toggle=True)
         self.editor_bar.append(rot_left_btn)
-
-        rot_right_btn = Gtk.Button(icon_name="object-rotate-right-symbolic")
-        rot_right_btn.add_css_class("osd")
-        rot_right_btn.add_css_class("circular")
-        rot_right_btn.set_size_request(48, 48)
-        rot_right_btn.set_tooltip_text(_("Rotate right"))
-        rot_right_btn.connect("clicked", self.on_editor_rotate_right)
         self.editor_bar.append(rot_right_btn)
-
-        self.crop_toggle_btn = Gtk.ToggleButton(label="✂")
-        self.crop_toggle_btn.add_css_class("osd")
-        self.crop_toggle_btn.add_css_class("circular")
-        self.crop_toggle_btn.set_size_request(48, 48)
-        self.crop_toggle_btn.set_tooltip_text(_("Crop"))
-        self.crop_toggle_btn.connect("toggled", self.on_editor_toggle_crop)
         self.editor_bar.append(self.crop_toggle_btn)
 
-        save_btn = Gtk.Button(icon_name="document-save-symbolic")
-        save_btn.add_css_class("osd")
-        save_btn.add_css_class("circular")
+        sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        sep.set_margin_start(4)
+        sep.set_margin_end(4)
+        sep.set_margin_top(6)
+        sep.set_margin_bottom(6)
+        self.editor_bar.append(sep)
+
+        cancel_editor_btn = _edit_btn("window-close-symbolic",
+                                      _("Cancel"), self.on_editor_cancel)
+        self.editor_bar.append(cancel_editor_btn)
+
+        save_btn = Gtk.Button(label=_("Save"))
         save_btn.add_css_class("suggested-action")
-        save_btn.set_size_request(48, 48)
-        save_btn.set_tooltip_text(_("Save"))
+        save_btn.add_css_class("pill")
+        save_btn.set_valign(Gtk.Align.CENTER)
         save_btn.connect("clicked", self.on_editor_save)
         self.editor_bar.append(save_btn)
-
-        cancel_editor_btn = Gtk.Button(icon_name="window-close-symbolic")
-        cancel_editor_btn.add_css_class("osd")
-        cancel_editor_btn.add_css_class("circular")
-        cancel_editor_btn.set_size_request(48, 48)
-        cancel_editor_btn.set_tooltip_text(_("Cancel"))
-        cancel_editor_btn.connect("clicked", self.on_editor_cancel)
-        self.editor_bar.append(cancel_editor_btn)
 
         viewer_area.add_overlay(self.editor_bar)
 
@@ -5938,6 +5945,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_edit_current(self, btn):
         path = self._current_photo_path() or "?"
+        # Editing is photo-only; videos can't be rotated/cropped here.
+        if path != "?" and is_video(path):
+            return
         log_info(_("Editor opened for: {name}").format(name=os.path.basename(path)))
         self._editor_active         = True
         self._editor_rotation       = 0
