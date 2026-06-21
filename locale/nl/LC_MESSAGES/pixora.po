@@ -119,8 +119,8 @@ msgstr "Deactiveren"
 msgid "Deselect all"
 msgstr "Deselecteer alles"
 
-msgid "Extra tools and terminal output. For advanced users."
-msgstr "Extra hulpmiddelen en terminal-uitvoer. Voor gevorderden."
+msgid "Extra tools and terminal output. Only enable if you know what you're doing."
+msgstr "Extra hulpmiddelen en terminal-uitvoer. Alleen aanzetten als je weet wat je doet."
 
 msgid "Continue"
 msgstr "Doorgaan"
@@ -2788,8 +2788,17 @@ msgstr "Stad"
 msgid "Postcode"
 msgstr "Postcode"
 
-msgid "Street and house number"
-msgstr "Straat en huisnummer"
+msgid "Street"
+msgstr "Straat"
+
+msgid "House number"
+msgstr "Huisnummer"
+
+msgid "Add"
+msgstr "Toevoegen"
+
+msgid "'Recently Deleted' is empty — photos still in there are on the device and would be imported too"
+msgstr "'Recent verwijderd' is leeg — foto's die daar nog in staan, staan op het apparaat en worden ook geïmporteerd"
 
 msgid "Addition (optional)"
 msgstr "Toevoeging (optioneel)"

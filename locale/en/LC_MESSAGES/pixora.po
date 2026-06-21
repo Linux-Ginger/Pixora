@@ -119,8 +119,8 @@ msgstr "Deactivate"
 msgid "Deselect all"
 msgstr "Deselect all"
 
-msgid "Extra tools and terminal output. For advanced users."
-msgstr "Extra tools and terminal output. For advanced users."
+msgid "Extra tools and terminal output. Only enable if you know what you're doing."
+msgstr "Extra tools and terminal output. Only enable if you know what you're doing."
 
 msgid "Continue"
 msgstr "Continue"
@@ -2770,8 +2770,17 @@ msgstr "City"
 msgid "Postcode"
 msgstr "Postcode"
 
-msgid "Street and house number"
-msgstr "Street and house number"
+msgid "Street"
+msgstr "Street"
+
+msgid "House number"
+msgstr "House number"
+
+msgid "Add"
+msgstr "Add"
+
+msgid "'Recently Deleted' is empty — photos still in there are on the device and would be imported too"
+msgstr "'Recently Deleted' is empty — photos still in there are on the device and would be imported too"
 
 msgid "Addition (optional)"
 msgstr "Addition (optional)"

@@ -185,8 +185,8 @@ msgstr "Entwicklermodus aktivieren?"
 msgid "Deactivate developer mode?"
 msgstr "Entwicklermodus deaktivieren?"
 
-msgid "Extra tools and terminal output. For advanced users."
-msgstr "Zusätzliche Werkzeuge und Terminal-Ausgabe. Für fortgeschrittene Benutzer."
+msgid "Extra tools and terminal output. Only enable if you know what you're doing."
+msgstr "Zusätzliche Werkzeuge und Terminal-Ausgabe. Nur aktivieren, wenn du weißt, was du tust."
 
 msgid ""
 "This removes all existing iPhone pairings in /var/lib/lockdown/. Your "
@@ -2798,8 +2798,17 @@ msgstr "Stadt"
 msgid "Postcode"
 msgstr "Postleitzahl"
 
-msgid "Street and house number"
-msgstr "Straße und Hausnummer"
+msgid "Street"
+msgstr "Straße"
+
+msgid "House number"
+msgstr "Hausnummer"
+
+msgid "Add"
+msgstr "Hinzufügen"
+
+msgid "'Recently Deleted' is empty — photos still in there are on the device and would be imported too"
+msgstr "'Zuletzt gelöscht' ist leer — Fotos, die noch darin sind, befinden sich auf dem Gerät und würden mit importiert"
 
 msgid "Addition (optional)"
 msgstr "Zusatz (optional)"

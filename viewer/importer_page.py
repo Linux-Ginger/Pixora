@@ -1151,6 +1151,8 @@ class ImporterPage(Gtk.Box):
               "so your photos are on the device, not only in the cloud"),
             _("Settings → Photos → 'Transfer to Mac or PC' → 'Keep Originals'"),
             _("Your screen stays unlocked during the import"),
+            _("'Recently Deleted' is empty — photos still in there are on the "
+              "device and would be imported too"),
             _("Photos are copied to your library; the originals on your device "
               "are kept and duplicates are reviewed first"),
         ]:

@@ -381,10 +381,19 @@
     return Math.abs(m.lat - homeLat) < 0.0011 && Math.abs(m.lon - homeLon) < 0.0017;
   }
 
+  // The thumb has width:auto, so its width is unknown until it loads — the
+  // popup wrapper (black bg) first sizes to ~0 width and the image lands
+  // outside it until you re-hover. Re-running update() once the image is in
+  // resizes the wrapper around the now-known dimensions.
+  function pixoraPopupImgLoaded() {
+    try { if (typeof map !== 'undefined' && map && map._popup) map._popup.update(); }
+    catch (e) {}
+  }
+
   function buildPopupHtml(m, count) {
     let html = '';
     if (m.thumb) {
-      html += '<img src="file://' + m.thumb + '" alt="" onerror="this.style.display=\'none\'">';
+      html += '<img src="file://' + m.thumb + '" alt="" onerror="this.style.display=\'none\'" onload="pixoraPopupImgLoaded()">';
     }
     html += '<div class="fname">' + escapeHtml(m.filename) + '</div>';
     html += '<div class="date">' + escapeHtml(m.date || '') + '</div>';

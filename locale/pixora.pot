@@ -117,7 +117,10 @@ msgstr ""
 msgid "Deselect all"
 msgstr ""
 
-msgid "Extra tools and terminal output. For advanced users."
+msgid "Extra tools and terminal output. Only enable if you know what you're doing."
+msgstr ""
+
+msgid "'Recently Deleted' is empty — photos still in there are on the device and would be imported too"
 msgstr ""
 
 msgid "Pixora will restart in a terminal so you can see what it's doing. Updates run there too."
@@ -1943,7 +1946,13 @@ msgstr ""
 msgid "Postcode"
 msgstr ""
 
-msgid "Street and house number"
+msgid "Street"
+msgstr ""
+
+msgid "House number"
+msgstr ""
+
+msgid "Add"
 msgstr ""
 
 msgid "Addition (optional)"

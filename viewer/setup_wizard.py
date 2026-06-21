@@ -623,8 +623,27 @@ class SetupWizard(Adw.Window):
         except Exception:
             pass
         group.add(info_row)
-
         page.append(group)
+
+        # HEIC→JPEG conversion (recommended on; user can switch it off).
+        conv_group = Adw.PreferencesGroup()
+        self.conv_switch = Gtk.Switch()
+        self.conv_switch.set_valign(Gtk.Align.CENTER)
+        self.conv_switch.set_active(True)
+        conv_row = Adw.ActionRow(
+            title=_("Convert HEIC to JPEG on import"),
+            subtitle=_("Each HEIC is re-saved as a maximum-quality JPEG that replaces the original. Date and location are kept."),
+        )
+        conv_row.add_prefix(Gtk.Image.new_from_icon_name("image-x-generic-symbolic"))
+        conv_row.add_suffix(_recommended_badge())
+        conv_row.add_suffix(self.conv_switch)
+        conv_row.set_activatable_widget(self.conv_switch)
+        try:
+            conv_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        conv_group.add(conv_row)
+        page.append(conv_group)
         return page
 
     def _build_thumbnail(self):
@@ -1022,6 +1041,8 @@ class SetupWizard(Adw.Window):
             self._chosen_drive_idx = self.drive_combo.get_selected()
         if hasattr(self, "dup_switch"):
             self._chosen_dup = self.dup_switch.get_active()
+        if hasattr(self, "conv_switch"):
+            self._chosen_conv = self.conv_switch.get_active()
         # _chosen_thumb_size, _chosen_lang, selected_backup_path already on self.
 
     def _apply_wizard_state(self):
@@ -1037,6 +1058,8 @@ class SetupWizard(Adw.Window):
                 pass
         if hasattr(self, "dup_switch") and hasattr(self, "_chosen_dup"):
             self.dup_switch.set_active(self._chosen_dup)
+        if hasattr(self, "conv_switch") and hasattr(self, "_chosen_conv"):
+            self.conv_switch.set_active(self._chosen_conv)
 
     def go_next(self, btn):
         page = self.pages[self.current]
@@ -1261,6 +1284,7 @@ class SetupWizard(Adw.Window):
             "backup_dedup":        self._chosen_backup_dedup,
             "backup_silent":       self._chosen_backup_silent,
             "duplicate_threshold": self._get_threshold(),
+            "convert_heic":        self.conv_switch.get_active(),
             "language":            self._chosen_lang,
             "thumbnail_size":      self._chosen_thumb_size,
         }

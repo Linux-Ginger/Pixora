@@ -439,6 +439,10 @@ _metadata_cache = {
 _metadata_dirty = False
 _metadata_save_lock = threading.Lock()
 
+# Bump when the GPS reader changes so cached (possibly negative) results from an
+# older reader are discarded — e.g. HEIC photos that wrongly cached "no GPS".
+_GPS_READER_VERSION = "v2"
+
 
 _METADATA_MAX_GEOCODE = 3000
 
@@ -452,6 +456,12 @@ def _load_metadata_cache():
             v = data.get(k)
             if isinstance(v, dict):
                 _metadata_cache[k] = v
+        # GPS reader changed → drop the old gps_coords cache once so HEIC
+        # photos that cached "no location" get re-read with the new reader.
+        if data.get("_gps_reader") != _GPS_READER_VERSION:
+            _metadata_cache["gps_coords"] = {}
+            _metadata_dirty = True
+        _metadata_cache["_gps_reader"] = _GPS_READER_VERSION
         # Drop legacy geocode entries (empty values or pre-lang key format).
         geo = _metadata_cache.get("geocode", {})
         pruned = {k: v for k, v in geo.items() if v and ":" in k}
@@ -531,19 +541,28 @@ def get_gps_coords(photo_path):
 def _get_gps_coords_raw(photo_path):
     try:
         from PIL import Image
-        from PIL.ExifTags import TAGS, GPSTAGS
-        img  = Image.open(photo_path)
+        from PIL.ExifTags import GPSTAGS
+        img = Image.open(photo_path)
         if img.mode == "P" and "transparency" in img.info:
             img = img.convert("RGBA")
-        exif = img._getexif()
-        if not exif:
-            return None
+        # getexif().get_ifd(GPSInfo) works across JPEG *and* HEIC; the old
+        # _getexif() silently returns no GPS for HEIF, which is why locations
+        # only showed up after a HEIC→JPEG conversion.
         gps_info = {}
-        for tag, value in exif.items():
-            tag_name = TAGS.get(tag, tag)
-            if tag_name == "GPSInfo":
-                for gps_tag, gps_value in value.items():
-                    gps_info[GPSTAGS.get(gps_tag, gps_tag)] = gps_value
+        try:
+            gps_ifd = img.getexif().get_ifd(0x8825)  # 0x8825 = GPSInfo IFD
+            for gps_tag, gps_value in (gps_ifd or {}).items():
+                gps_info[GPSTAGS.get(gps_tag, gps_tag)] = gps_value
+        except Exception:
+            gps_info = {}
+        if not gps_info:
+            # Fallback for odd files the IFD path misses.
+            from PIL.ExifTags import TAGS
+            exif = img._getexif()
+            for tag, value in (exif or {}).items():
+                if TAGS.get(tag, tag) == "GPSInfo":
+                    for gt, gv in value.items():
+                        gps_info[GPSTAGS.get(gt, gt)] = gv
         if not gps_info:
             return None
         def to_decimal(coords, ref):
@@ -3325,8 +3344,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _home_address_text(self):
         parts = []
-        street = (f"{self.settings.get('home_street','')} "
-                  f"{self.settings.get('home_addition','')}").strip()
+        street = " ".join(x for x in (
+            self.settings.get('home_street', ''),
+            self.settings.get('home_house_number', ''),
+            self.settings.get('home_addition', ''),
+        ) if x).strip()
         if street:
             parts.append(street)
         pc_city = (f"{self.settings.get('home_postcode','')} "
@@ -3340,7 +3362,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _place_address_text(self, p):
         parts = []
-        street = f"{p.get('street','')} {p.get('addition','')}".strip()
+        street = " ".join(x for x in (
+            p.get('street', ''), p.get('house_number', ''), p.get('addition', '')
+        ) if x).strip()
         if street:
             parts.append(street)
         pc_city = f"{p.get('postcode','')} {p.get('city','')}".strip()
@@ -3376,20 +3400,25 @@ class MainWindow(Adw.ApplicationWindow):
             return ic
 
         # Main home (priority) — flagged with a 'Main home' accent badge.
+        home_set = self.settings.get("home_lat") is not None
         main_row = Adw.ActionRow(title=_("My home"))
         main_row.set_subtitle(self._home_address_text())
-        if self.settings.get("home_lat") is not None:
-            main_row.add_prefix(_verified_check())
         main_row.add_suffix(self._accent_badge(_("Main home")))
-        rm = _suffix_btn(_("Remove"), self._on_remove_home)
-        rm.set_sensitive(self.settings.get("home_lat") is not None)
-        main_row.add_suffix(rm)
-        main_row.add_suffix(_suffix_btn(
-            _("Change"), lambda b: self._open_place_dialog(None)))
+        if home_set:
+            main_row.add_prefix(_verified_check())
+            rm = _suffix_btn(_("Remove"), self._on_remove_home)
+            main_row.add_suffix(rm)
+            main_row.add_suffix(_suffix_btn(
+                _("Change"), lambda b: self._open_place_dialog(None)))
+            self._remove_home_btn = rm
+        else:
+            # Nothing to remove or change yet — just an Add action.
+            main_row.add_suffix(_suffix_btn(
+                _("Add"), lambda b: self._open_place_dialog(None)))
+            self._remove_home_btn = None
         grp.add(main_row)
         self._place_rows.append(main_row)
         self.home_row = main_row
-        self._remove_home_btn = rm
 
         # Extra named places.
         for i, p in enumerate(self.settings.get("extra_places", [])):
@@ -3431,26 +3460,31 @@ class MainWindow(Adw.ApplicationWindow):
                     "city": self.settings.get("home_city", ""),
                     "postcode": self.settings.get("home_postcode", ""),
                     "street": self.settings.get("home_street", ""),
+                    "house_number": self.settings.get("home_house_number", ""),
                     "addition": self.settings.get("home_addition", "")}
         elif index == "new":
-            data = {"name": "", "country": None, "city": "",
-                    "postcode": "", "street": "", "addition": ""}
+            data = {"name": "", "country": None, "city": "", "postcode": "",
+                    "street": "", "house_number": "", "addition": ""}
         else:
             data = self.settings.get("extra_places", [])[index]
 
         dlg = Adw.MessageDialog(
             transient_for=self,
             heading=_("My home") if is_main else _("Place"),
-            body=_("Fill in the address so it can be looked up exactly. It’s "
+            body=_("Fill in your address so it can be looked up exactly. It’s "
                    "looked up once via OpenStreetMap, then stored only on this "
                    "computer."))
-        group = Adw.PreferencesGroup()
 
+        # Three blocks: top (name/country/street), a side-by-side house number +
+        # addition pair, then postcode/city — reads cleaner than one long column.
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+
+        top = Adw.PreferencesGroup()
         name_row = None
         if not is_main:
             name_row = Adw.EntryRow(title=_mk(_("Name (e.g. Grandma & Grandpa)")))
             name_row.set_text(data.get("name", ""))
-            group.add(name_row)
+            top.add(name_row)
 
         country_row = Adw.ComboRow(title=_("Country"))
         model = Gtk.StringList()
@@ -3460,42 +3494,69 @@ class MainWindow(Adw.ApplicationWindow):
         saved_country = data.get("country") or _LOCALE_COUNTRY.get(_lang, "Netherlands")
         if saved_country in COUNTRIES:
             country_row.set_selected(COUNTRIES.index(saved_country))
-        city_row = Adw.EntryRow(title=_("City"))
-        city_row.set_text(data.get("city", ""))
-        postcode_row = Adw.EntryRow(title=_("Postcode"))
-        postcode_row.set_text(data.get("postcode", ""))
-        street_row = Adw.EntryRow(title=_("Street and house number"))
+        top.add(country_row)
+
+        street_row = Adw.EntryRow(title=_("Street"))
         street_row.set_text(data.get("street", ""))
+        top.add(street_row)
+
+        # House number + addition side by side (two small cards).
+        pair = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12,
+                       homogeneous=True)
+        hn_group = Adw.PreferencesGroup()
+        hn_group.set_hexpand(True)
+        housenr_row = Adw.EntryRow(title=_("House number"))
+        housenr_row.set_text(data.get("house_number", ""))
+        hn_group.add(housenr_row)
+        add_group = Adw.PreferencesGroup()
+        add_group.set_hexpand(True)
         addition_row = Adw.EntryRow(title=_("Addition (optional)"))
         addition_row.set_text(data.get("addition", ""))
+        add_group.add(addition_row)
+        pair.append(hn_group)
+        pair.append(add_group)
 
-        for r in (country_row, street_row, addition_row, postcode_row, city_row):
-            group.add(r)
-        dlg.set_extra_child(group)
+        bottom = Adw.PreferencesGroup()
+        postcode_row = Adw.EntryRow(title=_("Postcode"))
+        postcode_row.set_text(data.get("postcode", ""))
+        bottom.add(postcode_row)
+        city_row = Adw.EntryRow(title=_("City"))
+        city_row.set_text(data.get("city", ""))
+        bottom.add(city_row)
+
+        box.append(top)
+        box.append(pair)
+        box.append(bottom)
+        dlg.set_extra_child(box)
         dlg.add_response("cancel", _("Cancel"))
         dlg.add_response("save", _("Save"))
         dlg.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("save")
         dlg.set_close_response("cancel")
-        rows = (name_row, country_row, city_row, postcode_row, street_row, addition_row)
+        rows = (name_row, country_row, city_row, postcode_row, street_row,
+                housenr_row, addition_row)
         dlg.connect("response", self._on_place_response, index, rows)
         dlg.present()
 
     def _on_place_response(self, dlg, response, index, rows):
         if response != "save":
             return
-        name_row, country_row, city_row, postcode_row, street_row, addition_row = rows
+        (name_row, country_row, city_row, postcode_row, street_row,
+         housenr_row, addition_row) = rows
         country = COUNTRIES[country_row.get_selected()]
         city = city_row.get_text().strip()
         postcode = postcode_row.get_text().strip()
         street = street_row.get_text().strip()
+        house_number = housenr_row.get_text().strip()
         addition = addition_row.get_text().strip()
         name = name_row.get_text().strip() if name_row is not None else ""
         if not street and not city and not postcode:
             return
-        full_street = f"{street} {addition}".strip() if addition else street
+        # Nominatim's structured 'street' field wants "<number> <street name>".
+        full_street = " ".join(x for x in (house_number, street) if x).strip()
         fields = {"name": name, "country": country, "city": city,
-                  "postcode": postcode, "street": street, "addition": addition}
+                  "postcode": postcode, "street": street,
+                  "house_number": house_number, "addition": addition}
 
         def _lookup():
             res = geocode_address(street=full_street, city=city,
@@ -3553,6 +3614,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.settings["home_city"] = fields["city"]
             self.settings["home_postcode"] = fields["postcode"]
             self.settings["home_street"] = fields["street"]
+            self.settings["home_house_number"] = fields["house_number"]
             self.settings["home_addition"] = fields["addition"]
             if self._map_widget:
                 self._map_widget.set_home(lat, lon)
@@ -4916,6 +4978,11 @@ class MainWindow(Adw.ApplicationWindow):
             self._photo_spinner.start()
         self._set_viewer_location("empty")
         self.main_stack.set_visible_child_name("viewer")
+        # Bump the load id together with clearing the cache: any in-flight
+        # background loader bails before it can write a stale thumb (mapped to
+        # the old view order) into the fresh dict — that desync showed a
+        # neighbour's frame on the wrong filmstrip cell.
+        self._filmstrip_load_id += 1
         self._filmstrip_thumbs = {}
         GLib.idle_add(self._update_filmstrip)
         GLib.timeout_add(80, self._scroll_filmstrip_to_current)
@@ -7512,6 +7579,9 @@ class MainWindow(Adw.ApplicationWindow):
             gsk_row.set_subtitle_lines(2)
         except Exception:
             pass
+        # Advanced knob — only surfaced in dev mode; GPU crashes are otherwise
+        # handled automatically by the renderer crash-recovery.
+        gsk_row.set_visible(bool(self.settings.get("dev_mode", False)))
         perf_group.add(gsk_row)
 
         advanced_box.append(perf_group)
@@ -7519,7 +7589,7 @@ class MainWindow(Adw.ApplicationWindow):
         dev_group = Adw.PreferencesGroup()
         dev_group.set_title(_("Advanced"))
         dev_group.set_description(
-            _("Extra tools and terminal output. For advanced users.")
+            _("Extra tools and terminal output. Only enable if you know what you're doing.")
         )
         current_dev = bool(self.settings.get("dev_mode", False))
         dev_row = Adw.ActionRow(
