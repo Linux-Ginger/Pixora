@@ -117,7 +117,7 @@ msgstr ""
 msgid "Deselect all"
 msgstr ""
 
-msgid "Extra tools and terminal output. Only enable if you know what you're doing."
+msgid "Runs Pixora in a terminal with debug output, plus extra tools. Only enable if you know what you're doing."
 msgstr ""
 
 msgid "'Recently Deleted' is empty — photos still in there are on the device and would be imported too"

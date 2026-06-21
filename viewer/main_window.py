@@ -641,6 +641,12 @@ def _mk(s):
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _titlecase(s):
+    """Capitalise the first letter of each word, leaving the rest as typed
+    ('rotterdam' → 'Rotterdam', 'den haag' → 'Den Haag')."""
+    return " ".join(w[:1].upper() + w[1:] if w else w for w in (s or "").split(" "))
+
+
 def geocode_address(street=None, city=None, postcode=None, country=None,
                     loose=False):
     """Structured address → (lat, lon, display_name) via Nominatim, or None.
@@ -3544,16 +3550,21 @@ class MainWindow(Adw.ApplicationWindow):
         (name_row, country_row, city_row, postcode_row, street_row,
          housenr_row, addition_row) = rows
         country = COUNTRIES[country_row.get_selected()]
-        city = city_row.get_text().strip()
-        postcode = postcode_row.get_text().strip()
-        street = street_row.get_text().strip()
+        # Auto-tidy capitalisation: postcode/addition uppercase, city/street
+        # title-cased — so "1234bb" → "1234BB", "rotterdam" → "Rotterdam".
+        city = _titlecase(city_row.get_text().strip())
+        postcode = postcode_row.get_text().strip().upper()
+        street = _titlecase(street_row.get_text().strip())
         house_number = housenr_row.get_text().strip()
-        addition = addition_row.get_text().strip()
+        addition = addition_row.get_text().strip().upper()
         name = name_row.get_text().strip() if name_row is not None else ""
         if not street and not city and not postcode:
             return
-        # Nominatim's structured 'street' field wants "<number> <street name>".
-        full_street = " ".join(x for x in (house_number, street) if x).strip()
+        # Number + addition form one unit ("12" + "A" → "12A"); keeping them
+        # together lets Nominatim resolve the exact address instead of snapping
+        # to a neighbouring house (which made the addition look like it changed).
+        number = f"{house_number}{addition}".strip()
+        full_street = " ".join(x for x in (number, street) if x).strip()
         fields = {"name": name, "country": country, "city": city,
                   "postcode": postcode, "street": street,
                   "house_number": house_number, "addition": addition}
@@ -7589,7 +7600,7 @@ class MainWindow(Adw.ApplicationWindow):
         dev_group = Adw.PreferencesGroup()
         dev_group.set_title(_("Advanced"))
         dev_group.set_description(
-            _("Extra tools and terminal output. Only enable if you know what you're doing.")
+            _("Runs Pixora in a terminal with debug output, plus extra tools. Only enable if you know what you're doing.")
         )
         current_dev = bool(self.settings.get("dev_mode", False))
         dev_row = Adw.ActionRow(
