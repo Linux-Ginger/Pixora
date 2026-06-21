@@ -6234,22 +6234,40 @@ class MainWindow(Adw.ApplicationWindow):
         badge.set_visible(path in self._favorites)
 
     def _populate_filter_menu(self):
-        """(Re)build the filter popover: favorites + one row per saved place."""
+        """(Re)build the filter popover: favorites + one row per saved place.
+        Favorites + main home tick orange; extra places tick blue (matching the
+        badges/pins)."""
+        if not getattr(self, "_filter_check_css", None):
+            self._filter_check_css = Gtk.CssProvider()
+            self._filter_check_css.load_from_string(
+                ".pixora-check-orange check:checked {"
+                " background-color: #e95420; border-color: #e95420; }"
+                ".pixora-check-blue check:checked {"
+                " background-color: #4C7BE1; border-color: #4C7BE1; }")
+            Gtk.StyleContext.add_provider_for_display(
+                Gdk.Display.get_default(), self._filter_check_css,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
         box = self._filter_box
         child = box.get_first_child()
         while child:
             box.remove(child)
             child = box.get_first_child()
         self._fav_check = Gtk.CheckButton(label=_("Only favorites"))
+        self._fav_check.add_css_class("pixora-check-orange")
         self._fav_check.set_active(self._favorites_only)
         self._fav_check.connect("toggled", self._on_filter_changed)
         box.append(self._fav_check)
         self._place_checks = []
         places = self._all_places()
+        home_set = self.settings.get("home_lat") is not None
         if places:
             box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
-            for name, _lat, _lon in places:
+            for i, (name, _lat, _lon) in enumerate(places):
+                is_main = home_set and i == 0   # main home is always first
                 c = Gtk.CheckButton(label=name)
+                c.add_css_class("pixora-check-orange" if is_main
+                                else "pixora-check-blue")
                 c.set_active(name in self._place_filter)
                 c.connect("toggled", self._on_filter_changed)
                 box.append(c)
