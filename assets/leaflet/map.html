@@ -85,6 +85,15 @@
     } catch (e) {}
     return false;
   };
+  // try/catch reports cross-origin errors WITH details (window.onerror masks
+  // them as a bare "Script error" for file:// scripts like leaflet.js).
+  function _report(where, e) {
+    try {
+      window.webkit.messageHandlers.pixora.postMessage(JSON.stringify(
+        { type: 'js-error',
+          msg: where + ': ' + ((e && e.message) || e) + ' | ' + ((e && e.stack) || '') }));
+    } catch (_) {}
+  }
 
   // Soepel in-/uitzoomen en pannen (GPU-versnelling op de main pc aanwezig).
   // fadeAnimation laat tegels invloeien i.p.v. hard inklappen.
@@ -276,10 +285,8 @@
     maxClusterRadius: 60,
     animate: false,
     animateAddingMarkers: false,
-    chunkedLoading: true,
-    chunkInterval: 50,
-    chunkDelay: 20,
-    removeOutsideVisibleBounds: true,
+    chunkedLoading: false,
+    removeOutsideVisibleBounds: false,
     iconCreateFunction: function(c) {
       const count = c.getChildCount();
       const size = count < 10 ? 'cluster' : 'cluster-lg';
@@ -389,48 +396,39 @@
   });
 
   window.pixoraSetMarkers = function(markers, view) {
+   try {
     cluster.clearLayers();
     if (!markers || !markers.length) return;
     const bounds = L.latLngBounds();
     markers.forEach(function(m) {
-      const latlng = [m.lat, m.lon];
-      const marker = L.marker(latlng, { icon: singleIcon(), _pix: m });
-      marker.bindPopup(buildPopupHtml(m, 1), { maxWidth: 240, closeButton: false, autoPan: false });
-      marker.on('mouseover', function() { marker.openPopup(); });
-      marker.on('mouseout', function() { marker.closePopup(); });
-      marker.on('click', function() {
-        sendToPixora({ type: 'open_photos', paths: [m.path] });
-      });
-      cluster.addLayer(marker);
-      bounds.extend(latlng);
+      try {
+        const latlng = [m.lat, m.lon];
+        const marker = L.marker(latlng, { icon: singleIcon(), _pix: m });
+        marker.bindPopup(buildPopupHtml(m, 1), { maxWidth: 240, closeButton: false, autoPan: false });
+        marker.on('mouseover', function() { marker.openPopup(); });
+        marker.on('mouseout', function() { marker.closePopup(); });
+        marker.on('click', function() {
+          sendToPixora({ type: 'open_photos', paths: [m.path] });
+        });
+        cluster.addLayer(marker);
+        bounds.extend(latlng);
+      } catch (em) { _report('marker', em); }
     });
     // Eerst size invalideren: als de WebView nog niet zijn eindgrootte had toen
     // de page laadde, zou fitBounds op verkeerde dimensies rekenen.
     map.invalidateSize(false);
     updateMinZoom();
-    // Begin-weergave; faalt dit, val terug op alle markers zodat foto's altijd
-    // zichtbaar zijn.
-    try {
-      if (view && view.center) {
-        map.setView(view.center, view.zoom || 13, { animate: false });
-      } else if (view && view.bounds) {
-        map.fitBounds(view.bounds, { padding: [40, 40], maxZoom: 13, animate: false });
-      } else if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
-      }
-    } catch (e) {
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
-      }
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
     }
+   } catch (e) { _report('pixoraSetMarkers', e); }
   };
 
   window.pixoraGoHome = function(lat, lon, zoom) {
-    map.invalidateSize(false);
-    // setView first guarantees a jump even if a flyTo gets interrupted, then
-    // flyTo adds the smooth glide.
-    map.setView([lat, lon], zoom || 15, { animate: false });
-    map.flyTo([lat, lon], zoom || 15, { duration: 1.0 });
+    try {
+      map.invalidateSize(false);
+      map.setView([lat, lon], zoom || 15, { animate: false });
+    } catch (e) { _report('pixoraGoHome', e); }
   };
   window.pixoraRefresh = function() {
     map.invalidateSize(false);
@@ -440,18 +438,20 @@
   // A house pin (outside the cluster, always visible) marks home on the map.
   let homeMarker = null;
   window.pixoraSetHome = function(lat, lon) {
-    if (homeMarker) { map.removeLayer(homeMarker); homeMarker = null; }
-    if (lat == null || lon == null) return;
-    const icon = L.divIcon({
-      html: '<div class="pixora-home">🏠</div>',
-      className: '', iconSize: [30, 30], iconAnchor: [15, 15]
-    });
-    homeMarker = L.marker([lat, lon], { icon: icon, zIndexOffset: 1000 });
-    homeMarker.bindPopup('<div class="fname">' + (LBL.home || 'Home') + '</div>',
-      { closeButton: false, autoPan: false });
-    homeMarker.on('mouseover', function() { homeMarker.openPopup(); });
-    homeMarker.on('mouseout', function() { homeMarker.closePopup(); });
-    homeMarker.addTo(map);
+    try {
+      if (homeMarker) { map.removeLayer(homeMarker); homeMarker = null; }
+      if (lat == null || lon == null) return;
+      const icon = L.divIcon({
+        html: '<div class="pixora-home">🏠</div>',
+        className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+      });
+      homeMarker = L.marker([lat, lon], { icon: icon, zIndexOffset: 1000 });
+      homeMarker.bindPopup('<div class="fname">' + (LBL.home || 'Home') + '</div>',
+        { closeButton: false, autoPan: false });
+      homeMarker.on('mouseover', function() { homeMarker.openPopup(); });
+      homeMarker.on('mouseout', function() { homeMarker.closePopup(); });
+      homeMarker.addTo(map);
+    } catch (e) { _report('pixoraSetHome', e); }
   };
 
   window.pixoraReady = true;
