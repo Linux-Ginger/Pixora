@@ -5703,6 +5703,7 @@ class MainWindow(Adw.ApplicationWindow):
                 btn.set_icon_name("media-playback-start-symbolic")
             else:
                 self.video_play_btn.set_icon_name("media-playback-start-symbolic")
+            self._flash_playpause("media-playback-pause-symbolic")
             self._stop_video_poll()
             self._cancel_fade()
             self._show_viewer_ui()
@@ -5718,8 +5719,53 @@ class MainWindow(Adw.ApplicationWindow):
                 btn.set_icon_name("media-playback-pause-symbolic")
             else:
                 self.video_play_btn.set_icon_name("media-playback-pause-symbolic")
+            self._flash_playpause("media-playback-start-symbolic")
             self._start_video_poll()
             self._reset_fade_timer()
+
+    def _flash_playpause(self, icon_name):
+        """Brief round play/pause icon in the center, fading out (like a player)."""
+        area = getattr(self, "viewer_area", None)
+        if area is None:
+            return
+        box = Gtk.Box()
+        box.set_halign(Gtk.Align.CENTER)
+        box.set_valign(Gtk.Align.CENTER)
+        box.set_can_target(False)
+        box.set_size_request(92, 92)
+        bcss = Gtk.CssProvider()
+        bcss.load_from_string(
+            "box { background-color: rgba(0,0,0,0.55); border-radius: 9999px; }")
+        box.get_style_context().add_provider(
+            bcss, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        img = Gtk.Image.new_from_icon_name(icon_name)
+        img.set_pixel_size(46)
+        img.set_halign(Gtk.Align.CENTER)
+        img.set_valign(Gtk.Align.CENTER)
+        img.set_hexpand(True)
+        img.set_vexpand(True)
+        icss = Gtk.CssProvider()
+        icss.load_from_string("image { color: #ffffff; }")
+        img.get_style_context().add_provider(
+            icss, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        box.append(img)
+        area.add_overlay(box)
+        state = {"i": 0}
+        frames = 14
+
+        def _step():
+            t = state["i"] / frames
+            if t >= 1.0:
+                try:
+                    area.remove_overlay(box)
+                except Exception:
+                    pass
+                return False
+            box.set_opacity(max(0.0, 1.0 - t * t))   # hold briefly, then fade
+            state["i"] += 1
+            return True
+
+        GLib.timeout_add(35, _step)
 
     def _on_video_scrub(self, scale):
         if self._video_scrubbing_lock or not self._video_media:
