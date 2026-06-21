@@ -117,9 +117,10 @@ msgstr ""
 msgid "Deselect all"
 msgstr ""
 
-msgid ""
-"Shows terminal output and extra task buttons. Only enable if you know what "
-"you're doing."
+msgid "Extra tools and terminal output. For advanced users."
+msgstr ""
+
+msgid "Pixora will restart in a terminal so you can see what it's doing. Updates run there too."
 msgstr ""
 
 msgid "Continue"
@@ -1035,9 +1036,7 @@ msgstr ""
 msgid "Year folder with month subfolders — e.g. 2024/2024-03/."
 msgstr ""
 
-msgid ""
-"Pixora visually compares each new photo with your library. On a match "
-"you pick per photo: skip, import anyway, or keep both."
+msgid "New photos are checked against your library. On a match you choose: skip, import anyway, or keep both."
 msgstr ""
 
 msgid ""
@@ -1832,9 +1831,7 @@ msgid ""
 "Date and location are kept."
 msgstr ""
 
-msgid ""
-"Each photo is filed by capture date into the layout below — your library "
-"stays sorted automatically."
+msgid "Photos are filed by date in the layout below."
 msgstr ""
 
 msgid ""
@@ -1985,25 +1982,25 @@ msgstr ""
 msgid "Welcome to Pixora"
 msgstr ""
 
-msgid "Your photos and videos, neatly organised and private on your own computer."
+msgid "All your photos and videos in one place — neatly organised and private on your own computer."
 msgstr ""
 
-msgid "Connect your iPhone or iPad and import photos and videos. Edits come over too, and duplicates are detected automatically."
+msgid "Plug in your iPhone or iPad and import in one go. Your edits come along, and duplicates are skipped automatically."
 msgstr ""
 
 msgid "Automatically organised"
 msgstr ""
 
-msgid "Pixora files every photo by date. HEIC photos are converted to JPEG so they open everywhere — your originals stay intact."
+msgid "Every photo is filed by date automatically. HEIC photos open everywhere — and your originals stay untouched."
 msgstr ""
 
 msgid "Map"
 msgstr ""
 
-msgid "See where your photos were taken, and set your home so you can jump back to it anytime."
+msgid "See on the map where your photos were taken. Mark the places that matter, like home, and jump back with one click."
 msgstr ""
 
-msgid "Connect a USB drive for automatic backups, so you always have a second copy of your photos."
+msgid "Plug in a USB drive and Pixora backs up after every import — so you always have a second copy."
 msgstr ""
 
 msgid "You’re all set"

@@ -3147,20 +3147,20 @@ class MainWindow(Adw.ApplicationWindow):
     def _show_welcome(self):
         pages = [
             ("🎉", _("Welcome to Pixora"),
-             _("Your photos and videos, neatly organised and private on your "
-               "own computer.")),
+             _("All your photos and videos in one place — neatly organised and "
+               "private on your own computer.")),
             ("📥", _("Import"),
-             _("Connect your iPhone or iPad and import photos and videos. "
-               "Edits come over too, and duplicates are detected automatically.")),
+             _("Plug in your iPhone or iPad and import in one go. Your edits "
+               "come along, and duplicates are skipped automatically.")),
             ("🗂️", _("Automatically organised"),
-             _("Pixora files every photo by date. HEIC photos are converted to "
-               "JPEG so they open everywhere — your originals stay intact.")),
+             _("Every photo is filed by date automatically. HEIC photos open "
+               "everywhere — and your originals stay untouched.")),
             ("🗺️", _("Map"),
-             _("See where your photos were taken, and set your home so you can "
-               "jump back to it anytime.")),
+             _("See on the map where your photos were taken. Mark the places "
+               "that matter, like home, and jump back with one click.")),
             ("💾", _("Backup"),
-             _("Connect a USB drive for automatic backups, so you always have a "
-               "second copy of your photos.")),
+             _("Plug in a USB drive and Pixora backs up after every import — so "
+               "you always have a second copy.")),
             ("✨", _("You’re all set"),
              _("You can change everything later in Settings. Enjoy Pixora!")),
         ]
@@ -7483,7 +7483,7 @@ class MainWindow(Adw.ApplicationWindow):
         dev_group = Adw.PreferencesGroup()
         dev_group.set_title(_("Advanced"))
         dev_group.set_description(
-            _("Shows terminal output and extra task buttons. Only enable if you know what you're doing.")
+            _("Extra tools and terminal output. For advanced users.")
         )
         current_dev = bool(self.settings.get("dev_mode", False))
         dev_row = Adw.ActionRow(
@@ -7528,7 +7528,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         structure_info_row = Adw.ActionRow(
             title=_("How it works"),
-            subtitle=_("Each photo is filed by capture date into the layout below — your library stays sorted automatically."),
+            subtitle=_("Photos are filed by date in the layout below."),
         )
         structure_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
         structure_info_row.set_activatable(False)
@@ -7610,7 +7610,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         dup_info_row = Adw.ActionRow(
             title=_("How it works"),
-            subtitle=_("Pixora visually compares each new photo with your library. On a match you pick per photo: skip, import anyway, or keep both."),
+            subtitle=_("New photos are checked against your library. On a match you choose: skip, import anyway, or keep both."),
         )
         dup_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
         dup_info_row.set_activatable(False)
@@ -8461,7 +8461,7 @@ class MainWindow(Adw.ApplicationWindow):
         target = not currently_active
         if target:
             heading = _("Activate developer mode?")
-            body = _("In dev mode Pixora starts in a terminal and updates go through the terminal so you can see output. Pixora restarts immediately.")
+            body = _("Pixora will restart in a terminal so you can see what it's doing. Updates run there too.")
         else:
             heading = _("Deactivate developer mode?")
             body = _("Pixora will then start without a terminal and use the GUI updater.")
