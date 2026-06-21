@@ -1640,9 +1640,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_resizable(False)
         log_info(_("Startup phase 4: loading photos scheduled via idle_add"))
         GLib.idle_add(self.load_photos)
-        # First run after setup: show the welcome tour once.
-        if not self.settings.get("welcome_shown"):
-            GLib.timeout_add(600, self._show_welcome)
+        # Welcome tour is scheduled from _load_done (2s after the grid appears),
+        # so it never shows on top of the loading spinner.
         self.connect("close-request", self.on_close)
         GLib.idle_add(self._check_for_update)
         threading.Thread(target=self._start_services, daemon=True).start()
@@ -2126,23 +2125,39 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _start_settings_update_pulse(self):
-        """Flicker the header settings icon to signal an available update,
-        matching the update button's 1.5s rhythm."""
+        """Crossfade the header settings icon between the gear and the
+        update-available icon to signal a pending update — a smooth fade, like
+        the update button, swapping the icon at the dim point."""
         if getattr(self, "_settings_pulse_id", None):
             return
-        self._settings_pulse_on = False
+        self._settings_pulse_op = 1.0
+        self._settings_pulse_dir = -1
+        self._settings_pulse_update_icon = False
 
         def _tick():
-            self._settings_pulse_on = not self._settings_pulse_on
+            self._settings_pulse_op += self._settings_pulse_dir * 0.05
+            if self._settings_pulse_op <= 0.2:
+                self._settings_pulse_op = 0.2
+                self._settings_pulse_dir = 1
+                # Swap at the trough → reads as a crossfade between the two icons.
+                self._settings_pulse_update_icon = not self._settings_pulse_update_icon
+                try:
+                    self.settings_btn.set_icon_name(
+                        "software-update-available-symbolic"
+                        if self._settings_pulse_update_icon
+                        else "preferences-system-symbolic")
+                except Exception:
+                    pass
+            elif self._settings_pulse_op >= 1.0:
+                self._settings_pulse_op = 1.0
+                self._settings_pulse_dir = -1
             try:
-                self.settings_btn.set_icon_name(
-                    "software-update-available-symbolic"
-                    if self._settings_pulse_on else "preferences-system-symbolic")
+                self.settings_btn.set_opacity(self._settings_pulse_op)
             except Exception:
                 pass
             return True
 
-        self._settings_pulse_id = GLib.timeout_add(1500, _tick)
+        self._settings_pulse_id = GLib.timeout_add(45, _tick)
 
     def _show_update_message_dialog(self, new_version):
         self._start_settings_update_pulse()
@@ -4486,6 +4501,12 @@ class MainWindow(Adw.ApplicationWindow):
             cluster_lbl if cluster_lbl else self._media_count_text())
         self._loading = False
         GLib.timeout_add(120, self._run_viewport_hydrate)
+        # First run after setup: show the welcome tour once, 2s after the grid
+        # is up (never over the loading spinner).
+        if (not self.settings.get("welcome_shown")
+                and not getattr(self, "_welcome_scheduled", False)):
+            self._welcome_scheduled = True
+            GLib.timeout_add(2000, self._show_welcome)
         return False
 
     def show_empty_state(self):
@@ -4640,9 +4661,11 @@ class MainWindow(Adw.ApplicationWindow):
             and abs(coords[1] - hlon) < 0.0017)
 
     def _decorate_location(self, text):
-        """Append a '(🏠 Home)' tag when the open photo is at home."""
-        if getattr(self, "_viewer_near_home", False) and text:
-            return f"{text}  (🏠 {_('Home')})"
+        """Append a '(🏠 Home)' tag when the open photo is at home; show the tag
+        alone if there's no place name yet."""
+        if getattr(self, "_viewer_near_home", False):
+            tag = f"🏠 {_('Home')}"
+            return f"{text}  ({tag})" if text else tag
         return text
 
     def _load_full_photo(self, path, load_id):
@@ -4772,7 +4795,10 @@ class MainWindow(Adw.ApplicationWindow):
         ts = get_photo_date(path)
         datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
-        if searching:
+        if getattr(self, "_viewer_near_home", False) and not location:
+            # Show '🏠 Home' right away; geocode upgrades it to 'City (🏠 Home)'.
+            self._set_viewer_location("done", self._decorate_location(""))
+        elif searching:
             self._set_viewer_location("searching")
         elif location:
             self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
@@ -5233,7 +5259,10 @@ class MainWindow(Adw.ApplicationWindow):
         ts = get_photo_date(path)
         datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
-        if searching:
+        if getattr(self, "_viewer_near_home", False) and not location:
+            # Show '🏠 Home' right away; geocode upgrades it to 'City (🏠 Home)'.
+            self._set_viewer_location("done", self._decorate_location(""))
+        elif searching:
             self._set_viewer_location("searching")
         elif location:
             self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
@@ -5466,6 +5495,9 @@ class MainWindow(Adw.ApplicationWindow):
             w.set_can_target(True)
         if self._video_media is None:
             self.video_controls.set_visible(False)
+        else:
+            # No edit button on videos — it can't edit them and just no-ops.
+            self.edit_btn.set_visible(False)
         # Restore zoom-driven visibility.
         zoomed = getattr(self, '_viewer_zoom', 1.0) > 1.0
         if zoomed:

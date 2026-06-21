@@ -2868,3 +2868,6 @@ msgstr "I understand"
 
 msgid "Photos and videos are copied to your library — the originals on your device are kept. Possible duplicates are shown for review first and never deleted automatically."
 msgstr "Photos and videos are copied to your library — the originals on your device are kept. Possible duplicates are shown for review first and never deleted automatically."
+
+msgid "Shown as a pin on the map and used by the home button. Stored only on this computer."
+msgstr "Shown as a pin on the map and used by the home button. Stored only on this computer."
