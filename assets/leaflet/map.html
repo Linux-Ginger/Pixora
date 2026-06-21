@@ -111,7 +111,11 @@
     '© <a href="https://openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
   ).addTo(map);
 
-  const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  // De tegel-URL komt van Pixora (pixoraSetTileUrl): normaal de lokale
+  // tile-cache op 127.0.0.1, met OSM als fallback. De laag wordt pas gemaakt
+  // zodra die URL binnen is.
+  let tileLayer = null;
+  const TILE_OPTS = {
     maxZoom: 19,
     crossOrigin: true,
     // Load tiles continu tijdens pannen — voorkomt grijze vlakken wanneer
@@ -120,8 +124,18 @@
     updateWhenZooming: false,
     keepBuffer: 3,
     noWrap: true
-  });
-  tileLayer.addTo(map);
+  };
+  let firstTileLoaded = false;
+  let tileErrorCount = 0;
+  let offlineNotified = false;
+  const tilesLoadingEl = document.getElementById('tiles-loading');
+
+  function showBanner() {
+    document.getElementById('offline-banner').style.display = 'block';
+  }
+  function hideBanner() {
+    document.getElementById('offline-banner').style.display = 'none';
+  }
 
   // Met zoomAnimation/updateWhenZooming uit vraagt Leaflet na een zoom soms
   // niet alle tegels op, waardoor er lege vlakken blijven tot je opnieuw
@@ -138,67 +152,61 @@
   });
   map.on('moveend', function() { setTimeout(nudgeTiles, 0); });
 
-  function showBanner() {
-    document.getElementById('offline-banner').style.display = 'block';
-  }
-  function hideBanner() {
-    document.getElementById('offline-banner').style.display = 'none';
-  }
-  const tilesLoadingEl = document.getElementById('tiles-loading');
+  window.pixoraSetTileUrl = function(url) {
+    if (tileLayer) { map.removeLayer(tileLayer); tileLayer = null; }
+    firstTileLoaded = false;
+    tileErrorCount = 0;
+    offlineNotified = false;
 
-  // Subtiele "kaart laden"-pil zolang er tile-requests open staan.
-  tileLayer.on('loading', function() { tilesLoadingEl.style.display = 'block'; });
-  tileLayer.on('load', function() { tilesLoadingEl.style.display = 'none'; });
+    tileLayer = L.tileLayer(url, TILE_OPTS);
 
-  // Laat Pixora weten wanneer de eerste tiles klaar zijn, zodat de
-  // spinner kan wisselen naar de kaart.
-  let firstTileLoaded = false;
-  tileLayer.on('load', function() {
-    if (!firstTileLoaded) {
-      firstTileLoaded = true;
-      sendToPixora({ type: 'map-ready' });
-    }
-  });
-
-  // Directe offline-check: als browser al zegt offline → meld dat meteen.
-  // Anders: 4s geen enkele tile binnen → meld offline.
-  if (!navigator.onLine) {
-    setTimeout(function() {
-      showBanner();
-      sendToPixora({ type: 'map-offline' });
-    }, 200);
-  } else {
-    setTimeout(function() {
+    // Subtiele "kaart laden"-pil zolang er tile-requests open staan.
+    tileLayer.on('loading', function() { tilesLoadingEl.style.display = 'block'; });
+    tileLayer.on('load', function() {
+      tilesLoadingEl.style.display = 'none';
       if (!firstTileLoaded) {
+        firstTileLoaded = true;
+        sendToPixora({ type: 'map-ready' });
+      }
+    });
+    tileLayer.on('tileerror', function(e) {
+      // Eén automatische retry per tile: tijdelijke hiccups herstellen zichzelf.
+      if (e && e.tile && !e.tile._pixoraRetried && navigator.onLine) {
+        e.tile._pixoraRetried = true;
+        const src = e.tile.src;
+        setTimeout(function() { e.tile.src = src; }, 1500);
+        return;
+      }
+      tileErrorCount += 1;
+      if ((tileErrorCount > 2 || !navigator.onLine) && !offlineNotified) {
+        offlineNotified = true;
         showBanner();
         sendToPixora({ type: 'map-offline' });
       }
-    }, 4000);
-  }
+    });
+    tileLayer.on('tileload', function() {
+      tileErrorCount = 0;
+      offlineNotified = false;
+      hideBanner();
+    });
+    tileLayer.addTo(map);
 
-  let tileErrorCount = 0;
-  let offlineNotified = false;
-  tileLayer.on('tileerror', function(e) {
-    // Eén automatische retry per tile: tijdelijke netwerk-hiccups herstellen
-    // zichzelf zonder dat de gebruiker grijze vlakken ziet.
-    if (e && e.tile && !e.tile._pixoraRetried && navigator.onLine) {
-      e.tile._pixoraRetried = true;
-      const src = e.tile.src;
-      setTimeout(function() { e.tile.src = src; }, 1500);
-      return;
+    // Directe offline-check: browser al offline → meld meteen; anders 4s geen
+    // enkele tile binnen → meld offline.
+    if (!navigator.onLine) {
+      setTimeout(function() {
+        showBanner();
+        sendToPixora({ type: 'map-offline' });
+      }, 200);
+    } else {
+      setTimeout(function() {
+        if (!firstTileLoaded) {
+          showBanner();
+          sendToPixora({ type: 'map-offline' });
+        }
+      }, 4000);
     }
-    tileErrorCount += 1;
-    if ((tileErrorCount > 2 || !navigator.onLine) && !offlineNotified) {
-      offlineNotified = true;
-      showBanner();
-      sendToPixora({ type: 'map-offline' });
-    }
-  });
-  tileLayer.on('tileload', function() {
-    tileErrorCount = 0;
-    offlineNotified = false;
-    hideBanner();
-  });
+  };
 
   window.addEventListener('offline', function() {
     showBanner();
@@ -219,7 +227,7 @@
     hideBanner();
     tileErrorCount = 0;
     offlineNotified = false;
-    try { tileLayer.redraw(); } catch (e) {}
+    if (tileLayer) { try { tileLayer.redraw(); } catch (e) {} }
     setTimeout(nudgeTiles, 0);
   }
   document.getElementById('retry-btn').addEventListener('click', retryTiles);

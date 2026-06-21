@@ -858,11 +858,12 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
 
 class MapWidget(Gtk.Box):
-    def __init__(self, markers, open_photo_cb, status_cb=None):
+    def __init__(self, markers, open_photo_cb, status_cb=None, tile_url=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.markers = markers
         self.open_photo_cb = open_photo_cb
         self.status_cb = status_cb
+        self._tile_url = tile_url
         self.set_vexpand(True)
         self.set_hexpand(True)
         self._pending_markers = list(markers) if markers else []
@@ -904,8 +905,8 @@ class MapWidget(Gtk.Box):
         try:
             # WebKit 6.0 API
             if hasattr(WebKit2, "NetworkSession"):
-                # Own session with a persistent cache: tiles load from disk on
-                # re-open instead of re-downloading from OSM every time.
+                # Own session (sandbox toggle below). Map tiles are served by
+                # tile_proxy from disk, so this cache only holds Leaflet's JS/CSS.
                 try:
                     os.makedirs(TILE_CACHE_DIR, exist_ok=True)
                     network_session = WebKit2.NetworkSession.new(
@@ -1019,8 +1020,13 @@ class MapWidget(Gtk.Box):
             "retry": _("Try again"),
             "loadingTiles": _("Loading map…"),
         }
+        tile_js = ""
+        if self._tile_url:
+            tile_js = (f"if(window.pixoraSetTileUrl)"
+                       f"{{window.pixoraSetTileUrl({json.dumps(self._tile_url)});}}")
         js = (
-            f"if(window.pixoraSetLabels){{window.pixoraSetLabels({json.dumps(labels)});}}"
+            tile_js
+            + f"if(window.pixoraSetLabels){{window.pixoraSetLabels({json.dumps(labels)});}}"
             f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers({json.dumps(data)});}}"
         )
         ran = False
@@ -2799,6 +2805,18 @@ class MainWindow(Adw.ApplicationWindow):
                 m=len(markers), p=len(seen_paths), t=len(self.photos)
             )
         )
+        # Warm the tile cache around photo locations so the first view is fast.
+        try:
+            from tile_proxy import start_proxy, deg2tile
+            _base, cache = start_proxy(TILE_CACHE_DIR)
+            tiles = []
+            for (lat, lon, *_rest) in markers:
+                for z in (3, 6, 9, 11, 13):
+                    tx, ty = deg2tile(lat, lon, z)
+                    tiles.append((z, tx, ty))
+            cache.prefetch(tiles)
+        except Exception as e:
+            log_warn(_("Tile prefetch skipped: {err}").format(err=e))
         GLib.idle_add(self._show_map, markers)
 
     def _show_map(self, markers):
@@ -2811,9 +2829,18 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
+        # Local tile cache (fast re-open, offline fallback); OSM if it won't start.
+        tile_url = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        try:
+            from tile_proxy import start_proxy
+            base, _cache = start_proxy(TILE_CACHE_DIR)
+            tile_url = base + "/{z}/{x}/{y}.png"
+        except Exception as e:
+            log_warn(_("Tile proxy unavailable, using OSM directly: {err}").format(err=e))
+
         self._map_widget = MapWidget(
             markers, self._open_photo_from_map,
-            status_cb=self._on_map_status
+            status_cb=self._on_map_status, tile_url=tile_url
         )
         self.map_content.append(self._map_widget)
         # Wait for map-ready; 12s fallback prevents hang.
