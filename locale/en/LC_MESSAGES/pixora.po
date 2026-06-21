@@ -2833,6 +2833,18 @@ msgstr "Plug in a USB drive and Pixora backs up after every import — so you al
 msgid "You’re all set"
 msgstr "You’re all set"
 
+msgid "Welcome to the map"
+msgstr "Welcome to the map"
+
+msgid "This is your first time here. The map shows where your photos were taken. Add your home and the places that matter to you — they get marked here and you can filter your photos by them. That’s it!"
+msgstr "This is your first time here. The map shows where your photos were taken. Add your home and the places that matter to you — they get marked here and you can filter your photos by them. That’s it!"
+
+msgid "Maybe later"
+msgstr "Maybe later"
+
+msgid "Add my home"
+msgstr "Add my home"
+
 msgid "You can change everything later in Settings. Enjoy Pixora!"
 msgstr "You can change everything later in Settings. Enjoy Pixora!"
 

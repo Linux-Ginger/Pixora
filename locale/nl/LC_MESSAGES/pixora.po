@@ -2851,6 +2851,18 @@ msgstr "Sluit een USB-schijf aan en Pixora maakt na elke import een back-up — 
 msgid "You’re all set"
 msgstr "Je bent klaar"
 
+msgid "Welcome to the map"
+msgstr "Welkom op de kaart"
+
+msgid "This is your first time here. The map shows where your photos were taken. Add your home and the places that matter to you — they get marked here and you can filter your photos by them. That’s it!"
+msgstr "Dit is je eerste keer hier. De kaart laat zien waar je foto's zijn gemaakt. Voeg je thuis en je favoriete plekken toe — die worden hier gemarkeerd en je kunt je foto's erop filteren. Meer is het niet!"
+
+msgid "Maybe later"
+msgstr "Misschien later"
+
+msgid "Add my home"
+msgstr "Mijn thuis toevoegen"
+
 msgid "You can change everything later in Settings. Enjoy Pixora!"
 msgstr "Je kunt alles later wijzigen in Instellingen. Veel plezier met Pixora!"
 

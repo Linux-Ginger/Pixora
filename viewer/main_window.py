@@ -3097,6 +3097,7 @@ class MainWindow(Adw.ApplicationWindow):
             try:
                 self.map_spinner.stop()
                 self.map_container.set_visible_child_name("map")
+                self._maybe_show_map_intro()
             except Exception:
                 pass
         elif status == "offline":
@@ -3110,6 +3111,7 @@ class MainWindow(Adw.ApplicationWindow):
             try:
                 self.map_spinner.stop()
                 self.map_container.set_visible_child_name("map")
+                self._maybe_show_map_intro()
             except Exception:
                 pass
         return False
@@ -3120,6 +3122,7 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             self.map_spinner.stop()
             self.map_container.set_visible_child_name("map")
+            self._maybe_show_map_intro()
         except Exception:
             pass
         return False
@@ -3244,6 +3247,39 @@ class MainWindow(Adw.ApplicationWindow):
             win.close()
         except Exception:
             pass
+
+    def _maybe_show_map_intro(self):
+        """First time the map is shown: offer to add home + places, once."""
+        if self.settings.get("map_intro_shown"):
+            return
+        self.settings["map_intro_shown"] = True
+        try:
+            save_settings(self.settings)
+        except Exception:
+            pass
+        # Defer so the dialog lands over the now-visible map, not the spinner.
+        GLib.timeout_add(400, self._show_map_intro)
+
+    def _show_map_intro(self):
+        dlg = Adw.MessageDialog(
+            transient_for=self,
+            heading=_("Welcome to the map"),
+            body=_("This is your first time here. The map shows where your "
+                   "photos were taken. Add your home and the places that matter "
+                   "to you — they get marked here and you can filter your photos "
+                   "by them. That’s it!"))
+        dlg.add_response("later", _("Maybe later"))
+        dlg.add_response("add", _("Add my home"))
+        dlg.set_response_appearance("add", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("add")
+        dlg.set_close_response("later")
+        dlg.connect("response", self._on_map_intro_response)
+        dlg.present()
+        return False
+
+    def _on_map_intro_response(self, dlg, response):
+        if response == "add":
+            self._open_place_dialog()  # main home
 
     def _accent_badge(self, text):
         """Small blue accent pill (same look as the 'Recommended' badge)."""

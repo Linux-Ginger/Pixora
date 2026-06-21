@@ -2006,6 +2006,18 @@ msgstr ""
 msgid "You’re all set"
 msgstr ""
 
+msgid "Welcome to the map"
+msgstr ""
+
+msgid "This is your first time here. The map shows where your photos were taken. Add your home and the places that matter to you — they get marked here and you can filter your photos by them. That’s it!"
+msgstr ""
+
+msgid "Maybe later"
+msgstr ""
+
+msgid "Add my home"
+msgstr ""
+
 msgid "You can change everything later in Settings. Enjoy Pixora!"
 msgstr ""
 

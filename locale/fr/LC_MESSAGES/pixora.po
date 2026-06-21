@@ -2878,6 +2878,18 @@ msgstr "Branche un disque USB et Pixora sauvegarde après chaque import — pour
 msgid "You’re all set"
 msgstr "Tout est prêt"
 
+msgid "Welcome to the map"
+msgstr "Bienvenue sur la carte"
+
+msgid "This is your first time here. The map shows where your photos were taken. Add your home and the places that matter to you — they get marked here and you can filter your photos by them. That’s it!"
+msgstr "C’est ta première visite ici. La carte montre où tes photos ont été prises. Ajoute ton domicile et les lieux qui comptent pour toi — ils sont marqués ici et tu peux filtrer tes photos par lieu. C’est tout !"
+
+msgid "Maybe later"
+msgstr "Peut-être plus tard"
+
+msgid "Add my home"
+msgstr "Ajouter mon domicile"
+
 msgid "You can change everything later in Settings. Enjoy Pixora!"
 msgstr "Tu peux tout modifier plus tard dans les Réglages. Profite bien de Pixora !"
 
