@@ -1454,7 +1454,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._favorites             = load_favorites()
         self._favorites_save_id     = None
         self._favorites_only        = False
-        self._home_only             = False
+        self._place_filter          = set()   # names of places to filter on
         self._current_flow          = None
         self._current_row_hbox      = None
         self._current_row_width     = 0
@@ -2739,20 +2739,19 @@ class MainWindow(Adw.ApplicationWindow):
         filter_btn.set_label(_("Filter"))   # icon themes vary; a label always shows
         filter_btn.add_css_class("flat")
         filter_btn.set_tooltip_text(_("Filter"))
-        _filter_pop = Gtk.Popover()
-        _fbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        _fbox.set_margin_top(8)
-        _fbox.set_margin_bottom(8)
-        _fbox.set_margin_start(10)
-        _fbox.set_margin_end(10)
-        self.fav_check = Gtk.CheckButton(label=_("Only favorites"))
-        self.fav_check.connect("toggled", self._on_filter_changed)
-        self.home_check = Gtk.CheckButton(label=_("Only home"))
-        self.home_check.connect("toggled", self._on_filter_changed)
-        _fbox.append(self.fav_check)
-        _fbox.append(self.home_check)
-        _filter_pop.set_child(_fbox)
-        filter_btn.set_popover(_filter_pop)
+        self._filter_pop = Gtk.Popover()
+        self._filter_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self._filter_box.set_margin_top(8)
+        self._filter_box.set_margin_bottom(8)
+        self._filter_box.set_margin_start(10)
+        self._filter_box.set_margin_end(10)
+        self._filter_pop.set_child(self._filter_box)
+        # Rebuilt each time it opens so it always reflects the current places.
+        self._filter_pop.connect(
+            "notify::visible",
+            lambda p, _ps: self._populate_filter_menu() if p.get_visible() else None)
+        filter_btn.set_popover(self._filter_pop)
+        self._populate_filter_menu()
         self.header.pack_end(filter_btn)
 
         self.map_btn = Gtk.Button(label=_("🗺"))
@@ -4320,13 +4319,17 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_photos_scanned(self, photos, photo_path):
         log_info(_("load_photos: {n} files found").format(n=len(photos)))
-        filtering = self._favorites_only or self._home_only
+        filtering = self._favorites_only or bool(self._place_filter)
         if filtering:
-            # Union: each checked filter ADDS its photos (favorites and/or home),
-            # so turning both on shows more, not fewer.
-            photos = [p for p in photos if
-                      (self._favorites_only and p in self._favorites) or
-                      (self._home_only and self._photo_near_home(p))]
+            # Union: each ticked filter ADDS its photos (favorites and/or each
+            # selected place), so ticking more shows more.
+            def _keep(p):
+                if self._favorites_only and p in self._favorites:
+                    return True
+                if self._place_filter and self._photo_place(p) in self._place_filter:
+                    return True
+                return False
+            photos = [p for p in photos if _keep(p)]
         if not photos:
             if filtering:
                 self._show_empty_favorites()
@@ -6230,27 +6233,44 @@ class MainWindow(Adw.ApplicationWindow):
             return
         badge.set_visible(path in self._favorites)
 
+    def _populate_filter_menu(self):
+        """(Re)build the filter popover: favorites + one row per saved place."""
+        box = self._filter_box
+        child = box.get_first_child()
+        while child:
+            box.remove(child)
+            child = box.get_first_child()
+        self._fav_check = Gtk.CheckButton(label=_("Only favorites"))
+        self._fav_check.set_active(self._favorites_only)
+        self._fav_check.connect("toggled", self._on_filter_changed)
+        box.append(self._fav_check)
+        self._place_checks = []
+        places = self._all_places()
+        if places:
+            box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+            for name, _lat, _lon in places:
+                c = Gtk.CheckButton(label=name)
+                c.set_active(name in self._place_filter)
+                c.connect("toggled", self._on_filter_changed)
+                box.append(c)
+                self._place_checks.append((name, c))
+
     def _on_filter_changed(self, _btn=None):
-        self._favorites_only = self.fav_check.get_active()
-        self._home_only = self.home_check.get_active()
-        log_info(_("Filter — favorites: {f}, home: {h}").format(
-            f=self._favorites_only, h=self._home_only))
+        self._favorites_only = getattr(self, "_fav_check", None) is not None \
+            and self._fav_check.get_active()
+        self._place_filter = {name for name, c in getattr(self, "_place_checks", [])
+                              if c.get_active()}
         self._apply_filter_banner()
         self.load_photos()
 
     def _apply_filter_banner(self):
-        """Show the inline banner (same look as the location filter) for the
-        active favorites/home filters."""
+        """Inline banner (same look as the location filter) for active filters."""
         parts = []
         if self._favorites_only:
             parts.append(_("Favorites"))
-        if self._home_only:
-            parts.append(_("Home"))
+        parts.extend(sorted(self._place_filter))
         if parts:
-            if self._favorites_only and self._home_only:
-                self._filter_icon.set_text("⭐🏠")
-            else:
-                self._filter_icon.set_text("⭐" if self._favorites_only else "🏠")
+            self._filter_icon.set_text("⭐" if self._favorites_only else "🏠")
             self.filter_title_lbl.set_text(" · ".join(parts))
             self.filter_subtitle_lbl.set_text("")
             self.filter_info_bar.set_visible(True)
@@ -6258,17 +6278,21 @@ class MainWindow(Adw.ApplicationWindow):
             self.filter_info_bar.set_visible(False)
             self._filter_icon.set_text("📍")
 
+    def _clear_all_filters(self):
+        self._favorites_only = False
+        self._place_filter = set()
+        self._apply_filter_banner()
+        self.load_photos()
+
     def _on_clear_filter(self, btn=None):
         # One ✕ for every filter kind.
-        if self._favorites_only or self._home_only:
-            self.fav_check.set_active(False)
-            self.home_check.set_active(False)  # each fires _on_filter_changed
+        if self._favorites_only or self._place_filter:
+            self._clear_all_filters()
         else:
             self.on_clear_cluster_filter()
 
     def _on_show_all_favorites(self, _banner):
-        self.fav_check.set_active(False)
-        self.home_check.set_active(False)
+        self._clear_all_filters()
 
 
     def on_edit_current(self, btn):
