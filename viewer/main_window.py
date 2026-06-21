@@ -1095,23 +1095,22 @@ class MapWidget(Gtk.Box):
             "loadingTiles": _("Loading map…"),
             "home": _("My home"),
         }
-        tile_js = ""
+        # Separate calls so a failure in one (e.g. labels) can't stop the
+        # markers from being drawn.
         if self._tile_url:
-            tile_js = (f"if(window.pixoraSetTileUrl)"
-                       f"{{window.pixoraSetTileUrl({json.dumps(self._tile_url)});}}")
-        home_js = ""
-        if self._home:
-            home_js = (f"if(window.pixoraSetHome)"
-                       f"{{window.pixoraSetHome({float(self._home[0])},"
-                       f"{float(self._home[1])});}}")
-        js = (
-            tile_js
-            + f"if(window.pixoraSetLabels){{window.pixoraSetLabels({json.dumps(labels)});}}"
+            self._run_js(
+                f"if(window.pixoraSetTileUrl){{window.pixoraSetTileUrl("
+                f"{json.dumps(self._tile_url)});}}", "tile")
+        self._run_js(
+            f"if(window.pixoraSetLabels){{window.pixoraSetLabels("
+            f"{json.dumps(labels)});}}", "labels")
+        self._run_js(
             f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers("
-            f"{json.dumps(data)},{json.dumps(self._initial_view)});}}"
-            + home_js
-        )
-        self._run_js(js)
+            f"{json.dumps(data)},{json.dumps(self._initial_view)});}}", "markers")
+        if self._home:
+            self._run_js(
+                f"if(window.pixoraSetHome){{window.pixoraSetHome("
+                f"{float(self._home[0])},{float(self._home[1])});}}", "home")
         return False
 
     def _on_decide_policy(self, web, decision, decision_type):
@@ -1138,12 +1137,20 @@ class MapWidget(Gtk.Box):
             return True
         return False
 
-    def _run_js(self, js):
-        """Run JS in the map, across both WebKit API generations."""
+    def _run_js(self, js, label=""):
+        """Run JS in the map, across both WebKit API generations. Logs JS-side
+        exceptions via the async callback (so silent failures become visible)."""
         if not getattr(self, "web", None):
             return
+
+        def _cb(web, result, *_a):
+            try:
+                web.evaluate_javascript_finish(result)
+            except Exception as e:
+                log_warn("JS error [%s]: %r" % (label, e))
+
         try:
-            self.web.evaluate_javascript(js, -1, None, None, None, None, None)
+            self.web.evaluate_javascript(js, -1, None, None, None, _cb, None)
             return
         except Exception:
             pass
@@ -1193,6 +1200,8 @@ class MapWidget(Gtk.Box):
             log_warn(_("Map → offline / tile errors"))
             if self.status_cb:
                 GLib.idle_add(self.status_cb, "offline")
+        elif msg_type == "js-error":
+            log_error("Map JS error: %s" % payload.get("msg", ""))
 
 
 class BackupFolderPicker(Adw.Dialog):

@@ -77,6 +77,15 @@
 <script src="markercluster.js"></script>
 <script>
 (function() {
+  // Report any uncaught JS error to Pixora's log so map bugs are diagnosable.
+  window.onerror = function(message, source, lineno, colno) {
+    try {
+      window.webkit.messageHandlers.pixora.postMessage(JSON.stringify(
+        { type: 'js-error', msg: String(message) + ' @' + lineno + ':' + colno }));
+    } catch (e) {}
+    return false;
+  };
+
   // Soepel in-/uitzoomen en pannen (GPU-versnelling op de main pc aanwezig).
   // fadeAnimation laat tegels invloeien i.p.v. hard inklappen.
   const map = L.map('map', {
@@ -399,14 +408,20 @@
     // de page laadde, zou fitBounds op verkeerde dimensies rekenen.
     map.invalidateSize(false);
     updateMinZoom();
-    // Begin-weergave: huis als dat ingesteld is, anders het drukste foto-gebied,
-    // en pas als laatste terugval álle markers (kan de wereld omvatten).
-    if (view && view.center) {
-      map.setView(view.center, view.zoom || 13, { animate: false });
-    } else if (view && view.bounds) {
-      map.fitBounds(view.bounds, { padding: [40, 40], maxZoom: 13, animate: false });
-    } else if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
+    // Begin-weergave; faalt dit, val terug op alle markers zodat foto's altijd
+    // zichtbaar zijn.
+    try {
+      if (view && view.center) {
+        map.setView(view.center, view.zoom || 13, { animate: false });
+      } else if (view && view.bounds) {
+        map.fitBounds(view.bounds, { padding: [40, 40], maxZoom: 13, animate: false });
+      } else if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
+      }
+    } catch (e) {
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
+      }
     }
   };
 
