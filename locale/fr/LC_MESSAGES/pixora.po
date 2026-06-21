@@ -2847,3 +2847,6 @@ msgstr "Saisis ton adresse pour qu’elle soit trouvée précisément. Elle est 
 
 msgid "Couldn’t find that address. Check the fields and try again."
 msgstr "Adresse introuvable. Vérifie les champs et réessaie."
+
+msgid "Map → go home ({lat}, {lon})"
+msgstr "Carte → aller au domicile ({lat}, {lon})"

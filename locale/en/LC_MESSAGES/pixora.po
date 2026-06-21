@@ -2800,3 +2800,6 @@ msgstr "Fill in your address so it can be looked up exactly. It’s looked up on
 
 msgid "Couldn’t find that address. Check the fields and try again."
 msgstr "Couldn’t find that address. Check the fields and try again."
+
+msgid "Map → go home ({lat}, {lon})"
+msgstr "Map → go home ({lat}, {lon})"

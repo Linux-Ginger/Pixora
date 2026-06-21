@@ -2830,3 +2830,6 @@ msgstr "Gib deine Adresse ein, damit sie genau gefunden wird. Sie wird einmal ü
 
 msgid "Couldn’t find that address. Check the fields and try again."
 msgstr "Diese Adresse wurde nicht gefunden. Überprüfe die Felder und versuche es erneut."
+
+msgid "Map → go home ({lat}, {lon})"
+msgstr "Karte → nach Hause ({lat}, {lon})"

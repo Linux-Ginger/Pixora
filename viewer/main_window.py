@@ -2853,6 +2853,9 @@ class MainWindow(Adw.ApplicationWindow):
         go.set_halign(Gtk.Align.FILL)
         go.get_child().set_halign(Gtk.Align.START)
         go.connect("clicked", self._on_go_home, pop)
+        # Greyed out until a home is actually set.
+        self._go_home_item = go
+        go.set_sensitive(self.settings.get("home_lat") is not None)
         setb = Gtk.Button(label=_("Set home address…"))
         setb.add_css_class("flat")
         setb.set_halign(Gtk.Align.FILL)
@@ -2902,6 +2905,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def open_map(self, btn=None):
         log_info(_("Map opened ({n} photos going to GPS scan)").format(n=len(self.photos)))
+        self._refresh_home_menu()
         self.header.set_visible(False)
         self.bottom_stack.set_visible(False)
         self._set_toolbars_revealed(False)
@@ -3059,6 +3063,11 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         return False
 
+    def _refresh_home_menu(self):
+        if hasattr(self, "_go_home_item"):
+            self._go_home_item.set_sensitive(
+                self.settings.get("home_lat") is not None)
+
     def _on_refresh_map(self, btn):
         if self._map_widget:
             self._map_widget.refresh()
@@ -3068,14 +3077,9 @@ class MainWindow(Adw.ApplicationWindow):
         lat = self.settings.get("home_lat")
         lon = self.settings.get("home_lon")
         if lat is None or lon is None:
-            dlg = Adw.MessageDialog(
-                transient_for=self,
-                heading=_("No home set yet"),
-                body=_("Set your home address first using the home button."))
-            dlg.add_response("ok", _("OK"))
-            dlg.present()
             return
         if self._map_widget:
+            log_info(_("Map → go home ({lat}, {lon})").format(lat=lat, lon=lon))
             self._map_widget.go_home(lat, lon, self.settings.get("home_zoom"))
 
     def _on_set_home(self, btn, pop):
@@ -3167,6 +3171,7 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_error(_("Could not save home: {err}").format(err=e))
             return False
+        self._refresh_home_menu()
         if self._map_widget:
             self._map_widget.set_home(lat, lon)
             self._map_widget.go_home(lat, lon, 16)

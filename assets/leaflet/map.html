@@ -411,7 +411,11 @@
   };
 
   window.pixoraGoHome = function(lat, lon, zoom) {
-    map.flyTo([lat, lon], zoom || 15, { duration: 1.2 });
+    map.invalidateSize(false);
+    // setView first guarantees a jump even if a flyTo gets interrupted, then
+    // flyTo adds the smooth glide.
+    map.setView([lat, lon], zoom || 15, { animate: false });
+    map.flyTo([lat, lon], zoom || 15, { duration: 1.0 });
   };
   window.pixoraRefresh = function() {
     map.invalidateSize(false);

@@ -2819,3 +2819,6 @@ msgstr "Vul je adres in zodat het precies opgezocht kan worden. Het wordt één 
 
 msgid "Couldn’t find that address. Check the fields and try again."
 msgstr "Dat adres is niet gevonden. Controleer de velden en probeer opnieuw."
+
+msgid "Map → go home ({lat}, {lon})"
+msgstr "Kaart → ga naar huis ({lat}, {lon})"

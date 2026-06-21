@@ -1960,3 +1960,6 @@ msgstr ""
 
 msgid "Couldn’t find that address. Check the fields and try again."
 msgstr ""
+
+msgid "Map → go home ({lat}, {lon})"
+msgstr ""
