@@ -2901,3 +2901,12 @@ msgstr "Fotos und Videos werden in deine Bibliothek kopiert — die Originale au
 
 msgid "Shown as a pin on the map and used by the home button. Stored only on this computer."
 msgstr "Wird als Stecknadel auf der Karte angezeigt und von der Haus-Schaltfläche genutzt. Nur auf diesem Computer gespeichert."
+
+msgid "Filter"
+msgstr "Filter"
+
+msgid "Only favorites"
+msgstr "Nur Favoriten"
+
+msgid "Only home"
+msgstr "Nur Zuhause"

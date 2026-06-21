@@ -2031,3 +2031,12 @@ msgstr ""
 
 msgid "Shown as a pin on the map and used by the home button. Stored only on this computer."
 msgstr ""
+
+msgid "Filter"
+msgstr ""
+
+msgid "Only favorites"
+msgstr ""
+
+msgid "Only home"
+msgstr ""

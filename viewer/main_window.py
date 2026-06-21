@@ -1436,6 +1436,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._favorites             = load_favorites()
         self._favorites_save_id     = None
         self._favorites_only        = False
+        self._home_only             = False
         self._current_flow          = None
         self._current_row_hbox      = None
         self._current_row_width     = 0
@@ -2705,12 +2706,25 @@ class MainWindow(Adw.ApplicationWindow):
         self.sort_combo.connect("notify::selected", self.on_sort_changed)
         self.header.pack_start(self.sort_combo)
 
-        self.favorites_toggle = Gtk.ToggleButton()
-        self.favorites_toggle.set_icon_name("starred-symbolic")
-        self.favorites_toggle.add_css_class("flat")
-        self.favorites_toggle.set_tooltip_text(_("Show only favorites"))
-        self.favorites_toggle.connect("toggled", self.toggle_favorites_filter)
-        self.header.pack_end(self.favorites_toggle)
+        # Filters grouped in one menu so the header doesn't overflow.
+        filter_btn = Gtk.MenuButton(icon_name="funnel-symbolic")
+        filter_btn.add_css_class("flat")
+        filter_btn.set_tooltip_text(_("Filter"))
+        _filter_pop = Gtk.Popover()
+        _fbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        _fbox.set_margin_top(8)
+        _fbox.set_margin_bottom(8)
+        _fbox.set_margin_start(10)
+        _fbox.set_margin_end(10)
+        self.fav_check = Gtk.CheckButton(label=_("Only favorites"))
+        self.fav_check.connect("toggled", self._on_filter_changed)
+        self.home_check = Gtk.CheckButton(label=_("Only home"))
+        self.home_check.connect("toggled", self._on_filter_changed)
+        _fbox.append(self.fav_check)
+        _fbox.append(self.home_check)
+        _filter_pop.set_child(_fbox)
+        filter_btn.set_popover(_filter_pop)
+        self.header.pack_end(filter_btn)
 
         self.map_btn = Gtk.Button(label=_("🗺"))
         self.map_btn.add_css_class("flat")
@@ -3624,8 +3638,10 @@ class MainWindow(Adw.ApplicationWindow):
         sep.set_margin_bottom(6)
         self.editor_bar.append(sep)
 
-        cancel_editor_btn = _edit_btn("window-close-symbolic",
-                                      _("Cancel"), self.on_editor_cancel)
+        cancel_editor_btn = Gtk.Button(label=_("Cancel"))
+        cancel_editor_btn.add_css_class("pill")
+        cancel_editor_btn.set_valign(Gtk.Align.CENTER)
+        cancel_editor_btn.connect("clicked", self.on_editor_cancel)
         self.editor_bar.append(cancel_editor_btn)
 
         save_btn = Gtk.Button(label=_("Save"))
@@ -4041,8 +4057,11 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(_("load_photos: {n} files found").format(n=len(photos)))
         if self._favorites_only:
             photos = [p for p in photos if p in self._favorites]
+        if self._home_only:
+            photos = [p for p in photos if self._photo_near_home(p)]
+        filtering = self._favorites_only or self._home_only
         if not photos:
-            if self._favorites_only:
+            if filtering:
                 self._show_empty_favorites()
             else:
                 self.show_empty_state()
@@ -4050,9 +4069,9 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         self.photos = photos
         self._filmstrip_order_cache = None
-        # Favorites mode is shown by the banner now, so the footer is just counts.
+        # Filters are shown by the banner now, so the footer is just counts.
         self.photo_count_label.set_text(self._media_count_text())
-        if self._favorites_only:
+        if filtering:
             self.filter_subtitle_lbl.set_text(self._media_count_text())
         self.start_watcher(photo_path)
         # Read the combo here (main thread) — GTK isn't thread-safe.
@@ -4652,14 +4671,6 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._update_viewer_location, resolved, load_id)
         threading.Thread(target=_bg, daemon=True).start()
 
-    def _set_viewer_near_home(self, coords):
-        hlat = self.settings.get("home_lat")
-        hlon = self.settings.get("home_lon")
-        self._viewer_near_home = bool(
-            coords and hlat is not None and hlon is not None
-            and abs(coords[0] - hlat) < 0.0011
-            and abs(coords[1] - hlon) < 0.0017)
-
     def _decorate_location(self, text):
         """Append a '(🏠 Home)' tag when the open photo is at home; show the tag
         alone if there's no place name yet."""
@@ -4671,7 +4682,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _load_full_photo(self, path, load_id):
         if is_video(path):
             initial, coords = self._determine_initial_location(path)
-            self._set_viewer_near_home(coords)
+            self._viewer_near_home = self._photo_near_home(path)
             searching = bool(coords)
             if load_id == self._viewer_load_id:
                 GLib.idle_add(self._show_video, path, initial, searching)
@@ -4693,7 +4704,7 @@ class MainWindow(Adw.ApplicationWindow):
                     while len(self._viewer_pixbuf_cache) > 3:
                         self._viewer_pixbuf_cache.popitem(last=False)
         initial, coords = self._determine_initial_location(path)
-        self._set_viewer_near_home(coords)
+        self._viewer_near_home = self._photo_near_home(path)
         searching = bool(coords)
         if load_id == self._viewer_load_id:
             GLib.idle_add(self._show_full_photo, pixbuf, path, initial, searching)
@@ -5948,32 +5959,42 @@ class MainWindow(Adw.ApplicationWindow):
             return
         badge.set_visible(path in self._favorites)
 
-    def toggle_favorites_filter(self, btn):
-        self._favorites_only = btn.get_active()
-        log_info(_("Favorites filter: {state}").format(
-            state=_("on") if self._favorites_only else _("off")
-        ))
+    def _on_filter_changed(self, _btn=None):
+        self._favorites_only = self.fav_check.get_active()
+        self._home_only = self.home_check.get_active()
+        log_info(_("Filter — favorites: {f}, home: {h}").format(
+            f=self._favorites_only, h=self._home_only))
+        self._apply_filter_banner()
+        self.load_photos()
+
+    def _apply_filter_banner(self):
+        """Show the inline banner (same look as the location filter) for the
+        active favorites/home filters."""
+        parts = []
         if self._favorites_only:
-            # Use the same inline banner as the location filter.
-            self._filter_icon.set_text("⭐")
-            self.filter_title_lbl.set_text(_("Favorites"))
+            parts.append(_("Favorites"))
+        if self._home_only:
+            parts.append(_("Home"))
+        if parts:
+            self._filter_icon.set_text("⭐" if self._favorites_only else "🏠")
+            self.filter_title_lbl.set_text(" · ".join(parts))
             self.filter_subtitle_lbl.set_text("")
             self.filter_info_bar.set_visible(True)
         elif not getattr(self, "_photos_before_cluster", None):
             self.filter_info_bar.set_visible(False)
             self._filter_icon.set_text("📍")
-        self.load_photos()
 
     def _on_clear_filter(self, btn=None):
-        # One ✕ for both filter kinds.
-        if self._favorites_only:
-            self.favorites_toggle.set_active(False)  # fires toggle_favorites_filter
+        # One ✕ for every filter kind.
+        if self._favorites_only or self._home_only:
+            self.fav_check.set_active(False)
+            self.home_check.set_active(False)  # each fires _on_filter_changed
         else:
             self.on_clear_cluster_filter()
 
     def _on_show_all_favorites(self, _banner):
-        # Untoggling fires toggle_favorites_filter, which reloads + hides banner.
-        self.favorites_toggle.set_active(False)
+        self.fav_check.set_active(False)
+        self.home_check.set_active(False)
 
 
     def on_edit_current(self, btn):

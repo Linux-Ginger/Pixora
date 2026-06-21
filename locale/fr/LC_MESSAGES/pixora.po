@@ -2918,3 +2918,12 @@ msgstr "Les photos et vidéos sont copiées dans ta bibliothèque — les origin
 
 msgid "Shown as a pin on the map and used by the home button. Stored only on this computer."
 msgstr "Affiché comme repère sur la carte et utilisé par le bouton domicile. Stocké uniquement sur cet ordinateur."
+
+msgid "Filter"
+msgstr "Filtre"
+
+msgid "Only favorites"
+msgstr "Favoris uniquement"
+
+msgid "Only home"
+msgstr "Domicile uniquement"
