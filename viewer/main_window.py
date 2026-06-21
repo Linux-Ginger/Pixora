@@ -1075,6 +1075,7 @@ class MapWidget(Gtk.Box):
             "retry": _("Try again"),
             "loadingTiles": _("Loading map…"),
             "home": _("My home"),
+            "atHome": _("Home"),
         }
         # Separate calls so a failure in one (e.g. labels) can't stop the
         # markers from being drawn.
@@ -1085,13 +1086,15 @@ class MapWidget(Gtk.Box):
         self._run_js(
             f"if(window.pixoraSetLabels){{window.pixoraSetLabels("
             f"{json.dumps(labels)});}}", "labels")
-        self._run_js(
-            f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers("
-            f"{json.dumps(data)},{json.dumps(self._initial_view)});}}", "markers")
+        # Home BEFORE markers so the popups can show a "Home" badge for nearby
+        # photos (pixoraSetMarkers builds the popups).
         if self._home:
             self._run_js(
                 f"if(window.pixoraSetHome){{window.pixoraSetHome("
                 f"{float(self._home[0])},{float(self._home[1])});}}", "home")
+        self._run_js(
+            f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers("
+            f"{json.dumps(data)},{json.dumps(self._initial_view)});}}", "markers")
         return False
 
     def _on_decide_policy(self, web, decision, decision_type):

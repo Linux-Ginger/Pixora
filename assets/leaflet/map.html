@@ -65,7 +65,9 @@
   .leaflet-popup-content .date { opacity: 0.7; font-size: 11px; }
   .leaflet-popup-content .hint { color: #e95420; font-size: 10px; margin-top: 4px; }
   .leaflet-popup-content .count { color: #ffb300; font-size: 11px; margin-top: 4px; }
-  .leaflet-control-attribution a { color: #0077cc; }
+  /* No underline so the blue line doesn't run under the Leaflet flag-logo. */
+  .leaflet-control-attribution a { color: #0077cc; text-decoration: none; }
+  .leaflet-control-attribution a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -108,16 +110,15 @@
     // leaving the marker/home functions undefined. Give the map its own maxZoom.
     maxZoom: 19,
     minZoom: 2,
-    // Smooth, velocity-sensitive zoom + pan (was never the bug).
+    // Full-level steps with animation = fast AND smooth. (Fractional zoomSnap
+    // made each scroll a tiny step, which felt sluggish.)
     zoomAnimation: true,
     fadeAnimation: true,
     markerZoomAnimation: true,
     inertia: true,
     preferCanvas: true,
-    wheelDebounceTime: 20,
-    wheelPxPerZoomLevel: 55,
-    zoomSnap: 0.25,
-    zoomDelta: 0.5,
+    zoomSnap: 1,
+    zoomDelta: 1,
     maxBoundsViscosity: 1.0
   });
 
@@ -175,6 +176,7 @@
   let firstTileLoaded = false;
   let tileErrorCount = 0;
   let offlineNotified = false;
+  let homeLat = null, homeLon = null;   // set by pixoraSetHome; used for badges
   const tilesLoadingEl = document.getElementById('tiles-loading');
 
   function showBanner() {
@@ -348,7 +350,8 @@
     offline: "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden",
     retry: "Opnieuw proberen",
     loadingTiles: "Kaart laden…",
-    home: "Mijn huis"
+    home: "Mijn huis",
+    atHome: "Thuis"
   };
   window.pixoraSetLabels = function(labels) {
     Object.assign(LBL, labels);
@@ -357,6 +360,12 @@
     document.getElementById('tiles-loading-text').textContent = LBL.loadingTiles;
   };
 
+  function nearHome(m) {
+    if (homeLat == null || homeLon == null) return false;
+    // ~400 m box (lon a bit wider so it stays roughly square at NL latitudes).
+    return Math.abs(m.lat - homeLat) < 0.004 && Math.abs(m.lon - homeLon) < 0.006;
+  }
+
   function buildPopupHtml(m, count) {
     let html = '';
     if (m.thumb) {
@@ -364,6 +373,9 @@
     }
     html += '<div class="fname">' + escapeHtml(m.filename) + '</div>';
     html += '<div class="date">' + escapeHtml(m.date || '') + '</div>';
+    if (nearHome(m)) {
+      html += '<div class="count">🏠 ' + (LBL.atHome || 'Home') + '</div>';
+    }
     if (count && count > 1) {
       html += '<div class="count">+ ' + (count - 1) + ' ' + LBL.otherInCluster + '</div>';
       html += '<div class="hint">' + LBL.clickCluster + '</div>';
@@ -399,6 +411,27 @@
     if (!map.hasLayer(cluster)) map.addLayer(cluster);
   });
 
+  // Bounds of the densest ~15 km cell (+ neighbours), so the map opens where
+  // most photos are instead of centered on empty space between far-apart spots.
+  function densestBounds(markers) {
+    const cell = 0.15;
+    const bins = {};
+    markers.forEach(function(m) {
+      const k = Math.round(m.lat / cell) + '_' + Math.round(m.lon / cell);
+      (bins[k] = bins[k] || []).push(m);
+    });
+    let bestKey = null, bestN = 0;
+    for (const k in bins) { if (bins[k].length > bestN) { bestN = bins[k].length; bestKey = k; } }
+    if (!bestKey) return null;
+    const p = bestKey.split('_').map(Number);
+    const near = markers.filter(function(m) {
+      return Math.abs(Math.round(m.lat / cell) - p[0]) <= 1 &&
+             Math.abs(Math.round(m.lon / cell) - p[1]) <= 1;
+    });
+    const b = L.latLngBounds(near.map(function(m) { return [m.lat, m.lon]; }));
+    return b.isValid() ? b : null;
+  }
+
   window.pixoraSetMarkers = function(markers, view) {
    try {
     cluster.clearLayers();
@@ -422,7 +455,11 @@
     // de page laadde, zou fitBounds op verkeerde dimensies rekenen.
     map.invalidateSize(false);
     updateMinZoom();
-    if (bounds.isValid()) {
+    // Open on the densest photo area; fall back to framing all markers.
+    const dense = densestBounds(markers);
+    if (dense) {
+      map.fitBounds(dense, { padding: [40, 40], maxZoom: 14, animate: false });
+    } else if (bounds.isValid()) {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
     }
    } catch (e) { _report('pixoraSetMarkers', e); }
@@ -443,6 +480,7 @@
   let homeMarker = null;
   window.pixoraSetHome = function(lat, lon) {
     try {
+      homeLat = lat; homeLon = lon;
       if (homeMarker) { map.removeLayer(homeMarker); homeMarker = null; }
       if (lat == null || lon == null) return;
       const icon = L.divIcon({
