@@ -4415,6 +4415,14 @@ class MainWindow(Adw.ApplicationWindow):
             overlay.add_overlay(fav_badge)
 
             # Home badge: top-right (star is top-left), only for photos at home.
+            if 'home_box' not in tc:
+                p = Gtk.CssProvider()
+                # Square min size + 50% radius = a real circle (asymmetric
+                # padding on fav_box made the wider home glyph look oval).
+                p.load_from_string(
+                    "box { background-color: rgba(0,0,0,0.55);"
+                    " border-radius: 50%; min-width: 26px; min-height: 26px; }")
+                tc['home_box'] = p
             home_badge = Gtk.Box()
             home_badge.set_halign(Gtk.Align.END)
             home_badge.set_valign(Gtk.Align.START)
@@ -4423,8 +4431,12 @@ class MainWindow(Adw.ApplicationWindow):
             home_badge.set_can_target(False)
             home_badge.set_can_focus(False)
             home_badge.get_style_context().add_provider(
-                tc['fav_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                tc['home_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
             home_label = Gtk.Label()
+            home_label.set_halign(Gtk.Align.CENTER)
+            home_label.set_valign(Gtk.Align.CENTER)
+            home_label.set_hexpand(True)
+            home_label.set_vexpand(True)
             home_label.set_use_markup(True)
             home_label.set_markup('<span size="small">🏠</span>')
             home_badge.append(home_label)
