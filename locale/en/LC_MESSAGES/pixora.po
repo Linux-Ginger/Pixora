@@ -2901,3 +2901,15 @@ msgstr "e.g. Grandma & Grandpa — labels photos taken there"
 
 msgid "Address verified"
 msgstr "Address verified"
+
+msgid "Did you mean this?"
+msgstr "Did you mean this?"
+
+msgid "Confirm location"
+msgstr "Confirm location"
+
+msgid "Save here"
+msgstr "Save here"
+
+msgid "Edit"
+msgstr "Edit"

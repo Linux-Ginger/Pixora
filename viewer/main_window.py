@@ -622,21 +622,23 @@ def _mk(s):
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def geocode_address(street=None, city=None, postcode=None, country=None):
-    """Structured address → (lat, lon) via Nominatim, or None. One-off online
-    lookup; only the resulting coordinates are stored (locally)."""
+def geocode_address(street=None, city=None, postcode=None, country=None,
+                    loose=False):
+    """Structured address → (lat, lon, display_name) via Nominatim, or None.
+    loose=True drops the city, so a wrong/missing city can still resolve to a
+    'did you mean…' suggestion. One-off online lookup; only the result is kept."""
     try:
         import urllib.parse
-        params = {"format": "json", "limit": "1"}
+        params = {"format": "json", "limit": "1", "addressdetails": "0"}
         if street:
             params["street"] = street
-        if city:
+        if city and not loose:
             params["city"] = city
         if postcode:
             params["postalcode"] = postcode
         if country:
             params["country"] = country
-        if len(params) == 2:        # nothing useful supplied
+        if len(params) == 3:        # nothing useful supplied
             return None
         url = ("https://nominatim.openstreetmap.org/search?"
                + urllib.parse.urlencode(params))
@@ -647,7 +649,8 @@ def geocode_address(street=None, city=None, postcode=None, country=None):
         with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read())
         if data:
-            return float(data[0]["lat"]), float(data[0]["lon"])
+            return (float(data[0]["lat"]), float(data[0]["lon"]),
+                    data[0].get("display_name", ""))
     except Exception:
         pass
     return None
@@ -914,7 +917,7 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
 class MapWidget(Gtk.Box):
     def __init__(self, markers, open_photo_cb, status_cb=None, tile_url=None,
-                 initial_view=None, home=None):
+                 initial_view=None, home=None, places=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.markers = markers
         self.open_photo_cb = open_photo_cb
@@ -922,6 +925,7 @@ class MapWidget(Gtk.Box):
         self._tile_url = tile_url
         self._initial_view = initial_view
         self._home = home              # (lat, lon) or None
+        self._places = places or []    # [{name, lat, lon}, …] extra places
         self.set_vexpand(True)
         self.set_hexpand(True)
         self._pending_markers = list(markers) if markers else []
@@ -1103,9 +1107,18 @@ class MapWidget(Gtk.Box):
                 f"if(window.pixoraSetHome){{window.pixoraSetHome("
                 f"{float(self._home[0])},{float(self._home[1])});}}", "home")
         self._run_js(
+            f"if(window.pixoraSetPlaces){{window.pixoraSetPlaces("
+            f"{json.dumps(self._places)});}}", "places")
+        self._run_js(
             f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers("
             f"{json.dumps(data)},{json.dumps(self._initial_view)});}}", "markers")
         return False
+
+    def set_places(self, places):
+        self._places = places or []
+        self._run_js(
+            f"if(window.pixoraSetPlaces){{window.pixoraSetPlaces("
+            f"{json.dumps(self._places)});}}")
 
     def _on_decide_policy(self, web, decision, decision_type):
         try:
@@ -3058,10 +3071,11 @@ class MainWindow(Adw.ApplicationWindow):
                             "zoom": self.settings.get("home_zoom") or 13}
 
         home = ([hlat, hlon] if hlat is not None and hlon is not None else None)
+        places = self._map_places_list()
         self._map_widget = MapWidget(
             markers, self._open_photo_from_map,
             status_cb=self._on_map_status, tile_url=tile_url,
-            initial_view=initial_view, home=home
+            initial_view=initial_view, home=home, places=places
         )
         self.map_content.append(self._map_widget)
         # Wait for map-ready; 12s fallback prevents hang.
@@ -3340,10 +3354,13 @@ class MainWindow(Adw.ApplicationWindow):
         # Back-compat shim (map home button) → main home editor.
         self._open_place_dialog(None)
 
-    def _open_place_dialog(self, index=None):
-        """index: None = main home, 'new' = add a place, int = edit a place."""
+    def _open_place_dialog(self, index=None, prefill=None):
+        """index: None = main home, 'new' = add a place, int = edit a place.
+        prefill keeps the just-typed fields when reopening after 'Edit'."""
         is_main = index is None
-        if is_main:
+        if prefill is not None:
+            data = prefill
+        elif is_main:
             data = {"name": "", "country": self.settings.get("home_country"),
                     "city": self.settings.get("home_city", ""),
                     "postcode": self.settings.get("home_postcode", ""),
@@ -3413,23 +3430,53 @@ class MainWindow(Adw.ApplicationWindow):
         full_street = f"{street} {addition}".strip() if addition else street
         fields = {"name": name, "country": country, "city": city,
                   "postcode": postcode, "street": street, "addition": addition}
-        threading.Thread(
-            target=lambda: GLib.idle_add(
-                self._save_place, index,
-                geocode_address(street=full_street, city=city,
-                                postcode=postcode, country=country), fields),
-            daemon=True).start()
 
-    def _save_place(self, index, coords, fields):
-        if not coords:
+        def _lookup():
+            res = geocode_address(street=full_street, city=city,
+                                  postcode=postcode, country=country)
+            loose = False
+            if res is None:
+                # Wrong/missing city? Retry without it to suggest a match.
+                res = geocode_address(street=full_street, postcode=postcode,
+                                      country=country, loose=True)
+                loose = res is not None
+            GLib.idle_add(self._confirm_place, index, res, fields, loose)
+
+        threading.Thread(target=_lookup, daemon=True).start()
+
+    def _confirm_place(self, index, result, fields, was_loose):
+        if not result:
             dlg = Adw.MessageDialog(
                 transient_for=self,
                 heading=_("Address not found"),
                 body=_("Couldn’t find that address. Check the fields and "
                        "try again."))
+            dlg.add_response("edit", _("Edit"))
             dlg.add_response("ok", _("OK"))
+            dlg.connect("response", lambda d, r: (
+                self._open_place_dialog(index, prefill=fields)
+                if r == "edit" else None))
             dlg.present()
             return False
+        lat, lon, display = result
+        heading = _("Did you mean this?") if was_loose else _("Confirm location")
+        dlg = Adw.MessageDialog(
+            transient_for=self, heading=heading, body=display or "")
+        dlg.add_response("edit", _("Edit"))
+        dlg.add_response("save", _("Save here"))
+        dlg.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("save")
+
+        def _resp(d, r):
+            if r == "save":
+                self._save_place(index, (lat, lon), fields)
+            elif r == "edit":
+                self._open_place_dialog(index, prefill=fields)
+        dlg.connect("response", _resp)
+        dlg.present()
+        return False
+
+    def _save_place(self, index, coords, fields):
         lat, lon = coords
         # Stored only in the local 0600 settings file — never sent anywhere.
         if index is None:
@@ -3461,7 +3508,14 @@ class MainWindow(Adw.ApplicationWindow):
             log_error(_("Could not save place: {err}").format(err=e))
             return False
         self._rebuild_places_group()
+        if self._map_widget:
+            self._map_widget.set_places(self._map_places_list())
         return False
+
+    def _map_places_list(self):
+        return [{"name": p.get("name", ""), "lat": p["lat"], "lon": p["lon"]}
+                for p in self.settings.get("extra_places", [])
+                if p.get("lat") is not None and p.get("lon") is not None]
 
     def _on_remove_place(self, index):
         places = self.settings.get("extra_places", [])
@@ -3472,6 +3526,8 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 pass
             self._rebuild_places_group()
+            if self._map_widget:
+                self._map_widget.set_places(self._map_places_list())
 
     def _open_photo_from_map(self, paths):
         if isinstance(paths, str):

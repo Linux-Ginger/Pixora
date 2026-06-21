@@ -2920,3 +2920,15 @@ msgstr "bijv. Opa & oma — labelt foto's die daar gemaakt zijn"
 
 msgid "Address verified"
 msgstr "Adres geverifieerd"
+
+msgid "Did you mean this?"
+msgstr "Bedoel je dit?"
+
+msgid "Confirm location"
+msgstr "Locatie bevestigen"
+
+msgid "Save here"
+msgstr "Hier opslaan"
+
+msgid "Edit"
+msgstr "Bewerken"

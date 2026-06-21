@@ -2931,3 +2931,15 @@ msgstr "z. B. Oma & Opa — markiert dort aufgenommene Fotos"
 
 msgid "Address verified"
 msgstr "Adresse bestätigt"
+
+msgid "Did you mean this?"
+msgstr "Meintest du das?"
+
+msgid "Confirm location"
+msgstr "Standort bestätigen"
+
+msgid "Save here"
+msgstr "Hier speichern"
+
+msgid "Edit"
+msgstr "Bearbeiten"

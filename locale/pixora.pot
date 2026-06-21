@@ -2061,3 +2061,15 @@ msgstr ""
 
 msgid "Address verified"
 msgstr ""
+
+msgid "Did you mean this?"
+msgstr ""
+
+msgid "Confirm location"
+msgstr ""
+
+msgid "Save here"
+msgstr ""
+
+msgid "Edit"
+msgstr ""

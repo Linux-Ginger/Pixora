@@ -54,6 +54,8 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.35);
   }
+  /* Extra places use a blue ring to distinguish from the main home. */
+  .pixora-home.pixora-place { border-color: #4C7BE1; width: 28px; height: 28px; font-size: 15px; }
   .leaflet-popup-content-wrapper {
     background: rgba(30,30,30,0.94); color: #fff; border-radius: 10px;
   }
@@ -507,6 +509,30 @@
       homeMarker.on('mouseout', function() { homeMarker.closePopup(); });
       homeMarker.addTo(map);
     } catch (e) { _report('pixoraSetHome', e); }
+  };
+
+  // Extra named places: a pin each (blue, to tell them from the main home).
+  let placeMarkers = [];
+  window.pixoraSetPlaces = function(places) {
+    try {
+      placeMarkers.forEach(function(m) { map.removeLayer(m); });
+      placeMarkers = [];
+      if (!places) return;
+      places.forEach(function(p) {
+        if (p.lat == null || p.lon == null) return;
+        const icon = L.divIcon({
+          html: '<div class="pixora-home pixora-place">🏠</div>',
+          className: '', iconSize: [28, 28], iconAnchor: [14, 14]
+        });
+        const m = L.marker([p.lat, p.lon], { icon: icon, zIndexOffset: 900 });
+        m.bindPopup('<div class="fname">' + escapeHtml(p.name || '') + '</div>',
+          { closeButton: false, autoPan: false });
+        m.on('mouseover', function() { m.openPopup(); });
+        m.on('mouseout', function() { m.closePopup(); });
+        m.addTo(map);
+        placeMarkers.push(m);
+      });
+    } catch (e) { _report('pixoraSetPlaces', e); }
   };
 
   window.pixoraReady = true;

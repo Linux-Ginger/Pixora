@@ -2948,3 +2948,15 @@ msgstr "p. ex. Mamie & Papi — étiquette les photos prises là-bas"
 
 msgid "Address verified"
 msgstr "Adresse vérifiée"
+
+msgid "Did you mean this?"
+msgstr "Voulais-tu dire ceci ?"
+
+msgid "Confirm location"
+msgstr "Confirmer l’emplacement"
+
+msgid "Save here"
+msgstr "Enregistrer ici"
+
+msgid "Edit"
+msgstr "Modifier"
