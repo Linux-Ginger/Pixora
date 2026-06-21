@@ -166,25 +166,26 @@ class TileCache:
 
     # ── main entry ──────────────────────────────────────────────────
     def get(self, z, x, y):
-        """Return tile bytes for serving, or None if nothing can be shown."""
+        """Return (bytes, cacheable). cacheable=False for parent-fallback
+        placeholders so the browser refetches the real tile next time."""
         if self._fresh(z, x, y):
             cached = self._read(z, x, y)
             if cached:
-                return cached
+                return cached, True
         # Stale or missing → try the network (single-flight per tile).
         with self._tile_lock((z, x, y)):
             if self._fresh(z, x, y):       # another thread just refreshed it
                 cached = self._read(z, x, y)
                 if cached:
-                    return cached
+                    return cached, True
             fetched = self._fetch(z, x, y)
             if fetched:
-                return fetched
+                return fetched, True
         # Offline / fetch failed → stale copy, else parent fallback.
         stale = self._read(z, x, y)
         if stale:
-            return stale
-        return self._parent_fallback(z, x, y)
+            return stale, True
+        return self._parent_fallback(z, x, y), False
 
     def prefetch(self, tiles, cap=400):
         """Background-warm a list of (z,x,y) tiles, skipping fresh ones."""
@@ -219,6 +220,9 @@ class TileCache:
 
 class _Handler(BaseHTTPRequestHandler):
     cache = None  # set by start_proxy
+    # Keep-alive: reuse a few TCP connections for all tiles instead of opening
+    # one per tile — cuts the per-tile overhead that makes tiles fill in slowly.
+    protocol_version = "HTTP/1.1"
 
     def do_GET(self):
         m = _TILE_RE.match(self.path)
@@ -226,7 +230,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         z, x, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        data = self.cache.get(z, x, y) if self.cache else None
+        data, cacheable = self.cache.get(z, x, y) if self.cache else (None, False)
         if not data:
             self.send_error(404)
             return
@@ -235,7 +239,12 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         # Loopback only; canvas rendering needs an explicit CORS allow.
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Cache-Control", "no-cache")
+        # Let WebKit keep real tiles in its own fast cache (instant re-open);
+        # never cache parent-fallback placeholders — they must be replaced.
+        if cacheable:
+            self.send_header("Cache-Control", "max-age=86400")
+        else:
+            self.send_header("Cache-Control", "no-cache")
         self.end_headers()
         try:
             self.wfile.write(data)
