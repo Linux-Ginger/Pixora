@@ -2901,3 +2901,11 @@ msgstr "Tu peux tout modifier plus tard dans les Réglages. Profite bien de Pixo
 
 msgid "Remove"
 msgstr "Supprimer"
+
+msgid "Favorites"
+msgstr "Favoris"
+
+msgid "%d video"
+msgid_plural "%d videos"
+msgstr[0] "%d vidéo"
+msgstr[1] "%d vidéos"

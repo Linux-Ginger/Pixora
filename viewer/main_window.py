@@ -2743,13 +2743,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.filter_info_bar.set_margin_bottom(4)
         self.filter_info_bar.set_visible(False)
 
-        _filter_icon = Gtk.Label(label="📍")
-        _filter_icon.set_valign(Gtk.Align.CENTER)
+        self._filter_icon = Gtk.Label(label="📍")
+        self._filter_icon.set_valign(Gtk.Align.CENTER)
         _filter_icon_css = Gtk.CssProvider()
         _filter_icon_css.load_from_string("label { font-size: 20px; }")
-        _filter_icon.get_style_context().add_provider(
+        self._filter_icon.get_style_context().add_provider(
             _filter_icon_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        self.filter_info_bar.append(_filter_icon)
+        self.filter_info_bar.append(self._filter_icon)
 
         _text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         _text_box.set_hexpand(True)
@@ -2771,7 +2771,7 @@ class MainWindow(Adw.ApplicationWindow):
         _clear_btn.add_css_class("flat")
         _clear_btn.set_valign(Gtk.Align.CENTER)
         _clear_btn.set_tooltip_text(_("Clear filter"))
-        _clear_btn.connect("clicked", self.on_clear_cluster_filter)
+        _clear_btn.connect("clicked", self._on_clear_filter)
         self.filter_info_bar.append(_clear_btn)
 
         outer.append(self.filter_info_bar)
@@ -3367,7 +3367,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.filter_info_bar.set_visible(True)
 
             self._cluster_location_label = title
-            self.photo_count_label.set_text(count_str)
+            self.photo_count_label.set_text(self._media_count_text(valid))
             GLib.idle_add(self.start_load)
 
     def _fetch_cluster_location(self, sample_path):
@@ -3404,8 +3404,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._filmstrip_order_cache = None
         self._photos_before_cluster = None
         self._cluster_location_label = None
-        n = len(self.photos)
-        self.photo_count_label.set_text(ngettext("%d photo", "%d photos", n) % n)
+        self.photo_count_label.set_text(self._media_count_text())
         try:
             self.filter_info_bar.set_visible(False)
         except Exception:
@@ -3840,6 +3839,20 @@ class MainWindow(Adw.ApplicationWindow):
 
         return viewer_area
 
+    def _media_count_text(self, photos=None):
+        """'6 photos & 2 videos' — counts stills vs videos separately."""
+        photos = self.photos if photos is None else photos
+        vids = sum(1 for p in photos if is_video(p))
+        pics = len(photos) - vids
+        parts = []
+        if pics:
+            parts.append(ngettext("%d photo", "%d photos", pics) % pics)
+        if vids:
+            parts.append(ngettext("%d video", "%d videos", vids) % vids)
+        if not parts:
+            parts.append(ngettext("%d photo", "%d photos", 0) % 0)
+        return " & ".join(parts)
+
     def build_bottombar(self):
         self.bottom_stack = Gtk.Stack()
         self.bottom_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
@@ -3849,6 +3862,19 @@ class MainWindow(Adw.ApplicationWindow):
         self.photo_count_label = Gtk.Label(label=ngettext("%d photo", "%d photos", 0) % 0)
         self.photo_count_label.add_css_class("dim-label")
         normal_bar.pack_start(self.photo_count_label)
+
+        # Pixora version on the right of the footer.
+        _ver = ""
+        try:
+            with open(VERSION_FILE) as _vf:
+                _ver = _vf.read().strip()
+        except Exception:
+            pass
+        if _ver:
+            ver_lbl = Gtk.Label(label=f"Pixora {_ver}")
+            ver_lbl.add_css_class("dim-label")
+            ver_lbl.add_css_class("caption")
+            normal_bar.pack_end(ver_lbl)
 
         self.bottom_stack.add_named(normal_bar, "normal")
 
@@ -3965,11 +3991,10 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         self.photos = photos
         self._filmstrip_order_cache = None
-        n = len(self.photos)
-        count_text = ngettext("%d photo", "%d photos", n) % n
+        # Favorites mode is shown by the banner now, so the footer is just counts.
+        self.photo_count_label.set_text(self._media_count_text())
         if self._favorites_only:
-            count_text = _("{count} (favorites)").format(count=count_text)
-        self.photo_count_label.set_text(count_text)
+            self.filter_subtitle_lbl.set_text(self._media_count_text())
         self.start_watcher(photo_path)
         # Read the combo here (main thread) — GTK isn't thread-safe.
         sort_idx = (self.sort_combo.get_selected()
@@ -4383,9 +4408,7 @@ class MainWindow(Adw.ApplicationWindow):
             GLib.timeout_add(500, self._maybe_check_structure_on_startup)
         cluster_lbl = getattr(self, '_cluster_location_label', None)
         self.photo_count_label.set_text(
-            cluster_lbl if cluster_lbl
-            else ngettext("%d photo", "%d photos", total) % total
-        )
+            cluster_lbl if cluster_lbl else self._media_count_text())
         self._loading = False
         GLib.timeout_add(120, self._run_viewport_hydrate)
         return False
@@ -5800,8 +5823,23 @@ class MainWindow(Adw.ApplicationWindow):
         log_info(_("Favorites filter: {state}").format(
             state=_("on") if self._favorites_only else _("off")
         ))
-        self.favorites_banner.set_revealed(self._favorites_only)
+        if self._favorites_only:
+            # Use the same inline banner as the location filter.
+            self._filter_icon.set_text("⭐")
+            self.filter_title_lbl.set_text(_("Favorites"))
+            self.filter_subtitle_lbl.set_text("")
+            self.filter_info_bar.set_visible(True)
+        elif not getattr(self, "_photos_before_cluster", None):
+            self.filter_info_bar.set_visible(False)
+            self._filter_icon.set_text("📍")
         self.load_photos()
+
+    def _on_clear_filter(self, btn=None):
+        # One ✕ for both filter kinds.
+        if self._favorites_only:
+            self.favorites_toggle.set_active(False)  # fires toggle_favorites_filter
+        else:
+            self.on_clear_cluster_filter()
 
     def _on_show_all_favorites(self, _banner):
         # Untoggling fires toggle_favorites_filter, which reloads + hides banner.

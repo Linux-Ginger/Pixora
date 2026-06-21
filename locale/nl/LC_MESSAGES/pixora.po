@@ -2873,3 +2873,11 @@ msgstr "Je kunt alles later wijzigen in Instellingen. Veel plezier met Pixora!"
 
 msgid "Remove"
 msgstr "Verwijderen"
+
+msgid "Favorites"
+msgstr "Favorieten"
+
+msgid "%d video"
+msgid_plural "%d videos"
+msgstr[0] "%d video"
+msgstr[1] "%d video's"

@@ -2014,3 +2014,11 @@ msgstr ""
 
 msgid "Remove"
 msgstr ""
+
+msgid "Favorites"
+msgstr ""
+
+msgid "%d video"
+msgid_plural "%d videos"
+msgstr[0] ""
+msgstr[1] ""

@@ -2854,3 +2854,11 @@ msgstr "You can change everything later in Settings. Enjoy Pixora!"
 
 msgid "Remove"
 msgstr "Remove"
+
+msgid "Favorites"
+msgstr "Favorites"
+
+msgid "%d video"
+msgid_plural "%d videos"
+msgstr[0] "%d video"
+msgstr[1] "%d videos"

@@ -2884,3 +2884,11 @@ msgstr "Du kannst alles später in den Einstellungen ändern. Viel Spaß mit Pix
 
 msgid "Remove"
 msgstr "Entfernen"
+
+msgid "Favorites"
+msgstr "Favoriten"
+
+msgid "%d video"
+msgid_plural "%d videos"
+msgstr[0] "%d Video"
+msgstr[1] "%d Videos"
