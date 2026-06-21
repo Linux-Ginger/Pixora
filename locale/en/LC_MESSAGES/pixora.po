@@ -2776,3 +2776,27 @@ msgstr "Set your home address first using the home button."
 
 msgid "Your home is set and stored only on this computer — never shared."
 msgstr "Your home is set and stored only on this computer — never shared."
+
+msgid "Country"
+msgstr "Country"
+
+msgid "City"
+msgstr "City"
+
+msgid "Postcode"
+msgstr "Postcode"
+
+msgid "Street and house number"
+msgstr "Street and house number"
+
+msgid "Addition (optional)"
+msgstr "Addition (optional)"
+
+msgid "My home"
+msgstr "My home"
+
+msgid "Fill in your address so it can be looked up exactly. It’s looked up once via OpenStreetMap, then stored only on this computer."
+msgstr "Fill in your address so it can be looked up exactly. It’s looked up once via OpenStreetMap, then stored only on this computer."
+
+msgid "Couldn’t find that address. Check the fields and try again."
+msgstr "Couldn’t find that address. Check the fields and try again."

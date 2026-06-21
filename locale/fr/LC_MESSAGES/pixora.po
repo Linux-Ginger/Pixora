@@ -2823,3 +2823,27 @@ msgstr "Définis d’abord l’adresse de ton domicile via le bouton domicile."
 
 msgid "Your home is set and stored only on this computer — never shared."
 msgstr "Ton domicile est défini et stocké uniquement sur cet ordinateur — jamais partagé."
+
+msgid "Country"
+msgstr "Pays"
+
+msgid "City"
+msgstr "Ville"
+
+msgid "Postcode"
+msgstr "Code postal"
+
+msgid "Street and house number"
+msgstr "Rue et numéro"
+
+msgid "Addition (optional)"
+msgstr "Complément (facultatif)"
+
+msgid "My home"
+msgstr "Mon domicile"
+
+msgid "Fill in your address so it can be looked up exactly. It’s looked up once via OpenStreetMap, then stored only on this computer."
+msgstr "Saisis ton adresse pour qu’elle soit trouvée précisément. Elle est recherchée une fois via OpenStreetMap, puis stockée uniquement sur cet ordinateur."
+
+msgid "Couldn’t find that address. Check the fields and try again."
+msgstr "Adresse introuvable. Vérifie les champs et réessaie."

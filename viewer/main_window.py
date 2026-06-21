@@ -598,14 +598,38 @@ def _reverse_geocode_raw(lat, lon):
     except Exception:
         return ""
 
-def geocode_address(address):
-    """Address → (lat, lon) via Nominatim, or None. One-off online lookup;
-    the result is the only thing Pixora stores (locally)."""
+# English country names for the home dialog; Nominatim matches these reliably.
+COUNTRIES = [
+    "Australia", "Austria", "Belgium", "Brazil", "Bulgaria", "Canada",
+    "Croatia", "Czechia", "Denmark", "Estonia", "Finland", "France",
+    "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Italy", "Japan",
+    "Latvia", "Lithuania", "Luxembourg", "Malta", "Mexico", "Morocco",
+    "Netherlands", "New Zealand", "Norway", "Poland", "Portugal", "Romania",
+    "Slovakia", "Slovenia", "South Africa", "Spain", "Sweden", "Switzerland",
+    "Turkey", "Ukraine", "United Kingdom", "United States",
+]
+_LOCALE_COUNTRY = {"nl": "Netherlands", "de": "Germany",
+                   "fr": "France", "en": "United Kingdom"}
+
+
+def geocode_address(street=None, city=None, postcode=None, country=None):
+    """Structured address → (lat, lon) via Nominatim, or None. One-off online
+    lookup; only the resulting coordinates are stored (locally)."""
     try:
         import urllib.parse
-        q = urllib.parse.quote(address)
-        url = (f"https://nominatim.openstreetmap.org/search"
-               f"?q={q}&format=json&limit=1")
+        params = {"format": "json", "limit": "1"}
+        if street:
+            params["street"] = street
+        if city:
+            params["city"] = city
+        if postcode:
+            params["postalcode"] = postcode
+        if country:
+            params["country"] = country
+        if len(params) == 2:        # nothing useful supplied
+            return None
+        url = ("https://nominatim.openstreetmap.org/search?"
+               + urllib.parse.urlencode(params))
         req = urllib.request.Request(url, headers={
             "User-Agent": "Pixora/1.0 (+https://github.com/Linux-Ginger/Pixora)",
             "Accept-Language": _lang,
@@ -899,13 +923,14 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
 class MapWidget(Gtk.Box):
     def __init__(self, markers, open_photo_cb, status_cb=None, tile_url=None,
-                 initial_view=None):
+                 initial_view=None, home=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.markers = markers
         self.open_photo_cb = open_photo_cb
         self.status_cb = status_cb
         self._tile_url = tile_url
         self._initial_view = initial_view
+        self._home = home              # (lat, lon) or None
         self.set_vexpand(True)
         self.set_hexpand(True)
         self._pending_markers = list(markers) if markers else []
@@ -1068,16 +1093,23 @@ class MapWidget(Gtk.Box):
             "offline": _("⚠ No internet connection — map tiles cannot be loaded"),
             "retry": _("Try again"),
             "loadingTiles": _("Loading map…"),
+            "home": _("My home"),
         }
         tile_js = ""
         if self._tile_url:
             tile_js = (f"if(window.pixoraSetTileUrl)"
                        f"{{window.pixoraSetTileUrl({json.dumps(self._tile_url)});}}")
+        home_js = ""
+        if self._home:
+            home_js = (f"if(window.pixoraSetHome)"
+                       f"{{window.pixoraSetHome({float(self._home[0])},"
+                       f"{float(self._home[1])});}}")
         js = (
             tile_js
             + f"if(window.pixoraSetLabels){{window.pixoraSetLabels({json.dumps(labels)});}}"
             f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers("
             f"{json.dumps(data)},{json.dumps(self._initial_view)});}}"
+            + home_js
         )
         self._run_js(js)
         return False
@@ -1127,6 +1159,11 @@ class MapWidget(Gtk.Box):
 
     def refresh(self):
         self._run_js("if(window.pixoraRefresh){window.pixoraRefresh();}")
+
+    def set_home(self, lat, lon):
+        self._home = (lat, lon)
+        self._run_js(f"if(window.pixoraSetHome)"
+                     f"{{window.pixoraSetHome({float(lat)},{float(lon)});}}")
 
     def _on_js_message(self, ucm, message):
         try:
@@ -2968,10 +3005,11 @@ class MainWindow(Adw.ApplicationWindow):
             if b:
                 initial_view = {"bounds": b}
 
+        home = ([hlat, hlon] if hlat is not None and hlon is not None else None)
         self._map_widget = MapWidget(
             markers, self._open_photo_from_map,
             status_cb=self._on_map_status, tile_url=tile_url,
-            initial_view=initial_view
+            initial_view=initial_view, home=home
         )
         self.map_content.append(self._map_widget)
         # Wait for map-ready; 12s fallback prevents hang.
@@ -3045,41 +3083,71 @@ class MainWindow(Adw.ApplicationWindow):
         dlg = Adw.MessageDialog(
             transient_for=self,
             heading=_("Set home address"),
-            body=_("Enter your home address. It’s looked up once via "
-                   "OpenStreetMap to find the spot, then stored only on this "
+            body=_("Fill in your address so it can be looked up exactly. It’s "
+                   "looked up once via OpenStreetMap, then stored only on this "
                    "computer."))
-        entry = Gtk.Entry()
-        entry.set_placeholder_text(_("e.g. Dam 1, Amsterdam"))
-        entry.set_text(self.settings.get("home_address", ""))
-        entry.set_activates_default(True)
-        dlg.set_extra_child(entry)
+        group = Adw.PreferencesGroup()
+
+        country_row = Adw.ComboRow(title=_("Country"))
+        model = Gtk.StringList()
+        for name in COUNTRIES:
+            model.append(name)
+        country_row.set_model(model)
+        saved_country = self.settings.get("home_country") \
+            or _LOCALE_COUNTRY.get(_lang, "Netherlands")
+        if saved_country in COUNTRIES:
+            country_row.set_selected(COUNTRIES.index(saved_country))
+
+        city_row = Adw.EntryRow(title=_("City"))
+        city_row.set_text(self.settings.get("home_city", ""))
+        postcode_row = Adw.EntryRow(title=_("Postcode"))
+        postcode_row.set_text(self.settings.get("home_postcode", ""))
+        street_row = Adw.EntryRow(title=_("Street and house number"))
+        street_row.set_text(self.settings.get("home_street", ""))
+        addition_row = Adw.EntryRow(title=_("Addition (optional)"))
+        addition_row.set_text(self.settings.get("home_addition", ""))
+
+        for r in (country_row, street_row, addition_row, postcode_row, city_row):
+            group.add(r)
+        dlg.set_extra_child(group)
         dlg.add_response("cancel", _("Cancel"))
         dlg.add_response("save", _("Save"))
         dlg.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("save")
         dlg.set_close_response("cancel")
-        dlg.connect("response", self._on_home_address_response, entry)
+        rows = (country_row, city_row, postcode_row, street_row, addition_row)
+        dlg.connect("response", self._on_home_address_response, rows)
         dlg.present()
 
-    def _on_home_address_response(self, dlg, response, entry):
+    def _on_home_address_response(self, dlg, response, rows):
         if response != "save":
             return
-        address = entry.get_text().strip()
-        if not address:
+        country_row, city_row, postcode_row, street_row, addition_row = rows
+        country = COUNTRIES[country_row.get_selected()]
+        city = city_row.get_text().strip()
+        postcode = postcode_row.get_text().strip()
+        street = street_row.get_text().strip()
+        addition = addition_row.get_text().strip()
+        if not street and not city and not postcode:
             return
+        full_street = f"{street} {addition}".strip() if addition else street
+        fields = {"country": country, "city": city,
+                  "postcode": postcode, "street": street, "addition": addition}
         threading.Thread(target=self._geocode_home_thread,
-                         args=(address,), daemon=True).start()
+                         args=(full_street, city, postcode, country, fields),
+                         daemon=True).start()
 
-    def _geocode_home_thread(self, address):
-        coords = geocode_address(address)
-        GLib.idle_add(self._home_geocode_done, address, coords)
+    def _geocode_home_thread(self, street, city, postcode, country, fields):
+        coords = geocode_address(street=street, city=city,
+                                 postcode=postcode, country=country)
+        GLib.idle_add(self._home_geocode_done, coords, fields)
 
-    def _home_geocode_done(self, address, coords):
+    def _home_geocode_done(self, coords, fields):
         if not coords:
             dlg = Adw.MessageDialog(
                 transient_for=self,
                 heading=_("Address not found"),
-                body=_("Couldn’t find that address. Check the spelling and "
+                body=_("Couldn’t find that address. Check the fields and "
                        "try again."))
             dlg.add_response("ok", _("OK"))
             dlg.present()
@@ -3088,15 +3156,20 @@ class MainWindow(Adw.ApplicationWindow):
         # Stored only in the local 0600 settings file — never sent anywhere.
         self.settings["home_lat"] = lat
         self.settings["home_lon"] = lon
-        self.settings["home_address"] = address
-        self.settings["home_zoom"] = 15
+        self.settings["home_zoom"] = 16
+        self.settings["home_country"] = fields["country"]
+        self.settings["home_city"] = fields["city"]
+        self.settings["home_postcode"] = fields["postcode"]
+        self.settings["home_street"] = fields["street"]
+        self.settings["home_addition"] = fields["addition"]
         try:
             save_settings(self.settings)
         except Exception as e:
             log_error(_("Could not save home: {err}").format(err=e))
             return False
         if self._map_widget:
-            self._map_widget.go_home(lat, lon, 15)
+            self._map_widget.set_home(lat, lon)
+            self._map_widget.go_home(lat, lon, 16)
         dlg = Adw.MessageDialog(
             transient_for=self,
             heading=_("Home saved"),

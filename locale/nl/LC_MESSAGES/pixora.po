@@ -2795,3 +2795,27 @@ msgstr "Stel eerst je huisadres in via de huis-knop."
 
 msgid "Your home is set and stored only on this computer — never shared."
 msgstr "Je huis is ingesteld en wordt alleen op deze computer bewaard — nooit gedeeld."
+
+msgid "Country"
+msgstr "Land"
+
+msgid "City"
+msgstr "Stad"
+
+msgid "Postcode"
+msgstr "Postcode"
+
+msgid "Street and house number"
+msgstr "Straat en huisnummer"
+
+msgid "Addition (optional)"
+msgstr "Toevoeging (optioneel)"
+
+msgid "My home"
+msgstr "Mijn huis"
+
+msgid "Fill in your address so it can be looked up exactly. It’s looked up once via OpenStreetMap, then stored only on this computer."
+msgstr "Vul je adres in zodat het precies opgezocht kan worden. Het wordt één keer via OpenStreetMap opgezocht en daarna alleen op deze computer bewaard."
+
+msgid "Couldn’t find that address. Check the fields and try again."
+msgstr "Dat adres is niet gevonden. Controleer de velden en probeer opnieuw."

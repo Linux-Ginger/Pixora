@@ -1936,3 +1936,27 @@ msgstr ""
 
 msgid "Your home is set and stored only on this computer — never shared."
 msgstr ""
+
+msgid "Country"
+msgstr ""
+
+msgid "City"
+msgstr ""
+
+msgid "Postcode"
+msgstr ""
+
+msgid "Street and house number"
+msgstr ""
+
+msgid "Addition (optional)"
+msgstr ""
+
+msgid "My home"
+msgstr ""
+
+msgid "Fill in your address so it can be looked up exactly. It’s looked up once via OpenStreetMap, then stored only on this computer."
+msgstr ""
+
+msgid "Couldn’t find that address. Check the fields and try again."
+msgstr ""

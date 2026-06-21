@@ -48,6 +48,12 @@
   .pixora-marker.single { width: 18px; height: 18px; }
   .pixora-marker.cluster { width: 32px; height: 32px; font-size: 12px; }
   .pixora-marker.cluster-lg { width: 40px; height: 40px; font-size: 13px; }
+  .pixora-home {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #fff; border: 2px solid #e95420;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+  }
   .leaflet-popup-content-wrapper {
     background: rgba(30,30,30,0.94); color: #fff; border-radius: 10px;
   }
@@ -321,7 +327,8 @@
     clickOpen: "Klik om te openen",
     offline: "⚠ Geen internetverbinding — kaart-tiles kunnen niet geladen worden",
     retry: "Opnieuw proberen",
-    loadingTiles: "Kaart laden…"
+    loadingTiles: "Kaart laden…",
+    home: "Mijn huis"
   };
   window.pixoraSetLabels = function(labels) {
     Object.assign(LBL, labels);
@@ -403,13 +410,29 @@
     }
   };
 
-  // Vervang de oude set-center-as-home flow door losse home-helpers.
   window.pixoraGoHome = function(lat, lon, zoom) {
     map.flyTo([lat, lon], zoom || 15, { duration: 1.2 });
   };
   window.pixoraRefresh = function() {
     map.invalidateSize(false);
     if (typeof retryTiles === 'function') retryTiles();
+  };
+
+  // A house pin (outside the cluster, always visible) marks home on the map.
+  let homeMarker = null;
+  window.pixoraSetHome = function(lat, lon) {
+    if (homeMarker) { map.removeLayer(homeMarker); homeMarker = null; }
+    if (lat == null || lon == null) return;
+    const icon = L.divIcon({
+      html: '<div class="pixora-home">🏠</div>',
+      className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+    });
+    homeMarker = L.marker([lat, lon], { icon: icon, zIndexOffset: 1000 });
+    homeMarker.bindPopup('<div class="fname">' + (LBL.home || 'Home') + '</div>',
+      { closeButton: false, autoPan: false });
+    homeMarker.on('mouseover', function() { homeMarker.openPopup(); });
+    homeMarker.on('mouseout', function() { homeMarker.closePopup(); });
+    homeMarker.addTo(map);
   };
 
   window.pixoraReady = true;

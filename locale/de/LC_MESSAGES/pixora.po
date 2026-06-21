@@ -2806,3 +2806,27 @@ msgstr "Lege zuerst deine Heimatadresse über die Haus-Schaltfläche fest."
 
 msgid "Your home is set and stored only on this computer — never shared."
 msgstr "Dein Zuhause ist festgelegt und wird nur auf diesem Computer gespeichert — niemals geteilt."
+
+msgid "Country"
+msgstr "Land"
+
+msgid "City"
+msgstr "Stadt"
+
+msgid "Postcode"
+msgstr "Postleitzahl"
+
+msgid "Street and house number"
+msgstr "Straße und Hausnummer"
+
+msgid "Addition (optional)"
+msgstr "Zusatz (optional)"
+
+msgid "My home"
+msgstr "Mein Zuhause"
+
+msgid "Fill in your address so it can be looked up exactly. It’s looked up once via OpenStreetMap, then stored only on this computer."
+msgstr "Gib deine Adresse ein, damit sie genau gefunden wird. Sie wird einmal über OpenStreetMap nachgeschlagen und danach nur auf diesem Computer gespeichert."
+
+msgid "Couldn’t find that address. Check the fields and try again."
+msgstr "Diese Adresse wurde nicht gefunden. Überprüfe die Felder und versuche es erneut."
