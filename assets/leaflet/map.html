@@ -65,14 +65,10 @@
   .leaflet-popup-content { margin: 10px 12px; font-size: 12px; }
   /* Fixed size so the popup reserves space BEFORE the thumb loads — otherwise
      the image pops in outside the black background until you re-hover. */
-  /* Wrapper with overflow:hidden so the rounded corners actually clip the photo
-     (border-radius on an <img> with object-fit isn't clipped in WebKit). The
-     fixed box also reserves space before the thumb loads. contain = whole photo
-     (portraits not cropped). */
-  .leaflet-popup-content .thumb-wrap { width: 200px; height: 140px;
-    border-radius: 8px; overflow: hidden; background: #222; margin: 0 auto 6px auto; }
-  .leaflet-popup-content .thumb-wrap img { width: 100%; height: 100%;
-    object-fit: contain; display: block; }
+  /* Natural aspect (fixed height, auto width) → no black letterbox bars and no
+     cropping; without object-fit, WebKit clips the rounded corners properly. */
+  .leaflet-popup-content img { height: 140px; width: auto; max-width: 240px;
+    border-radius: 8px; display: block; margin: 0 auto 6px auto; }
   .leaflet-popup-content .fname { font-weight: bold; word-break: break-word; }
   .leaflet-popup-content .date { opacity: 0.7; font-size: 11px; }
   .leaflet-popup-content .hint { color: #e95420; font-size: 10px; margin-top: 4px; }
@@ -388,8 +384,7 @@
   function buildPopupHtml(m, count) {
     let html = '';
     if (m.thumb) {
-      html += '<div class="thumb-wrap"><img src="file://' + m.thumb +
-              '" alt="" onerror="this.parentNode.style.display=\'none\'"></div>';
+      html += '<img src="file://' + m.thumb + '" alt="" onerror="this.style.display=\'none\'">';
     }
     html += '<div class="fname">' + escapeHtml(m.filename) + '</div>';
     html += '<div class="date">' + escapeHtml(m.date || '') + '</div>';

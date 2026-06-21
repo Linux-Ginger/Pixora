@@ -4157,6 +4157,28 @@ class MainWindow(Adw.ApplicationWindow):
         """True if the photo was taken at any saved place."""
         return self._photo_place(path) is not None
 
+    def _photo_place_kind(self, path):
+        """'main' (taken at the main home), 'extra' (another saved place), or None."""
+        try:
+            coords = (get_video_gps_coords(path) if is_video(path)
+                      else get_gps_coords(path))
+        except Exception:
+            coords = None
+        if not coords:
+            return None
+        hlat = self.settings.get("home_lat")
+        hlon = self.settings.get("home_lon")
+        if (hlat is not None and hlon is not None
+                and abs(coords[0] - hlat) < 0.0011
+                and abs(coords[1] - hlon) < 0.0017):
+            return "main"
+        for p in self.settings.get("extra_places", []):
+            if (p.get("lat") is not None and p.get("lon") is not None
+                    and abs(coords[0] - p["lat"]) < 0.0011
+                    and abs(coords[1] - p["lon"]) < 0.0017):
+                return "extra"
+        return None
+
     def _media_count_text(self, photos=None):
         """'6 photos & 2 videos' — counts stills vs videos separately."""
         photos = self.photos if photos is None else photos
@@ -4399,7 +4421,8 @@ class MainWindow(Adw.ApplicationWindow):
         groups = self._group_by_date(photos)
         loaded = 0
 
-        home_set = self.settings.get("home_lat") is not None
+        has_places = (self.settings.get("home_lat") is not None
+                      or bool(self.settings.get("extra_places")))
         def fetch(idx):
             path = photos[idx]
             pb = load_thumbnail(path)
@@ -4410,8 +4433,8 @@ class MainWindow(Adw.ApplicationWindow):
             pb = None
             cache_path = get_cache_path(path, THUMB_SIZE)
             dur = get_video_duration(path) if is_video(path) else 0.0
-            near_home = self._photo_near_home(path) if home_set else False
-            return (idx, path, cache_path, w, h, dur, near_home)
+            place_kind = self._photo_place_kind(path) if has_places else None
+            return (idx, path, cache_path, w, h, dur, place_kind)
 
         with ThreadPoolExecutor(max_workers=THUMB_WORKERS) as pool:
             for date_str, date_obj, indices in groups:
@@ -4638,7 +4661,7 @@ class MainWindow(Adw.ApplicationWindow):
             tc['btn'] = p
             self._thumb_css = tc
         tc = self._thumb_css
-        for index, path, cache_path, pb_w, pb_h, duration, near_home in batch:
+        for index, path, cache_path, pb_w, pb_h, duration, place_kind in batch:
             if pb_h > 0:
                 width_at_thumb = max(1, int(pb_w * THUMB_SIZE / pb_h))
             else:
@@ -4702,15 +4725,16 @@ class MainWindow(Adw.ApplicationWindow):
             fav_badge.set_visible(path in self._favorites)
             overlay.add_overlay(fav_badge)
 
-            # Home badge: top-right (star is top-left), only for photos at home.
-            if 'home_box' not in tc:
-                p = Gtk.CssProvider()
-                # Square min size + 50% radius = a real circle (asymmetric
-                # padding on fav_box made the wider home glyph look oval).
-                p.load_from_string(
-                    "box { background-color: rgba(0,0,0,0.55);"
-                    " border-radius: 50%; min-width: 26px; min-height: 26px; }")
-                tc['home_box'] = p
+            # Home badge: top-right (star is top-left). Orange circle = main
+            # home, blue circle = another saved place (matches the map pins).
+            if 'home_box_main' not in tc:
+                for key, colour in (("home_box_main", "#e95420"),
+                                    ("home_box_extra", "#4C7BE1")):
+                    p = Gtk.CssProvider()
+                    p.load_from_string(
+                        "box { background-color: %s; border-radius: 50%%;"
+                        " min-width: 26px; min-height: 26px; }" % colour)
+                    tc[key] = p
             home_badge = Gtk.Box()
             home_badge.set_halign(Gtk.Align.END)
             home_badge.set_valign(Gtk.Align.START)
@@ -4719,7 +4743,8 @@ class MainWindow(Adw.ApplicationWindow):
             home_badge.set_can_target(False)
             home_badge.set_can_focus(False)
             home_badge.get_style_context().add_provider(
-                tc['home_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                tc['home_box_extra' if place_kind == "extra" else 'home_box_main'],
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
             home_label = Gtk.Label()
             home_label.set_halign(Gtk.Align.CENTER)
             home_label.set_valign(Gtk.Align.CENTER)
@@ -4728,7 +4753,7 @@ class MainWindow(Adw.ApplicationWindow):
             home_label.set_use_markup(True)
             home_label.set_markup('<span size="small">🏠</span>')
             home_badge.append(home_label)
-            home_badge.set_visible(bool(near_home))
+            home_badge.set_visible(place_kind is not None)
             overlay.add_overlay(home_badge)
 
             btn = Gtk.Button()
