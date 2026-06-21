@@ -3483,13 +3483,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._nav_direction = None  # "next" / "prev" / None (first-open)
         viewer_area.add_overlay(self._viewer_stack)
 
-        # Video lives INSIDE the slide-stack as a third child, so switching
-        # photo↔video slides just like photo↔photo.
         self.video_display = Gtk.Picture()
         self.video_display.set_content_fit(Gtk.ContentFit.CONTAIN)
         self.video_display.set_vexpand(True)
         self.video_display.set_hexpand(True)
-        self._viewer_stack.add_named(self.video_display, "video")
+        self.video_display.set_visible(False)
+        viewer_area.add_overlay(self.video_display)
 
         self.viewer_close_btn = Gtk.Button(icon_name="window-close-symbolic")
         self.viewer_close_btn.add_css_class("osd")
@@ -4686,11 +4685,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_full_photo(self, pixbuf, path, location="", searching=False):
         self._hide_photo_spinner()  # load finished (or failed): stop the loader
-        # Coming from a video: stop playback + hide its controls. The stack
-        # slide to the photo slot replaces the video frame.
-        if self._viewer_stack.get_visible_child_name() == "video":
+        # Clear any video immediately — even if the photo is queued below, the
+        # video must never linger on top of an incoming photo.
+        if self.video_display.get_visible():
             self._stop_video()
+            self.video_display.set_visible(False)
             self.video_controls.set_visible(False)
+            self._viewer_stack.set_visible(True)
         # Queue while a previous slide is still running — starting a new
         # transition mid-flight makes GtkStack snap to the old target first,
         # causing a visible jump. On completion the latest stashed target fires.
@@ -4724,8 +4725,9 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._stop_video()
         self._show_viewer_ui()   # reset fade state
+        self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
-        self._viewer_stack.set_visible(True)  # shred-delete may have hidden it
+        self._viewer_stack.set_visible(True)  # may have been hidden for a video
         # Put new pixbuf in inactive slot, then flip stack for slide.
         incoming_slot = "b" if self._active_viewer_slot == "a" else "a"
         incoming_pic = (self._viewer_pic_b if incoming_slot == "b"
@@ -4952,7 +4954,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _close_viewer_cleanup(self):
         self.photo_picture.set_pixbuf(None)
+        self.video_display.set_visible(False)
         self.video_controls.set_visible(False)
+        self.photo_picture.set_visible(True)
         self.edit_btn.set_visible(True)
         self._show_viewer_ui()
         return False
@@ -5199,26 +5203,14 @@ class MainWindow(Adw.ApplicationWindow):
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
         self._show_viewer_ui()   # reset fade state
+        # Hide the whole photo stack (not just one slot) so a portrait video's
+        # letterbox shows the black background, never the previous photo.
+        self._viewer_stack.set_visible(False)
+        self.photo_picture.set_visible(False)
         self.edit_btn.set_visible(False)
         self._update_favorite_btn()
+        self.video_display.set_visible(True)
         self.video_controls.set_visible(True)
-        self._viewer_stack.set_visible(True)  # shred-delete may have hidden it
-        # Slide to the video child of the stack (same animation as photos).
-        anim_on = bool(self.settings.get("animations_enabled", True))
-        if not anim_on:
-            self._viewer_stack.set_transition_duration(0)
-            self._viewer_stack.set_transition_type(Gtk.StackTransitionType.NONE)
-        else:
-            self._viewer_stack.set_transition_duration(250)
-            nav = getattr(self, "_nav_direction", None)
-            if nav == "next":
-                self._viewer_stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
-            elif nav == "prev":
-                self._viewer_stack.set_transition_type(Gtk.StackTransitionType.SLIDE_RIGHT)
-            else:
-                self._viewer_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-        self._viewer_stack.set_visible_child_name("video")
-        self._nav_direction = None
         self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 8 + 56)
         self.viewer_counter.set_visible(True)
         self.filmstrip_scroll.set_visible(True)
@@ -6333,6 +6325,7 @@ class MainWindow(Adw.ApplicationWindow):
             try:
                 if self._video_media is not None:
                     self._video_media.pause()
+                self.video_display.set_visible(False)
             except Exception:
                 pass
         # Hide the whole stack so the falling strips reveal black, not the photo
