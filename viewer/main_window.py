@@ -441,7 +441,7 @@ _metadata_save_lock = threading.Lock()
 
 # Bump when the GPS reader changes so cached (possibly negative) results from an
 # older reader are discarded — e.g. HEIC photos that wrongly cached "no GPS".
-_GPS_READER_VERSION = "v2"
+_GPS_READER_VERSION = "v3"
 
 
 _METADATA_MAX_GEOCODE = 3000
@@ -573,6 +573,10 @@ def _get_gps_coords_raw(photo_path):
             return decimal
         lat = to_decimal(gps_info["GPSLatitude"],  gps_info.get("GPSLatitudeRef",  "N"))
         lon = to_decimal(gps_info["GPSLongitude"], gps_info.get("GPSLongitudeRef", "E"))
+        # "Null island" (0,0) is what cameras write when there's no real fix —
+        # treat it as no location so such photos don't get tagged with a place.
+        if abs(lat) < 0.0001 and abs(lon) < 0.0001:
+            return None
         return (lat, lon)
     except Exception:
         return None
@@ -793,7 +797,10 @@ def get_video_gps_coords(path):
         if loc:
             m = re.match(r'([+-]\d+\.\d+)([+-]\d+\.\d+)', loc)
             if m:
-                return (float(m.group(1)), float(m.group(2)))
+                lat, lon = float(m.group(1)), float(m.group(2))
+                if abs(lat) < 0.0001 and abs(lon) < 0.0001:
+                    return None  # null island = no real location
+                return (lat, lon)
     except Exception:
         pass
     return None
@@ -4247,7 +4254,13 @@ class MainWindow(Adw.ApplicationWindow):
         """Name of the first place within ~120 m of coords (main home wins)."""
         if not coords:
             return None
+        # Ignore null-island coords on either side so a stray (0,0) photo or a
+        # mis-saved place never matches everything.
+        if abs(coords[0]) < 0.0001 and abs(coords[1]) < 0.0001:
+            return None
         for name, lat, lon in self._all_places():
+            if abs(lat) < 0.0001 and abs(lon) < 0.0001:
+                continue
             if abs(coords[0] - lat) < 0.0011 and abs(coords[1] - lon) < 0.0017:
                 return name
         return None
