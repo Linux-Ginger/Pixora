@@ -99,22 +99,19 @@
   // a masked "Script error") — a throw here leaves pixoraSetMarkers/GoHome/
   // SetHome undefined, which is exactly the markers+home bug.
   try {
-  // Soepel in-/uitzoomen en pannen (GPU-versnelling op de main pc aanwezig).
-  // fadeAnimation laat tegels invloeien i.p.v. hard inklappen.
+  // Map options reverted to the known-good (markers-working) configuration:
+  // animations off. Smooth zoom can be re-added once markers are confirmed.
   const map = L.map('map', {
     zoomControl: true,
     attributionControl: false,
-    zoomAnimation: true,
-    fadeAnimation: true,
-    markerZoomAnimation: true,
-    inertia: true,
-    // Snelheidsgevoelig zoomen: hoe harder je scrollt, hoe meer er per keer
-    // wordt ingezoomd (Leaflet telt de scroll-delta binnen het debounce-venster
-    // op). Lage waarden = sneller reagerend.
-    wheelDebounceTime: 20,
-    wheelPxPerZoomLevel: 55,
-    zoomSnap: 0.25,
-    zoomDelta: 0.5,
+    zoomAnimation: false,
+    fadeAnimation: false,
+    markerZoomAnimation: false,
+    inertia: false,
+    preferCanvas: true,
+    wheelDebounceTime: 30,
+    wheelPxPerZoomLevel: 100,
+    zoomSnap: 1,
     minZoom: 2,
     maxBoundsViscosity: 1.0
   });
