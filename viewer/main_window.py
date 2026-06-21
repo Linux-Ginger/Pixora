@@ -5044,10 +5044,12 @@ class MainWindow(Adw.ApplicationWindow):
                         else self._viewer_pic_a)
         incoming_pic.set_visible(True)
         self.edit_btn.set_visible(True)
+        self.favorite_btn.set_margin_end(172)   # next to the edit button
         self._update_favorite_btn()
         self.viewer_counter.set_margin_bottom(FILM_THUMB + 12 + 16)
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
+        self._reset_viewer_transform()  # clear any leftover zoom from prev media
         self._viewer_pixbuf = pixbuf
         if pixbuf:
             incoming_pic.set_pixbuf(pixbuf)
@@ -5271,6 +5273,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_controls.set_visible(False)
         self.photo_picture.set_visible(True)
         self.edit_btn.set_visible(True)
+        self.favorite_btn.set_margin_end(172)
         self._show_viewer_ui()
         return False
 
@@ -5515,12 +5518,14 @@ class MainWindow(Adw.ApplicationWindow):
         self._preview_pending = None
         self._viewer_zoom   = 1.0
         self._viewer_offset = [0.0, 0.0]
+        self._reset_viewer_transform()  # clear any leftover zoom from prev media
         self._show_viewer_ui()   # reset fade state
         # Hide the whole photo stack (not just one slot) so a portrait video's
         # letterbox shows the black background, never the previous photo.
         self._viewer_stack.set_visible(False)
         self.photo_picture.set_visible(False)
         self.edit_btn.set_visible(False)
+        self.favorite_btn.set_margin_end(120)   # close the gap left by hidden edit
         self._update_favorite_btn()
         self.video_display.set_visible(True)
         self.video_controls.set_visible(True)
@@ -5829,6 +5834,7 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             # No edit button on videos — it can't edit them and just no-ops.
             self.edit_btn.set_visible(False)
+            self.favorite_btn.set_margin_end(120)   # close the edit-button gap
         # Restore zoom-driven visibility.
         zoomed = getattr(self, '_viewer_zoom', 1.0) > 1.0
         if zoomed:
@@ -6038,6 +6044,32 @@ class MainWindow(Adw.ApplicationWindow):
         self._transform_pending = True
         GLib.idle_add(self._do_apply_viewer_transform)
 
+    def _reset_viewer_transform(self):
+        """Force the shared zoom provider back to identity immediately. The
+        provider is shared by both photo slots and the video — without this a
+        zoomed photo would bleed into the next video (and vice versa)."""
+        self._viewer_zoom = 1.0
+        self._viewer_offset = [0.0, 0.0]
+        if hasattr(self, '_viewer_css_provider'):
+            self._last_applied_transform = (1.0, 0.0, 0.0)
+            self._viewer_css_provider.load_from_string(
+                "picture { transform: none; }")
+
+    def _zoom_target(self):
+        """The widget being zoomed plus its natural (w, h): the visible video
+        when a video is open, otherwise the photo. Returns (widget, iw, ih) or
+        None when nothing zoomable is shown."""
+        if getattr(self, "_video_media", None) and self.video_display.get_visible():
+            iw = self._video_media.get_intrinsic_width()
+            ih = self._video_media.get_intrinsic_height()
+            if iw and ih:
+                return self.video_display, iw, ih
+            return None
+        pb = getattr(self, "_viewer_pixbuf", None)
+        if pb:
+            return self.photo_picture, pb.get_width(), pb.get_height()
+        return None
+
     def _clamp_viewer_offset(self):
         """Keep a zoomed photo from being dragged off-screen: bound the pan so
         the image always covers the viewport."""
@@ -6045,12 +6077,14 @@ class MainWindow(Adw.ApplicationWindow):
         if z <= 1.0:
             self._viewer_offset = [0.0, 0.0]
             return
-        pb = getattr(self, "_viewer_pixbuf", None)
-        W = self.photo_picture.get_width()
-        H = self.photo_picture.get_height()
-        if not pb or W <= 0 or H <= 0:
+        tgt = self._zoom_target()
+        if not tgt:
             return
-        iw, ih = pb.get_width(), pb.get_height()
+        widget, iw, ih = tgt
+        W = widget.get_width()
+        H = widget.get_height()
+        if W <= 0 or H <= 0:
+            return
         if iw <= 0 or ih <= 0:
             return
         fit = min(W / iw, H / ih)          # CONTAIN-fit size at zoom 1
@@ -6079,7 +6113,8 @@ class MainWindow(Adw.ApplicationWindow):
             # Attach to BOTH slide slots — self.photo_picture flips between
             # pic_a/pic_b on every nav, so a provider on just one slot leaves
             # zoom dead on half the photos (transform hits the hidden widget).
-            for _pic in (self._viewer_pic_a, self._viewer_pic_b):
+            # video_display too, so the same scroll-zoom works on videos.
+            for _pic in (self._viewer_pic_a, self._viewer_pic_b, self.video_display):
                 _pic.get_style_context().add_provider(
                     self._viewer_css_provider, Gtk.STYLE_PROVIDER_PRIORITY_USER
                 )
