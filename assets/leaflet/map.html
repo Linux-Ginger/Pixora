@@ -99,20 +99,25 @@
   // a masked "Script error") — a throw here leaves pixoraSetMarkers/GoHome/
   // SetHome undefined, which is exactly the markers+home bug.
   try {
-  // Map options reverted to the known-good (markers-working) configuration:
-  // animations off. Smooth zoom can be re-added once markers are confirmed.
   const map = L.map('map', {
     zoomControl: true,
     attributionControl: false,
-    zoomAnimation: false,
-    fadeAnimation: false,
-    markerZoomAnimation: false,
-    inertia: false,
-    preferCanvas: true,
-    wheelDebounceTime: 30,
-    wheelPxPerZoomLevel: 100,
-    zoomSnap: 1,
+    // THE FIX: the tile layer (which carries maxZoom) is now created later via
+    // pixoraSetTileUrl, so the map had no maxZoom when fitWorld() ran at init →
+    // 'Map has no maxZoom specified' threw and aborted the whole script,
+    // leaving the marker/home functions undefined. Give the map its own maxZoom.
+    maxZoom: 19,
     minZoom: 2,
+    // Smooth, velocity-sensitive zoom + pan (was never the bug).
+    zoomAnimation: true,
+    fadeAnimation: true,
+    markerZoomAnimation: true,
+    inertia: true,
+    preferCanvas: true,
+    wheelDebounceTime: 20,
+    wheelPxPerZoomLevel: 55,
+    zoomSnap: 0.25,
+    zoomDelta: 0.5,
     maxBoundsViscosity: 1.0
   });
 
