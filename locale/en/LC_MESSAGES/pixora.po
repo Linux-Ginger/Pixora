@@ -2898,3 +2898,6 @@ msgstr "Name (e.g. Grandma & Grandpa)"
 
 msgid "e.g. Grandma & Grandpa — labels photos taken there"
 msgstr "e.g. Grandma & Grandpa — labels photos taken there"
+
+msgid "Address verified"
+msgstr "Address verified"

@@ -2917,3 +2917,6 @@ msgstr "Naam (bijv. Opa & oma)"
 
 msgid "e.g. Grandma & Grandpa — labels photos taken there"
 msgstr "bijv. Opa & oma — labelt foto's die daar gemaakt zijn"
+
+msgid "Address verified"
+msgstr "Adres geverifieerd"

@@ -617,6 +617,11 @@ _LOCALE_COUNTRY = {"nl": "Netherlands", "de": "Germany",
                    "fr": "France", "en": "United Kingdom"}
 
 
+def _mk(s):
+    """Escape text for Adw/Pango markup titles (an '&' otherwise breaks them)."""
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def geocode_address(street=None, city=None, postcode=None, country=None):
     """Structured address → (lat, lon) via Nominatim, or None. One-off online
     lookup; only the resulting coordinates are stored (locally)."""
@@ -3284,9 +3289,18 @@ class MainWindow(Adw.ApplicationWindow):
             b.connect("clicked", cb)
             return b
 
+        def _verified_check():
+            # Green check = address was found/geocoded (verified).
+            ic = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+            ic.add_css_class("success")
+            ic.set_tooltip_text(_("Address verified"))
+            return ic
+
         # Main home (priority).
         main_row = Adw.ActionRow(title=_("My home"))
         main_row.set_subtitle(self._home_address_text())
+        if self.settings.get("home_lat") is not None:
+            main_row.add_prefix(_verified_check())
         rm = _suffix_btn(_("Remove"), self._on_remove_home)
         rm.set_sensitive(self.settings.get("home_lat") is not None)
         main_row.add_suffix(rm)
@@ -3299,8 +3313,9 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Extra named places.
         for i, p in enumerate(self.settings.get("extra_places", [])):
-            row = Adw.ActionRow(title=p.get("name") or _("Place"))
-            row.set_subtitle(self._place_address_text(p))
+            row = Adw.ActionRow(title=_mk(p.get("name") or _("Place")))
+            row.set_subtitle(_mk(self._place_address_text(p)))
+            row.add_prefix(_verified_check())
             row.add_suffix(_suffix_btn(
                 _("Remove"), lambda b, idx=i: self._on_remove_place(idx)))
             row.add_suffix(_suffix_btn(
@@ -3311,7 +3326,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Add-a-place row.
         add_row = Adw.ActionRow(title=_("Add a place"))
         add_row.set_subtitle(
-            _("e.g. Grandma & Grandpa — labels photos taken there"))
+            _mk(_("e.g. Grandma & Grandpa — labels photos taken there")))
         addb = Gtk.Button(icon_name="list-add-symbolic")
         addb.add_css_class("flat")
         addb.set_valign(Gtk.Align.CENTER)
@@ -3350,7 +3365,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         name_row = None
         if not is_main:
-            name_row = Adw.EntryRow(title=_("Name (e.g. Grandma & Grandpa)"))
+            name_row = Adw.EntryRow(title=_mk(_("Name (e.g. Grandma & Grandpa)")))
             name_row.set_text(data.get("name", ""))
             group.add(name_row)
 
@@ -6102,7 +6117,10 @@ class MainWindow(Adw.ApplicationWindow):
         if self._home_only:
             parts.append(_("Home"))
         if parts:
-            self._filter_icon.set_text("⭐" if self._favorites_only else "🏠")
+            if self._favorites_only and self._home_only:
+                self._filter_icon.set_text("⭐🏠")
+            else:
+                self._filter_icon.set_text("⭐" if self._favorites_only else "🏠")
             self.filter_title_lbl.set_text(" · ".join(parts))
             self.filter_subtitle_lbl.set_text("")
             self.filter_info_bar.set_visible(True)
@@ -6421,6 +6439,11 @@ class MainWindow(Adw.ApplicationWindow):
                     self._favorites.discard(path)
                     self._favorites.add(new_path)
                     self._schedule_save_favorites()
+            # Drop the stale (pre-edit) full-res pixbuf, else the big image keeps
+            # showing the old orientation while the thumbnail is already rotated.
+            with self._pixbuf_cache_lock:
+                self._viewer_pixbuf_cache.pop(path, None)
+                self._viewer_pixbuf_cache.pop(new_path, None)
             self._viewer_load_id += 1
             load_id = self._viewer_load_id
             threading.Thread(
@@ -7026,7 +7049,7 @@ class MainWindow(Adw.ApplicationWindow):
         display_box.append(folder_group)
 
         self._places_group = Adw.PreferencesGroup()
-        self._places_group.set_title(_("Home & places"))
+        self._places_group.set_title(_mk(_("Home & places")))
         self._places_group.set_description(
             _("Your address is looked up once via OpenStreetMap to get its "
               "coordinates, then stored only on this computer — never shared. "

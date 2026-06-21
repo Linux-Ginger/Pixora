@@ -2945,3 +2945,6 @@ msgstr "Nom (p. ex. Mamie & Papi)"
 
 msgid "e.g. Grandma & Grandpa — labels photos taken there"
 msgstr "p. ex. Mamie & Papi — étiquette les photos prises là-bas"
+
+msgid "Address verified"
+msgstr "Adresse vérifiée"
