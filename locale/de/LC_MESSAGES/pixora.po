@@ -2779,3 +2779,30 @@ msgstr "Zuhause gespeichert"
 
 msgid "This map spot is now your home. It’s stored only on this computer and never shared."
 msgstr "Dieser Kartenpunkt ist jetzt dein Zuhause. Er wird nur auf diesem Computer gespeichert und niemals geteilt."
+
+msgid "Refresh map"
+msgstr "Karte aktualisieren"
+
+msgid "Set home address…"
+msgstr "Heimatadresse festlegen…"
+
+msgid "Set home address"
+msgstr "Heimatadresse festlegen"
+
+msgid "Enter your home address. It’s looked up once via OpenStreetMap to find the spot, then stored only on this computer."
+msgstr "Gib deine Heimatadresse ein. Sie wird einmal über OpenStreetMap nachgeschlagen, um den Ort zu finden, und danach nur auf diesem Computer gespeichert."
+
+msgid "e.g. Dam 1, Amsterdam"
+msgstr "z. B. Dam 1, Amsterdam"
+
+msgid "Address not found"
+msgstr "Adresse nicht gefunden"
+
+msgid "Couldn’t find that address. Check the spelling and try again."
+msgstr "Diese Adresse wurde nicht gefunden. Überprüfe die Schreibweise und versuche es erneut."
+
+msgid "Set your home address first using the home button."
+msgstr "Lege zuerst deine Heimatadresse über die Haus-Schaltfläche fest."
+
+msgid "Your home is set and stored only on this computer — never shared."
+msgstr "Dein Zuhause ist festgelegt und wird nur auf diesem Computer gespeichert — niemals geteilt."

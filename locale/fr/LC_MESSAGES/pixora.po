@@ -2796,3 +2796,30 @@ msgstr "Domicile enregistré"
 
 msgid "This map spot is now your home. It’s stored only on this computer and never shared."
 msgstr "Cet endroit sur la carte est désormais ton domicile. Il est stocké uniquement sur cet ordinateur et jamais partagé."
+
+msgid "Refresh map"
+msgstr "Actualiser la carte"
+
+msgid "Set home address…"
+msgstr "Définir l’adresse du domicile…"
+
+msgid "Set home address"
+msgstr "Définir l’adresse du domicile"
+
+msgid "Enter your home address. It’s looked up once via OpenStreetMap to find the spot, then stored only on this computer."
+msgstr "Saisis l’adresse de ton domicile. Elle est recherchée une fois via OpenStreetMap pour trouver l’endroit, puis stockée uniquement sur cet ordinateur."
+
+msgid "e.g. Dam 1, Amsterdam"
+msgstr "p. ex. Dam 1, Amsterdam"
+
+msgid "Address not found"
+msgstr "Adresse introuvable"
+
+msgid "Couldn’t find that address. Check the spelling and try again."
+msgstr "Adresse introuvable. Vérifie l’orthographe et réessaie."
+
+msgid "Set your home address first using the home button."
+msgstr "Définis d’abord l’adresse de ton domicile via le bouton domicile."
+
+msgid "Your home is set and stored only on this computer — never shared."
+msgstr "Ton domicile est défini et stocké uniquement sur cet ordinateur — jamais partagé."

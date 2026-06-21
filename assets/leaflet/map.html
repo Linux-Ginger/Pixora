@@ -119,11 +119,13 @@
   // markers, dus de "ergens in Nederland spawnen"-bug verdwijnt).
   map.fitWorld({ animate: false });
 
-  L.control.attribution({
-    prefix: '<a href="https://leafletjs.com/" target="_blank">Leaflet</a>'
-  }).addAttribution(
-    '© <a href="https://openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
-  ).addTo(map);
+  // Default prefix shows the Leaflet flag-logo + "Leaflet". OSM requires the
+  // "© OpenStreetMap contributors" credit linking to the copyright page.
+  // Links open in the system browser via Pixora's decide-policy handler.
+  L.control.attribution({ position: 'bottomright' })
+    .addAttribution(
+      '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+    ).addTo(map);
 
   // De tegel-URL komt van Pixora (pixoraSetTileUrl): normaal de lokale
   // tile-cache op 127.0.0.1, met OSM als fallback. De laag wordt pas gemaakt
@@ -370,7 +372,7 @@
     if (!map.hasLayer(cluster)) map.addLayer(cluster);
   });
 
-  window.pixoraSetMarkers = function(markers) {
+  window.pixoraSetMarkers = function(markers, view) {
     cluster.clearLayers();
     if (!markers || !markers.length) return;
     const bounds = L.latLngBounds();
@@ -386,24 +388,28 @@
       cluster.addLayer(marker);
       bounds.extend(latlng);
     });
-    if (bounds.isValid()) {
-      // Eerst size invalideren: als de WebView nog niet zijn eindgrootte
-      // had toen de page laadde, zou fitBounds op verkeerde dimensies
-      // rekenen en de map op de default-view (wereld) blijven staan.
-      map.invalidateSize(false);
-      updateMinZoom();
+    // Eerst size invalideren: als de WebView nog niet zijn eindgrootte had toen
+    // de page laadde, zou fitBounds op verkeerde dimensies rekenen.
+    map.invalidateSize(false);
+    updateMinZoom();
+    // Begin-weergave: huis als dat ingesteld is, anders het drukste foto-gebied,
+    // en pas als laatste terugval álle markers (kan de wereld omvatten).
+    if (view && view.center) {
+      map.setView(view.center, view.zoom || 13, { animate: false });
+    } else if (view && view.bounds) {
+      map.fitBounds(view.bounds, { padding: [40, 40], maxZoom: 13, animate: false });
+    } else if (bounds.isValid()) {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12, animate: false });
     }
   };
 
-  // Home: Pixora bewaart de locatie lokaal en stuurt 'm hierheen om naartoe
-  // te vliegen, of vraagt het huidige middelpunt op om als huis op te slaan.
+  // Vervang de oude set-center-as-home flow door losse home-helpers.
   window.pixoraGoHome = function(lat, lon, zoom) {
     map.flyTo([lat, lon], zoom || 15, { duration: 1.2 });
   };
-  window.pixoraSendCenter = function() {
-    const c = map.getCenter();
-    sendToPixora({ type: 'map-center', lat: c.lat, lon: c.lng, zoom: map.getZoom() });
+  window.pixoraRefresh = function() {
+    map.invalidateSize(false);
+    if (typeof retryTiles === 'function') retryTiles();
   };
 
   window.pixoraReady = true;

@@ -598,6 +598,46 @@ def _reverse_geocode_raw(lat, lon):
     except Exception:
         return ""
 
+def geocode_address(address):
+    """Address → (lat, lon) via Nominatim, or None. One-off online lookup;
+    the result is the only thing Pixora stores (locally)."""
+    try:
+        import urllib.parse
+        q = urllib.parse.quote(address)
+        url = (f"https://nominatim.openstreetmap.org/search"
+               f"?q={q}&format=json&limit=1")
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Pixora/1.0 (+https://github.com/Linux-Ginger/Pixora)",
+            "Accept-Language": _lang,
+        })
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read())
+        if data:
+            return float(data[0]["lat"]), float(data[0]["lon"])
+    except Exception:
+        pass
+    return None
+
+
+def _densest_photo_bounds(markers):
+    """Bounds of the densest ~1° cluster of markers, so travel outliers don't
+    zoom the initial map view out to the whole world."""
+    from collections import Counter
+    if not markers:
+        return None
+    bins = Counter()
+    for m in markers:
+        bins[(round(m[0]), round(m[1]))] += 1
+    blat, blon = max(bins, key=bins.get)
+    near = [(m[0], m[1]) for m in markers
+            if abs(m[0] - blat) <= 1.0 and abs(m[1] - blon) <= 1.0]
+    if not near:
+        return None
+    lats = [p[0] for p in near]
+    lons = [p[1] for p in near]
+    return [[min(lats), min(lons)], [max(lats), max(lons)]]
+
+
 _EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, DateTimeDigitized, DateTime
 
 def get_photo_date(path: str) -> float:
@@ -859,13 +899,13 @@ class PhotoFolderHandler(FileSystemEventHandler):
 
 class MapWidget(Gtk.Box):
     def __init__(self, markers, open_photo_cb, status_cb=None, tile_url=None,
-                 center_cb=None):
+                 initial_view=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.markers = markers
         self.open_photo_cb = open_photo_cb
         self.status_cb = status_cb
         self._tile_url = tile_url
-        self.center_cb = center_cb
+        self._initial_view = initial_view
         self.set_vexpand(True)
         self.set_hexpand(True)
         self._pending_markers = list(markers) if markers else []
@@ -979,6 +1019,13 @@ class MapWidget(Gtk.Box):
             log_error(_("WebView bridge setup error: {err}").format(err=e))
 
         self.web.connect("load-changed", self._on_load_changed)
+        # Kill the WebKit right-click menu (Reload/Inspect have no place here).
+        self.web.connect("context-menu", lambda *a: True)
+        # Open attribution links in the system browser, not inside the map.
+        try:
+            self.web.connect("decide-policy", self._on_decide_policy)
+        except Exception:
+            pass
 
         assets_dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "..", "assets", "leaflet"
@@ -1029,9 +1076,34 @@ class MapWidget(Gtk.Box):
         js = (
             tile_js
             + f"if(window.pixoraSetLabels){{window.pixoraSetLabels({json.dumps(labels)});}}"
-            f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers({json.dumps(data)});}}"
+            f"if(window.pixoraSetMarkers){{window.pixoraSetMarkers("
+            f"{json.dumps(data)},{json.dumps(self._initial_view)});}}"
         )
         self._run_js(js)
+        return False
+
+    def _on_decide_policy(self, web, decision, decision_type):
+        try:
+            t = WebKit2.PolicyDecisionType
+            if decision_type not in (t.NAVIGATION_ACTION, t.NEW_WINDOW_ACTION):
+                return False
+            uri = decision.get_navigation_action().get_request().get_uri() or ""
+        except Exception:
+            return False
+        # Only intercept real web links (attribution); file:// + the localhost
+        # tile proxy must keep loading inside the view.
+        if uri.startswith("http://127.0.0.1") or uri.startswith("file://"):
+            return False
+        if uri.startswith("http://") or uri.startswith("https://"):
+            try:
+                subprocess.Popen(["xdg-open", uri])
+            except Exception:
+                pass
+            try:
+                decision.ignore()
+            except Exception:
+                pass
+            return True
         return False
 
     def _run_js(self, js):
@@ -1053,8 +1125,8 @@ class MapWidget(Gtk.Box):
         self._run_js(f"if(window.pixoraGoHome)"
                      f"{{window.pixoraGoHome({float(lat)},{float(lon)},{z});}}")
 
-    def request_center(self):
-        self._run_js("if(window.pixoraSendCenter){window.pixoraSendCenter();}")
+    def refresh(self):
+        self._run_js("if(window.pixoraRefresh){window.pixoraRefresh();}")
 
     def _on_js_message(self, ucm, message):
         try:
@@ -1084,10 +1156,6 @@ class MapWidget(Gtk.Box):
             log_warn(_("Map → offline / tile errors"))
             if self.status_cb:
                 GLib.idle_add(self.status_cb, "offline")
-        elif msg_type == "map-center":
-            if self.center_cb:
-                GLib.idle_add(self.center_cb, payload.get("lat"),
-                              payload.get("lon"), payload.get("zoom"))
 
 
 class BackupFolderPicker(Adw.Dialog):
@@ -2735,21 +2803,20 @@ class MainWindow(Adw.ApplicationWindow):
         self.map_title_label.add_css_class("dim-label")
         map_header.set_title_widget(self.map_title_label)
 
-        # Home button: fly to a saved home spot, or save the current view as one.
+        # Home button: fly to a saved home, or set it by typing your address.
         home_btn = Gtk.MenuButton(icon_name="go-home-symbolic")
         home_btn.add_css_class("flat")
         home_btn.set_tooltip_text(_("Home"))
         pop = Gtk.Popover()
         vb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        for m in (6,):
-            vb.set_margin_top(m); vb.set_margin_bottom(m)
-            vb.set_margin_start(m); vb.set_margin_end(m)
+        vb.set_margin_top(6); vb.set_margin_bottom(6)
+        vb.set_margin_start(6); vb.set_margin_end(6)
         go = Gtk.Button(label=_("Go to my home"))
         go.add_css_class("flat")
         go.set_halign(Gtk.Align.FILL)
         go.get_child().set_halign(Gtk.Align.START)
         go.connect("clicked", self._on_go_home, pop)
-        setb = Gtk.Button(label=_("Set current view as home"))
+        setb = Gtk.Button(label=_("Set home address…"))
         setb.add_css_class("flat")
         setb.set_halign(Gtk.Align.FILL)
         setb.get_child().set_halign(Gtk.Align.START)
@@ -2758,7 +2825,15 @@ class MainWindow(Adw.ApplicationWindow):
         vb.append(setb)
         pop.set_child(vb)
         home_btn.set_popover(pop)
+
+        # Refresh button: reload the map tiles.
+        refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
+        refresh_btn.add_css_class("flat")
+        refresh_btn.set_tooltip_text(_("Refresh map"))
+        refresh_btn.connect("clicked", self._on_refresh_map)
+
         map_header.pack_end(home_btn)
+        map_header.pack_end(refresh_btn)
 
         box.append(map_header)
 
@@ -2881,10 +2956,22 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_warn(_("Tile proxy unavailable, using OSM directly: {err}").format(err=e))
 
+        # Initial camera: saved home → else the densest photo area → else fit all.
+        initial_view = None
+        hlat = self.settings.get("home_lat")
+        hlon = self.settings.get("home_lon")
+        if hlat is not None and hlon is not None:
+            initial_view = {"center": [hlat, hlon],
+                            "zoom": self.settings.get("home_zoom") or 13}
+        elif markers:
+            b = _densest_photo_bounds(markers)
+            if b:
+                initial_view = {"bounds": b}
+
         self._map_widget = MapWidget(
             markers, self._open_photo_from_map,
             status_cb=self._on_map_status, tile_url=tile_url,
-            center_cb=self._on_map_center
+            initial_view=initial_view
         )
         self.map_content.append(self._map_widget)
         # Wait for map-ready; 12s fallback prevents hang.
@@ -2934,6 +3021,10 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         return False
 
+    def _on_refresh_map(self, btn):
+        if self._map_widget:
+            self._map_widget.refresh()
+
     def _on_go_home(self, btn, pop):
         pop.popdown()
         lat = self.settings.get("home_lat")
@@ -2942,8 +3033,7 @@ class MainWindow(Adw.ApplicationWindow):
             dlg = Adw.MessageDialog(
                 transient_for=self,
                 heading=_("No home set yet"),
-                body=_("Open the map where you live, then choose “Set current "
-                       "view as home”."))
+                body=_("Set your home address first using the home button."))
             dlg.add_response("ok", _("OK"))
             dlg.present()
             return
@@ -2952,27 +3042,66 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_set_home(self, btn, pop):
         pop.popdown()
-        if self._map_widget:
-            self._map_widget.request_center()
+        dlg = Adw.MessageDialog(
+            transient_for=self,
+            heading=_("Set home address"),
+            body=_("Enter your home address. It’s looked up once via "
+                   "OpenStreetMap to find the spot, then stored only on this "
+                   "computer."))
+        entry = Gtk.Entry()
+        entry.set_placeholder_text(_("e.g. Dam 1, Amsterdam"))
+        entry.set_text(self.settings.get("home_address", ""))
+        entry.set_activates_default(True)
+        dlg.set_extra_child(entry)
+        dlg.add_response("cancel", _("Cancel"))
+        dlg.add_response("save", _("Save"))
+        dlg.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("save")
+        dlg.set_close_response("cancel")
+        dlg.connect("response", self._on_home_address_response, entry)
+        dlg.present()
 
-    def _on_map_center(self, lat, lon, zoom):
-        # Home is stored only in the local 0600 settings file — never sent out.
-        if lat is None or lon is None:
+    def _on_home_address_response(self, dlg, response, entry):
+        if response != "save":
+            return
+        address = entry.get_text().strip()
+        if not address:
+            return
+        threading.Thread(target=self._geocode_home_thread,
+                         args=(address,), daemon=True).start()
+
+    def _geocode_home_thread(self, address):
+        coords = geocode_address(address)
+        GLib.idle_add(self._home_geocode_done, address, coords)
+
+    def _home_geocode_done(self, address, coords):
+        if not coords:
+            dlg = Adw.MessageDialog(
+                transient_for=self,
+                heading=_("Address not found"),
+                body=_("Couldn’t find that address. Check the spelling and "
+                       "try again."))
+            dlg.add_response("ok", _("OK"))
+            dlg.present()
             return False
+        lat, lon = coords
+        # Stored only in the local 0600 settings file — never sent anywhere.
         self.settings["home_lat"] = lat
         self.settings["home_lon"] = lon
-        if zoom:
-            self.settings["home_zoom"] = zoom
+        self.settings["home_address"] = address
+        self.settings["home_zoom"] = 15
         try:
             save_settings(self.settings)
         except Exception as e:
             log_error(_("Could not save home: {err}").format(err=e))
             return False
+        if self._map_widget:
+            self._map_widget.go_home(lat, lon, 15)
         dlg = Adw.MessageDialog(
             transient_for=self,
             heading=_("Home saved"),
-            body=_("This map spot is now your home. It’s stored only on this "
-                   "computer and never shared."))
+            body=_("Your home is set and stored only on this computer — "
+                   "never shared."))
         dlg.add_response("ok", _("OK"))
         dlg.present()
         return False
