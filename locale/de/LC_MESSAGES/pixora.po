@@ -2943,3 +2943,21 @@ msgstr "Hier speichern"
 
 msgid "Edit"
 msgstr "Bearbeiten"
+
+msgid "Main home"
+msgstr "Hauptzuhause"
+
+msgid "Remove your main home?"
+msgstr "Hauptzuhause entfernen?"
+
+msgid "Your main home will be removed. Your photos are not affected."
+msgstr "Dein Hauptzuhause wird entfernt. Deine Fotos bleiben unberührt."
+
+msgid "Remove place?"
+msgstr "Ort entfernen?"
+
+msgid "Remove “{name}”? Your photos are not affected."
+msgstr "„{name}“ entfernen? Deine Fotos bleiben unberührt."
+
+msgid "this place"
+msgstr "diesen Ort"

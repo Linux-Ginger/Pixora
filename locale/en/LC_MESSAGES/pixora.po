@@ -2913,3 +2913,21 @@ msgstr "Save here"
 
 msgid "Edit"
 msgstr "Edit"
+
+msgid "Main home"
+msgstr "Main home"
+
+msgid "Remove your main home?"
+msgstr "Remove your main home?"
+
+msgid "Your main home will be removed. Your photos are not affected."
+msgstr "Your main home will be removed. Your photos are not affected."
+
+msgid "Remove place?"
+msgstr "Remove place?"
+
+msgid "Remove “{name}”? Your photos are not affected."
+msgstr "Remove “{name}”? Your photos are not affected."
+
+msgid "this place"
+msgstr "this place"

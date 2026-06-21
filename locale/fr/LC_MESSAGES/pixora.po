@@ -2960,3 +2960,21 @@ msgstr "Enregistrer ici"
 
 msgid "Edit"
 msgstr "Modifier"
+
+msgid "Main home"
+msgstr "Domicile principal"
+
+msgid "Remove your main home?"
+msgstr "Supprimer le domicile principal ?"
+
+msgid "Your main home will be removed. Your photos are not affected."
+msgstr "Ton domicile principal sera supprimé. Tes photos ne sont pas affectées."
+
+msgid "Remove place?"
+msgstr "Supprimer le lieu ?"
+
+msgid "Remove “{name}”? Your photos are not affected."
+msgstr "Supprimer « {name} » ? Tes photos ne sont pas affectées."
+
+msgid "this place"
+msgstr "ce lieu"

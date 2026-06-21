@@ -2932,3 +2932,21 @@ msgstr "Hier opslaan"
 
 msgid "Edit"
 msgstr "Bewerken"
+
+msgid "Main home"
+msgstr "Hoofdhuis"
+
+msgid "Remove your main home?"
+msgstr "Hoofdhuis verwijderen?"
+
+msgid "Your main home will be removed. Your photos are not affected."
+msgstr "Je hoofdhuis wordt verwijderd. Je foto's worden niet aangeraakt."
+
+msgid "Remove place?"
+msgstr "Plek verwijderen?"
+
+msgid "Remove “{name}”? Your photos are not affected."
+msgstr "“{name}” verwijderen? Je foto's worden niet aangeraakt."
+
+msgid "this place"
+msgstr "deze plek"

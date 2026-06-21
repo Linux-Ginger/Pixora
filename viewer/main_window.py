@@ -3246,7 +3246,37 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
+    def _accent_badge(self, text):
+        """Small blue accent pill (same look as the 'Recommended' badge)."""
+        badge = Gtk.Label(label=text)
+        badge.set_valign(Gtk.Align.CENTER)
+        badge.add_css_class("recommended-badge")
+        css = Gtk.CssProvider()
+        css.load_from_string(
+            ".recommended-badge { background-color: @accent_bg_color;"
+            " color: @accent_fg_color; border-radius: 9999px; padding: 1px 9px;"
+            " font-size: 0.72em; font-weight: 800; letter-spacing: 0.4px; }")
+        badge.get_style_context().add_provider(
+            css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        return badge
+
     def _on_remove_home(self, btn=None):
+        if self.settings.get("home_lat") is None:
+            return
+        dlg = Adw.MessageDialog(
+            transient_for=self,
+            heading=_("Remove your main home?"),
+            body=_("Your main home will be removed. Your photos are not affected."))
+        dlg.add_response("cancel", _("Cancel"))
+        dlg.add_response("remove", _("Remove"))
+        dlg.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
+        dlg.set_default_response("cancel")
+        dlg.connect("response", self._do_remove_home)
+        dlg.present()
+
+    def _do_remove_home(self, dlg, response):
+        if response != "remove":
+            return
         for k in ("home_lat", "home_lon", "home_zoom", "home_country",
                   "home_city", "home_postcode", "home_street", "home_addition"):
             self.settings.pop(k, None)
@@ -3310,11 +3340,12 @@ class MainWindow(Adw.ApplicationWindow):
             ic.set_tooltip_text(_("Address verified"))
             return ic
 
-        # Main home (priority).
+        # Main home (priority) — flagged with a 'Main home' accent badge.
         main_row = Adw.ActionRow(title=_("My home"))
         main_row.set_subtitle(self._home_address_text())
         if self.settings.get("home_lat") is not None:
             main_row.add_prefix(_verified_check())
+        main_row.add_suffix(self._accent_badge(_("Main home")))
         rm = _suffix_btn(_("Remove"), self._on_remove_home)
         rm.set_sensitive(self.settings.get("home_lat") is not None)
         main_row.add_suffix(rm)
@@ -3518,6 +3549,24 @@ class MainWindow(Adw.ApplicationWindow):
                 if p.get("lat") is not None and p.get("lon") is not None]
 
     def _on_remove_place(self, index):
+        places = self.settings.get("extra_places", [])
+        if not (0 <= index < len(places)):
+            return
+        name = places[index].get("name") or _("this place")
+        dlg = Adw.MessageDialog(
+            transient_for=self,
+            heading=_("Remove place?"),
+            body=_("Remove “{name}”? Your photos are not affected.").format(name=name))
+        dlg.add_response("cancel", _("Cancel"))
+        dlg.add_response("remove", _("Remove"))
+        dlg.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
+        dlg.set_default_response("cancel")
+        dlg.connect("response",
+                    lambda d, r, idx=index: self._do_remove_place(idx)
+                    if r == "remove" else None)
+        dlg.present()
+
+    def _do_remove_place(self, index):
         places = self.settings.get("extra_places", [])
         if 0 <= index < len(places):
             places.pop(index)

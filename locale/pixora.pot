@@ -2073,3 +2073,21 @@ msgstr ""
 
 msgid "Edit"
 msgstr ""
+
+msgid "Main home"
+msgstr ""
+
+msgid "Remove your main home?"
+msgstr ""
+
+msgid "Your main home will be removed. Your photos are not affected."
+msgstr ""
+
+msgid "Remove place?"
+msgstr ""
+
+msgid "Remove “{name}”? Your photos are not affected."
+msgstr ""
+
+msgid "this place"
+msgstr ""
