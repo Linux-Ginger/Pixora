@@ -15,6 +15,7 @@ import time
 import threading
 import urllib.request
 import urllib.error
+from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 
@@ -30,6 +31,7 @@ USER_AGENT = "Pixora/1.0 (+https://github.com/Linux-Ginger/Pixora)"
 _FETCH_TIMEOUT = 6                     # seconds per OSM request
 _MAX_CONCURRENT_FETCH = 4             # be gentle: OSM forbids bulk hammering
 _OFFLINE_COOLDOWN = 15               # after repeated failures, skip the network
+_MEM_MAX_TILES = 2000               # ~40 MB hot tiles kept in RAM (no disk read)
 
 _TILE_RE = re.compile(r"^/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png$")
 
@@ -66,6 +68,24 @@ class TileCache:
         self._fail_count = 0
         self._offline_until = 0.0
         self._state_lock = threading.Lock()
+        # Hot tiles in RAM: serving these skips the disk read entirely.
+        self._mem = OrderedDict()        # (z,x,y) → bytes
+        self._mem_lock = threading.Lock()
+
+    # ── RAM cache ───────────────────────────────────────────────────
+    def _mem_get(self, key):
+        with self._mem_lock:
+            b = self._mem.get(key)
+            if b is not None:
+                self._mem.move_to_end(key)
+            return b
+
+    def _mem_put(self, key, data):
+        with self._mem_lock:
+            self._mem[key] = data
+            self._mem.move_to_end(key)
+            while len(self._mem) > _MEM_MAX_TILES:
+                self._mem.popitem(last=False)
 
     # ── disk helpers ────────────────────────────────────────────────
     def _path(self, z, x, y):
@@ -168,23 +188,33 @@ class TileCache:
     def get(self, z, x, y):
         """Return (bytes, cacheable). cacheable=False for parent-fallback
         placeholders so the browser refetches the real tile next time."""
+        key = (z, x, y)
+        hot = self._mem_get(key)           # RAM first: no disk read at all
+        if hot is not None:
+            return hot, True
         if self._fresh(z, x, y):
             cached = self._read(z, x, y)
             if cached:
+                self._mem_put(key, cached)
                 return cached, True
         # Stale or missing → try the network (single-flight per tile).
-        with self._tile_lock((z, x, y)):
+        with self._tile_lock(key):
+            hot = self._mem_get(key)        # another thread may have just filled it
+            if hot is not None:
+                return hot, True
             if self._fresh(z, x, y):       # another thread just refreshed it
                 cached = self._read(z, x, y)
                 if cached:
+                    self._mem_put(key, cached)
                     return cached, True
             fetched = self._fetch(z, x, y)
             if fetched:
+                self._mem_put(key, fetched)
                 return fetched, True
         # Offline / fetch failed → stale copy, else parent fallback.
         stale = self._read(z, x, y)
         if stale:
-            return stale, True
+            return stale, True             # not RAM-cached: replace it once online
         return self._parent_fallback(z, x, y), False
 
     def prefetch(self, tiles, cap=400):

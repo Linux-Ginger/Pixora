@@ -5,8 +5,17 @@
 <link rel="stylesheet" href="leaflet.css">
 <link rel="stylesheet" href="markercluster.css">
 <style>
-  html, body { margin: 0; padding: 0; height: 100%; background: #d8dde0; font-family: sans-serif; }
-  #map { width: 100%; height: 100%; background: #d8dde0; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+  /* Graph-paper backdrop shows through wherever a tile hasn't drawn yet —
+     calmer than a flat grey gap while tiles load. */
+  #map {
+    width: 100%; height: 100%;
+    background-color: #eef1f4;
+    background-image:
+      linear-gradient(#dde3e8 1px, transparent 1px),
+      linear-gradient(90deg, #dde3e8 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
   #offline-banner {
     position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
     background: rgba(30,30,30,0.92); color: #fff; padding: 10px 16px;
@@ -62,18 +71,21 @@
 <script src="markercluster.js"></script>
 <script>
 (function() {
-  // Performance: alle animaties uit voor VM-rendering zonder GPU-accel
+  // Soepel in-/uitzoomen en pannen (GPU-versnelling op de main pc aanwezig).
+  // fadeAnimation laat tegels invloeien i.p.v. hard inklappen.
   const map = L.map('map', {
     zoomControl: true,
     attributionControl: false,
-    zoomAnimation: false,
-    fadeAnimation: false,
-    markerZoomAnimation: false,
-    inertia: false,
+    zoomAnimation: true,
+    fadeAnimation: true,
+    markerZoomAnimation: true,
+    inertia: true,
     preferCanvas: true,
-    wheelDebounceTime: 30,
-    wheelPxPerZoomLevel: 100,
-    zoomSnap: 1,
+    // Fijnere muiswiel-stappen + korte tween = vloeiend zoomen i.p.v. springen.
+    wheelDebounceTime: 40,
+    wheelPxPerZoomLevel: 120,
+    zoomSnap: 0.25,
+    zoomDelta: 0.5,
     minZoom: 2,
     maxBoundsViscosity: 1.0
   });
