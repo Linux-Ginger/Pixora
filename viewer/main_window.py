@@ -3839,6 +3839,21 @@ class MainWindow(Adw.ApplicationWindow):
 
         return viewer_area
 
+    def _photo_near_home(self, path):
+        """True if the photo's GPS is within ~120 m of the saved home."""
+        hlat = self.settings.get("home_lat")
+        hlon = self.settings.get("home_lon")
+        if hlat is None or hlon is None:
+            return False
+        try:
+            coords = (get_video_gps_coords(path) if is_video(path)
+                      else get_gps_coords(path))
+        except Exception:
+            coords = None
+        if not coords:
+            return False
+        return abs(coords[0] - hlat) < 0.0011 and abs(coords[1] - hlon) < 0.0017
+
     def _media_count_text(self, photos=None):
         """'6 photos & 2 videos' — counts stills vs videos separately."""
         photos = self.photos if photos is None else photos
@@ -4076,6 +4091,7 @@ class MainWindow(Adw.ApplicationWindow):
         groups = self._group_by_date(photos)
         loaded = 0
 
+        home_set = self.settings.get("home_lat") is not None
         def fetch(idx):
             path = photos[idx]
             pb = load_thumbnail(path)
@@ -4086,7 +4102,8 @@ class MainWindow(Adw.ApplicationWindow):
             pb = None
             cache_path = get_cache_path(path, THUMB_SIZE)
             dur = get_video_duration(path) if is_video(path) else 0.0
-            return (idx, path, cache_path, w, h, dur)
+            near_home = self._photo_near_home(path) if home_set else False
+            return (idx, path, cache_path, w, h, dur, near_home)
 
         with ThreadPoolExecutor(max_workers=THUMB_WORKERS) as pool:
             for date_str, date_obj, indices in groups:
@@ -4313,7 +4330,7 @@ class MainWindow(Adw.ApplicationWindow):
             tc['btn'] = p
             self._thumb_css = tc
         tc = self._thumb_css
-        for index, path, cache_path, pb_w, pb_h, duration in batch:
+        for index, path, cache_path, pb_w, pb_h, duration, near_home in batch:
             if pb_h > 0:
                 width_at_thumb = max(1, int(pb_w * THUMB_SIZE / pb_h))
             else:
@@ -4376,6 +4393,23 @@ class MainWindow(Adw.ApplicationWindow):
             fav_badge.append(fav_label)
             fav_badge.set_visible(path in self._favorites)
             overlay.add_overlay(fav_badge)
+
+            # Home badge: top-right (star is top-left), only for photos at home.
+            home_badge = Gtk.Box()
+            home_badge.set_halign(Gtk.Align.END)
+            home_badge.set_valign(Gtk.Align.START)
+            home_badge.set_margin_end(6)
+            home_badge.set_margin_top(6)
+            home_badge.set_can_target(False)
+            home_badge.set_can_focus(False)
+            home_badge.get_style_context().add_provider(
+                tc['fav_box'], Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            home_label = Gtk.Label()
+            home_label.set_use_markup(True)
+            home_label.set_markup('<span size="small">🏠</span>')
+            home_badge.append(home_label)
+            home_badge.set_visible(bool(near_home))
+            overlay.add_overlay(home_badge)
 
             btn = Gtk.Button()
             btn.set_child(overlay)
@@ -4556,9 +4590,24 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._update_viewer_location, resolved, load_id)
         threading.Thread(target=_bg, daemon=True).start()
 
+    def _set_viewer_near_home(self, coords):
+        hlat = self.settings.get("home_lat")
+        hlon = self.settings.get("home_lon")
+        self._viewer_near_home = bool(
+            coords and hlat is not None and hlon is not None
+            and abs(coords[0] - hlat) < 0.0011
+            and abs(coords[1] - hlon) < 0.0017)
+
+    def _decorate_location(self, text):
+        """Append a '(🏠 Home)' tag when the open photo is at home."""
+        if getattr(self, "_viewer_near_home", False) and text:
+            return f"{text}  (🏠 {_('Home')})"
+        return text
+
     def _load_full_photo(self, path, load_id):
         if is_video(path):
             initial, coords = self._determine_initial_location(path)
+            self._set_viewer_near_home(coords)
             searching = bool(coords)
             if load_id == self._viewer_load_id:
                 GLib.idle_add(self._show_video, path, initial, searching)
@@ -4580,6 +4629,7 @@ class MainWindow(Adw.ApplicationWindow):
                     while len(self._viewer_pixbuf_cache) > 3:
                         self._viewer_pixbuf_cache.popitem(last=False)
         initial, coords = self._determine_initial_location(path)
+        self._set_viewer_near_home(coords)
         searching = bool(coords)
         if load_id == self._viewer_load_id:
             GLib.idle_add(self._show_full_photo, pixbuf, path, initial, searching)
@@ -4591,7 +4641,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Guard against stale callbacks after nav.
         if load_id != self._viewer_load_id:
             return False
-        self._set_viewer_location("done", text)
+        self._set_viewer_location("done", self._decorate_location(text))
         return False
 
     def _show_full_photo(self, pixbuf, path, location="", searching=False):
@@ -4631,7 +4681,7 @@ class MainWindow(Adw.ApplicationWindow):
             if searching:
                 self._set_viewer_location("searching")
             elif location:
-                self._set_viewer_location("done", f"📍 {location}")
+                self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
             return False
 
         self._stop_video()
@@ -4684,7 +4734,7 @@ class MainWindow(Adw.ApplicationWindow):
         if searching:
             self._set_viewer_location("searching")
         elif location:
-            self._set_viewer_location("done", f"📍 {location}")
+            self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
         else:
             self._set_viewer_location("empty")
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
@@ -5145,7 +5195,7 @@ class MainWindow(Adw.ApplicationWindow):
         if searching:
             self._set_viewer_location("searching")
         elif location:
-            self._set_viewer_location("done", f"📍 {location}")
+            self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
         else:
             self._set_viewer_location("empty")
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
