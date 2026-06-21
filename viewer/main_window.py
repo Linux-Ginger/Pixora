@@ -643,25 +643,6 @@ def geocode_address(street=None, city=None, postcode=None, country=None):
     return None
 
 
-def _densest_photo_bounds(markers):
-    """Bounds of the densest ~1° cluster of markers, so travel outliers don't
-    zoom the initial map view out to the whole world."""
-    from collections import Counter
-    if not markers:
-        return None
-    bins = Counter()
-    for m in markers:
-        bins[(round(m[0]), round(m[1]))] += 1
-    blat, blon = max(bins, key=bins.get)
-    near = [(m[0], m[1]) for m in markers
-            if abs(m[0] - blat) <= 1.0 and abs(m[1] - blon) <= 1.0]
-    if not near:
-        return None
-    lats = [p[0] for p in near]
-    lons = [p[1] for p in near]
-    return [[min(lats), min(lons)], [max(lats), max(lons)]]
-
-
 _EXIF_DATE_TAGS = (36867, 36868, 306)  # DateTimeOriginal, DateTimeDigitized, DateTime
 
 def get_photo_date(path: str) -> float:
@@ -2989,17 +2970,13 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             log_warn(_("Tile proxy unavailable, using OSM directly: {err}").format(err=e))
 
-        # Initial camera: show the photos (densest area) so they're always
-        # visible; only fall back to home when there are no GPS photos. Home is
-        # still shown as a pin and reachable via the home button.
+        # Initial camera: just frame all the photos — reliable and always shows
+        # them. Only center on home when there are no GPS photos at all. Home is
+        # a pin + the home button regardless.
         initial_view = None
         hlat = self.settings.get("home_lat")
         hlon = self.settings.get("home_lon")
-        if markers:
-            b = _densest_photo_bounds(markers)
-            if b:
-                initial_view = {"bounds": b}
-        elif hlat is not None and hlon is not None:
+        if not markers and hlat is not None and hlon is not None:
             initial_view = {"center": [hlat, hlon],
                             "zoom": self.settings.get("home_zoom") or 13}
 
