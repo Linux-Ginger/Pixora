@@ -3227,7 +3227,7 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
-    def _on_remove_home(self, btn):
+    def _on_remove_home(self, btn=None):
         for k in ("home_lat", "home_lon", "home_zoom", "home_country",
                   "home_city", "home_postcode", "home_street", "home_addition"):
             self.settings.pop(k, None)
@@ -3235,12 +3235,7 @@ class MainWindow(Adw.ApplicationWindow):
             save_settings(self.settings)
         except Exception as e:
             log_error(_("Could not remove home: {err}").format(err=e))
-        if getattr(self, "home_row", None) is not None:
-            try:
-                self.home_row.set_subtitle(self._home_address_text())
-            except Exception:
-                pass
-        btn.set_sensitive(False)
+        self._rebuild_places_group()
         if self._map_widget:
             self._map_widget.set_home(None, None)
 
@@ -3259,33 +3254,122 @@ class MainWindow(Adw.ApplicationWindow):
             parts.append(country)
         return ", ".join(parts) if parts else _("Not set")
 
+    def _place_address_text(self, p):
+        parts = []
+        street = f"{p.get('street','')} {p.get('addition','')}".strip()
+        if street:
+            parts.append(street)
+        pc_city = f"{p.get('postcode','')} {p.get('city','')}".strip()
+        if pc_city:
+            parts.append(pc_city)
+        if p.get("country"):
+            parts.append(p["country"])
+        return ", ".join(parts) if parts else _("Not set")
+
+    def _rebuild_places_group(self):
+        grp = getattr(self, "_places_group", None)
+        if grp is None:
+            return
+        for row in getattr(self, "_place_rows", []):
+            try:
+                grp.remove(row)
+            except Exception:
+                pass
+        self._place_rows = []
+
+        def _suffix_btn(label, cb):
+            b = Gtk.Button(label=label)
+            b.add_css_class("flat")
+            b.set_valign(Gtk.Align.CENTER)
+            b.connect("clicked", cb)
+            return b
+
+        # Main home (priority).
+        main_row = Adw.ActionRow(title=_("My home"))
+        main_row.set_subtitle(self._home_address_text())
+        rm = _suffix_btn(_("Remove"), self._on_remove_home)
+        rm.set_sensitive(self.settings.get("home_lat") is not None)
+        main_row.add_suffix(rm)
+        main_row.add_suffix(_suffix_btn(
+            _("Change"), lambda b: self._open_place_dialog(None)))
+        grp.add(main_row)
+        self._place_rows.append(main_row)
+        self.home_row = main_row
+        self._remove_home_btn = rm
+
+        # Extra named places.
+        for i, p in enumerate(self.settings.get("extra_places", [])):
+            row = Adw.ActionRow(title=p.get("name") or _("Place"))
+            row.set_subtitle(self._place_address_text(p))
+            row.add_suffix(_suffix_btn(
+                _("Remove"), lambda b, idx=i: self._on_remove_place(idx)))
+            row.add_suffix(_suffix_btn(
+                _("Change"), lambda b, idx=i: self._open_place_dialog(idx)))
+            grp.add(row)
+            self._place_rows.append(row)
+
+        # Add-a-place row.
+        add_row = Adw.ActionRow(title=_("Add a place"))
+        add_row.set_subtitle(
+            _("e.g. Grandma & Grandpa — labels photos taken there"))
+        addb = Gtk.Button(icon_name="list-add-symbolic")
+        addb.add_css_class("flat")
+        addb.set_valign(Gtk.Align.CENTER)
+        addb.connect("clicked", lambda b: self._open_place_dialog("new"))
+        add_row.add_suffix(addb)
+        add_row.set_activatable_widget(addb)
+        grp.add(add_row)
+        self._place_rows.append(add_row)
+
     def _open_home_address_dialog(self):
+        # Back-compat shim (map home button) → main home editor.
+        self._open_place_dialog(None)
+
+    def _open_place_dialog(self, index=None):
+        """index: None = main home, 'new' = add a place, int = edit a place."""
+        is_main = index is None
+        if is_main:
+            data = {"name": "", "country": self.settings.get("home_country"),
+                    "city": self.settings.get("home_city", ""),
+                    "postcode": self.settings.get("home_postcode", ""),
+                    "street": self.settings.get("home_street", ""),
+                    "addition": self.settings.get("home_addition", "")}
+        elif index == "new":
+            data = {"name": "", "country": None, "city": "",
+                    "postcode": "", "street": "", "addition": ""}
+        else:
+            data = self.settings.get("extra_places", [])[index]
+
         dlg = Adw.MessageDialog(
             transient_for=self,
-            heading=_("Set home address"),
-            body=_("Fill in your address so it can be looked up exactly. It’s "
+            heading=_("My home") if is_main else _("Place"),
+            body=_("Fill in the address so it can be looked up exactly. It’s "
                    "looked up once via OpenStreetMap, then stored only on this "
                    "computer."))
         group = Adw.PreferencesGroup()
+
+        name_row = None
+        if not is_main:
+            name_row = Adw.EntryRow(title=_("Name (e.g. Grandma & Grandpa)"))
+            name_row.set_text(data.get("name", ""))
+            group.add(name_row)
 
         country_row = Adw.ComboRow(title=_("Country"))
         model = Gtk.StringList()
         for name in COUNTRIES:
             model.append(name)
         country_row.set_model(model)
-        saved_country = self.settings.get("home_country") \
-            or _LOCALE_COUNTRY.get(_lang, "Netherlands")
+        saved_country = data.get("country") or _LOCALE_COUNTRY.get(_lang, "Netherlands")
         if saved_country in COUNTRIES:
             country_row.set_selected(COUNTRIES.index(saved_country))
-
         city_row = Adw.EntryRow(title=_("City"))
-        city_row.set_text(self.settings.get("home_city", ""))
+        city_row.set_text(data.get("city", ""))
         postcode_row = Adw.EntryRow(title=_("Postcode"))
-        postcode_row.set_text(self.settings.get("home_postcode", ""))
+        postcode_row.set_text(data.get("postcode", ""))
         street_row = Adw.EntryRow(title=_("Street and house number"))
-        street_row.set_text(self.settings.get("home_street", ""))
+        street_row.set_text(data.get("street", ""))
         addition_row = Adw.EntryRow(title=_("Addition (optional)"))
-        addition_row.set_text(self.settings.get("home_addition", ""))
+        addition_row.set_text(data.get("addition", ""))
 
         for r in (country_row, street_row, addition_row, postcode_row, city_row):
             group.add(r)
@@ -3295,34 +3379,33 @@ class MainWindow(Adw.ApplicationWindow):
         dlg.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
         dlg.set_default_response("save")
         dlg.set_close_response("cancel")
-        rows = (country_row, city_row, postcode_row, street_row, addition_row)
-        dlg.connect("response", self._on_home_address_response, rows)
+        rows = (name_row, country_row, city_row, postcode_row, street_row, addition_row)
+        dlg.connect("response", self._on_place_response, index, rows)
         dlg.present()
 
-    def _on_home_address_response(self, dlg, response, rows):
+    def _on_place_response(self, dlg, response, index, rows):
         if response != "save":
             return
-        country_row, city_row, postcode_row, street_row, addition_row = rows
+        name_row, country_row, city_row, postcode_row, street_row, addition_row = rows
         country = COUNTRIES[country_row.get_selected()]
         city = city_row.get_text().strip()
         postcode = postcode_row.get_text().strip()
         street = street_row.get_text().strip()
         addition = addition_row.get_text().strip()
+        name = name_row.get_text().strip() if name_row is not None else ""
         if not street and not city and not postcode:
             return
         full_street = f"{street} {addition}".strip() if addition else street
-        fields = {"country": country, "city": city,
+        fields = {"name": name, "country": country, "city": city,
                   "postcode": postcode, "street": street, "addition": addition}
-        threading.Thread(target=self._geocode_home_thread,
-                         args=(full_street, city, postcode, country, fields),
-                         daemon=True).start()
+        threading.Thread(
+            target=lambda: GLib.idle_add(
+                self._save_place, index,
+                geocode_address(street=full_street, city=city,
+                                postcode=postcode, country=country), fields),
+            daemon=True).start()
 
-    def _geocode_home_thread(self, street, city, postcode, country, fields):
-        coords = geocode_address(street=street, city=city,
-                                 postcode=postcode, country=country)
-        GLib.idle_add(self._home_geocode_done, coords, fields)
-
-    def _home_geocode_done(self, coords, fields):
+    def _save_place(self, index, coords, fields):
         if not coords:
             dlg = Adw.MessageDialog(
                 transient_for=self,
@@ -3334,40 +3417,46 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         lat, lon = coords
         # Stored only in the local 0600 settings file — never sent anywhere.
-        self.settings["home_lat"] = lat
-        self.settings["home_lon"] = lon
-        self.settings["home_zoom"] = 16
-        self.settings["home_country"] = fields["country"]
-        self.settings["home_city"] = fields["city"]
-        self.settings["home_postcode"] = fields["postcode"]
-        self.settings["home_street"] = fields["street"]
-        self.settings["home_addition"] = fields["addition"]
+        if index is None:
+            self.settings["home_lat"] = lat
+            self.settings["home_lon"] = lon
+            self.settings["home_zoom"] = 16
+            self.settings["home_country"] = fields["country"]
+            self.settings["home_city"] = fields["city"]
+            self.settings["home_postcode"] = fields["postcode"]
+            self.settings["home_street"] = fields["street"]
+            self.settings["home_addition"] = fields["addition"]
+            if self._map_widget:
+                self._map_widget.set_home(lat, lon)
+                self._map_widget.go_home(lat, lon, 16)
+        else:
+            entry = dict(fields)
+            entry["lat"] = lat
+            entry["lon"] = lon
+            if not entry.get("name"):
+                entry["name"] = fields["city"] or _("Place")
+            places = self.settings.setdefault("extra_places", [])
+            if index == "new":
+                places.append(entry)
+            else:
+                places[index] = entry
         try:
             save_settings(self.settings)
         except Exception as e:
-            log_error(_("Could not save home: {err}").format(err=e))
+            log_error(_("Could not save place: {err}").format(err=e))
             return False
-        if getattr(self, "home_row", None) is not None:
-            try:
-                self.home_row.set_subtitle(self._home_address_text())
-            except Exception:
-                pass
-        if getattr(self, "_remove_home_btn", None) is not None:
-            try:
-                self._remove_home_btn.set_sensitive(True)
-            except Exception:
-                pass
-        if self._map_widget:
-            self._map_widget.set_home(lat, lon)
-            self._map_widget.go_home(lat, lon, 16)
-        dlg = Adw.MessageDialog(
-            transient_for=self,
-            heading=_("Home saved"),
-            body=_("Your home is set and stored only on this computer — "
-                   "never shared."))
-        dlg.add_response("ok", _("OK"))
-        dlg.present()
+        self._rebuild_places_group()
         return False
+
+    def _on_remove_place(self, index):
+        places = self.settings.get("extra_places", [])
+        if 0 <= index < len(places):
+            places.pop(index)
+            try:
+                save_settings(self.settings)
+            except Exception:
+                pass
+            self._rebuild_places_group()
 
     def _open_photo_from_map(self, paths):
         if isinstance(paths, str):
@@ -3914,20 +4003,39 @@ class MainWindow(Adw.ApplicationWindow):
 
         return viewer_area
 
-    def _photo_near_home(self, path):
-        """True if the photo's GPS is within ~120 m of the saved home."""
+    def _all_places(self):
+        """[(name, lat, lon), …] — main home first (priority), then extras."""
+        places = []
         hlat = self.settings.get("home_lat")
         hlon = self.settings.get("home_lon")
-        if hlat is None or hlon is None:
-            return False
+        if hlat is not None and hlon is not None:
+            places.append((_("Home"), hlat, hlon))
+        for p in self.settings.get("extra_places", []):
+            if p.get("lat") is not None and p.get("lon") is not None:
+                places.append((p.get("name") or _("Place"), p["lat"], p["lon"]))
+        return places
+
+    def _place_for_coords(self, coords):
+        """Name of the first place within ~120 m of coords (main home wins)."""
+        if not coords:
+            return None
+        for name, lat, lon in self._all_places():
+            if abs(coords[0] - lat) < 0.0011 and abs(coords[1] - lon) < 0.0017:
+                return name
+        return None
+
+    def _photo_place(self, path):
+        """Place name for the photo's GPS, or None."""
         try:
             coords = (get_video_gps_coords(path) if is_video(path)
                       else get_gps_coords(path))
         except Exception:
             coords = None
-        if not coords:
-            return False
-        return abs(coords[0] - hlat) < 0.0011 and abs(coords[1] - hlon) < 0.0017
+        return self._place_for_coords(coords)
+
+    def _photo_near_home(self, path):
+        """True if the photo was taken at any saved place."""
+        return self._photo_place(path) is not None
 
     def _media_count_text(self, photos=None):
         """'6 photos & 2 videos' — counts stills vs videos separately."""
@@ -4689,17 +4797,18 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=_bg, daemon=True).start()
 
     def _decorate_location(self, text):
-        """Append a '(🏠 Home)' tag when the open photo is at home; show the tag
-        alone if there's no place name yet."""
-        if getattr(self, "_viewer_near_home", False):
-            tag = f"🏠 {_('Home')}"
+        """Append a '(🏠 <place>)' tag when the open photo was taken at a saved
+        place; show the tag alone if there's no place name yet."""
+        place = getattr(self, "_viewer_place", None)
+        if place:
+            tag = f"🏠 {place}"
             return f"{text}  ({tag})" if text else tag
         return text
 
     def _load_full_photo(self, path, load_id):
         if is_video(path):
             initial, coords = self._determine_initial_location(path)
-            self._viewer_near_home = self._photo_near_home(path)
+            self._viewer_place = self._photo_place(path)
             searching = bool(coords)
             if load_id == self._viewer_load_id:
                 GLib.idle_add(self._show_video, path, initial, searching)
@@ -4721,7 +4830,7 @@ class MainWindow(Adw.ApplicationWindow):
                     while len(self._viewer_pixbuf_cache) > 3:
                         self._viewer_pixbuf_cache.popitem(last=False)
         initial, coords = self._determine_initial_location(path)
-        self._viewer_near_home = self._photo_near_home(path)
+        self._viewer_place = self._photo_place(path)
         searching = bool(coords)
         if load_id == self._viewer_load_id:
             GLib.idle_add(self._show_full_photo, pixbuf, path, initial, searching)
@@ -4823,7 +4932,7 @@ class MainWindow(Adw.ApplicationWindow):
         ts = get_photo_date(path)
         datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
-        if getattr(self, "_viewer_near_home", False) and not location:
+        if getattr(self, "_viewer_place", None) and not location:
             # Show '🏠 Home' right away; geocode upgrades it to 'City (🏠 Home)'.
             self._set_viewer_location("done", self._decorate_location(""))
         elif searching:
@@ -5287,7 +5396,7 @@ class MainWindow(Adw.ApplicationWindow):
         ts = get_photo_date(path)
         datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
         self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
-        if getattr(self, "_viewer_near_home", False) and not location:
+        if getattr(self, "_viewer_place", None) and not location:
             # Show '🏠 Home' right away; geocode upgrades it to 'City (🏠 Home)'.
             self._set_viewer_location("done", self._decorate_location(""))
         elif searching:
@@ -6887,6 +6996,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._settings_tabs_bar = None
             self.home_row = None
             self._remove_home_btn = None
+            self._places_group = None
+            self._place_rows = []
             if hasattr(self, "settings_btn"):
                 self.settings_btn.set_sensitive(True)
             return False
@@ -6914,29 +7025,16 @@ class MainWindow(Adw.ApplicationWindow):
         folder_group.add(self.folder_row)
         display_box.append(folder_group)
 
-        home_group = Adw.PreferencesGroup()
-        home_group.set_title(_("Home location"))
-        home_group.set_description(
+        self._places_group = Adw.PreferencesGroup()
+        self._places_group.set_title(_("Home & places"))
+        self._places_group.set_description(
             _("Your address is looked up once via OpenStreetMap to get its "
               "coordinates, then stored only on this computer — never shared. "
               "Place names shown on the map and in the viewer are likewise "
               "fetched once from OpenStreetMap and cached locally."))
-        self.home_row = Adw.ActionRow(title=_("Home address"))
-        self.home_row.set_subtitle(self._home_address_text())
-        remove_home_btn = Gtk.Button(label=_("Remove"))
-        remove_home_btn.add_css_class("flat")
-        remove_home_btn.set_valign(Gtk.Align.CENTER)
-        remove_home_btn.set_sensitive(self.settings.get("home_lat") is not None)
-        remove_home_btn.connect("clicked", self._on_remove_home)
-        self._remove_home_btn = remove_home_btn
-        self.home_row.add_suffix(remove_home_btn)
-        edit_home_btn = Gtk.Button(label=_("Change"))
-        edit_home_btn.add_css_class("flat")
-        edit_home_btn.set_valign(Gtk.Align.CENTER)
-        edit_home_btn.connect("clicked", lambda b: self._open_home_address_dialog())
-        self.home_row.add_suffix(edit_home_btn)
-        home_group.add(self.home_row)
-        display_box.append(home_group)
+        self._place_rows = []
+        display_box.append(self._places_group)
+        self._rebuild_places_group()
 
         display_group = Adw.PreferencesGroup()
         display_group.set_title(_("Display"))

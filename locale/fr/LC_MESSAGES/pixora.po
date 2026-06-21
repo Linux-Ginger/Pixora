@@ -2930,3 +2930,18 @@ msgstr "Domicile uniquement"
 
 msgid "Your address is looked up once via OpenStreetMap to get its coordinates, then stored only on this computer — never shared. Place names shown on the map and in the viewer are likewise fetched once from OpenStreetMap and cached locally."
 msgstr "Ton adresse est recherchée une fois via OpenStreetMap pour obtenir ses coordonnées, puis stockée uniquement sur cet ordinateur — jamais partagée. Les noms de lieux affichés sur la carte et dans la visionneuse sont également récupérés une fois via OpenStreetMap et mis en cache localement."
+
+msgid "Place"
+msgstr "Lieu"
+
+msgid "Add a place"
+msgstr "Ajouter un lieu"
+
+msgid "Home & places"
+msgstr "Domicile & lieux"
+
+msgid "Name (e.g. Grandma & Grandpa)"
+msgstr "Nom (p. ex. Mamie & Papi)"
+
+msgid "e.g. Grandma & Grandpa — labels photos taken there"
+msgstr "p. ex. Mamie & Papi — étiquette les photos prises là-bas"

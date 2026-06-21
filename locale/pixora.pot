@@ -2043,3 +2043,18 @@ msgstr ""
 
 msgid "Your address is looked up once via OpenStreetMap to get its coordinates, then stored only on this computer — never shared. Place names shown on the map and in the viewer are likewise fetched once from OpenStreetMap and cached locally."
 msgstr ""
+
+msgid "Place"
+msgstr ""
+
+msgid "Add a place"
+msgstr ""
+
+msgid "Home & places"
+msgstr ""
+
+msgid "Name (e.g. Grandma & Grandpa)"
+msgstr ""
+
+msgid "e.g. Grandma & Grandpa — labels photos taken there"
+msgstr ""
