@@ -1157,6 +1157,10 @@ class MapWidget(Gtk.Box):
         self._run_js("if(window.pixoraRefresh){window.pixoraRefresh();}")
 
     def set_home(self, lat, lon):
+        if lat is None or lon is None:
+            self._home = None
+            self._run_js("if(window.pixoraSetHome){window.pixoraSetHome(null,null);}")
+            return
         self._home = (lat, lon)
         self._run_js(f"if(window.pixoraSetHome)"
                      f"{{window.pixoraSetHome({float(lat)},{float(lon)});}}")
@@ -3163,6 +3167,23 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
+    def _on_remove_home(self, btn):
+        for k in ("home_lat", "home_lon", "home_zoom", "home_country",
+                  "home_city", "home_postcode", "home_street", "home_addition"):
+            self.settings.pop(k, None)
+        try:
+            save_settings(self.settings)
+        except Exception as e:
+            log_error(_("Could not remove home: {err}").format(err=e))
+        if getattr(self, "home_row", None) is not None:
+            try:
+                self.home_row.set_subtitle(self._home_address_text())
+            except Exception:
+                pass
+        btn.set_sensitive(False)
+        if self._map_widget:
+            self._map_widget.set_home(None, None)
+
     def _home_address_text(self):
         parts = []
         street = (f"{self.settings.get('home_street','')} "
@@ -3269,6 +3290,11 @@ class MainWindow(Adw.ApplicationWindow):
         if getattr(self, "home_row", None) is not None:
             try:
                 self.home_row.set_subtitle(self._home_address_text())
+            except Exception:
+                pass
+        if getattr(self, "_remove_home_btn", None) is not None:
+            try:
+                self._remove_home_btn.set_sensitive(True)
             except Exception:
                 pass
         if self._map_widget:
@@ -5682,10 +5708,11 @@ class MainWindow(Adw.ApplicationWindow):
         if path in self._favorites:
             self._favorites.discard(path)
             log_info(_("Favorite removed: {p}").format(p=path))
+            self._play_favorite_animation(added=False)
         else:
             self._favorites.add(path)
             log_info(_("Favorite added: {p}").format(p=path))
-            self._play_favorite_animation()
+            self._play_favorite_animation(added=True)
         self._schedule_save_favorites()
         self._update_favorite_btn()
         # Refresh thumb badge if visible.
@@ -5693,37 +5720,63 @@ class MainWindow(Adw.ApplicationWindow):
         if widget:
             self._refresh_thumb_favorite(self.current_index)
 
-    def _play_favorite_animation(self):
-        """Quick heart that pops up and fades out over the photo."""
+    def _play_favorite_animation(self, added=True):
+        """Star that pops up and fades over the photo. When un-favoriting, a red
+        diagonal slash crosses the star out."""
         area = getattr(self, "viewer_area", None)
         if area is None:
             return
-        heart = Gtk.Label(label="★")
-        heart.set_halign(Gtk.Align.CENTER)
-        heart.set_valign(Gtk.Align.CENTER)
-        heart.set_can_target(False)  # never intercept clicks
+        star = Gtk.Label(label="★")
+        star.set_halign(Gtk.Align.CENTER)
+        star.set_valign(Gtk.Align.CENTER)
+        star.set_can_target(False)  # never intercept clicks
         css = Gtk.CssProvider()
-        heart.add_css_class("fav-burst")
-        heart.get_style_context().add_provider(
+        star.add_css_class("fav-burst")
+        star.get_style_context().add_provider(
             css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        area.add_overlay(heart)
+        area.add_overlay(star)
+
+        slash = slash_css = None
+        if not added:
+            slash = Gtk.Box()
+            slash.set_halign(Gtk.Align.CENTER)
+            slash.set_valign(Gtk.Align.CENTER)
+            slash.set_can_target(False)
+            slash.set_size_request(150, 14)
+            slash_css = Gtk.CssProvider()
+            slash.add_css_class("fav-slash")
+            slash.get_style_context().add_provider(
+                slash_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            area.add_overlay(slash)
+
         state = {"i": 0}
         frames = 16
 
         def _step():
             t = state["i"] / frames
             if t >= 1.0:
-                try:
-                    area.remove_overlay(heart)
-                except Exception:
-                    pass
+                for w in (star, slash):
+                    if w is not None:
+                        try:
+                            area.remove_overlay(w)
+                        except Exception:
+                            pass
                 return False
             scale = 0.6 + 1.3 * t          # 0.6 -> ~1.9
+            color = "#ffcc33" if added else "#c8ccd0"
             css.load_from_string(
-                ".fav-burst { color: #ffcc33; font-size: 110px;"
+                ".fav-burst { color: %s; font-size: 110px;"
                 " text-shadow: 0 2px 14px rgba(0,0,0,0.5);"
-                f" transform: scale({scale:.3f}); }}")
-            heart.set_opacity(max(0.0, 1.0 - t))
+                " transform: scale(%.3f); }" % (color, scale))
+            if slash is not None:
+                slash_css.load_from_string(
+                    ".fav-slash { background: #e0392b; border-radius: 7px;"
+                    " box-shadow: 0 1px 8px rgba(0,0,0,0.6);"
+                    " transform: rotate(45deg) scale(%.3f); }" % scale)
+            op = max(0.0, 1.0 - t)
+            star.set_opacity(op)
+            if slash is not None:
+                slash.set_opacity(op)
             state["i"] += 1
             return True
 
@@ -6616,6 +6669,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._settings_stack = None
             self._settings_tabs_bar = None
             self.home_row = None
+            self._remove_home_btn = None
             if hasattr(self, "settings_btn"):
                 self.settings_btn.set_sensitive(True)
             return False
@@ -6650,6 +6704,13 @@ class MainWindow(Adw.ApplicationWindow):
               "only on this computer."))
         self.home_row = Adw.ActionRow(title=_("Home address"))
         self.home_row.set_subtitle(self._home_address_text())
+        remove_home_btn = Gtk.Button(label=_("Remove"))
+        remove_home_btn.add_css_class("flat")
+        remove_home_btn.set_valign(Gtk.Align.CENTER)
+        remove_home_btn.set_sensitive(self.settings.get("home_lat") is not None)
+        remove_home_btn.connect("clicked", self._on_remove_home)
+        self._remove_home_btn = remove_home_btn
+        self.home_row.add_suffix(remove_home_btn)
         edit_home_btn = Gtk.Button(label=_("Change"))
         edit_home_btn.add_css_class("flat")
         edit_home_btn.set_valign(Gtk.Align.CENTER)

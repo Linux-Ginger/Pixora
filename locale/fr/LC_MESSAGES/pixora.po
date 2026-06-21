@@ -2898,3 +2898,6 @@ msgstr "Tout est prêt"
 
 msgid "You can change everything later in Settings. Enjoy Pixora!"
 msgstr "Tu peux tout modifier plus tard dans les Réglages. Profite bien de Pixora !"
+
+msgid "Remove"
+msgstr "Supprimer"

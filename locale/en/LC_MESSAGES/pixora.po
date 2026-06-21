@@ -2851,3 +2851,6 @@ msgstr "You’re all set"
 
 msgid "You can change everything later in Settings. Enjoy Pixora!"
 msgstr "You can change everything later in Settings. Enjoy Pixora!"
+
+msgid "Remove"
+msgstr "Remove"

@@ -2870,3 +2870,6 @@ msgstr "Je bent klaar"
 
 msgid "You can change everything later in Settings. Enjoy Pixora!"
 msgstr "Je kunt alles later wijzigen in Instellingen. Veel plezier met Pixora!"
+
+msgid "Remove"
+msgstr "Verwijderen"
