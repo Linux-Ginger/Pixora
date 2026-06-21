@@ -1126,11 +1126,30 @@ class ImporterPage(Gtk.Box):
 
         box.append(info_group)
 
+        # Acknowledgement: the user ticks a box (so they read what happens)
+        # before the Import button unlocks.
+        warn_lbl = Gtk.Label()
+        warn_lbl.set_wrap(True)
+        warn_lbl.set_justify(Gtk.Justification.CENTER)
+        warn_lbl.add_css_class("dim-label")
+        warn_lbl.set_text(_(
+            "Photos and videos are copied to your library — the originals on "
+            "your device are kept. Possible duplicates are shown for review "
+            "first and never deleted automatically."))
+        box.append(warn_lbl)
+
         import_btn = Gtk.Button(label=_("Import"))
         import_btn.add_css_class("suggested-action")
         import_btn.add_css_class("pill")
         import_btn.set_halign(Gtk.Align.CENTER)
+        import_btn.set_sensitive(False)
         import_btn.connect("clicked", self._on_import_clicked)
+
+        ack = Gtk.CheckButton(label=_("I understand"))
+        ack.set_halign(Gtk.Align.CENTER)
+        ack.connect("toggled",
+                    lambda c: import_btn.set_sensitive(c.get_active()))
+        box.append(ack)
         box.append(import_btn)
 
         clamp.set_child(box)

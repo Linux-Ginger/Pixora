@@ -2125,7 +2125,27 @@ class MainWindow(Adw.ApplicationWindow):
         self._show_update_message_dialog(self._pending_update_version)
         return False
 
+    def _start_settings_update_pulse(self):
+        """Flicker the header settings icon to signal an available update,
+        matching the update button's 1.5s rhythm."""
+        if getattr(self, "_settings_pulse_id", None):
+            return
+        self._settings_pulse_on = False
+
+        def _tick():
+            self._settings_pulse_on = not self._settings_pulse_on
+            try:
+                self.settings_btn.set_icon_name(
+                    "software-update-available-symbolic"
+                    if self._settings_pulse_on else "preferences-system-symbolic")
+            except Exception:
+                pass
+            return True
+
+        self._settings_pulse_id = GLib.timeout_add(1500, _tick)
+
     def _show_update_message_dialog(self, new_version):
+        self._start_settings_update_pulse()
         dlg = Adw.AlertDialog(
             heading=_("Update available"),
             body=_("Pixora {v} is available. Update now?").format(v=new_version),

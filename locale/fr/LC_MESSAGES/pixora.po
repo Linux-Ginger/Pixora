@@ -2909,3 +2909,9 @@ msgid "%d video"
 msgid_plural "%d videos"
 msgstr[0] "%d vidéo"
 msgstr[1] "%d vidéos"
+
+msgid "I understand"
+msgstr "J’ai compris"
+
+msgid "Photos and videos are copied to your library — the originals on your device are kept. Possible duplicates are shown for review first and never deleted automatically."
+msgstr "Les photos et vidéos sont copiées dans ta bibliothèque — les originaux sur ton appareil sont conservés. Les doublons possibles sont d’abord présentés et jamais supprimés automatiquement."

@@ -2022,3 +2022,9 @@ msgid "%d video"
 msgid_plural "%d videos"
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "I understand"
+msgstr ""
+
+msgid "Photos and videos are copied to your library — the originals on your device are kept. Possible duplicates are shown for review first and never deleted automatically."
+msgstr ""
