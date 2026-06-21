@@ -2950,3 +2950,21 @@ msgstr "“{name}” verwijderen? Je foto's worden niet aangeraakt."
 
 msgid "this place"
 msgstr "deze plek"
+
+msgid "Before you import"
+msgstr "Voordat je importeert"
+
+msgid "Tick all of these — they make sure ALL your photos are found. If some are missing afterwards, it’s usually one of these."
+msgstr "Vink ze allemaal aan — zo worden ÁL je foto's gevonden. Als er daarna toch wat mist, is het meestal een van deze."
+
+msgid "iCloud Photos is off, or set to 'Download and Keep Originals' — so your photos are on the device, not only in the cloud"
+msgstr "iCloud-foto's staan uit, of op 'Originelen downloaden en behouden' — zodat je foto's op het apparaat staan, niet alleen in de cloud"
+
+msgid "Settings → Photos → 'Transfer to Mac or PC' → 'Keep Originals'"
+msgstr "Instellingen → Foto's → 'Naar Mac of pc overzetten' → 'Originelen behouden'"
+
+msgid "Your screen stays unlocked during the import"
+msgstr "Je scherm blijft ontgrendeld tijdens het importeren"
+
+msgid "Photos are copied to your library; the originals on your device are kept and duplicates are reviewed first"
+msgstr "Foto's worden naar je bibliotheek gekopieerd; de originelen op je apparaat blijven behouden en duplicaten worden eerst getoond"

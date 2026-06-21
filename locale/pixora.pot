@@ -2091,3 +2091,21 @@ msgstr ""
 
 msgid "this place"
 msgstr ""
+
+msgid "Before you import"
+msgstr ""
+
+msgid "Tick all of these — they make sure ALL your photos are found. If some are missing afterwards, it’s usually one of these."
+msgstr ""
+
+msgid "iCloud Photos is off, or set to 'Download and Keep Originals' — so your photos are on the device, not only in the cloud"
+msgstr ""
+
+msgid "Settings → Photos → 'Transfer to Mac or PC' → 'Keep Originals'"
+msgstr ""
+
+msgid "Your screen stays unlocked during the import"
+msgstr ""
+
+msgid "Photos are copied to your library; the originals on your device are kept and duplicates are reviewed first"
+msgstr ""

@@ -2978,3 +2978,21 @@ msgstr "Supprimer « {name} » ? Tes photos ne sont pas affectées."
 
 msgid "this place"
 msgstr "ce lieu"
+
+msgid "Before you import"
+msgstr "Avant d’importer"
+
+msgid "Tick all of these — they make sure ALL your photos are found. If some are missing afterwards, it’s usually one of these."
+msgstr "Coche-les toutes — elles garantissent que TOUTES tes photos sont trouvées. S’il en manque ensuite, c’est généralement l’une d’elles."
+
+msgid "iCloud Photos is off, or set to 'Download and Keep Originals' — so your photos are on the device, not only in the cloud"
+msgstr "Photos iCloud désactivées, ou réglées sur « Télécharger et garder les originaux » — pour que tes photos soient sur l’appareil, pas seulement dans le cloud"
+
+msgid "Settings → Photos → 'Transfer to Mac or PC' → 'Keep Originals'"
+msgstr "Réglages → Photos → « Transférer vers Mac ou PC » → « Garder les originaux »"
+
+msgid "Your screen stays unlocked during the import"
+msgstr "Ton écran reste déverrouillé pendant l’import"
+
+msgid "Photos are copied to your library; the originals on your device are kept and duplicates are reviewed first"
+msgstr "Les photos sont copiées dans ta bibliothèque ; les originaux sur ton appareil sont conservés et les doublons d’abord vérifiés"

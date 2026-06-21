@@ -1045,13 +1045,12 @@ class ImporterPage(Gtk.Box):
         listbox.set_selection_mode(Gtk.SelectionMode.NONE)
         listbox.add_css_class("boxed-list")
 
+        # Only what's needed to CONNECT — the prep steps move to the checklist
+        # on the next screen (after the device is found).
         for ico_name, title, subtitle in [
             ("drive-removable-media-symbolic", _("USB cable"),              _("Preferably use the original Apple cable")),
             ("security-medium-symbolic",       _("Trust this computer"), _("Tap 'Trust' if your device asks")),
             ("system-lock-screen-symbolic",    _("Unlocked screen"),     _("Make sure your device is unlocked during import")),
-            ("media-flash-symbolic",           _("Use a blue USB port"), _("USB 3.0 (blue) is much faster than black USB 2.0 ports")),
-            ("weather-overcast-symbolic",      _("iCloud photos"),          _("iCloud Photos disabled? Then all photos are stored locally on your device and will all be found.")),
-            ("document-save-symbolic",         _("File format"),        _("On your device: Settings → Photos → 'Transfer to Mac or PC' → 'Keep Originals'")),
         ]:
             row = Adw.ActionRow()
             row.set_title(title)
@@ -1126,18 +1125,9 @@ class ImporterPage(Gtk.Box):
 
         box.append(info_group)
 
-        # Acknowledgement: the user ticks a box (so they read what happens)
-        # before the Import button unlocks.
-        warn_lbl = Gtk.Label()
-        warn_lbl.set_wrap(True)
-        warn_lbl.set_justify(Gtk.Justification.CENTER)
-        warn_lbl.add_css_class("dim-label")
-        warn_lbl.set_text(_(
-            "Photos and videos are copied to your library — the originals on "
-            "your device are kept. Possible duplicates are shown for review "
-            "first and never deleted automatically."))
-        box.append(warn_lbl)
-
+        # Pre-flight checklist: tick ALL to enable Import. These are exactly the
+        # steps that make sure every photo is found — if some are missing later,
+        # it's almost always one of these.
         import_btn = Gtk.Button(label=_("Import"))
         import_btn.add_css_class("suggested-action")
         import_btn.add_css_class("pill")
@@ -1145,11 +1135,37 @@ class ImporterPage(Gtk.Box):
         import_btn.set_sensitive(False)
         import_btn.connect("clicked", self._on_import_clicked)
 
-        ack = Gtk.CheckButton(label=_("I understand"))
-        ack.set_halign(Gtk.Align.CENTER)
-        ack.connect("toggled",
-                    lambda c: import_btn.set_sensitive(c.get_active()))
-        box.append(ack)
+        checklist = Adw.PreferencesGroup()
+        checklist.set_title(_("Before you import"))
+        checklist.set_description(_(
+            "Tick all of these — they make sure ALL your photos are found. If "
+            "some are missing afterwards, it’s usually one of these."))
+        self._import_checks = []
+
+        def _refresh(*_a):
+            import_btn.set_sensitive(
+                all(c.get_active() for c in self._import_checks))
+
+        for line in [
+            _("iCloud Photos is off, or set to 'Download and Keep Originals' — "
+              "so your photos are on the device, not only in the cloud"),
+            _("Settings → Photos → 'Transfer to Mac or PC' → 'Keep Originals'"),
+            _("Your screen stays unlocked during the import"),
+            _("Photos are copied to your library; the originals on your device "
+              "are kept and duplicates are reviewed first"),
+        ]:
+            row = Adw.ActionRow()
+            row.set_title(line)
+            if hasattr(row, "set_title_lines"):
+                row.set_title_lines(0)   # let long checklist lines wrap
+            chk = Gtk.CheckButton()
+            chk.set_valign(Gtk.Align.CENTER)
+            chk.connect("toggled", _refresh)
+            row.add_prefix(chk)
+            row.set_activatable_widget(chk)
+            self._import_checks.append(chk)
+            checklist.add(row)
+        box.append(checklist)
         box.append(import_btn)
 
         clamp.set_child(box)
@@ -1157,7 +1173,11 @@ class ImporterPage(Gtk.Box):
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         vbox.append(status)
         vbox.append(clamp)
-        self.stack.add_named(vbox, "detected")
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_vexpand(True)
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_child(vbox)
+        self.stack.add_named(scroller, "detected")
 
     def _build_progress_page(self):
         clamp = Adw.Clamp()
