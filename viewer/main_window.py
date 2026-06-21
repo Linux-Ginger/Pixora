@@ -226,9 +226,14 @@ def _low_ram_system():
         return False
 
 THUMB_WORKERS = 2 if _low_ram_system() else 4
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".mp4", ".mov"}
-VIDEO_EXTENSIONS = {".mp4", ".mov"}
-_STILL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif"}
+# Must match the importer's SUPPORTED_EXT, otherwise files Pixora imported
+# (e.g. .heif/.dng/.m4v/.webp) sit in the library but never show in the grid.
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".dng",
+                    ".webp", ".gif", ".tiff", ".tif", ".bmp",
+                    ".mp4", ".mov", ".m4v", ".3gp"}
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".3gp"}
+_STILL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".dng",
+                     ".webp", ".gif", ".tiff", ".tif", ".bmp"}
 
 
 def live_photo_pairs(paths):
@@ -4542,6 +4547,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _show_full_photo(self, pixbuf, path, location="", searching=False):
         self._hide_photo_spinner()  # load finished (or failed): stop the loader
+        # Clear any video immediately — even if the photo is queued below, the
+        # video must never linger on top of an incoming photo.
+        if self.video_display.get_visible():
+            self._stop_video()
+            self.video_display.set_visible(False)
+            self.video_controls.set_visible(False)
+            self._viewer_stack.set_visible(True)
         # Queue while a previous slide is still running — starting a new
         # transition mid-flight makes GtkStack snap to the old target first,
         # causing a visible jump. On completion the latest stashed target fires.
