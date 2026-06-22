@@ -4099,14 +4099,15 @@ class MainWindow(Adw.ApplicationWindow):
         self.edit_btn.connect("clicked", self.on_edit_current)
         viewer_area.add_overlay(self.edit_btn)
 
-        # Info button (top-left) → small popover below it with media details.
+        # Info button — directly below the close button (top-right), clear of the
+        # title at top-left. Small popover opens beneath it with media details.
         self.info_btn = Gtk.Button(icon_name="dialog-information-symbolic")
         self.info_btn.add_css_class("osd")
         self.info_btn.add_css_class("circular")
-        self.info_btn.set_halign(Gtk.Align.START)
+        self.info_btn.set_halign(Gtk.Align.END)
         self.info_btn.set_valign(Gtk.Align.START)
-        self.info_btn.set_margin_top(16)
-        self.info_btn.set_margin_start(16)
+        self.info_btn.set_margin_top(64)
+        self.info_btn.set_margin_end(16)
         self.info_btn.set_size_request(40, 40)
         self.info_btn.set_tooltip_text(_("Photo & video details"))
         self.info_btn.connect("clicked", self.on_info_clicked)
@@ -4274,23 +4275,6 @@ class MainWindow(Adw.ApplicationWindow):
             b.connect("toggled", self._on_filter_preset, name)
             self.filter_bar.append(b)
             self._filter_preset_btns.append((name, b))
-        fsep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
-        fsep.set_margin_start(4)
-        fsep.set_margin_end(4)
-        fsep.set_margin_top(6)
-        fsep.set_margin_bottom(6)
-        self.filter_bar.append(fsep)
-        self.filter_strength_scale = Gtk.Scale.new_with_range(
-            Gtk.Orientation.HORIZONTAL, 0, 100, 1)
-        self.filter_strength_scale.set_value(100)
-        self.filter_strength_scale.set_draw_value(False)
-        self.filter_strength_scale.set_size_request(130, -1)
-        self.filter_strength_scale.set_valign(Gtk.Align.CENTER)
-        self.filter_strength_scale.set_tooltip_text(_("Filter strength"))
-        self.filter_strength_scale.set_sensitive(False)
-        self.filter_strength_scale.connect("value-changed",
-                                           self._on_filter_strength)
-        self.filter_bar.append(self.filter_strength_scale)
         viewer_area.add_overlay(self.filter_bar)
 
         self.viewer_title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -7041,7 +7025,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_handle           = None
         self._crop_rect_origin      = None
         self._editor_filter         = ""
-        self._editor_filter_strength = 1.0
         self._editor_filtered_pixbuf = None
         self._reset_filter_ui()
         self.crop_toggle_btn.set_active(False)
@@ -7068,7 +7051,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_handle           = None
         self._crop_rect_origin      = None
         self._editor_filter         = ""
-        self._editor_filter_strength = 1.0
         self._editor_filtered_pixbuf = None
         self.crop_toggle_btn.set_active(False)
         self.crop_overlay_area.set_visible(False)
@@ -7232,9 +7214,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._editor_display_pixbuf = self._viewer_pixbuf.rotate_simple(gdk_rot)
         # Rebuild the filtered version of the (rotated) base, then show preview.
         if getattr(self, "_editor_filter", ""):
-            self._editor_filtered_pixbuf = self._make_filtered_pixbuf(
-                self._editor_display_pixbuf, self._editor_filter)
-            self._render_filter_preview()
+            self._rebuild_filter_preview()
         else:
             self._editor_filtered_pixbuf = None
             self.photo_picture.set_pixbuf(self._editor_display_pixbuf)
@@ -7243,9 +7223,6 @@ class MainWindow(Adw.ApplicationWindow):
     def _reset_filter_ui(self):
         for name, b in getattr(self, "_filter_preset_btns", []):
             b.set_active(name == "")   # "Original" selected
-        if hasattr(self, "filter_strength_scale"):
-            self.filter_strength_scale.set_value(100)
-            self.filter_strength_scale.set_sensitive(False)
 
     def on_editor_toggle_filters(self, btn):
         self.filter_bar.set_visible(btn.get_active())
@@ -7254,32 +7231,39 @@ class MainWindow(Adw.ApplicationWindow):
         if not btn.get_active():
             return  # only react to the newly-selected one
         self._editor_filter = name
-        self.filter_strength_scale.set_sensitive(bool(name))
-        self._editor_apply_preview()
+        if not name:
+            self._editor_filtered_pixbuf = None
+            self._hide_photo_spinner()
+            self.photo_picture.set_pixbuf(self._editor_display_pixbuf)
+            return
+        self._rebuild_filter_preview()
 
-    def _on_filter_strength(self, scale):
-        self._editor_filter_strength = scale.get_value() / 100.0
-        self._render_filter_preview()
-
-    def _render_filter_preview(self):
+    def _rebuild_filter_preview(self):
+        """Build the filtered preview off the main thread (PIL decode + filter +
+        re-encode is slow) and show a spinner while it runs."""
         base = self._editor_display_pixbuf
-        filt = getattr(self, "_editor_filtered_pixbuf", None)
-        if base is None:
+        name = getattr(self, "_editor_filter", "")
+        if base is None or not name:
             return
-        if filt is None:
-            self.photo_picture.set_pixbuf(base)
-            return
-        strength = getattr(self, "_editor_filter_strength", 1.0)
-        if strength >= 0.999:
-            self.photo_picture.set_pixbuf(filt)
-        elif strength <= 0.001:
-            self.photo_picture.set_pixbuf(base)
-        else:
-            dest = base.copy()
-            filt.composite(dest, 0, 0, dest.get_width(), dest.get_height(),
-                           0, 0, 1, 1, GdkPixbuf.InterpType.NEAREST,
-                           int(strength * 255))
-            self.photo_picture.set_pixbuf(dest)
+        self._photo_spinner.set_visible(True)
+        self._photo_spinner.start()
+        self._filter_gen = getattr(self, "_filter_gen", 0) + 1
+        gen = self._filter_gen
+
+        def _bg():
+            pb = self._make_filtered_pixbuf(base, name)
+            GLib.idle_add(self._apply_filtered_preview, pb, gen, name)
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _apply_filtered_preview(self, pb, gen, name):
+        # Drop if a newer preset was picked or the editor was closed meanwhile.
+        if gen != getattr(self, "_filter_gen", 0) or not self._editor_active:
+            return False
+        self._hide_photo_spinner()
+        if pb is not None and self._editor_filter == name:
+            self._editor_filtered_pixbuf = pb
+            self.photo_picture.set_pixbuf(pb)
+        return False
 
     def _make_filtered_pixbuf(self, pixbuf, name):
         try:
@@ -7471,7 +7455,6 @@ class MainWindow(Adw.ApplicationWindow):
         rotation = self._editor_rotation
         # Capture filter now — on_editor_cancel() below resets the editor state.
         filt     = getattr(self, "_editor_filter", "")
-        fstr     = getattr(self, "_editor_filter_strength", 1.0)
         log_info(_("Editor save: rotation={rot}° crop={crop} path={p}").format(
             rot=rotation, crop=bool(self._crop_rect), p=path
         ))
@@ -7541,11 +7524,7 @@ class MainWindow(Adw.ApplicationWindow):
                     if cb[2] - cb[0] > 1 and cb[3] - cb[1] > 1:
                         img = img.crop(cb)
                 if filt:
-                    from PIL import Image as _PILImage
-                    base_rgb = img.convert("RGB")
-                    filtered = self._apply_named_filter(base_rgb, filt)
-                    img = (filtered if fstr >= 0.999
-                           else _PILImage.blend(base_rgb, filtered, fstr))
+                    img = self._apply_named_filter(img, filt)
 
                 out_path = path
                 if is_jpeg:
