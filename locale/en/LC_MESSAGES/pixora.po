@@ -3008,3 +3008,54 @@ msgstr "No location for this photo"
 
 msgid "No location for this video"
 msgstr "No location for this video"
+
+msgid "Photo & video details"
+msgstr "Photo & video details"
+
+msgid "Loading…"
+msgstr "Loading…"
+
+msgid "File size"
+msgstr "File size"
+
+msgid "Type"
+msgstr "Type"
+
+msgid "Taken"
+msgstr "Taken"
+
+msgid "Resolution"
+msgstr "Resolution"
+
+msgid "Megapixels"
+msgstr "Megapixels"
+
+msgid "Camera"
+msgstr "Camera"
+
+msgid "ISO"
+msgstr "ISO"
+
+msgid "Aperture"
+msgstr "Aperture"
+
+msgid "Shutter"
+msgstr "Shutter"
+
+msgid "Focal length"
+msgstr "Focal length"
+
+msgid "Duration"
+msgstr "Duration"
+
+msgid "Frame rate"
+msgstr "Frame rate"
+
+msgid "Codec"
+msgstr "Codec"
+
+msgid "Location"
+msgstr "Location"
+
+msgid "Filename"
+msgstr "Filename"

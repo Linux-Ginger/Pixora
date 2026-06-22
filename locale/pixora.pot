@@ -2181,3 +2181,54 @@ msgstr ""
 
 msgid "No location for this video"
 msgstr ""
+
+msgid "Photo & video details"
+msgstr ""
+
+msgid "Loading…"
+msgstr ""
+
+msgid "File size"
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid "Taken"
+msgstr ""
+
+msgid "Resolution"
+msgstr ""
+
+msgid "Megapixels"
+msgstr ""
+
+msgid "Camera"
+msgstr ""
+
+msgid "ISO"
+msgstr ""
+
+msgid "Aperture"
+msgstr ""
+
+msgid "Shutter"
+msgstr ""
+
+msgid "Focal length"
+msgstr ""
+
+msgid "Duration"
+msgstr ""
+
+msgid "Frame rate"
+msgstr ""
+
+msgid "Codec"
+msgstr ""
+
+msgid "Location"
+msgstr ""
+
+msgid "Filename"
+msgstr ""

@@ -3036,3 +3036,54 @@ msgstr "Dieses Foto hat keinen Standort"
 
 msgid "No location for this video"
 msgstr "Dieses Video hat keinen Standort"
+
+msgid "Photo & video details"
+msgstr "Foto- & Videodetails"
+
+msgid "Loading…"
+msgstr "Wird geladen…"
+
+msgid "File size"
+msgstr "Dateigröße"
+
+msgid "Type"
+msgstr "Typ"
+
+msgid "Taken"
+msgstr "Aufgenommen"
+
+msgid "Resolution"
+msgstr "Auflösung"
+
+msgid "Megapixels"
+msgstr "Megapixel"
+
+msgid "Camera"
+msgstr "Kamera"
+
+msgid "ISO"
+msgstr "ISO"
+
+msgid "Aperture"
+msgstr "Blende"
+
+msgid "Shutter"
+msgstr "Belichtungszeit"
+
+msgid "Focal length"
+msgstr "Brennweite"
+
+msgid "Duration"
+msgstr "Dauer"
+
+msgid "Frame rate"
+msgstr "Bildrate"
+
+msgid "Codec"
+msgstr "Codec"
+
+msgid "Location"
+msgstr "Standort"
+
+msgid "Filename"
+msgstr "Dateiname"

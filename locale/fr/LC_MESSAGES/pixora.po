@@ -3053,3 +3053,54 @@ msgstr "Aucune localisation pour cette photo"
 
 msgid "No location for this video"
 msgstr "Aucune localisation pour cette vidéo"
+
+msgid "Photo & video details"
+msgstr "Détails photo et vidéo"
+
+msgid "Loading…"
+msgstr "Chargement…"
+
+msgid "File size"
+msgstr "Taille du fichier"
+
+msgid "Type"
+msgstr "Type"
+
+msgid "Taken"
+msgstr "Pris le"
+
+msgid "Resolution"
+msgstr "Résolution"
+
+msgid "Megapixels"
+msgstr "Mégapixels"
+
+msgid "Camera"
+msgstr "Appareil photo"
+
+msgid "ISO"
+msgstr "ISO"
+
+msgid "Aperture"
+msgstr "Ouverture"
+
+msgid "Shutter"
+msgstr "Vitesse d’obturation"
+
+msgid "Focal length"
+msgstr "Distance focale"
+
+msgid "Duration"
+msgstr "Durée"
+
+msgid "Frame rate"
+msgstr "Fréquence d’images"
+
+msgid "Codec"
+msgstr "Codec"
+
+msgid "Location"
+msgstr "Localisation"
+
+msgid "Filename"
+msgstr "Nom du fichier"

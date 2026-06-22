@@ -832,6 +832,18 @@ def format_duration(seconds):
     return f"{m}:{s:02d}"
 
 
+def human_size(n):
+    """Bytes → '4.2 MB' style string."""
+    try:
+        n = float(n)
+    except Exception:
+        return ""
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024 or unit == "TB":
+            return f"{int(n)} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
+
+
 def get_video_gps_coords(path):
     import re
     try:
@@ -4087,6 +4099,29 @@ class MainWindow(Adw.ApplicationWindow):
         self.edit_btn.connect("clicked", self.on_edit_current)
         viewer_area.add_overlay(self.edit_btn)
 
+        # Info button (top-left) → small popover below it with media details.
+        self.info_btn = Gtk.Button(icon_name="dialog-information-symbolic")
+        self.info_btn.add_css_class("osd")
+        self.info_btn.add_css_class("circular")
+        self.info_btn.set_halign(Gtk.Align.START)
+        self.info_btn.set_valign(Gtk.Align.START)
+        self.info_btn.set_margin_top(16)
+        self.info_btn.set_margin_start(16)
+        self.info_btn.set_size_request(40, 40)
+        self.info_btn.set_tooltip_text(_("Photo & video details"))
+        self.info_btn.connect("clicked", self.on_info_clicked)
+        viewer_area.add_overlay(self.info_btn)
+
+        self.info_popover = Gtk.Popover()
+        self.info_popover.set_parent(self.info_btn)
+        self.info_popover.set_position(Gtk.PositionType.BOTTOM)
+        self._info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self._info_box.set_margin_top(10)
+        self._info_box.set_margin_bottom(10)
+        self._info_box.set_margin_start(12)
+        self._info_box.set_margin_end(12)
+        self.info_popover.set_child(self._info_box)
+
         # Viewer-overlay donut mirrors header donut; shares state.
         self._viewer_donut = Gtk.DrawingArea()
         self._viewer_donut.set_size_request(24, 24)
@@ -5365,6 +5400,138 @@ class MainWindow(Adw.ApplicationWindow):
             return f"{text}  ({tag})" if text else tag
         return text
 
+    def on_info_clicked(self, btn):
+        path = self._current_photo_path()
+        if not path:
+            return
+        # Read metadata off the main thread (ffprobe/EXIF can be slow), then fill.
+        self._fill_info_box([(_("Loading…"), "")])
+        self.info_popover.popup()
+
+        def _bg(p=path):
+            rows = self._gather_media_info(p)
+            GLib.idle_add(self._fill_info_box, rows, p)
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _fill_info_box(self, rows, for_path=None):
+        # Drop if the user already moved to another photo.
+        if for_path is not None and self._current_photo_path() != for_path:
+            return False
+        child = self._info_box.get_first_child()
+        while child:
+            nxt = child.get_next_sibling()
+            self._info_box.remove(child)
+            child = nxt
+        for key, value in rows:
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+            k = Gtk.Label(label=key)
+            k.add_css_class("dim-label")
+            k.set_xalign(0)
+            k.set_halign(Gtk.Align.START)
+            v = Gtk.Label(label=str(value))
+            v.set_xalign(1)
+            v.set_halign(Gtk.Align.END)
+            v.set_hexpand(True)
+            v.set_selectable(True)
+            v.set_wrap(True)
+            v.set_max_width_chars(34)
+            row.append(k)
+            row.append(v)
+            self._info_box.append(row)
+        return False
+
+    def _gather_media_info(self, path):
+        """[(label, value), …] of media details — runs in a background thread."""
+        rows = []
+        is_vid = is_video(path)
+        try:
+            rows.append((_("File size"), human_size(os.path.getsize(path))))
+        except Exception:
+            pass
+        ext = os.path.splitext(path)[1].lstrip(".").upper()
+        if ext:
+            rows.append((_("Type"), ext))
+        try:
+            ts = get_photo_date(path)
+            dt = datetime.datetime.fromtimestamp(ts)
+            rows.append((_("Taken"),
+                         format_viewer_date(dt) + dt.strftime(", %H:%M")))
+        except Exception:
+            pass
+        if is_vid:
+            try:
+                r = subprocess.run(
+                    ["ffprobe", "-v", "quiet", "-print_format", "json",
+                     "-show_format", "-show_streams", path],
+                    capture_output=True, text=True, timeout=8)
+                d = json.loads(r.stdout)
+                vs = next((s for s in d.get("streams", [])
+                           if s.get("codec_type") == "video"), {})
+                w, h = vs.get("width"), vs.get("height")
+                if w and h:
+                    rows.append((_("Resolution"), f"{w} × {h}"))
+                    rows.append((_("Megapixels"), f"{(w * h) / 1e6:.1f} MP"))
+                dur = float(d.get("format", {}).get("duration", 0) or 0)
+                if dur:
+                    rows.append((_("Duration"), format_duration(dur)))
+                fr = vs.get("r_frame_rate", "")
+                if "/" in fr:
+                    a, b = fr.split("/")
+                    if float(b):
+                        rows.append((_("Frame rate"), f"{float(a) / float(b):.0f} fps"))
+                if vs.get("codec_name"):
+                    rows.append((_("Codec"), vs["codec_name"].upper()))
+            except Exception:
+                pass
+        else:
+            try:
+                from PIL import Image
+                with Image.open(path) as img:
+                    w, h = img.size
+                    exif = img.getexif()
+                rows.append((_("Resolution"), f"{w} × {h}"))
+                rows.append((_("Megapixels"), f"{(w * h) / 1e6:.1f} MP"))
+                make = str(exif.get(0x010F) or "").strip()
+                model = str(exif.get(0x0110) or "").strip()
+                cam = " ".join(x for x in (make, model) if x)
+                if cam:
+                    rows.append((_("Camera"), cam))
+                try:
+                    ex = exif.get_ifd(0x8769)
+                except Exception:
+                    ex = {}
+                iso = ex.get(0x8827)
+                if iso:
+                    rows.append((_("ISO"), str(iso[0] if isinstance(iso, (tuple, list)) else iso)))
+                fn = ex.get(0x829D)
+                if fn:
+                    rows.append((_("Aperture"), f"f/{float(fn):.1f}"))
+                et = ex.get(0x829A)
+                if et:
+                    etf = float(et)
+                    if 0 < etf < 1:
+                        rows.append((_("Shutter"), f"1/{round(1 / etf)} s"))
+                    elif etf:
+                        rows.append((_("Shutter"), f"{etf:.0f} s"))
+                fl = ex.get(0x920A)
+                if fl:
+                    rows.append((_("Focal length"), f"{float(fl):.0f} mm"))
+            except Exception:
+                pass
+        try:
+            coords = (get_video_gps_coords(path) if is_vid else get_gps_coords(path))
+            if coords:
+                geo = cached_geocode(coords[0], coords[1])
+                loc = (geo.get("text") if geo else "") or f"{coords[0]:.4f}, {coords[1]:.4f}"
+                place = self._place_for_coords(coords)
+                if place:
+                    loc = f"{loc} (🏠 {place})"
+                rows.append((_("Location"), loc))
+        except Exception:
+            pass
+        rows.append((_("Filename"), os.path.basename(path)))
+        return rows
+
     def _load_full_photo(self, path, load_id):
         if is_video(path):
             initial, coords = self._determine_initial_location(path)
@@ -6265,6 +6432,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.viewer_close_btn,
             self.viewer_delete_btn,
             self.edit_btn,
+            self.info_btn,
             self.favorite_btn,
             self.prev_btn,
             self.next_btn,

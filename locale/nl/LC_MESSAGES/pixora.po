@@ -3026,3 +3026,54 @@ msgstr "Deze foto heeft geen locatie"
 
 msgid "No location for this video"
 msgstr "Deze video heeft geen locatie"
+
+msgid "Photo & video details"
+msgstr "Foto- & videodetails"
+
+msgid "Loading…"
+msgstr "Laden…"
+
+msgid "File size"
+msgstr "Bestandsgrootte"
+
+msgid "Type"
+msgstr "Type"
+
+msgid "Taken"
+msgstr "Gemaakt op"
+
+msgid "Resolution"
+msgstr "Resolutie"
+
+msgid "Megapixels"
+msgstr "Megapixels"
+
+msgid "Camera"
+msgstr "Camera"
+
+msgid "ISO"
+msgstr "ISO"
+
+msgid "Aperture"
+msgstr "Diafragma"
+
+msgid "Shutter"
+msgstr "Sluitertijd"
+
+msgid "Focal length"
+msgstr "Brandpuntsafstand"
+
+msgid "Duration"
+msgstr "Duur"
+
+msgid "Frame rate"
+msgstr "Framerate"
+
+msgid "Codec"
+msgstr "Codec"
+
+msgid "Location"
+msgstr "Locatie"
+
+msgid "Filename"
+msgstr "Bestandsnaam"
