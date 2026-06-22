@@ -7,6 +7,7 @@
 
 import os
 import math
+import shutil
 import threading
 import subprocess
 import sys
@@ -594,7 +595,7 @@ _geocode_failed_at = {}
 def reverse_geocode(lat, lon):
     # Cache key includes language — same coords get different labels per lang.
     global _metadata_dirty
-    key = f"{_lang}:{lat:.4f},{lon:.4f}"
+    key = f"g2:{_lang}:{lat:.4f},{lon:.4f}"
     cached = _metadata_cache["geocode"].get(key)
     if cached:
         return cached
@@ -614,8 +615,10 @@ def reverse_geocode(lat, lon):
 
 def _reverse_geocode_raw(lat, lon):
     try:
-        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-        # Accept-Language picks localized city/country labels.
+        # zoom=18 + addressdetails gives street/neighbourhood level, not just city.
+        url = (f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}"
+               f"&format=json&addressdetails=1&zoom=18")
+        # Accept-Language picks localized labels.
         req = urllib.request.Request(url, headers={
             "User-Agent": "Pixora/1.0 (+https://github.com/Linux-Ginger/Pixora)",
             "Accept-Language": _lang,
@@ -623,13 +626,20 @@ def _reverse_geocode_raw(lat, lon):
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read())
         addr = data.get("address", {})
-        city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("municipality") or ""
+        road = addr.get("road") or addr.get("pedestrian") or addr.get("footway") or ""
+        house = addr.get("house_number") or ""
+        street = (f"{road} {house}".strip()) if road else ""
+        suburb = (addr.get("suburb") or addr.get("neighbourhood")
+                  or addr.get("quarter") or addr.get("city_district") or "")
+        city = (addr.get("city") or addr.get("town") or addr.get("village")
+                or addr.get("municipality") or "")
         country = addr.get("country", "")
-        if city and country:
-            return f"{city}, {country}"
-        elif country:
-            return country
-        return ""
+        # Street, neighbourhood, city, country — skip blanks and repeats.
+        out = []
+        for part in (street, suburb, city, country):
+            if part and (not out or out[-1] != part):
+                out.append(part)
+        return ", ".join(out)
     except Exception:
         return ""
 
