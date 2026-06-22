@@ -8599,6 +8599,36 @@ class MainWindow(Adw.ApplicationWindow):
 
         import_box.append(convert_group)
 
+        video_group = Adw.PreferencesGroup()
+        video_group.set_title(_("Convert videos"))
+        video_group.set_description(
+            _("Make videos play on more devices. iPhone .mov becomes .mp4: "
+              "H.264 video is repackaged losslessly, HEVC is re-encoded to "
+              "H.264 at high quality. Date and location are kept."))
+        self.settings_video_switch = Gtk.Switch()
+        self.settings_video_switch.set_valign(Gtk.Align.CENTER)
+        self.settings_video_switch.set_active(
+            self.settings.get("convert_videos", False))
+        self.settings_video_switch.connect(
+            "notify::active", self.on_video_convert_toggled)
+        video_row = Adw.ActionRow(
+            title=_("Convert MOV to MP4 (H.264) on import"))
+        video_row.add_prefix(Gtk.Image.new_from_icon_name("video-x-generic-symbolic"))
+        video_row.add_suffix(self.settings_video_switch)
+        video_row.set_activatable_widget(self.settings_video_switch)
+        video_group.add(video_row)
+        video_info_row = Adw.ActionRow(
+            title=_("Heads-up"),
+            subtitle=_("Re-encoding HEVC takes time and can make files larger; H.264 videos convert instantly."))
+        video_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
+        video_info_row.set_activatable(False)
+        try:
+            video_info_row.set_subtitle_lines(3)
+        except Exception:
+            pass
+        video_group.add(video_info_row)
+        import_box.append(video_group)
+
         backup_group = Adw.PreferencesGroup()
         backup_group.set_title(_("Automatic backup"))
         backup_group.set_description(_("Backup to external USB drive after each import"))
@@ -10550,6 +10580,10 @@ class MainWindow(Adw.ApplicationWindow):
         save_settings(self.settings)
         if hasattr(self, "_convert_lib_btn"):
             self._convert_lib_btn.set_sensitive(True)
+
+    def on_video_convert_toggled(self, switch, _pspec):
+        self.settings["convert_videos"] = switch.get_active()
+        save_settings(self.settings)
 
     def _on_auto_confirm_toggle(self, switch, _pspec):
         """One master switch drives the per-task silent flags, so the existing

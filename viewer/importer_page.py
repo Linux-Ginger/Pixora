@@ -558,6 +558,38 @@ def convert_image(src: Path, dst: Path, fmt: str = "jpeg") -> bool:
         return False
 
 
+def _video_codec(path: Path) -> str:
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-select_streams", "v:0",
+             "-show_entries", "stream=codec_name", "-of", "csv=p=0", str(path)],
+            capture_output=True, text=True, timeout=15)
+        return r.stdout.strip().lower()
+    except Exception:
+        return ""
+
+
+def convert_video(src: Path, dst: Path) -> bool:
+    """Smart MOV→MP4 for broader compatibility. Already-H.264 video is just
+    remuxed into an .mp4 container (lossless, fast); HEVC and the rest are
+    re-encoded to H.264 at high quality so they play on older devices/players.
+    Date + location metadata are carried over. src must be a local file."""
+    try:
+        codec = _video_codec(src)
+        if codec in ("h264", "avc1"):
+            cmd = ["ffmpeg", "-y", "-i", str(src), "-c", "copy",
+                   "-map_metadata", "0", "-movflags", "+faststart", str(dst)]
+        else:
+            cmd = ["ffmpeg", "-y", "-i", str(src), "-map_metadata", "0",
+                   "-c:v", "libx264", "-crf", "20", "-preset", "fast",
+                   "-c:a", "aac", "-b:a", "192k",
+                   "-movflags", "+faststart", str(dst)]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        return r.returncode == 0 and dst.exists() and dst.stat().st_size > 0
+    except Exception:
+        return False
+
+
 def _walk_media(directory: Path, files: list[Path], progress_cb, counters: dict) -> None:
     """Recursively collect supported media under `directory`.
 
@@ -2396,10 +2428,18 @@ class ImporterPage(Gtk.Box):
                 render = find_edited_render(src)
                 if render is not None:
                     copy_src = render
-                # Optionally convert HEIC to a universally-viewable format.
+                # Optionally convert HEIC to a universally-viewable format, and
+                # MOV/HEVC video to H.264 .mp4 for broader compatibility.
                 convert = (self.settings.get("convert_heic", False)
                            and copy_src.suffix.lower() in (".heic", ".heif"))
-                out_ext = ".jpg" if convert else copy_src.suffix
+                vid_convert = (self.settings.get("convert_videos", False)
+                               and copy_src.suffix.lower() in (".mov", ".m4v", ".3gp"))
+                if convert:
+                    out_ext = ".jpg"
+                elif vid_convert:
+                    out_ext = ".mp4"
+                else:
+                    out_ext = copy_src.suffix
                 # CPLAssets masters are GUID-named; give them a readable,
                 # date-based name instead of a meaningless UUID in the archive.
                 if "CPLAssets" in src.parts:
@@ -2417,13 +2457,15 @@ class ImporterPage(Gtk.Box):
                         counter += 1
 
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                if convert:
-                    # Stage a reliable local copy first (decoding off FUSE is
-                    # garbled), then convert; fall back to the original on error.
+                if convert or vid_convert:
+                    # Stage a reliable local copy first (decoding/ffmpeg off FUSE
+                    # is garbled), then convert; fall back to the original on error.
                     tmp = dst.parent / (dst.stem + "_src" + copy_src.suffix)
                     try:
                         shutil.copy2(copy_src, tmp)
-                        if convert_image(tmp, dst, "jpeg"):
+                        ok = (convert_image(tmp, dst, "jpeg") if convert
+                              else convert_video(tmp, dst))
+                        if ok:
                             try:
                                 os.utime(dst, (ts, ts))
                             except OSError:

@@ -3111,3 +3111,18 @@ msgstr "Lebendig"
 
 msgid "Filter strength"
 msgstr "Filterstärke"
+
+msgid "Convert videos"
+msgstr "Videos umwandeln"
+
+msgid "Make videos play on more devices. iPhone .mov becomes .mp4: H.264 video is repackaged losslessly, HEVC is re-encoded to H.264 at high quality. Date and location are kept."
+msgstr "Damit Videos auf mehr Geräten laufen. iPhone-.mov wird .mp4: H.264-Video wird verlustfrei umverpackt, HEVC wird in hoher Qualität nach H.264 neu kodiert. Datum und Standort bleiben erhalten."
+
+msgid "Convert MOV to MP4 (H.264) on import"
+msgstr "MOV beim Import in MP4 (H.264) umwandeln"
+
+msgid "Heads-up"
+msgstr "Hinweis"
+
+msgid "Re-encoding HEVC takes time and can make files larger; H.264 videos convert instantly."
+msgstr "HEVC neu zu kodieren dauert und kann Dateien größer machen; H.264-Videos gehen sofort."
