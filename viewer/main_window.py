@@ -5493,8 +5493,8 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             ts = get_photo_date(path)
             dt = datetime.datetime.fromtimestamp(ts)
-            rows.append((_("Taken"),
-                         format_viewer_date(dt) + dt.strftime(", %H:%M")))
+            # format_viewer_date already includes the time — don't append it again.
+            rows.append((_("Taken"), format_viewer_date(dt)))
         except Exception:
             pass
         if is_vid:
@@ -5530,8 +5530,8 @@ class MainWindow(Adw.ApplicationWindow):
                     exif = img.getexif()
                 rows.append((_("Resolution"), f"{w} × {h}"))
                 rows.append((_("Megapixels"), f"{(w * h) / 1e6:.1f} MP"))
-                make = str(exif.get(0x010F) or "").strip()
-                model = str(exif.get(0x0110) or "").strip()
+                make = " ".join(str(exif.get(0x010F) or "").split())
+                model = " ".join(str(exif.get(0x0110) or "").split())
                 cam = " ".join(x for x in (make, model) if x)
                 if cam:
                     rows.append((_("Camera"), cam))
@@ -5540,8 +5540,13 @@ class MainWindow(Adw.ApplicationWindow):
                 except Exception:
                     ex = {}
                 iso = ex.get(0x8827)
+                if isinstance(iso, (tuple, list)):
+                    iso = iso[0] if iso else None
                 if iso:
-                    rows.append((_("ISO"), str(iso[0] if isinstance(iso, (tuple, list)) else iso)))
+                    try:
+                        rows.append((_("ISO"), str(int(iso))))
+                    except Exception:
+                        pass
                 fn = ex.get(0x829D)
                 if fn:
                     rows.append((_("Aperture"), f"f/{float(fn):.1f}"))
