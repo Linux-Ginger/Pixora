@@ -443,8 +443,13 @@ def get_photo_date(path: Path) -> float:
         return 0.0
 
 
-def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
-    """Apply AAE crop/rotation edits to the imported photo."""
+def apply_aae_edits(image_path: Path, aae_path: Path):
+    """Apply AAE crop/rotation edits to the imported photo.
+
+    Returns the resulting file path (which may differ from image_path — HEIC
+    is re-saved as .jpg), or None when nothing was changed. The caller must use
+    the returned path so later steps don't reference a file that no longer exists.
+    """
     try:
         import plistlib
         import zlib
@@ -454,7 +459,7 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
 
         raw = plist.get("adjustmentData")
         if not raw:
-            return False
+            return None
 
         # plistlib already base64-decodes; inner payload is zlib-compressed.
         try:
@@ -465,10 +470,11 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
         data = json.loads(json_str)
         adjustments = data.get("adjustments", [])
         if not adjustments:
-            return False
+            return None
 
         from PIL import Image
         img = Image.open(image_path)
+        orig_exif = img.info.get("exif", b"")  # keep date/location across the edit
         modified = False
 
         for adj in adjustments:
@@ -505,24 +511,30 @@ def apply_aae_edits(image_path: Path, aae_path: Path) -> bool:
         if modified:
             ext = image_path.suffix.lower()
             if ext in (".jpg", ".jpeg"):
-                img.save(image_path, "JPEG", quality=95, exif=img.info.get("exif", b""))
+                img.save(image_path, "JPEG", quality=95, exif=orig_exif)
+                img.close()
+                return image_path
             elif ext in (".heic", ".heif"):
-                # Pillow can't write HEIC; save as JPEG next to the original.
+                # Pillow can't write HEIC; re-save as JPEG and drop the original.
                 jpeg_path = image_path.with_suffix(".jpg")
-                img.save(jpeg_path, "JPEG", quality=95)
-                image_path.unlink()
-                jpeg_path.rename(image_path.with_suffix(".jpg"))
+                img.save(jpeg_path, "JPEG", quality=95, exif=orig_exif)
+                img.close()
+                if jpeg_path != image_path and image_path.exists():
+                    image_path.unlink()
+                return jpeg_path
             elif ext == ".png":
                 img.save(image_path, "PNG")
+                img.close()
+                return image_path
             else:
                 img.save(image_path)
-            img.close()
-            return True
+                img.close()
+                return image_path
 
         img.close()
     except Exception:
         pass
-    return False
+    return None
 
 
 def convert_image(src: Path, dst: Path, fmt: str = "jpeg") -> bool:
@@ -2433,7 +2445,9 @@ class ImporterPage(Gtk.Box):
                     if not aae.exists():
                         aae = src.with_suffix(".aae")
                     if aae.exists() and dst.suffix.lower() in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng"):
-                        apply_aae_edits(dst, aae)
+                        edited = apply_aae_edits(dst, aae)
+                        if edited is not None:
+                            dst = edited  # HEIC becomes .jpg; track the real file
 
                 # Live Photo: import only the still — the motion movie is
                 # skipped on purpose (cleaner archive, no stray video).

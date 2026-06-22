@@ -5332,8 +5332,12 @@ class MainWindow(Adw.ApplicationWindow):
         if pixbuf:
             self._apply_viewer_transform()
         ts = get_photo_date(path)
-        datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
-        self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
+        try:
+            datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
+        except (OverflowError, OSError, ValueError):
+            datum = ""
+        sep = "  —  " if datum else ""
+        self.viewer_title.set_text(f"{os.path.basename(path)}{sep}{datum}")
         if getattr(self, "_viewer_place", None) and not location:
             # Show '🏠 Home' right away; geocode upgrades it to 'City (🏠 Home)'.
             self._set_viewer_location("done", self._decorate_location(""))
@@ -5799,8 +5803,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_scrubber.set_value(0.0)
         self.video_time_label.set_text("0:00 / 0:00")
         ts = get_photo_date(path)
-        datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
-        self.viewer_title.set_text(f"{os.path.basename(path)}  —  {datum}")
+        try:
+            datum = format_viewer_date(datetime.datetime.fromtimestamp(ts))
+        except (OverflowError, OSError, ValueError):
+            datum = ""
+        sep = "  —  " if datum else ""
+        self.viewer_title.set_text(f"{os.path.basename(path)}{sep}{datum}")
         if getattr(self, "_viewer_place", None) and not location:
             # Show '🏠 Home' right away; geocode upgrades it to 'City (🏠 Home)'.
             self._set_viewer_location("done", self._decorate_location(""))
@@ -11124,12 +11132,19 @@ class MainWindow(Adw.ApplicationWindow):
                     text=True
                 )
                 self._backup_proc = proc
+                # Drain stderr on its own thread: reading stdout first and stderr
+                # after can deadlock when rsync fills the stderr pipe buffer.
+                _err_chunks = []
+                _err_thread = threading.Thread(
+                    target=lambda: _err_chunks.extend(proc.stderr or []),
+                    daemon=True)
+                _err_thread.start()
                 for line in proc.stdout:
                     _on_rsync_line(line)
-                _err = proc.stderr.read() if proc.stderr else ""
                 proc.wait(timeout=3600)
+                _err_thread.join(timeout=5)
                 success = proc.returncode == 0
-                rsync_err = _err.strip()
+                rsync_err = "".join(_err_chunks).strip()
             except Exception as e:
                 log_error(_("Backup error: {err}").format(err=e))
                 success = False
