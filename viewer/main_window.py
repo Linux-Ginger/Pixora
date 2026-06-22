@@ -5362,7 +5362,20 @@ class MainWindow(Adw.ApplicationWindow):
         self._set_viewer_location("done", self._decorate_location(text))
         return False
 
+    def _refresh_viewer_place(self, path):
+        """Recompute the place tag + stored address for `path`. Every viewer entry
+        point calls this so a cached fast-nav never inherits the previous photo's
+        place (which showed a stray 'Home' tag or a blank label)."""
+        try:
+            coords = (get_video_gps_coords(path) if is_video(path)
+                      else get_gps_coords(path))
+        except Exception:
+            coords = None
+        self._viewer_place = self._place_for_coords(coords)
+        self._viewer_place_addr = self._place_location_text(coords)
+
     def _show_full_photo(self, pixbuf, path, location="", searching=False):
+        self._refresh_viewer_place(path)
         self._hide_photo_spinner()  # load finished (or failed): stop the loader
         # Clear any video immediately — even if the photo is queued below, the
         # video must never linger on top of an incoming photo.
@@ -5874,6 +5887,7 @@ class MainWindow(Adw.ApplicationWindow):
         return True
 
     def _show_video(self, path, location="", searching=False):
+        self._refresh_viewer_place(path)
         self._hide_photo_spinner()
         self._stop_video()
         self._preview_cache = OrderedDict()
