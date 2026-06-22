@@ -4200,9 +4200,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.restore_orig_btn = _edit_btn("edit-undo-symbolic",
                                           _("Restore original"),
                                           self.on_editor_restore)
+        self.filter_toggle_btn = _edit_btn("color-select-symbolic", _("Filters"),
+                                           self.on_editor_toggle_filters, toggle=True)
         self.editor_bar.append(rot_left_btn)
         self.editor_bar.append(rot_right_btn)
         self.editor_bar.append(self.crop_toggle_btn)
+        self.editor_bar.append(self.filter_toggle_btn)
         self.editor_bar.append(self.restore_orig_btn)
 
         sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
@@ -4240,6 +4243,55 @@ class MainWindow(Adw.ApplicationWindow):
         # Editor toolbar must sit ABOVE the crop overlay, else the overlay eats
         # the button clicks (couldn't exit crop / cancel did nothing).
         viewer_area.add_overlay(self.editor_bar)
+
+        # Filter strip — presets + intensity, shown above the editor bar when the
+        # Filters button is on. Live preview; applied full-res on Save.
+        self.filter_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self.filter_bar.set_halign(Gtk.Align.CENTER)
+        self.filter_bar.set_valign(Gtk.Align.END)
+        self.filter_bar.set_margin_bottom(FILM_THUMB + 12 + 16 + 58)
+        self.filter_bar.add_css_class("pixora-editbar")
+        self.filter_bar.set_visible(False)
+        self._filter_preset_btns = []
+        presets = [
+            ("",      _("Original")),
+            ("bw",    _("B&W")),
+            ("sepia", _("Sepia")),
+            ("warm",  _("Warm")),
+            ("cool",  _("Cool")),
+            ("vivid", _("Vivid")),
+        ]
+        group_btn = None
+        for name, label in presets:
+            b = Gtk.ToggleButton(label=label)
+            b.add_css_class("flat")
+            b.set_valign(Gtk.Align.CENTER)
+            if group_btn is None:
+                group_btn = b
+                b.set_active(True)
+            else:
+                b.set_group(group_btn)
+            b.connect("toggled", self._on_filter_preset, name)
+            self.filter_bar.append(b)
+            self._filter_preset_btns.append((name, b))
+        fsep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        fsep.set_margin_start(4)
+        fsep.set_margin_end(4)
+        fsep.set_margin_top(6)
+        fsep.set_margin_bottom(6)
+        self.filter_bar.append(fsep)
+        self.filter_strength_scale = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        self.filter_strength_scale.set_value(100)
+        self.filter_strength_scale.set_draw_value(False)
+        self.filter_strength_scale.set_size_request(130, -1)
+        self.filter_strength_scale.set_valign(Gtk.Align.CENTER)
+        self.filter_strength_scale.set_tooltip_text(_("Filter strength"))
+        self.filter_strength_scale.set_sensitive(False)
+        self.filter_strength_scale.connect("value-changed",
+                                           self._on_filter_strength)
+        self.filter_bar.append(self.filter_strength_scale)
+        viewer_area.add_overlay(self.filter_bar)
 
         self.viewer_title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self.viewer_title_box.add_css_class("osd")
@@ -6988,6 +7040,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_rect             = None
         self._crop_handle           = None
         self._crop_rect_origin      = None
+        self._editor_filter         = ""
+        self._editor_filter_strength = 1.0
+        self._editor_filtered_pixbuf = None
+        self._reset_filter_ui()
         self.crop_toggle_btn.set_active(False)
         self.crop_overlay_area.set_visible(False)
         # Clean editor mode: hide all normal viewer chrome (filmstrip, counter,
@@ -7011,8 +7067,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._crop_rect             = None
         self._crop_handle           = None
         self._crop_rect_origin      = None
+        self._editor_filter         = ""
+        self._editor_filter_strength = 1.0
+        self._editor_filtered_pixbuf = None
         self.crop_toggle_btn.set_active(False)
         self.crop_overlay_area.set_visible(False)
+        self.filter_toggle_btn.set_active(False)
+        self.filter_bar.set_visible(False)
         self.editor_bar.set_visible(False)
         if self._viewer_pixbuf:
             self.photo_picture.set_pixbuf(self._viewer_pixbuf)
@@ -7169,7 +7230,109 @@ class MainWindow(Adw.ApplicationWindow):
             self._editor_display_pixbuf = self._viewer_pixbuf
         else:
             self._editor_display_pixbuf = self._viewer_pixbuf.rotate_simple(gdk_rot)
-        self.photo_picture.set_pixbuf(self._editor_display_pixbuf)
+        # Rebuild the filtered version of the (rotated) base, then show preview.
+        if getattr(self, "_editor_filter", ""):
+            self._editor_filtered_pixbuf = self._make_filtered_pixbuf(
+                self._editor_display_pixbuf, self._editor_filter)
+            self._render_filter_preview()
+        else:
+            self._editor_filtered_pixbuf = None
+            self.photo_picture.set_pixbuf(self._editor_display_pixbuf)
+
+    # ── Filters ──────────────────────────────────────────────────────
+    def _reset_filter_ui(self):
+        for name, b in getattr(self, "_filter_preset_btns", []):
+            b.set_active(name == "")   # "Original" selected
+        if hasattr(self, "filter_strength_scale"):
+            self.filter_strength_scale.set_value(100)
+            self.filter_strength_scale.set_sensitive(False)
+
+    def on_editor_toggle_filters(self, btn):
+        self.filter_bar.set_visible(btn.get_active())
+
+    def _on_filter_preset(self, btn, name):
+        if not btn.get_active():
+            return  # only react to the newly-selected one
+        self._editor_filter = name
+        self.filter_strength_scale.set_sensitive(bool(name))
+        self._editor_apply_preview()
+
+    def _on_filter_strength(self, scale):
+        self._editor_filter_strength = scale.get_value() / 100.0
+        self._render_filter_preview()
+
+    def _render_filter_preview(self):
+        base = self._editor_display_pixbuf
+        filt = getattr(self, "_editor_filtered_pixbuf", None)
+        if base is None:
+            return
+        if filt is None:
+            self.photo_picture.set_pixbuf(base)
+            return
+        strength = getattr(self, "_editor_filter_strength", 1.0)
+        if strength >= 0.999:
+            self.photo_picture.set_pixbuf(filt)
+        elif strength <= 0.001:
+            self.photo_picture.set_pixbuf(base)
+        else:
+            dest = base.copy()
+            filt.composite(dest, 0, 0, dest.get_width(), dest.get_height(),
+                           0, 0, 1, 1, GdkPixbuf.InterpType.NEAREST,
+                           int(strength * 255))
+            self.photo_picture.set_pixbuf(dest)
+
+    def _make_filtered_pixbuf(self, pixbuf, name):
+        try:
+            pil = self._pixbuf_to_pil(pixbuf)
+            return self._pil_to_pixbuf(self._apply_named_filter(pil, name))
+        except Exception as e:
+            log_error("filter preview failed: {}".format(e))
+            return None
+
+    def _pixbuf_to_pil(self, pb):
+        from PIL import Image
+        w, h = pb.get_width(), pb.get_height()
+        mode = "RGBA" if pb.get_has_alpha() else "RGB"
+        img = Image.frombytes(mode, (w, h), pb.get_pixels(),
+                              "raw", mode, pb.get_rowstride())
+        return img.convert("RGB")
+
+    def _pil_to_pixbuf(self, img):
+        from io import BytesIO
+        buf = BytesIO()
+        img.convert("RGB").save(buf, "PNG")
+        loader = GdkPixbuf.PixbufLoader.new_with_type("png")
+        try:
+            loader.write(buf.getvalue())
+        finally:
+            loader.close()
+        return loader.get_pixbuf()
+
+    def _apply_named_filter(self, img, name):
+        """Apply a named preset to a PIL image (full-strength). Used for both the
+        preview and the on-save full-resolution render."""
+        from PIL import Image, ImageOps, ImageEnhance
+        img = img.convert("RGB")
+        if name == "bw":
+            return ImageOps.grayscale(img).convert("RGB")
+        if name == "sepia":
+            g = ImageOps.grayscale(img)
+            return ImageOps.colorize(g, black=(28, 16, 0),
+                                     white=(255, 232, 184)).convert("RGB")
+        if name == "warm":
+            r, g, b = img.split()
+            r = r.point(lambda v: min(255, int(v * 1.12)))
+            b = b.point(lambda v: int(v * 0.90))
+            return Image.merge("RGB", (r, g, b))
+        if name == "cool":
+            r, g, b = img.split()
+            b = b.point(lambda v: min(255, int(v * 1.12)))
+            r = r.point(lambda v: int(v * 0.90))
+            return Image.merge("RGB", (r, g, b))
+        if name == "vivid":
+            img = ImageEnhance.Color(img).enhance(1.5)
+            return ImageEnhance.Contrast(img).enhance(1.12)
+        return img
 
     def on_editor_toggle_crop(self, btn):
         self._editor_crop_mode = btn.get_active()
@@ -7306,6 +7469,9 @@ class MainWindow(Adw.ApplicationWindow):
     def on_editor_save(self, btn):
         path     = self.photos[self.current_index]
         rotation = self._editor_rotation
+        # Capture filter now — on_editor_cancel() below resets the editor state.
+        filt     = getattr(self, "_editor_filter", "")
+        fstr     = getattr(self, "_editor_filter_strength", 1.0)
         log_info(_("Editor save: rotation={rot}° crop={crop} path={p}").format(
             rot=rotation, crop=bool(self._crop_rect), p=path
         ))
@@ -7374,6 +7540,12 @@ class MainWindow(Adw.ApplicationWindow):
                           min(ih, int(round(crop_frac[3] * ih))))
                     if cb[2] - cb[0] > 1 and cb[3] - cb[1] > 1:
                         img = img.crop(cb)
+                if filt:
+                    from PIL import Image as _PILImage
+                    base_rgb = img.convert("RGB")
+                    filtered = self._apply_named_filter(base_rgb, filt)
+                    img = (filtered if fstr >= 0.999
+                           else _PILImage.blend(base_rgb, filtered, fstr))
 
                 out_path = path
                 if is_jpeg:

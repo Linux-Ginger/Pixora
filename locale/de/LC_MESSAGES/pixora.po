@@ -3087,3 +3087,27 @@ msgstr "Standort"
 
 msgid "Filename"
 msgstr "Dateiname"
+
+msgid "Filters"
+msgstr "Filter"
+
+msgid "Original"
+msgstr "Original"
+
+msgid "B&W"
+msgstr "S/W"
+
+msgid "Sepia"
+msgstr "Sepia"
+
+msgid "Warm"
+msgstr "Warm"
+
+msgid "Cool"
+msgstr "Kühl"
+
+msgid "Vivid"
+msgstr "Lebendig"
+
+msgid "Filter strength"
+msgstr "Filterstärke"

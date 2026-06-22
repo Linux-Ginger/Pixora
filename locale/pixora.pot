@@ -2232,3 +2232,27 @@ msgstr ""
 
 msgid "Filename"
 msgstr ""
+
+msgid "Filters"
+msgstr ""
+
+msgid "Original"
+msgstr ""
+
+msgid "B&W"
+msgstr ""
+
+msgid "Sepia"
+msgstr ""
+
+msgid "Warm"
+msgstr ""
+
+msgid "Cool"
+msgstr ""
+
+msgid "Vivid"
+msgstr ""
+
+msgid "Filter strength"
+msgstr ""

@@ -3077,3 +3077,27 @@ msgstr "Locatie"
 
 msgid "Filename"
 msgstr "Bestandsnaam"
+
+msgid "Filters"
+msgstr "Filters"
+
+msgid "Original"
+msgstr "Origineel"
+
+msgid "B&W"
+msgstr "Z/W"
+
+msgid "Sepia"
+msgstr "Sepia"
+
+msgid "Warm"
+msgstr "Warm"
+
+msgid "Cool"
+msgstr "Koel"
+
+msgid "Vivid"
+msgstr "Levendig"
+
+msgid "Filter strength"
+msgstr "Filtersterkte"

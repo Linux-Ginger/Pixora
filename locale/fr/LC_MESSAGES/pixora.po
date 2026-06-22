@@ -3104,3 +3104,27 @@ msgstr "Localisation"
 
 msgid "Filename"
 msgstr "Nom du fichier"
+
+msgid "Filters"
+msgstr "Filtres"
+
+msgid "Original"
+msgstr "Original"
+
+msgid "B&W"
+msgstr "N&B"
+
+msgid "Sepia"
+msgstr "Sépia"
+
+msgid "Warm"
+msgstr "Chaud"
+
+msgid "Cool"
+msgstr "Froid"
+
+msgid "Vivid"
+msgstr "Éclatant"
+
+msgid "Filter strength"
+msgstr "Intensité du filtre"

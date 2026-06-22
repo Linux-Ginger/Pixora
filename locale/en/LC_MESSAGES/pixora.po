@@ -3059,3 +3059,27 @@ msgstr "Location"
 
 msgid "Filename"
 msgstr "Filename"
+
+msgid "Filters"
+msgstr "Filters"
+
+msgid "Original"
+msgstr "Original"
+
+msgid "B&W"
+msgstr "B&W"
+
+msgid "Sepia"
+msgstr "Sepia"
+
+msgid "Warm"
+msgstr "Warm"
+
+msgid "Cool"
+msgstr "Cool"
+
+msgid "Vivid"
+msgstr "Vivid"
+
+msgid "Filter strength"
+msgstr "Filter strength"
