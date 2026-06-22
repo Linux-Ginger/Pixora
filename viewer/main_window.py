@@ -592,25 +592,35 @@ def _get_gps_coords_raw(photo_path):
 _geocode_failed_at = {}
 
 
+def _geocode_key(lat, lon):
+    # Key includes language — same coords get different labels per lang.
+    return f"g3:{_lang}:{lat:.4f},{lon:.4f}"
+
+
+def cached_geocode(lat, lon):
+    """Already-cached geocode dict ({text,street,city}) or {} — never hits network."""
+    return _metadata_cache["geocode"].get(_geocode_key(lat, lon)) or {}
+
+
 def reverse_geocode(lat, lon):
-    # Cache key includes language — same coords get different labels per lang.
+    """Geocode dict {text, street, city}; looked up once then cached forever."""
     global _metadata_dirty
-    key = f"g2:{_lang}:{lat:.4f},{lon:.4f}"
+    key = _geocode_key(lat, lon)
     cached = _metadata_cache["geocode"].get(key)
     if cached:
         return cached
     # Rate-limit failed lookups (30 min) — avoids 5s timeouts when offline.
     last_fail = _geocode_failed_at.get(key, 0)
     if time.time() - last_fail < 1800:
-        return ""
+        return {}
     result = _reverse_geocode_raw(lat, lon)
-    if result:
+    if result and result.get("text"):
         _metadata_cache["geocode"][key] = result
         _metadata_dirty = True
         _geocode_failed_at.pop(key, None)
     else:
         _geocode_failed_at[key] = time.time()
-    return result
+    return result or {}
 
 
 def _reverse_geocode_raw(lat, lon):
@@ -638,9 +648,9 @@ def _reverse_geocode_raw(lat, lon):
         for part in (street, suburb, city, country):
             if part and (not out or out[-1] != part):
                 out.append(part)
-        return ", ".join(out)
+        return {"text": ", ".join(out), "street": street, "city": city}
     except Exception:
-        return ""
+        return {}
 
 # English country names for the home dialog; Nominatim matches these reliably.
 COUNTRIES = [
@@ -3906,7 +3916,7 @@ class MainWindow(Adw.ApplicationWindow):
                 coords = get_gps_coords(sample_path)
             if not coords:
                 return
-            loc = reverse_geocode(coords[0], coords[1])
+            loc = reverse_geocode(coords[0], coords[1]).get("text", "")
             if loc:
                 self._photo_location[sample_path] = loc
                 GLib.idle_add(self._apply_cluster_location, loc)
@@ -4411,7 +4421,11 @@ class MainWindow(Adw.ApplicationWindow):
             if (abs(coords[0] - lat) < _PLACE_TOL_LAT
                     and abs(coords[1] - lon) < _PLACE_TOL_LON):
                 return name
-        return None
+        # Street-name fallback for GPS drift (uses cached geocode only).
+        geo = cached_geocode(coords[0], coords[1])
+        _kind, name = self._match_place_kind_by_address(
+            geo.get("street", ""), geo.get("city", ""))
+        return name
 
     def _photo_place(self, path):
         """Place name for the photo's GPS, or None."""
@@ -4452,15 +4466,16 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _apply_initial_location(self, location, searching):
         """Set the viewer location label when a photo/video opens (pre-geocode).
-        Place photos show their stored address; GPS-less photos say so."""
-        if getattr(self, "_viewer_place", None) and not location:
+        A cached address shows instantly; an unlooked-up one shows the spinner;
+        place photos fall back to their stored address; GPS-less photos say so."""
+        if location:
+            self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
+        elif getattr(self, "_viewer_place", None):
             addr = getattr(self, "_viewer_place_addr", "") or ""
             base = f"📍 {addr}" if addr else ""
             self._set_viewer_location("done", self._decorate_location(base))
         elif searching:
             self._set_viewer_location("searching")
-        elif location:
-            self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
         else:
             self._set_viewer_location("done", f"📍 {_('Location unavailable')}")
 
@@ -4484,7 +4499,31 @@ class MainWindow(Adw.ApplicationWindow):
                     and abs(coords[0] - p["lat"]) < _PLACE_TOL_LAT
                     and abs(coords[1] - p["lon"]) < _PLACE_TOL_LON):
                 return "extra"
-        return None
+        # GPS drift can put an at-home photo outside the radius — fall back to a
+        # street-name match using the already-cached geocode (no network here).
+        geo = cached_geocode(coords[0], coords[1])
+        kind, _name = self._match_place_kind_by_address(
+            geo.get("street", ""), geo.get("city", ""))
+        return kind
+
+    def _match_place_kind_by_address(self, street, city):
+        """('main'|'extra', name) when street (and city, if known) matches a saved
+        place's street, else (None, None). This catches photos taken on the home
+        street that GPS drift pushed outside the radius."""
+        if not street:
+            return None, None
+        s = street.strip().lower()
+        c = (city or "").strip().lower()
+        hs = (self.settings.get("home_street") or "").strip().lower()
+        hc = (self.settings.get("home_city") or "").strip().lower()
+        if hs and s == hs and (not hc or not c or c == hc):
+            return "main", _("Home")
+        for p in self.settings.get("extra_places", []):
+            ps = (p.get("street") or "").strip().lower()
+            pc = (p.get("city") or "").strip().lower()
+            if ps and s == ps and (not pc or not c or c == pc):
+                return "extra", (p.get("name") or _("Place"))
+        return None, None
 
     def _media_count_text(self, photos=None):
         """'6 photos & 2 videos' — counts stills vs videos separately."""
@@ -5200,7 +5239,9 @@ class MainWindow(Adw.ApplicationWindow):
         ).start()
 
     def _determine_initial_location(self, path):
-        """Return (label, coords_for_geocode); caches "" for GPS-less photos."""
+        """Return (label, coords_for_lookup). coords is non-None only when an
+        online lookup is still needed (drives the spinner); a label that's already
+        cached comes back instantly so it never has to pop in via a spinner."""
         cached = self._photo_location.get(path)
         if cached:
             return cached, None
@@ -5209,7 +5250,11 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             coords = get_gps_coords(path)
         if coords:
-            return "", coords
+            geo = cached_geocode(coords[0], coords[1])
+            if geo.get("text"):
+                self._photo_location[path] = geo["text"]
+                return geo["text"], None  # already looked up once — show instantly
+            return "", coords             # needs a lookup → spinner + async geocode
         try:
             if cached is None and time.time() - os.path.getmtime(path) > 30:
                 self._photo_location[path] = ""
@@ -5239,21 +5284,28 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _start_geocode_upgrade(self, path, coords, load_id):
-        """Async geocode; falls back to the saved place address, then raw coords."""
+        """Async geocode; sets the place tag by street match, then caches the text."""
         place_addr = getattr(self, "_viewer_place_addr", "") or ""
+        had_place = bool(getattr(self, "_viewer_place", None))
 
         def _bg():
-            city = reverse_geocode(coords[0], coords[1])
-            if city:
-                resolved = f"📍 {city}"
-                self._photo_location[path] = city
+            geo = reverse_geocode(coords[0], coords[1])
+            text = geo.get("text", "")
+            # Street-name match catches a saved place that GPS drift put off-radius.
+            place = None
+            if not had_place:
+                _kind, place = self._match_place_kind_by_address(
+                    geo.get("street", ""), geo.get("city", ""))
+            if text:
+                resolved = f"📍 {text}"
+                self._photo_location[path] = text
             elif place_addr:
                 resolved = f"📍 {place_addr}"  # offline fallback for a saved place
             else:
                 resolved = f"📍 {coords[0]:.4f}, {coords[1]:.4f}"
                 # Don't cache — retry when online.
             if load_id == self._viewer_load_id:
-                GLib.idle_add(self._update_viewer_location, resolved, load_id)
+                GLib.idle_add(self._update_viewer_location, resolved, load_id, place)
         threading.Thread(target=_bg, daemon=True).start()
 
     def _decorate_location(self, text):
@@ -5299,10 +5351,12 @@ class MainWindow(Adw.ApplicationWindow):
         if coords:
             self._start_geocode_upgrade(path, coords, load_id)
 
-    def _update_viewer_location(self, text, load_id):
+    def _update_viewer_location(self, text, load_id, place=None):
         # Guard against stale callbacks after nav.
         if load_id != self._viewer_load_id:
             return False
+        if place and not getattr(self, "_viewer_place", None):
+            self._viewer_place = place
         self._set_viewer_location("done", self._decorate_location(text))
         return False
 

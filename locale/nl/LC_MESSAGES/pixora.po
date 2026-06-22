@@ -1806,7 +1806,7 @@ msgstr ""
 "importeren of beide bewaren."
 
 msgid "Looking up location…"
-msgstr "Locatie zoeken…"
+msgstr "Locatie opzoeken…"
 
 msgid "Enable"
 msgstr "Inschakelen"
