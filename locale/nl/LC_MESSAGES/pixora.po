@@ -2978,3 +2978,18 @@ msgstr "Dit wordt je opgeruimde bibliotheek"
 
 msgid "Drop your photos and videos in here however messy you like. Pixora files them into neat folders for you, using the layout you pick in the next step."
 msgstr "Gooi je foto's en video's hier zo rommelig als je wilt naar binnen. Pixora zet ze netjes in mappen voor je, volgens de indeling die je in de volgende stap kiest."
+
+msgid "What's new"
+msgstr "Wat is er nieuw"
+
+msgid "Release notes from the latest version"
+msgstr "Release-notities van de nieuwste versie"
+
+msgid "What changed in Pixora {v}"
+msgstr "Wat er is veranderd in Pixora {v}"
+
+msgid "Loading release notes…"
+msgstr "Release-notities laden…"
+
+msgid "No release notes available."
+msgstr "Geen release-notities beschikbaar."

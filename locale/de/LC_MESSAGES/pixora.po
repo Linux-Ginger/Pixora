@@ -2988,3 +2988,18 @@ msgstr "Das wird deine aufgeräumte Mediathek"
 
 msgid "Drop your photos and videos in here however messy you like. Pixora files them into neat folders for you, using the layout you pick in the next step."
 msgstr "Leg deine Fotos und Videos hier ab, so durcheinander wie du willst. Pixora sortiert sie für dich in ordentliche Ordner, anhand der Aufteilung, die du im nächsten Schritt wählst."
+
+msgid "What's new"
+msgstr "Was ist neu"
+
+msgid "Release notes from the latest version"
+msgstr "Versionshinweise der neuesten Version"
+
+msgid "What changed in Pixora {v}"
+msgstr "Was sich in Pixora {v} geändert hat"
+
+msgid "Loading release notes…"
+msgstr "Versionshinweise werden geladen…"
+
+msgid "No release notes available."
+msgstr "Keine Versionshinweise verfügbar."

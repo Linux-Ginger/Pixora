@@ -15,6 +15,7 @@ import hashlib
 import time
 import datetime
 import urllib.request
+import urllib.error
 import inspect
 from collections import defaultdict, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
@@ -208,7 +209,7 @@ LICENSE_PATH     = os.path.abspath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "LICENSE"
 ))
 INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
-GITHUB_RELEASES_API = "https://api.github.com/repos/Linux-Ginger/pixora/releases/latest"
+GITHUB_RELEASES_API = "https://api.github.com/repos/Linux-Ginger/Pixora/releases/latest"
 CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
 FAVORITES_PATH   = os.path.expanduser("~/.config/pixora/favorites.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
@@ -737,24 +738,47 @@ def _walk_rel_files(base):
 INSTALLED_VERSION_FILE = os.path.expanduser("~/.config/pixora/installed_version")
 
 
+def _fetch_latest_release():
+    """Latest published GitHub release as {version, body, url}.
+
+    Raises on network failure; returns None when the repo has no release yet.
+    This is the single source of truth for "is there an update" — Pixora tracks
+    tagged releases, not every commit on main.
+    """
+    req = urllib.request.Request(
+        GITHUB_RELEASES_API,
+        headers={
+            "User-Agent": "Pixora/1.0",
+            "Accept": "application/vnd.github+json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None  # no release published yet
+        raise
+    tag = (data.get("tag_name") or data.get("name") or "").strip()
+    version = tag[1:] if tag[:1] in ("v", "V") else tag
+    return {
+        "version": version,
+        "body": (data.get("body") or "").strip(),
+        "url": data.get("html_url") or "",
+    }
+
+
 def _fetch_versions():
-    """(local, remote) version strings; raises on network failure."""
+    """(local, remote) version strings; raises on network failure.
+
+    remote is "" when no release is published yet.
+    """
     local_version = ""
     if os.path.exists(INSTALLED_VERSION_FILE):
         with open(INSTALLED_VERSION_FILE) as f:
             local_version = f.read().strip()
-    # Cache-bust: raw.githubusercontent.com is Fastly-cached ~5 min.
-    req = urllib.request.Request(
-        f"https://raw.githubusercontent.com/Linux-Ginger/Pixora/main/version.txt?t={int(time.time())}",
-        headers={
-            "User-Agent": "Pixora/1.0",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=5) as resp:
-        remote_version = resp.read().decode().strip()
-    return local_version, remote_version
+    rel = _fetch_latest_release()
+    return local_version, (rel["version"] if rel else "")
 
 
 def get_video_duration(path):
@@ -1540,6 +1564,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._structure_popup_dismissed = False
         self._home_ready_at = None
         self._pending_update_version = None
+        self._latest_release = None
         self._update_dialog_shown = False
 
         self.set_title("Pixora (Dev Mode)" if self.settings.get("dev_mode") else "Pixora")
@@ -2156,9 +2181,12 @@ class MainWindow(Adw.ApplicationWindow):
             # Dev runs have no installed_version — skip the network round-trip.
             if not os.path.exists(INSTALLED_VERSION_FILE):
                 return
-            local_version, remote_version = _fetch_versions()
-            if remote_version and remote_version != local_version:
-                self._pending_update_version = remote_version
+            with open(INSTALLED_VERSION_FILE) as f:
+                local_version = f.read().strip()
+            rel = _fetch_latest_release()
+            if rel and rel["version"] and rel["version"] != local_version:
+                self._pending_update_version = rel["version"]
+                self._latest_release = rel
                 GLib.idle_add(self._maybe_show_update_popup)
         except Exception:
             pass
@@ -2221,12 +2249,30 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._settings_pulse_id = GLib.timeout_add(45, _tick)
 
+    def _make_release_notes_widget(self, body):
+        """Scrollable, read-only view of a release's notes (markdown shown as-is)."""
+        label = Gtk.Label(label=body)
+        label.set_wrap(True)
+        label.set_xalign(0)
+        label.set_yalign(0)
+        label.set_selectable(True)
+        label.add_css_class("body")
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_min_content_height(140)
+        scroller.set_max_content_height(260)
+        scroller.set_child(label)
+        return scroller
+
     def _show_update_message_dialog(self, new_version):
         self._start_settings_update_pulse()
         dlg = Adw.AlertDialog(
             heading=_("Update available"),
             body=_("Pixora {v} is available. Update now?").format(v=new_version),
         )
+        rel = self._latest_release
+        if rel and rel.get("body"):
+            dlg.set_extra_child(self._make_release_notes_widget(rel["body"]))
         dlg.add_response("later", _("Later"))
         dlg.add_response("bijwerken", _("Update"))
         dlg.set_response_appearance("bijwerken", Adw.ResponseAppearance.SUGGESTED)
@@ -2530,22 +2576,30 @@ class MainWindow(Adw.ApplicationWindow):
         return True
 
     def _do_settings_update_check(self):
+        local_version = ""
         try:
-            local_version, remote_version = _fetch_versions()
+            if os.path.exists(INSTALLED_VERSION_FILE):
+                with open(INSTALLED_VERSION_FILE) as f:
+                    local_version = f.read().strip()
+            rel = _fetch_latest_release()
         except Exception:
-            GLib.idle_add(self._settings_update_result, None, None)
+            GLib.idle_add(self._settings_update_result, None, None, None)
             return
-        GLib.idle_add(self._settings_update_result, local_version, remote_version)
+        GLib.idle_add(self._settings_update_result, local_version,
+                      (rel["version"] if rel else ""), rel)
 
-    def _settings_update_result(self, local_version, remote_version):
+    def _settings_update_result(self, local_version, remote_version, rel):
         # Dialog may have closed → widgets disposed.
         try:
             if remote_version is None:
                 self._update_check_row.set_subtitle(_("Check failed"))
                 self._set_update_state("idle")
                 return False
-            self._update_remote_version = remote_version
-            if local_version == remote_version:
+            if rel:
+                self._latest_release = rel
+                self._populate_changelog(rel.get("body", ""), rel.get("version", ""))
+            # No release yet (remote "") reads as up to date.
+            if not remote_version or local_version == remote_version:
                 self._update_check_row.set_subtitle(_("You have the latest version"))
                 self._set_update_state("uptodate")
             else:
@@ -2553,6 +2607,39 @@ class MainWindow(Adw.ApplicationWindow):
                     _("Version {v} available").format(v=remote_version)
                 )
                 self._set_update_state("available")
+        except Exception:
+            pass
+        return False
+
+    def _populate_changelog(self, body, version=""):
+        label = getattr(self, "_changelog_label", None)
+        expander = getattr(self, "_changelog_expander", None)
+        if label is None or expander is None:
+            return
+        label.set_text(body or _("No release notes available."))
+        if version:
+            expander.set_subtitle(
+                _("What changed in Pixora {v}").format(v=version))
+        else:
+            expander.set_subtitle(_("Release notes from the latest version"))
+
+    def _load_about_changelog(self):
+        """Fetch the latest release notes in the background for the About page."""
+        def _work():
+            try:
+                rel = _fetch_latest_release()
+            except Exception:
+                rel = None
+            GLib.idle_add(self._apply_about_changelog, rel)
+        threading.Thread(target=_work, daemon=True).start()
+
+    def _apply_about_changelog(self, rel):
+        try:
+            if rel and rel.get("body"):
+                self._latest_release = rel
+                self._populate_changelog(rel["body"], rel.get("version", ""))
+            else:
+                self._populate_changelog(None, "")
         except Exception:
             pass
         return False
@@ -8097,6 +8184,27 @@ class MainWindow(Adw.ApplicationWindow):
             installed_ver = _("Unknown")
         version_row = Adw.ActionRow(title=_("Version"), subtitle=installed_ver)
         about_group.add(version_row)
+
+        # "What's new" — release notes pulled from the latest GitHub release.
+        self._changelog_expander = Adw.ExpanderRow(
+            title=_("What's new"),
+            subtitle=_("Release notes from the latest version"))
+        self._changelog_expander.add_prefix(
+            Gtk.Image.new_from_icon_name("view-list-bullet-symbolic"))
+        notes_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        notes_box.set_margin_top(8)
+        notes_box.set_margin_bottom(8)
+        notes_box.set_margin_start(12)
+        notes_box.set_margin_end(12)
+        self._changelog_label = Gtk.Label(label=_("Loading release notes…"))
+        self._changelog_label.set_wrap(True)
+        self._changelog_label.set_xalign(0)
+        self._changelog_label.set_selectable(True)
+        self._changelog_label.add_css_class("body")
+        notes_box.append(self._changelog_label)
+        self._changelog_expander.add_row(notes_box)
+        about_group.add(self._changelog_expander)
+        self._load_about_changelog()
 
         self._update_check_row = Adw.ActionRow(title=_("Check for updates"))
 
