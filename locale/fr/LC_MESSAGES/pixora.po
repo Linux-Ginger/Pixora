@@ -3047,3 +3047,6 @@ msgstr "Cela annule toutes les modifications et rétablit la photo exactement te
 
 msgid "Restore"
 msgstr "Restaurer"
+
+msgid "Location unavailable"
+msgstr "Localisation indisponible"

@@ -626,9 +626,8 @@ def _reverse_geocode_raw(lat, lon):
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read())
         addr = data.get("address", {})
-        road = addr.get("road") or addr.get("pedestrian") or addr.get("footway") or ""
-        house = addr.get("house_number") or ""
-        street = (f"{road} {house}".strip()) if road else ""
+        # Street name only — no house number (we don't want to broadcast it).
+        street = addr.get("road") or addr.get("pedestrian") or addr.get("footway") or ""
         suburb = (addr.get("suburb") or addr.get("neighbourhood")
                   or addr.get("quarter") or addr.get("city_district") or "")
         city = (addr.get("city") or addr.get("town") or addr.get("village")
@@ -4423,6 +4422,48 @@ class MainWindow(Adw.ApplicationWindow):
             coords = None
         return self._place_for_coords(coords)
 
+    @staticmethod
+    def _addr_line(street, city, country):
+        """'Street, City, Country' from stored parts, skipping blanks. No house no."""
+        return ", ".join(x for x in (street, city, country) if x)
+
+    def _place_location_text(self, coords):
+        """The saved address of the place the coords fall in (home first), so a
+        place photo shows a real street/city even offline. '' when none match."""
+        if not coords:
+            return ""
+        if abs(coords[0]) < 0.0001 and abs(coords[1]) < 0.0001:
+            return ""
+        hlat = self.settings.get("home_lat")
+        hlon = self.settings.get("home_lon")
+        if (hlat is not None and hlon is not None
+                and abs(coords[0] - hlat) < _PLACE_TOL_LAT
+                and abs(coords[1] - hlon) < _PLACE_TOL_LON):
+            return self._addr_line(self.settings.get("home_street", ""),
+                                   self.settings.get("home_city", ""),
+                                   self.settings.get("home_country", ""))
+        for p in self.settings.get("extra_places", []):
+            if (p.get("lat") is not None and p.get("lon") is not None
+                    and abs(coords[0] - p["lat"]) < _PLACE_TOL_LAT
+                    and abs(coords[1] - p["lon"]) < _PLACE_TOL_LON):
+                return self._addr_line(p.get("street", ""), p.get("city", ""),
+                                       p.get("country", ""))
+        return ""
+
+    def _apply_initial_location(self, location, searching):
+        """Set the viewer location label when a photo/video opens (pre-geocode).
+        Place photos show their stored address; GPS-less photos say so."""
+        if getattr(self, "_viewer_place", None) and not location:
+            addr = getattr(self, "_viewer_place_addr", "") or ""
+            base = f"📍 {addr}" if addr else ""
+            self._set_viewer_location("done", self._decorate_location(base))
+        elif searching:
+            self._set_viewer_location("searching")
+        elif location:
+            self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
+        else:
+            self._set_viewer_location("done", f"📍 {_('Location unavailable')}")
+
     def _photo_place_kind(self, path):
         """'main' (taken at the main home), 'extra' (another saved place), or None."""
         try:
@@ -5198,12 +5239,16 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _start_geocode_upgrade(self, path, coords, load_id):
-        """Async geocode; falls back to raw coords on failure."""
+        """Async geocode; falls back to the saved place address, then raw coords."""
+        place_addr = getattr(self, "_viewer_place_addr", "") or ""
+
         def _bg():
             city = reverse_geocode(coords[0], coords[1])
             if city:
                 resolved = f"📍 {city}"
                 self._photo_location[path] = city
+            elif place_addr:
+                resolved = f"📍 {place_addr}"  # offline fallback for a saved place
             else:
                 resolved = f"📍 {coords[0]:.4f}, {coords[1]:.4f}"
                 # Don't cache — retry when online.
@@ -5246,6 +5291,7 @@ class MainWindow(Adw.ApplicationWindow):
                         self._viewer_pixbuf_cache.popitem(last=False)
         initial, coords = self._determine_initial_location(path)
         self._viewer_place = self._photo_place(path)
+        self._viewer_place_addr = self._place_location_text(coords)
         searching = bool(coords)
         if load_id == self._viewer_load_id:
             GLib.idle_add(self._show_full_photo, pixbuf, path, initial, searching)
@@ -5353,15 +5399,7 @@ class MainWindow(Adw.ApplicationWindow):
             datum = ""
         sep = "  —  " if datum else ""
         self.viewer_title.set_text(f"{os.path.basename(path)}{sep}{datum}")
-        if getattr(self, "_viewer_place", None) and not location:
-            # Show '🏠 Home' right away; geocode upgrades it to 'City (🏠 Home)'.
-            self._set_viewer_location("done", self._decorate_location(""))
-        elif searching:
-            self._set_viewer_location("searching")
-        elif location:
-            self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
-        else:
-            self._set_viewer_location("empty")
+        self._apply_initial_location(location, searching)
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)
@@ -5824,15 +5862,7 @@ class MainWindow(Adw.ApplicationWindow):
             datum = ""
         sep = "  —  " if datum else ""
         self.viewer_title.set_text(f"{os.path.basename(path)}{sep}{datum}")
-        if getattr(self, "_viewer_place", None) and not location:
-            # Show '🏠 Home' right away; geocode upgrades it to 'City (🏠 Home)'.
-            self._set_viewer_location("done", self._decorate_location(""))
-        elif searching:
-            self._set_viewer_location("searching")
-        elif location:
-            self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
-        else:
-            self._set_viewer_location("empty")
+        self._apply_initial_location(location, searching)
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)

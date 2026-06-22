@@ -3002,3 +3002,6 @@ msgstr "This undoes every edit and brings the photo back exactly as it was impor
 
 msgid "Restore"
 msgstr "Restore"
+
+msgid "Location unavailable"
+msgstr "Location unavailable"

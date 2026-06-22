@@ -3020,3 +3020,6 @@ msgstr "Dit maakt elke bewerking ongedaan en zet de foto precies terug zoals hij
 
 msgid "Restore"
 msgstr "Herstellen"
+
+msgid "Location unavailable"
+msgstr "Locatie niet beschikbaar"

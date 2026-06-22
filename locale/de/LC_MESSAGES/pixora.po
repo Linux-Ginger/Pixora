@@ -3030,3 +3030,6 @@ msgstr "Das macht alle Bearbeitungen rückgängig und stellt das Foto genau so w
 
 msgid "Restore"
 msgstr "Wiederherstellen"
+
+msgid "Location unavailable"
+msgstr "Standort nicht verfügbar"

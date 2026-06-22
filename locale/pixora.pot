@@ -2175,3 +2175,6 @@ msgstr ""
 
 msgid "Restore"
 msgstr ""
+
+msgid "Location unavailable"
+msgstr ""
