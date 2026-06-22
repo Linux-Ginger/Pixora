@@ -3098,3 +3098,29 @@ msgstr "Heads-up"
 
 msgid "Re-encoding HEVC takes time and can make files larger; H.264 videos convert instantly."
 msgstr "Re-encoding HEVC takes time and can make files larger; H.264 videos convert instantly."
+
+msgid "Improve compatibility"
+msgstr "Improve compatibility"
+
+msgid "iPhone photos (HEIC) and videos (MOV/HEVC) are hard to open outside Apple. Pixora can convert them to JPEG and MP4 (H.264) so they work everywhere — date and location are kept."
+msgstr "iPhone photos (HEIC) and videos (MOV/HEVC) are hard to open outside Apple. Pixora can convert them to JPEG and MP4 (H.264) so they work everywhere — date and location are kept."
+
+msgid "H.264 video is repackaged instantly; HEVC is re-encoded (slower, can be larger)."
+msgstr "H.264 video is repackaged instantly; HEVC is re-encoded (slower, can be larger)."
+
+msgid "Converting videos to MP4…"
+msgstr "Converting videos to MP4…"
+
+msgid "Converted %(c)d of %(t)d videos. %(f)d could not be converted and were left as-is."
+msgstr "Converted %(c)d of %(t)d videos. %(f)d could not be converted and were left as-is."
+
+msgid "Converted %d video to MP4."
+msgid_plural "Converted %d videos to MP4."
+msgstr[0] "Converted %d video to MP4."
+msgstr[1] "Converted %d videos to MP4."
+
+msgid "Convert existing photos now"
+msgstr "Convert existing photos now"
+
+msgid "Convert existing videos now"
+msgstr "Convert existing videos now"

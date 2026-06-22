@@ -8543,23 +8543,11 @@ class MainWindow(Adw.ApplicationWindow):
         import_box.append(dup_group)
 
         convert_group = Adw.PreferencesGroup()
-        convert_group.set_title(_("Convert HEIC photos"))
+        convert_group.set_title(_("Improve compatibility"))
         convert_group.set_description(
-            _("HEIC is Apple's iPhone photo format — hard to open outside "
-              "Apple. Pixora converts each one to a maximum-quality JPEG: "
-              "visually lossless, with date and location kept."))
-
-        convert_info_row = Adw.ActionRow(
-            title=_("How it works"),
-            subtitle=_("Each HEIC is re-saved as a maximum-quality JPEG that replaces the original. Date and location are kept."),
-        )
-        convert_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
-        convert_info_row.set_activatable(False)
-        try:
-            convert_info_row.set_subtitle_lines(4)
-        except Exception:
-            pass
-        convert_group.add(convert_info_row)
+            _("iPhone photos (HEIC) and videos (MOV/HEVC) are hard to open "
+              "outside Apple. Pixora can convert them to JPEG and MP4 (H.264) "
+              "so they work everywhere — date and location are kept."))
 
         self.settings_convert_switch = Gtk.Switch()
         self.settings_convert_switch.set_valign(Gtk.Align.CENTER)
@@ -8580,7 +8568,7 @@ class MainWindow(Adw.ApplicationWindow):
         convert_group.add(convert_row)
 
         convert_now_row = Adw.ActionRow(
-            title=_("Convert existing library now"))
+            title=_("Convert existing photos now"))
         convert_now_row.add_prefix(
             Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
         self._convert_lib_btn = Gtk.Button(label=_("Run now"))
@@ -8597,14 +8585,7 @@ class MainWindow(Adw.ApplicationWindow):
             pass
         convert_group.add(convert_now_row)
 
-        import_box.append(convert_group)
-
-        video_group = Adw.PreferencesGroup()
-        video_group.set_title(_("Convert videos"))
-        video_group.set_description(
-            _("Make videos play on more devices. iPhone .mov becomes .mp4: "
-              "H.264 video is repackaged losslessly, HEVC is re-encoded to "
-              "H.264 at high quality. Date and location are kept."))
+        # ── Video conversion (same group) ──
         self.settings_video_switch = Gtk.Switch()
         self.settings_video_switch.set_valign(Gtk.Align.CENTER)
         self.settings_video_switch.set_active(
@@ -8612,22 +8593,32 @@ class MainWindow(Adw.ApplicationWindow):
         self.settings_video_switch.connect(
             "notify::active", self.on_video_convert_toggled)
         video_row = Adw.ActionRow(
-            title=_("Convert MOV to MP4 (H.264) on import"))
+            title=_("Convert MOV to MP4 (H.264) on import"),
+            subtitle=_("H.264 video is repackaged instantly; HEVC is re-encoded (slower, can be larger)."))
         video_row.add_prefix(Gtk.Image.new_from_icon_name("video-x-generic-symbolic"))
         video_row.add_suffix(self.settings_video_switch)
         video_row.set_activatable_widget(self.settings_video_switch)
-        video_group.add(video_row)
-        video_info_row = Adw.ActionRow(
-            title=_("Heads-up"),
-            subtitle=_("Re-encoding HEVC takes time and can make files larger; H.264 videos convert instantly."))
-        video_info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
-        video_info_row.set_activatable(False)
         try:
-            video_info_row.set_subtitle_lines(3)
+            video_row.set_subtitle_lines(2)
         except Exception:
             pass
-        video_group.add(video_info_row)
-        import_box.append(video_group)
+        convert_group.add(video_row)
+
+        video_now_row = Adw.ActionRow(
+            title=_("Convert existing videos now"))
+        video_now_row.add_prefix(
+            Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+        self._video_lib_btn = Gtk.Button(label=_("Run now"))
+        self._video_lib_btn.add_css_class("flat")
+        self._video_lib_btn.set_valign(Gtk.Align.CENTER)
+        self._video_lib_btn.set_sensitive(
+            bool(self.settings.get("convert_videos", False)))
+        self._video_lib_btn.connect("clicked", self._on_convert_videos_library_clicked)
+        video_now_row.add_suffix(self._video_lib_btn)
+        video_now_row.set_visible(dev_mode)
+        convert_group.add(video_now_row)
+
+        import_box.append(convert_group)
 
         backup_group = Adw.PreferencesGroup()
         backup_group.set_title(_("Automatic backup"))
@@ -10584,6 +10575,127 @@ class MainWindow(Adw.ApplicationWindow):
     def on_video_convert_toggled(self, switch, _pspec):
         self.settings["convert_videos"] = switch.get_active()
         save_settings(self.settings)
+        if hasattr(self, "_video_lib_btn"):
+            self._video_lib_btn.set_sensitive(switch.get_active())
+
+    def _collect_library_videos(self):
+        """Every .mov/.m4v/.3gp file currently in the photo library."""
+        from pathlib import Path as _P
+        photo_path = self.settings.get("photo_path") or os.path.join(
+            os.path.expanduser("~"), "Photos")
+        out = []
+        if not os.path.isdir(photo_path):
+            return out
+        for root, _dirs, fnames in os.walk(photo_path):
+            for fn in fnames:
+                if os.path.splitext(fn)[1].lower() in (".mov", ".m4v", ".3gp"):
+                    out.append(_P(root) / fn)
+        return out
+
+    def _on_convert_videos_library_clicked(self, btn):
+        if self._heic_converting:   # shared 'library conversion busy' flag
+            return
+
+        def _scan():
+            files = self._collect_library_videos()
+            GLib.idle_add(self._start_video_library_conversion, files)
+        threading.Thread(target=_scan, daemon=True).start()
+
+    def _start_video_library_conversion(self, files):
+        if self._heic_converting or not files:
+            return False
+        self._heic_converting = True
+        self._heic_fraction = 0.0
+        self._heic_detail = ""
+        if hasattr(self, "_video_lib_btn"):
+            self._video_lib_btn.set_sensitive(False)
+            self._video_lib_btn.set_label(_("Converting…"))
+        tip = _("Converting videos to MP4…")
+        if hasattr(self, "_backup_donut_btn"):
+            self._set_donuts_visible(True)
+            self._backup_donut_btn.set_tooltip_text(tip)
+        if hasattr(self, "_viewer_donut_btn"):
+            self._viewer_donut_btn.set_tooltip_text(tip)
+        self._redraw_donuts()
+        log_info("Video library conversion started: {} files".format(len(files)))
+        threading.Thread(
+            target=self._convert_video_library_thread,
+            args=(files,), daemon=True).start()
+        return False
+
+    def _convert_video_library_thread(self, files):
+        from importer_page import convert_video
+        total = len(files)
+        done = converted = failed = 0
+        for fp in files:
+            try:
+                ts = fp.stat().st_mtime
+            except OSError:
+                ts = None
+            dst = fp.with_suffix(".mp4")
+            if dst.exists():
+                stem, parent, n = dst.stem, dst.parent, 1
+                while dst.exists():
+                    dst = parent / ("%s_%d.mp4" % (stem, n))
+                    n += 1
+            ok = False
+            try:
+                ok = convert_video(fp, dst)
+            except Exception:
+                ok = False
+            if ok and dst.exists():
+                if ts is not None:
+                    try:
+                        os.utime(dst, (ts, ts))
+                    except OSError:
+                        pass
+                try:
+                    fp.unlink()
+                except OSError:
+                    pass
+                converted += 1
+            else:
+                try:
+                    if dst.exists():
+                        dst.unlink()
+                except OSError:
+                    pass
+                failed += 1
+            done += 1
+            GLib.idle_add(self._set_heic_progress, done, total, fp.name)
+        GLib.idle_add(self._finish_video_library_conversion, converted, failed)
+
+    def _finish_video_library_conversion(self, converted, failed):
+        self._heic_converting = False
+        self._heic_fraction = 0.0
+        self._heic_detail = ""
+        if hasattr(self, "_video_lib_btn"):
+            self._video_lib_btn.set_sensitive(True)
+            self._video_lib_btn.set_label(_("Run now"))
+        if hasattr(self, "_backup_donut_btn"):
+            self._set_donuts_visible(self._backup_running)
+        self._redraw_donuts()
+        log_info("Video library conversion done: {} converted, {} failed".format(
+            converted, failed))
+        try:
+            self.reload_photos()
+        except Exception:
+            pass
+        if (converted + failed) > 0:
+            if failed:
+                body = _("Converted %(c)d of %(t)d videos. %(f)d could not be converted and were left as-is.") % {
+                    "c": converted, "t": converted + failed, "f": failed}
+            else:
+                body = ngettext(
+                    "Converted %d video to MP4.",
+                    "Converted %d videos to MP4.",
+                    converted) % converted
+            dlg = Adw.AlertDialog(heading=_("Conversion complete"), body=body)
+            dlg.add_response("ok", _("OK"))
+            dlg.set_default_response("ok")
+            dlg.set_close_response("ok")
+            self._present_dialog(dlg)
+        return False
 
     def _on_auto_confirm_toggle(self, switch, _pspec):
         """One master switch drives the per-task silent flags, so the existing
