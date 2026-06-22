@@ -6867,15 +6867,21 @@ class MainWindow(Adw.ApplicationWindow):
             rot=rotation, crop=bool(self._crop_rect), p=path
         ))
 
-        crop_box = None
+        # Crop is captured as fractions of the displayed pixbuf, not pixels:
+        # the viewer pixbuf is capped at 2560px, so pixel coords would crop the
+        # wrong region of the full-resolution original. Fractions scale cleanly.
+        crop_frac = None
         if self._editor_crop_mode and self._crop_rect:
             aw = self.crop_overlay_area.get_width()
             ah = self.crop_overlay_area.get_height()
             p1 = self._widget_to_image_coords(self._crop_rect[0], self._crop_rect[1], aw, ah)
             p2 = self._widget_to_image_coords(self._crop_rect[2], self._crop_rect[3], aw, ah)
             if p1 and p2 and abs(p2[0] - p1[0]) > 4 and abs(p2[1] - p1[1]) > 4:
-                crop_box = (min(p1[0], p2[0]), min(p1[1], p2[1]),
-                            max(p1[0], p2[0]), max(p1[1], p2[1]))
+                disp = self._editor_display_pixbuf or self._viewer_pixbuf
+                dw = max(1, disp.get_width())
+                dh = max(1, disp.get_height())
+                crop_frac = (min(p1[0], p2[0]) / dw, min(p1[1], p2[1]) / dh,
+                             max(p1[0], p2[0]) / dw, max(p1[1], p2[1]) / dh)
 
         self.on_editor_cancel()
 
@@ -6899,8 +6905,14 @@ class MainWindow(Adw.ApplicationWindow):
 
                 if rotation != 0:
                     img = img.rotate(rotation, expand=True)
-                if crop_box:
-                    img = img.crop(crop_box)
+                if crop_frac:
+                    iw, ih = img.size
+                    cb = (max(0, int(round(crop_frac[0] * iw))),
+                          max(0, int(round(crop_frac[1] * ih))),
+                          min(iw, int(round(crop_frac[2] * iw))),
+                          min(ih, int(round(crop_frac[3] * ih))))
+                    if cb[2] - cb[0] > 1 and cb[3] - cb[1] > 1:
+                        img = img.crop(cb)
 
                 out_path = path
                 if is_jpeg:
