@@ -311,7 +311,10 @@
     chunkedLoading: false,
     removeOutsideVisibleBounds: false,
     iconCreateFunction: function(c) {
-      const count = c.getChildCount();
+      // Sum the per-site counts so the badge reflects photos, not site markers.
+      var count = c.getAllChildMarkers().reduce(function(s, m) {
+        return s + ((m.options._pix && m.options._pix.count) || 1);
+      }, 0);
       const size = count < 10 ? 'cluster' : 'cluster-lg';
       return L.divIcon({
         html: '<div class="pixora-marker ' + size + '">' + count + '</div>',
@@ -325,7 +328,9 @@
     const children = e.layer.getAllChildMarkers();
     if (!children.length) return;
     const first = children[0].options._pix;
-    const count = children.length;
+    const count = children.reduce(function(s, c) {
+      return s + ((c.options._pix && c.options._pix.count) || 1);
+    }, 0);
     const html = buildPopupHtml(first, count);
     L.popup({ closeButton: false, autoPan: false, offset: [0, -12] })
       .setLatLng(e.layer.getLatLng())
@@ -336,7 +341,11 @@
 
   // Klik op cluster: geef ALLE paths door aan Pixora
   cluster.on('clusterclick', function(e) {
-    const paths = e.layer.getAllChildMarkers().map(function(m) { return m.options._pix.path; });
+    const paths = [];
+    e.layer.getAllChildMarkers().forEach(function(m) {
+      const px = m.options._pix || {};
+      (px.paths || [px.path]).forEach(function(p) { if (p) paths.push(p); });
+    });
     console.log('[Pixora] cluster click, ' + paths.length + ' foto\'s');
     sendToPixora({ type: 'open_photos', paths: paths });
     if (e.originalEvent) {
@@ -468,12 +477,25 @@
     markers.forEach(function(m) {
       try {
         const latlng = [m.lat, m.lon];
-        const marker = L.marker(latlng, { icon: singleIcon(), _pix: m });
-        marker.bindPopup(buildPopupHtml(m, 1), { maxWidth: 240, closeButton: false, autoPan: false });
+        const cnt = m.count || 1;
+        const paths = m.paths || [m.path];
+        var icon;
+        if (cnt > 1) {
+          // Several photos at the same spot → one ball with the count.
+          const size = cnt < 10 ? 'cluster' : 'cluster-lg';
+          icon = L.divIcon({
+            html: '<div class="pixora-marker ' + size + '">' + cnt + '</div>',
+            className: '', iconSize: null
+          });
+        } else {
+          icon = singleIcon();
+        }
+        const marker = L.marker(latlng, { icon: icon, _pix: m });
+        marker.bindPopup(buildPopupHtml(m, cnt), { maxWidth: 240, closeButton: false, autoPan: false });
         marker.on('mouseover', function() { marker.openPopup(); });
         marker.on('mouseout', function() { marker.closePopup(); });
         marker.on('click', function() {
-          sendToPixora({ type: 'open_photos', paths: [m.path] });
+          sendToPixora({ type: 'open_photos', paths: paths });
         });
         cluster.addLayer(marker);
         bounds.extend(latlng);

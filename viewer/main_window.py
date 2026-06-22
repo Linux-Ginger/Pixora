@@ -1148,9 +1148,22 @@ class MapWidget(Gtk.Box):
             GLib.timeout_add(80, self._push_markers)
 
     def _push_markers(self):
-        data = []
+        # Group photos shot at essentially the same spot (~11 m grid) into one
+        # site marker carrying a count + all paths, so GPS jitter doesn't scatter
+        # them into many lone pins. markercluster still merges sites city-scale.
+        groups = {}
+        order = []
         for m in self._pending_markers:
-            path = m[4]
+            key = (round(m[0], 4), round(m[1], 4))
+            if key not in groups:
+                groups[key] = []
+                order.append(key)
+            groups[key].append(m)
+        data = []
+        for key in order:
+            grp = groups[key]
+            first = grp[0]
+            path = first[4]
             thumb_w = None
             try:
                 thumb = get_cache_path(path, THUMB_SIZE)
@@ -1167,9 +1180,11 @@ class MapWidget(Gtk.Box):
             except Exception:
                 thumb = None
             data.append({
-                "lat": m[0], "lon": m[1],
-                "filename": m[2], "date": m[3],
+                "lat": first[0], "lon": first[1],
+                "filename": first[2], "date": first[3],
                 "path": path, "thumb": thumb, "w": thumb_w,
+                "count": len(grp),
+                "paths": [g[4] for g in grp],
             })
         labels = {
             "otherInCluster": _("other photos in this cluster"),
