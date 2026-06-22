@@ -1148,20 +1148,40 @@ class MapWidget(Gtk.Box):
             GLib.timeout_add(80, self._push_markers)
 
     def _push_markers(self):
-        # Group photos shot at essentially the same spot (~11 m grid) into one
-        # site marker carrying a count + all paths, so GPS jitter doesn't scatter
-        # them into many lone pins. markercluster still merges sites city-scale.
-        groups = {}
-        order = []
+        # Group photos shot at essentially the same spot into one site marker
+        # (count + all paths), so GPS jitter doesn't scatter them into lone pins
+        # even at max zoom. Grouped by REAL distance (not a grid) so points either
+        # side of a cell edge can't split; a coarse bucket index keeps it fast.
+        THRESH_M = 20.0
+        BUCKET = 0.0015  # ~165 m cell — wider than the threshold, so neighbours cover all candidates
+        clusters = []     # list of member-lists
+        anchors = []      # (lat, lon) per cluster, index-aligned with clusters
+        buckets = {}      # (bi, bj) -> [cluster index, …]
         for m in self._pending_markers:
-            key = (round(m[0], 4), round(m[1], 4))
-            if key not in groups:
-                groups[key] = []
-                order.append(key)
-            groups[key].append(m)
+            lat, lon = m[0], m[1]
+            bi, bj = int(lat / BUCKET), int(lon / BUCKET)
+            found = None
+            for di in (-1, 0, 1):
+                for dj in (-1, 0, 1):
+                    for gi in buckets.get((bi + di, bj + dj), ()):
+                        alat, alon = anchors[gi]
+                        dy = (lat - alat) * 111000.0
+                        dx = (lon - alon) * 111000.0 * math.cos(math.radians(alat))
+                        if dx * dx + dy * dy <= THRESH_M * THRESH_M:
+                            found = gi
+                            break
+                    if found is not None:
+                        break
+                if found is not None:
+                    break
+            if found is not None:
+                clusters[found].append(m)
+            else:
+                clusters.append([m])
+                anchors.append((lat, lon))
+                buckets.setdefault((bi, bj), []).append(len(clusters) - 1)
         data = []
-        for key in order:
-            grp = groups[key]
+        for grp in clusters:
             first = grp[0]
             path = first[4]
             thumb_w = None
