@@ -67,7 +67,10 @@
      the image pops in outside the black background until you re-hover. */
   /* Natural aspect (fixed height, auto width) → no black letterbox bars and no
      cropping; without object-fit, WebKit clips the rounded corners properly. */
-  .leaflet-popup-content img { height: 140px; width: auto; max-width: 240px;
+  /* No width:auto — the width/height attributes (sent from Python) set the box
+     so the popup reserves space before the image loads. Falls back to natural
+     width when no attribute is present. */
+  .leaflet-popup-content img { height: 140px; max-width: 240px;
     border-radius: 8px; display: block; margin: 0 auto 6px auto; }
   .leaflet-popup-content .fname { font-weight: bold; word-break: break-word; }
   .leaflet-popup-content .date { opacity: 0.7; font-size: 11px; }
@@ -381,10 +384,8 @@
     return Math.abs(m.lat - homeLat) < 0.0011 && Math.abs(m.lon - homeLon) < 0.0017;
   }
 
-  // The thumb has width:auto, so its width is unknown until it loads — the
-  // popup wrapper (black bg) first sizes to ~0 width and the image lands
-  // outside it until you re-hover. Re-running update() once the image is in
-  // resizes the wrapper around the now-known dimensions.
+  // Fallback when a thumb's size wasn't provided: re-run update() once it loads
+  // so the wrapper resizes around the now-known dimensions.
   function pixoraPopupImgLoaded() {
     try { if (typeof map !== 'undefined' && map && map._popup) map._popup.update(); }
     catch (e) {}
@@ -393,7 +394,10 @@
   function buildPopupHtml(m, count) {
     let html = '';
     if (m.thumb) {
-      html += '<img src="file://' + m.thumb + '" alt="" onerror="this.style.display=\'none\'" onload="pixoraPopupImgLoaded()">';
+      // Width/height set up front so the black background reserves the right
+      // space BEFORE the image loads (no mis-sized bg on first hover).
+      var dim = m.w ? ' width="' + m.w + '" height="140"' : '';
+      html += '<img src="file://' + m.thumb + '"' + dim + ' alt="" onerror="this.style.display=\'none\'" onload="pixoraPopupImgLoaded()">';
     }
     html += '<div class="fname">' + escapeHtml(m.filename) + '</div>';
     html += '<div class="date">' + escapeHtml(m.date || '') + '</div>';

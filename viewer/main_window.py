@@ -1151,16 +1151,25 @@ class MapWidget(Gtk.Box):
         data = []
         for m in self._pending_markers:
             path = m[4]
+            thumb_w = None
             try:
                 thumb = get_cache_path(path, THUMB_SIZE)
                 if not os.path.exists(thumb):
                     thumb = None
+                else:
+                    # Display width at the popup's fixed 140px height — sent so the
+                    # popup reserves the right space BEFORE the thumb loads (else the
+                    # black background is mis-sized on first hover). Header-only read.
+                    info = GdkPixbuf.Pixbuf.get_file_info(thumb)
+                    tw, th = (info[1], info[2]) if info else (0, 0)
+                    if th and th > 0:
+                        thumb_w = max(1, min(240, round(tw * 140 / th)))
             except Exception:
                 thumb = None
             data.append({
                 "lat": m[0], "lon": m[1],
                 "filename": m[2], "date": m[3],
-                "path": path, "thumb": thumb,
+                "path": path, "thumb": thumb, "w": thumb_w,
             })
         labels = {
             "otherInCluster": _("other photos in this cluster"),
