@@ -218,6 +218,12 @@ THUMB_SIZE       = 200
 FILM_THUMB       = 70
 BATCH_SIZE       = 15
 
+# How close a photo's GPS must sit to a saved place to count as "taken there".
+# Wide enough to absorb indoor/urban GPS drift (a fix can wander 100-200 m), yet
+# tight enough not to grab the next street over. ~175 m at NL latitudes.
+_PLACE_TOL_LAT   = 0.0016
+_PLACE_TOL_LON   = 0.0024
+
 def _low_ram_system():
     try:
         pages = os.sysconf("SC_PHYS_PAGES")
@@ -4389,7 +4395,8 @@ class MainWindow(Adw.ApplicationWindow):
         for name, lat, lon in self._all_places():
             if abs(lat) < 0.0001 and abs(lon) < 0.0001:
                 continue
-            if abs(coords[0] - lat) < 0.0011 and abs(coords[1] - lon) < 0.0017:
+            if (abs(coords[0] - lat) < _PLACE_TOL_LAT
+                    and abs(coords[1] - lon) < _PLACE_TOL_LON):
                 return name
         return None
 
@@ -4414,13 +4421,13 @@ class MainWindow(Adw.ApplicationWindow):
         hlat = self.settings.get("home_lat")
         hlon = self.settings.get("home_lon")
         if (hlat is not None and hlon is not None
-                and abs(coords[0] - hlat) < 0.0011
-                and abs(coords[1] - hlon) < 0.0017):
+                and abs(coords[0] - hlat) < _PLACE_TOL_LAT
+                and abs(coords[1] - hlon) < _PLACE_TOL_LON):
             return "main"
         for p in self.settings.get("extra_places", []):
             if (p.get("lat") is not None and p.get("lon") is not None
-                    and abs(coords[0] - p["lat"]) < 0.0011
-                    and abs(coords[1] - p["lon"]) < 0.0017):
+                    and abs(coords[0] - p["lat"]) < _PLACE_TOL_LAT
+                    and abs(coords[1] - p["lon"]) < _PLACE_TOL_LON):
                 return "extra"
         return None
 
@@ -6900,9 +6907,25 @@ class MainWindow(Adw.ApplicationWindow):
                 is_jpeg = ext in (".jpg", ".jpeg")
                 is_png  = ext == ".png"
 
-                exif = img.getexif() if not is_png else None
+                # Carry the original EXIF across the edit (GPS + capture date +
+                # orientation). Preload the GPS and Exif sub-IFDs so tobytes()
+                # keeps them — plain getexif().tobytes() drops those, which lost
+                # the photo's location and shuffled its date order after editing.
+                exif_out = b""
+                if not is_png:
+                    try:
+                        src_exif = img.info.get("exif")
+                        if src_exif:
+                            ex = Image.Exif()
+                            ex.load(src_exif)
+                            ex.get_ifd(0x8825)  # GPS IFD
+                            ex.get_ifd(0x8769)  # Exif sub-IFD (DateTimeOriginal)
+                            ex[0x0112] = 1      # pixels become upright below
+                            exif_out = ex.tobytes()
+                    except Exception:
+                        exif_out = b""
 
-                # Normalize EXIF orientation (align PIL and GdkPixbuf).
+                # Bake EXIF orientation into the pixels (align PIL and GdkPixbuf).
                 img = ImageOps.exif_transpose(img)
 
                 if rotation != 0:
@@ -6918,11 +6941,7 @@ class MainWindow(Adw.ApplicationWindow):
 
                 out_path = path
                 if is_jpeg:
-                    # Reset orientation to 1 — pixels are now physically correct.
-                    if exif is not None:
-                        exif[0x0112] = 1
-                    img.save(path, "JPEG", quality=95,
-                             exif=exif.tobytes() if exif is not None else b"")
+                    img.save(path, "JPEG", quality=95, exif=exif_out)
                 elif is_png:
                     img.save(path, "PNG")
                 else:
@@ -6936,10 +6955,7 @@ class MainWindow(Adw.ApplicationWindow):
                         counter += 1
                     if img.mode not in ("RGB", "L"):
                         img = img.convert("RGB")
-                    if exif is not None:
-                        exif[0x0112] = 1
-                    img.save(out_path, "JPEG", quality=95,
-                             exif=exif.tobytes() if exif is not None else b"")
+                    img.save(out_path, "JPEG", quality=95, exif=exif_out)
                     os.remove(path)
                 if os.path.exists(old_cache):
                     os.remove(old_cache)
