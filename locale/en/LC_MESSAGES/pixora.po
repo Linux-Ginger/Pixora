@@ -3005,3 +3005,6 @@ msgstr "Restore"
 
 msgid "No location for this photo"
 msgstr "No location for this photo"
+
+msgid "No location for this video"
+msgstr "No location for this video"

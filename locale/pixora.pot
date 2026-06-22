@@ -2178,3 +2178,6 @@ msgstr ""
 
 msgid "No location for this photo"
 msgstr ""
+
+msgid "No location for this video"
+msgstr ""

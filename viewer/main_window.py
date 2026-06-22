@@ -4464,7 +4464,7 @@ class MainWindow(Adw.ApplicationWindow):
                                        p.get("country", ""))
         return ""
 
-    def _apply_initial_location(self, location, searching):
+    def _apply_initial_location(self, location, searching, is_video=False):
         """Set the viewer location label when a photo/video opens (pre-geocode).
         A cached address shows instantly; an unlooked-up one shows the spinner;
         place photos fall back to their stored address; GPS-less photos say so."""
@@ -4479,7 +4479,9 @@ class MainWindow(Adw.ApplicationWindow):
             base = f"📍 {addr}" if addr else ""
             self._set_viewer_location("done", self._decorate_location(base))
         else:
-            self._set_viewer_location("done", f"📍 {_('No location for this photo')}")
+            none_msg = (_("No location for this video") if is_video
+                        else _("No location for this photo"))
+            self._set_viewer_location("done", f"📍 {none_msg}")
 
     def _photo_place_kind(self, path):
         """'main' (taken at the main home), 'extra' (another saved place), or None."""
@@ -5929,7 +5931,7 @@ class MainWindow(Adw.ApplicationWindow):
             datum = ""
         sep = "  —  " if datum else ""
         self.viewer_title.set_text(f"{os.path.basename(path)}{sep}{datum}")
-        self._apply_initial_location(location, searching)
+        self._apply_initial_location(location, searching, is_video=True)
         self.viewer_counter.set_text(f"{self.current_index + 1} / {len(self.photos)}")
         self.prev_btn.set_sensitive(self.current_index > 0)
         self.next_btn.set_sensitive(self.current_index < len(self.photos) - 1)

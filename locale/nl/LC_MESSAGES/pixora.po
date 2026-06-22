@@ -3023,3 +3023,6 @@ msgstr "Herstellen"
 
 msgid "No location for this photo"
 msgstr "Deze foto heeft geen locatie"
+
+msgid "No location for this video"
+msgstr "Deze video heeft geen locatie"

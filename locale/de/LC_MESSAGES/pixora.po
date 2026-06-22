@@ -3033,3 +3033,6 @@ msgstr "Wiederherstellen"
 
 msgid "No location for this photo"
 msgstr "Dieses Foto hat keinen Standort"
+
+msgid "No location for this video"
+msgstr "Dieses Video hat keinen Standort"
