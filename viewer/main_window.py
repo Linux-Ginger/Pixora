@@ -5324,7 +5324,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _load_full_photo(self, path, load_id):
         if is_video(path):
             initial, coords = self._determine_initial_location(path)
-            self._viewer_place = self._photo_place(path)
+            # Read GPS here (bg thread) — ffprobe on the main thread froze the UI.
+            self._set_viewer_place(get_video_gps_coords(path))
             searching = bool(coords)
             if load_id == self._viewer_load_id:
                 GLib.idle_add(self._show_video, path, initial, searching)
@@ -5346,8 +5347,7 @@ class MainWindow(Adw.ApplicationWindow):
                     while len(self._viewer_pixbuf_cache) > 3:
                         self._viewer_pixbuf_cache.popitem(last=False)
         initial, coords = self._determine_initial_location(path)
-        self._viewer_place = self._photo_place(path)
-        self._viewer_place_addr = self._place_location_text(coords)
+        self._set_viewer_place(coords if coords else get_gps_coords(path))
         searching = bool(coords)
         if load_id == self._viewer_load_id:
             GLib.idle_add(self._show_full_photo, pixbuf, path, initial, searching)
@@ -5364,20 +5364,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._set_viewer_location("done", self._decorate_location(text))
         return False
 
-    def _refresh_viewer_place(self, path):
-        """Recompute the place tag + stored address for `path`. Every viewer entry
-        point calls this so a cached fast-nav never inherits the previous photo's
-        place (which showed a stray 'Home' tag or a blank label)."""
-        try:
-            coords = (get_video_gps_coords(path) if is_video(path)
-                      else get_gps_coords(path))
-        except Exception:
-            coords = None
+    def _set_viewer_place(self, coords):
+        """Set the place tag + stored address from already-read coords (pure, no
+        I/O) so it's safe on the main thread — never reads GPS here."""
         self._viewer_place = self._place_for_coords(coords)
         self._viewer_place_addr = self._place_location_text(coords)
 
     def _show_full_photo(self, pixbuf, path, location="", searching=False):
-        self._refresh_viewer_place(path)
         self._hide_photo_spinner()  # load finished (or failed): stop the loader
         # Clear any video immediately — even if the photo is queued below, the
         # video must never linger on top of an incoming photo.
@@ -5565,6 +5558,9 @@ class MainWindow(Adw.ApplicationWindow):
             if cached is not None:
                 # Resolve location — else label vanishes on prev/next through cached photos.
                 initial, coords = self._determine_initial_location(path)
+                # Refresh the place tag for THIS photo (not the previous one). GPS
+                # is photo EXIF here (cached/fast) — no ffprobe on the main thread.
+                self._set_viewer_place(coords if coords else get_gps_coords(path))
                 self._show_full_photo(cached, path, initial, searching=bool(coords))
                 if coords:
                     self._start_geocode_upgrade(path, coords, load_id)
@@ -5889,7 +5885,6 @@ class MainWindow(Adw.ApplicationWindow):
         return True
 
     def _show_video(self, path, location="", searching=False):
-        self._refresh_viewer_place(path)
         self._hide_photo_spinner()
         self._stop_video()
         self._preview_cache = OrderedDict()
