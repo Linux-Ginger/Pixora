@@ -1152,8 +1152,8 @@ class MapWidget(Gtk.Box):
         # (count + all paths), so GPS jitter doesn't scatter them into lone pins
         # even at max zoom. Grouped by REAL distance (not a grid) so points either
         # side of a cell edge can't split; a coarse bucket index keeps it fast.
-        THRESH_M = 20.0
-        BUCKET = 0.0015  # ~165 m cell — wider than the threshold, so neighbours cover all candidates
+        THRESH_M = 50.0   # GPS (esp. indoors) drifts well past 20 m for one spot
+        BUCKET = 0.0020  # ~220 m cell — wider than the threshold, so neighbours cover all candidates
         clusters = []     # list of member-lists
         anchors = []      # (lat, lon) per cluster, index-aligned with clusters
         buckets = {}      # (bi, bj) -> [cluster index, …]
