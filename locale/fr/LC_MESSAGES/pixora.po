@@ -3020,3 +3020,18 @@ msgstr "Chargement des notes de version…"
 
 msgid "No release notes available."
 msgstr "Aucune note de version disponible."
+
+msgid "📱 iPhone or iPad detected…"
+msgstr "📱 iPhone ou iPad détecté…"
+
+msgid "📱 Tap “Trust” on your device to continue"
+msgstr "📱 Touchez « Se fier » sur votre appareil pour continuer"
+
+msgid "✅ Connected — tap Trust on your device if asked"
+msgstr "✅ Connecté — touchez « Se fier » sur l’appareil si demandé"
+
+msgid "✅ Connected — your device is ready"
+msgstr "✅ Connecté — votre appareil est prêt"
+
+msgid "⚠️ Device not recognised — unplug it, reconnect, and tap Trust"
+msgstr "⚠️ Appareil non reconnu — débranchez-le, rebranchez-le et touchez « Se fier »"

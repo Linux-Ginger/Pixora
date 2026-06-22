@@ -2148,3 +2148,18 @@ msgstr ""
 
 msgid "No release notes available."
 msgstr ""
+
+msgid "📱 iPhone or iPad detected…"
+msgstr ""
+
+msgid "📱 Tap “Trust” on your device to continue"
+msgstr ""
+
+msgid "✅ Connected — tap Trust on your device if asked"
+msgstr ""
+
+msgid "✅ Connected — your device is ready"
+msgstr ""
+
+msgid "⚠️ Device not recognised — unplug it, reconnect, and tap Trust"
+msgstr ""

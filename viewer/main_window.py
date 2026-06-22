@@ -1976,72 +1976,119 @@ class MainWindow(Adw.ApplicationWindow):
         if self._recovery_prompt_active:
             return False
         self._recovery_prompt_active = True
-        self._set_iphone_banner(_("📱 iPhone detected, please wait…"))
+        self._set_iphone_banner(_("📱 iPhone or iPad detected…"))
         threading.Thread(target=self._iphone_recovery_flow, daemon=True).start()
         return False
 
     def _iphone_recovery_flow(self):
-        """Auto recovery: wait patiently for usbmuxd, reset only as last resort."""
-        # Freshly-plugged devices (and the Trust handshake) can take a while to
-        # register. Poll for ~12s before doing anything drastic so we don't
-        # nag the user with a usbmuxd reset that isn't needed.
-        for _attempt in range(8):
-            if self._idevice_check():
-                log_info(_("iPhone directly recognised by usbmuxd"))
-                GLib.idle_add(self._iphone_flow_success, False)
-                return
-            time.sleep(1.5)
-        log_warn(_("iPhone not recognised by usbmuxd — starting auto-recovery"))
-        GLib.idle_add(self._set_iphone_banner,
-                      _("🔧 Restoring connection, please wait…"))
-        reset_ok = False
+        """Wait patiently for the device and the Trust handshake.
+
+        A freshly-plugged iPhone/iPad appears on the USB bus before it is
+        trusted, and the user needs time to unlock and tap Trust. We NEVER reset
+        usbmuxd while a device is visible — that kills the in-progress trust
+        handshake (the old 'unplug and replug to make it work' bug). usbmuxd is
+        only reset when nothing is on the bus at all.
+        """
         try:
-            r = subprocess.run(
-                ["pkexec", "sh", "-c",
-                 "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
-                capture_output=True, text=True, timeout=40
-            )
-            reset_ok = (r.returncode == 0)
-            log_info(_("usbmuxd reset rc={rc}").format(rc=r.returncode))
-        except Exception as e:
-            log_error(_("usbmuxd reset error: {err}").format(err=e))
-            reset_ok = False
-        if not reset_ok:
+            from importer_page import pair_state
+
+            # Wait through the Trust handshake for a device already on the bus.
+            def _wait_for_trust(udid):
+                trust_prompted = False
+                deadline = time.time() + 60
+                while time.time() < deadline:
+                    state = pair_state(udid)
+                    if state == "paired":
+                        GLib.idle_add(self._iphone_flow_success, False)
+                        return True
+                    if state == "nodevice":
+                        return False  # fell off the bus → let caller reset
+                    if not trust_prompted:
+                        trust_prompted = True
+                        GLib.idle_add(
+                            self._set_iphone_banner,
+                            _("📱 Tap “Trust” on your device to continue"))
+                    time.sleep(1.5)
+                    udid = self._idevice_udid() or udid
+                # Plugged but never trusted — stand down quietly; the importer's
+                # own Trust loop guides the user when they start an import.
+                GLib.idle_add(self._iphone_flow_idle)
+                return True
+
+            # Phase 1 — is the device already on the bus (~9s grace)?
+            for _attempt in range(6):
+                udid = self._idevice_udid()
+                if udid:
+                    if _wait_for_trust(udid):
+                        return
+                    break
+                time.sleep(1.5)
+
+            # Phase 2 — nothing on the bus: usbmuxd may be wedged. Reset once.
+            log_warn("No device on the bus — resetting usbmuxd")
+            GLib.idle_add(self._set_iphone_banner,
+                          _("🔧 Restoring connection, please wait…"))
+            try:
+                r = subprocess.run(
+                    ["pkexec", "sh", "-c",
+                     "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
+                    capture_output=True, text=True, timeout=40
+                )
+                reset_ok = (r.returncode == 0)
+            except Exception as e:
+                log_error("usbmuxd reset error: {}".format(e))
+                reset_ok = False
+            if not reset_ok:
+                GLib.idle_add(self._iphone_flow_fail)
+                return
+            time.sleep(2.5)
+            udid = self._idevice_udid()
+            if udid and _wait_for_trust(udid):
+                return
             GLib.idle_add(self._iphone_flow_fail)
-            return
-        time.sleep(2.5)
-        has_device = self._idevice_check()
-        if has_device:
-            log_info(_("iPhone recognised after reset"))
-            GLib.idle_add(self._iphone_flow_success, True)
-        else:
-            log_warn(_("iPhone still unrecognised after reset"))
+        except Exception as e:
+            log_error("recovery flow error: {}".format(e))
             GLib.idle_add(self._iphone_flow_fail)
 
     def _idevice_check(self):
+        return bool(self._idevice_udid())
+
+    def _idevice_udid(self):
+        """First connected device's UDID, or '' when none is on the bus."""
         try:
             result = subprocess.run(
                 ["idevice_id", "-l"],
                 capture_output=True, text=True, timeout=4
             )
-            return any(l.strip() for l in result.stdout.splitlines())
+            for line in result.stdout.splitlines():
+                if line.strip():
+                    return line.strip()
         except Exception:
-            return False
+            pass
+        return ""
 
     def _iphone_flow_success(self, was_reset):
         self._recovery_prompt_active = False
         self._update_import_btn_state(True)
         self._set_iphone_banner(
-            _("✅ iPhone ready — tap Trust on your iPhone if asked")
-            if was_reset else _("✅ iPhone connected")
+            _("✅ Connected — tap Trust on your device if asked")
+            if was_reset else _("✅ Connected — your device is ready")
         )
         GLib.timeout_add_seconds(4, self._clear_iphone_banner)
+        return False
+
+    def _iphone_flow_idle(self):
+        # Device is plugged but not trusted yet: keep the import button lit and
+        # drop the banner — no error, the importer guides Trust on import.
+        self._recovery_prompt_active = False
+        self._update_import_btn_state(True)
+        self._clear_iphone_banner()
         return False
 
     def _iphone_flow_fail(self):
         self._recovery_prompt_active = False
         self._set_iphone_banner(
-            _("⚠️ iPhone not recognised — try Settings > iPhone connection")
+            _("⚠️ Device not recognised — unplug it, reconnect, and tap Trust")
         )
         GLib.timeout_add_seconds(8, self._clear_iphone_banner)
         return False

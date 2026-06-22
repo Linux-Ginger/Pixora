@@ -3003,3 +3003,18 @@ msgstr "Versionshinweise werden geladen…"
 
 msgid "No release notes available."
 msgstr "Keine Versionshinweise verfügbar."
+
+msgid "📱 iPhone or iPad detected…"
+msgstr "📱 iPhone oder iPad erkannt…"
+
+msgid "📱 Tap “Trust” on your device to continue"
+msgstr "📱 Tippe auf „Vertrauen“ auf deinem Gerät, um fortzufahren"
+
+msgid "✅ Connected — tap Trust on your device if asked"
+msgstr "✅ Verbunden — tippe auf deinem Gerät auf „Vertrauen“, falls gefragt"
+
+msgid "✅ Connected — your device is ready"
+msgstr "✅ Verbunden — dein Gerät ist bereit"
+
+msgid "⚠️ Device not recognised — unplug it, reconnect, and tap Trust"
+msgstr "⚠️ Gerät nicht erkannt — abziehen, erneut anschließen und auf „Vertrauen“ tippen"

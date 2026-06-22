@@ -2993,3 +2993,18 @@ msgstr "Release-notities laden…"
 
 msgid "No release notes available."
 msgstr "Geen release-notities beschikbaar."
+
+msgid "📱 iPhone or iPad detected…"
+msgstr "📱 iPhone of iPad gedetecteerd…"
+
+msgid "📱 Tap “Trust” on your device to continue"
+msgstr "📱 Tik op ‘Vertrouw’ op je apparaat om door te gaan"
+
+msgid "✅ Connected — tap Trust on your device if asked"
+msgstr "✅ Verbonden — tik op Vertrouw op je apparaat als dat gevraagd wordt"
+
+msgid "✅ Connected — your device is ready"
+msgstr "✅ Verbonden — je apparaat is klaar"
+
+msgid "⚠️ Device not recognised — unplug it, reconnect, and tap Trust"
+msgstr "⚠️ Apparaat niet herkend — haal het los, sluit opnieuw aan en tik op Vertrouw"
