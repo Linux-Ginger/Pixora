@@ -2127,3 +2127,9 @@ msgstr ""
 
 msgid "Photos are copied to your library; the originals on your device are kept and duplicates are reviewed first"
 msgstr ""
+
+msgid "This becomes your tidy library"
+msgstr ""
+
+msgid "Drop your photos and videos in here however messy you like. Pixora files them into neat folders for you, using the layout you pick in the next step."
+msgstr ""

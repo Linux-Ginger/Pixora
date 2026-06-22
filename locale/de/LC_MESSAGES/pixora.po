@@ -2982,3 +2982,9 @@ msgstr "Dein Bildschirm bleibt während des Imports entsperrt"
 
 msgid "Photos are copied to your library; the originals on your device are kept and duplicates are reviewed first"
 msgstr "Fotos werden in deine Bibliothek kopiert; die Originale auf deinem Gerät bleiben erhalten und Duplikate werden zuerst geprüft"
+
+msgid "This becomes your tidy library"
+msgstr "Das wird deine aufgeräumte Mediathek"
+
+msgid "Drop your photos and videos in here however messy you like. Pixora files them into neat folders for you, using the layout you pick in the next step."
+msgstr "Leg deine Fotos und Videos hier ab, so durcheinander wie du willst. Pixora sortiert sie für dich in ordentliche Ordner, anhand der Aufteilung, die du im nächsten Schritt wählst."

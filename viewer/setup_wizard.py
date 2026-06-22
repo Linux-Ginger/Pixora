@@ -334,6 +334,21 @@ class SetupWizard(Adw.Window):
         row_box.append(browse_btn)
         page.append(row_box)
 
+        info_group = Adw.PreferencesGroup()
+        info_group.set_margin_top(8)
+        info_row = Adw.ActionRow(
+            title=_("This becomes your tidy library"),
+            subtitle=_("Drop your photos and videos in here however messy you like. Pixora files them into neat folders for you, using the layout you pick in the next step."),
+        )
+        info_row.add_prefix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
+        info_row.set_activatable(False)
+        try:
+            info_row.set_subtitle_lines(4)
+        except Exception:
+            pass
+        info_group.add(info_row)
+        page.append(info_group)
+
         return page
 
     # ── Page: folder structure ───────────────────────────────────────

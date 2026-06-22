@@ -2972,3 +2972,9 @@ msgstr "Je scherm blijft ontgrendeld tijdens het importeren"
 
 msgid "Photos are copied to your library; the originals on your device are kept and duplicates are reviewed first"
 msgstr "Foto's worden naar je bibliotheek gekopieerd; de originelen op je apparaat blijven behouden en duplicaten worden eerst getoond"
+
+msgid "This becomes your tidy library"
+msgstr "Dit wordt je opgeruimde bibliotheek"
+
+msgid "Drop your photos and videos in here however messy you like. Pixora files them into neat folders for you, using the layout you pick in the next step."
+msgstr "Gooi je foto's en video's hier zo rommelig als je wilt naar binnen. Pixora zet ze netjes in mappen voor je, volgens de indeling die je in de volgende stap kiest."

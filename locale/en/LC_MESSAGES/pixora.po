@@ -2954,3 +2954,9 @@ msgstr "Your screen stays unlocked during the import"
 
 msgid "Photos are copied to your library; the originals on your device are kept and duplicates are reviewed first"
 msgstr "Photos are copied to your library; the originals on your device are kept and duplicates are reviewed first"
+
+msgid "This becomes your tidy library"
+msgstr "This becomes your tidy library"
+
+msgid "Drop your photos and videos in here however messy you like. Pixora files them into neat folders for you, using the layout you pick in the next step."
+msgstr "Drop your photos and videos in here however messy you like. Pixora files them into neat folders for you, using the layout you pick in the next step."
