@@ -16,6 +16,7 @@ import time
 import datetime
 import urllib.request
 import urllib.error
+from version import __version__ as APP_VERSION
 import inspect
 from collections import defaultdict, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
@@ -204,7 +205,6 @@ if not WEBKIT_AVAILABLE:
             continue
 
 ASSETS_DIR       = os.path.join(os.path.dirname(__file__), "..", "assets", "logos")
-VERSION_FILE     = os.path.join(os.path.dirname(__file__), "..", "version.txt")
 LICENSE_PATH     = os.path.abspath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "LICENSE"
 ))
@@ -1685,11 +1685,7 @@ class MainWindow(Adw.ApplicationWindow):
         splash_inner.append(splash_lbl)
         splash.append(splash_inner)
 
-        try:
-            with open(VERSION_FILE) as _vf:
-                _splash_ver = _vf.read().strip()
-        except Exception:
-            _splash_ver = ""
+        _splash_ver = APP_VERSION
         if _splash_ver:
             splash_ver_lbl = Gtk.Label(label=f"Pixora {_splash_ver}")
             splash_ver_lbl.add_css_class("dim-label")
@@ -4412,12 +4408,7 @@ class MainWindow(Adw.ApplicationWindow):
         normal_bar.pack_start(self.photo_count_label)
 
         # Pixora version on the right of the footer.
-        _ver = ""
-        try:
-            with open(VERSION_FILE) as _vf:
-                _ver = _vf.read().strip()
-        except Exception:
-            pass
+        _ver = APP_VERSION
         if _ver:
             ver_lbl = Gtk.Label(label=f"Pixora {_ver}")
             ver_lbl.add_css_class("dim-label")
@@ -8187,7 +8178,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # "What's new" — release notes pulled from the latest GitHub release.
         self._changelog_expander = Adw.ExpanderRow(
-            title=_("What's new"),
+            title=_("What's new?"),
             subtitle=_("Release notes from the latest version"))
         self._changelog_expander.add_prefix(
             Gtk.Image.new_from_icon_name("view-list-bullet-symbolic"))

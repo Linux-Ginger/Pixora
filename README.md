@@ -18,7 +18,7 @@
 
 ---
 
-**Pixora** is an open-source photo & video manager for Linux. Plug in your iPhone and Pixora imports everything, files it into neat folders, catches duplicates by actually comparing the images, backs up to your external drive, and gives you a fast viewer with maps, favourites and a built-in editor — all offline, all on your own machine.
+**Pixora** is an open-source photo & video manager for Linux. Plug in your iPhone or iPad and Pixora imports everything, files it into neat folders, catches duplicates by actually comparing the images, backs up to your external drive, and gives you a fast viewer with maps, favourites and a built-in editor — all offline, all on your own machine.
 
 > ⚠️ **Under active development.** Pixora is usable but still evolving; expect rough edges.
 

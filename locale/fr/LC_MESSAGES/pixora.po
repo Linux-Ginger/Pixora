@@ -3006,8 +3006,8 @@ msgstr "Ceci devient votre bibliothèque bien rangée"
 msgid "Drop your photos and videos in here however messy you like. Pixora files them into neat folders for you, using the layout you pick in the next step."
 msgstr "Déposez vos photos et vidéos ici, en vrac si vous voulez. Pixora les classe dans des dossiers bien ordonnés pour vous, selon la disposition que vous choisissez à l'étape suivante."
 
-msgid "What's new"
-msgstr "Nouveautés"
+msgid "What's new?"
+msgstr "Nouveautés ?"
 
 msgid "Release notes from the latest version"
 msgstr "Notes de version de la dernière version"

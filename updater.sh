@@ -75,7 +75,9 @@ step_done clone
 
 step finalize "Configuration and services"
 mkdir -p "$(dirname "$VERSION_FILE")"
-cp -f "$INSTALL_DIR/version.txt" "$VERSION_FILE"
+# Version lives in the code (viewer/version.py), not a separate version.txt.
+APP_VER="$(grep -oP '__version__\s*=\s*"\K[^"]+' "$INSTALL_DIR/viewer/version.py" 2>/dev/null || true)"
+printf '%s' "$APP_VER" > "$VERSION_FILE"
 
 # Compile .po -> .mo; remove old .mo first so we don't silently fall back
 # to a stale compilation when msgfmt fails. Errors on stdout for UI-log.

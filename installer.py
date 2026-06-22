@@ -12,6 +12,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib
 
 import os
+import re
 import sys
 
 # ── i18n ─────────────────────────────────────────────────────────────
@@ -333,15 +334,10 @@ class InstallerWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
-        try:
-            req = urllib.request.Request(
-                "https://raw.githubusercontent.com/Linux-Ginger/Pixora/refs/heads/main/version.txt",
-                headers={"User-Agent": "Pixora-Installer"}
-            )
-            with urllib.request.urlopen(req, timeout=5) as r:
-                remote_version = r.read().decode().strip()
-        except Exception:
-            pass
+        # Latest published release is the version to compare against.
+        if tags:
+            latest = tags[0].strip()
+            remote_version = latest[1:] if latest[:1] in ("v", "V") else latest
 
         GLib.idle_add(self._update_version_list, tags)
         if self._already_installed and remote_version:
@@ -591,11 +587,18 @@ class InstallerWindow(Adw.ApplicationWindow):
 
     def _launch_app(self):
         try:
-            version_src = INSTALL_DIR / "version.txt"
-            installed_version_file = Path.home() / ".config" / "pixora" / "installed_version"
+            # Version lives in viewer/version.py (no separate version.txt).
+            installed_ver = ""
+            version_src = INSTALL_DIR / "viewer" / "version.py"
             if version_src.exists():
+                m = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']',
+                              version_src.read_text())
+                if m:
+                    installed_ver = m.group(1)
+            if installed_ver:
+                installed_version_file = Path.home() / ".config" / "pixora" / "installed_version"
                 installed_version_file.parent.mkdir(parents=True, exist_ok=True)
-                installed_version_file.write_text(version_src.read_text())
+                installed_version_file.write_text(installed_ver)
 
             # Prefer installed launcher; otherwise run main.py directly.
             pixora_bin = Path.home() / ".local" / "bin" / "pixora"
