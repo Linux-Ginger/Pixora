@@ -1519,8 +1519,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._backup_fraction  = 0.0
         self._backup_detail    = ""
         self._backup_proc      = None
-        self._backup_total     = 0
-        self._backup_done      = 0
         self._backup_scanning  = False
         self._backup_deduping  = False
         self._orphan_reviewing = False
@@ -4403,10 +4401,6 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             coords = None
         return self._place_for_coords(coords)
-
-    def _photo_near_home(self, path):
-        """True if the photo was taken at any saved place."""
-        return self._photo_place(path) is not None
 
     def _photo_place_kind(self, path):
         """'main' (taken at the main home), 'extra' (another saved place), or None."""
@@ -8270,7 +8264,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._update_check_state = "idle"
         self._update_check_pulse_id = None
         self._update_check_fade_id = None
-        self._update_remote_version = None
 
         self._update_check_btn = Gtk.Button()
         self._update_check_btn.add_css_class("flat")
@@ -8312,7 +8305,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Startup check already found update → pulse now.
         if self._pending_update_version:
-            self._update_remote_version = self._pending_update_version
             self._update_check_row.set_subtitle(
                 _("Version {v} available").format(v=self._pending_update_version)
             )
@@ -11190,7 +11182,6 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             all_src = list(_walk_rel_files(src))
             total = len(all_src)
-            self._backup_total = total
             src_rels = set()
             for i, (sf, rel) in enumerate(all_src):
                 src_rels.add(rel)
@@ -11202,7 +11193,6 @@ class MainWindow(Adw.ApplicationWindow):
                     import shutil as _sh
                     _sh.copy2(sf, df)
                 frac = (i + 1) / total if total > 0 else 1.0
-                self._backup_done = i + 1
                 GLib.idle_add(self._update_backup_progress, frac,
                               f"{i + 1} / {total}")
             if delete_extraneous:

@@ -41,7 +41,6 @@ HASH_CACHE   = CACHE_DIR / "hashes.json"
 # Per-user mountpoint to avoid clashes with stale mounts or parallel instances.
 MOUNT_POINT  = Path(tempfile.gettempdir()) / f"pixora_iphone_{os.getuid()}"
 
-BACKUP_FSTYPES = {"ext4", "ext3", "ext2", "ntfs", "exfat", "fuseblk", "btrfs", "xfs", "vfat"}
 SUPPORTED_EXT  = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".dng", ".mp4", ".mov", ".m4v", ".webp", ".gif", ".tiff", ".tif", ".3gp", ".bmp"}
 EXCLUDED_EXT   = {".aae"}
 SKIP_DIRS      = {".Trash", "Recently Deleted", "Onlangs verwijderd", ".recently-deleted"}
@@ -1009,6 +1008,8 @@ class ImporterPage(Gtk.Box):
             except Exception:
                 pass
             self._poll_timer_id = None
+        # Stop the progress pulse too, else it keeps firing on a hidden page.
+        self._stop_progress_pulse()
         # Invalidate in-flight thumb loaders so idle callbacks skip dead widgets.
         self._thumb_load_gen += 1
         unmount_iphone(MOUNT_POINT)

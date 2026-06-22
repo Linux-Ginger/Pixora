@@ -1192,7 +1192,7 @@ class SetupWizard(Adw.Window):
         try:
             result = subprocess.run(
                 ["lsblk", "-o", "UUID,MOUNTPOINT", "-J"],
-                capture_output=True, text=True
+                capture_output=True, text=True, timeout=5
             )
             data = json.loads(result.stdout)
             for device in data.get("blockdevices", []):

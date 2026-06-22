@@ -76,7 +76,6 @@ PHASES = [
         ("Configuration + services", "finalize"),
     ]),
 ]
-ALL_STEPS = [(label, key) for _, steps in PHASES for label, key in steps]
 
 ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
 STEP_RE = re.compile(r'^STEP:([^:]+):(.*)$')

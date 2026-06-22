@@ -68,10 +68,25 @@ echo ""
 
 rm -rf "$HOME/.local/share/pixora"
 rm -f "$HOME/.local/share/applications/pixora.desktop"
+rm -f "$HOME/.local/share/applications/com.linuxginger.pixora.installer.desktop"
+rm -f "$HOME/.local/share/applications/com.linuxginger.pixora.updater.desktop"
 rm -f "$HOME/.local/bin/pixora"
+
+# Icons written next to the .desktop files.
+ICONS_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+rm -f "$ICONS_DIR/pixora-icon.svg" \
+      "$ICONS_DIR/com.linuxginger.pixora.installer.svg" \
+      "$ICONS_DIR/com.linuxginger.pixora.updater.svg"
+
+# Settings and caches (the photo library itself is never touched).
+rm -rf "$HOME/.config/pixora"
+rm -rf "$HOME/.cache/pixora"
 
 if command -v update-desktop-database &> /dev/null; then
     update-desktop-database "$HOME/.local/share/applications"
+fi
+if command -v gtk4-update-icon-cache &> /dev/null; then
+    gtk4-update-icon-cache -q -t -f "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 fi
 
 echo -e "${GREEN}${BOLD}${LBL_DONE}${NC}"
