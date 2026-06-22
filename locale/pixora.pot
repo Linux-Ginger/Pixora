@@ -2163,3 +2163,15 @@ msgstr ""
 
 msgid "⚠️ Device not recognised — unplug it, reconnect, and tap Trust"
 msgstr ""
+
+msgid "Restore original"
+msgstr ""
+
+msgid "Restore the original?"
+msgstr ""
+
+msgid "This undoes every edit and brings the photo back exactly as it was imported."
+msgstr ""
+
+msgid "Restore"
+msgstr ""

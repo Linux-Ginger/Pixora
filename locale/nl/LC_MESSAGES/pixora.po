@@ -3008,3 +3008,15 @@ msgstr "✅ Verbonden — je apparaat is klaar"
 
 msgid "⚠️ Device not recognised — unplug it, reconnect, and tap Trust"
 msgstr "⚠️ Apparaat niet herkend — haal het los, sluit opnieuw aan en tik op Vertrouw"
+
+msgid "Restore original"
+msgstr "Origineel herstellen"
+
+msgid "Restore the original?"
+msgstr "Origineel herstellen?"
+
+msgid "This undoes every edit and brings the photo back exactly as it was imported."
+msgstr "Dit maakt elke bewerking ongedaan en zet de foto precies terug zoals hij geïmporteerd is."
+
+msgid "Restore"
+msgstr "Herstellen"

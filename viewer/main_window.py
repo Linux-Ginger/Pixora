@@ -4099,9 +4099,13 @@ class MainWindow(Adw.ApplicationWindow):
                                   _("Rotate right"), self.on_editor_rotate_right)
         self.crop_toggle_btn = _edit_btn("edit-cut-symbolic", _("Crop"),
                                          self.on_editor_toggle_crop, toggle=True)
+        self.restore_orig_btn = _edit_btn("edit-undo-symbolic",
+                                          _("Restore original"),
+                                          self.on_editor_restore)
         self.editor_bar.append(rot_left_btn)
         self.editor_bar.append(rot_right_btn)
         self.editor_bar.append(self.crop_toggle_btn)
+        self.editor_bar.append(self.restore_orig_btn)
 
         sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
         sep.set_margin_start(4)
@@ -6676,6 +6680,9 @@ class MainWindow(Adw.ApplicationWindow):
         for w in self._video_fade_widgets():
             w.set_visible(False)
         self.editor_bar.set_visible(True)
+        # Show "Restore original" only when this photo has an edit to undo.
+        self.restore_orig_btn.set_visible(
+            path != "?" and self._has_original_backup(path))
         self.prev_btn.set_sensitive(False)
         self.next_btn.set_sensitive(False)
 
@@ -6699,6 +6706,117 @@ class MainWindow(Adw.ApplicationWindow):
         # Bring the normal viewer chrome back.
         self._show_viewer_ui()
         self._reset_fade_timer()
+
+    # ── Original backup / restore ────────────────────────────────────
+    def _originals_dir(self):
+        d = os.path.join(INSTALL_DIR, "originals")
+        os.makedirs(d, exist_ok=True)
+        try:
+            os.chmod(d, 0o700)  # keep originals private to the user
+        except OSError:
+            pass
+        return d
+
+    def _load_originals_index(self):
+        try:
+            with open(os.path.join(self._originals_dir(), "index.json")) as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _save_originals_index(self, idx):
+        try:
+            with open(os.path.join(self._originals_dir(), "index.json"), "w") as f:
+                json.dump(idx, f)
+        except Exception:
+            pass
+
+    def _has_original_backup(self, path):
+        entry = self._load_originals_index().get(path)
+        return bool(entry and os.path.exists(
+            os.path.join(self._originals_dir(), entry["backup"])))
+
+    def _backup_original_once(self, path):
+        """Stash the untouched original the first time a photo is edited so it can
+        be restored later. No-op once a backup for this photo already exists."""
+        if self._has_original_backup(path):
+            return
+        try:
+            idx = self._load_originals_index()
+            backup_name = hashlib.md5(path.encode()).hexdigest() + \
+                os.path.splitext(path)[1]
+            dst = os.path.join(self._originals_dir(), backup_name)
+            shutil.copy2(path, dst)
+            try:
+                os.chmod(dst, 0o600)
+            except OSError:
+                pass
+            idx[path] = {"backup": backup_name, "orig": os.path.basename(path)}
+            self._save_originals_index(idx)
+        except Exception as e:
+            log_error("original backup failed: {}".format(e))
+
+    def on_editor_restore(self, btn=None):
+        cur = self._current_photo_path()
+        if not cur or not self._has_original_backup(cur):
+            return
+        dlg = Adw.MessageDialog(
+            transient_for=self,
+            heading=_("Restore the original?"),
+            body=_("This undoes every edit and brings the photo back exactly as it was imported."),
+        )
+        dlg.add_response("cancel", _("Cancel"))
+        dlg.add_response("restore", _("Restore"))
+        dlg.set_response_appearance("restore", Adw.ResponseAppearance.DESTRUCTIVE)
+        dlg.set_default_response("cancel")
+        dlg.set_close_response("cancel")
+        dlg.connect("response",
+                    lambda d, r: self._do_restore_original(cur) if r == "restore" else None)
+        dlg.present()
+
+    def _do_restore_original(self, cur):
+        idx = self._load_originals_index()
+        entry = idx.get(cur)
+        if not entry:
+            return
+        backup = os.path.join(self._originals_dir(), entry["backup"])
+        if not os.path.exists(backup):
+            return
+        try:
+            restored = os.path.join(os.path.dirname(cur), entry["orig"])
+            for p in (cur, restored):
+                try:
+                    c = get_cache_path(p)
+                    if os.path.exists(c):
+                        os.remove(c)
+                except Exception:
+                    pass
+            shutil.copy2(backup, restored)
+            # Drop the edited file if its name differs (e.g. HEIC was saved as JPG).
+            if os.path.abspath(restored) != os.path.abspath(cur) and os.path.exists(cur):
+                os.remove(cur)
+            os.remove(backup)
+            idx.pop(cur, None)
+            self._save_originals_index(idx)
+        except Exception as e:
+            log_error("restore original failed: {}".format(e))
+            return
+        # Move references over and refresh viewer + grid.
+        self.photos = [restored if p == cur else p for p in self.photos]
+        self._filmstrip_order_cache = None
+        if cur in self._favorites:
+            self._favorites.discard(cur)
+            self._favorites.add(restored)
+            self._schedule_save_favorites()
+        with self._pixbuf_cache_lock:
+            self._viewer_pixbuf_cache.pop(cur, None)
+            self._viewer_pixbuf_cache.pop(restored, None)
+        self.on_editor_cancel()
+        self._viewer_load_id += 1
+        load_id = self._viewer_load_id
+        threading.Thread(target=self._load_full_photo,
+                         args=(restored, load_id), daemon=True).start()
+        GLib.timeout_add(300, self.start_load)
 
     def _reset_crop(self):
         self._editor_crop_mode = False
@@ -6898,6 +7016,8 @@ class MainWindow(Adw.ApplicationWindow):
             try:
                 from PIL import Image
                 original_mtime = os.path.getmtime(path)
+                # Keep the untouched original so edits can be undone later.
+                self._backup_original_once(path)
                 old_cache = get_cache_path(path)
                 from PIL import ImageOps
                 img = Image.open(path)
@@ -6970,6 +7090,11 @@ class MainWindow(Adw.ApplicationWindow):
                 # Extension changed (e.g. HEIC → JPG): move every reference over.
                 self.photos = [new_path if p == path else p for p in self.photos]
                 self._filmstrip_order_cache = None
+                # Re-key the original backup so Restore still finds it.
+                idx = self._load_originals_index()
+                if path in idx:
+                    idx[new_path] = idx.pop(path)
+                    self._save_originals_index(idx)
                 if path in self._favorites:
                     self._favorites.discard(path)
                     self._favorites.add(new_path)

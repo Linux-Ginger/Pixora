@@ -3018,3 +3018,15 @@ msgstr "✅ Verbunden — dein Gerät ist bereit"
 
 msgid "⚠️ Device not recognised — unplug it, reconnect, and tap Trust"
 msgstr "⚠️ Gerät nicht erkannt — abziehen, erneut anschließen und auf „Vertrauen“ tippen"
+
+msgid "Restore original"
+msgstr "Original wiederherstellen"
+
+msgid "Restore the original?"
+msgstr "Original wiederherstellen?"
+
+msgid "This undoes every edit and brings the photo back exactly as it was imported."
+msgstr "Das macht alle Bearbeitungen rückgängig und stellt das Foto genau so wieder her, wie es importiert wurde."
+
+msgid "Restore"
+msgstr "Wiederherstellen"
