@@ -4122,6 +4122,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._info_box.set_margin_start(12)
         self._info_box.set_margin_end(12)
         self.info_popover.set_child(self._info_box)
+        self.info_popover.connect("closed", lambda p: self._reset_fade_timer())
 
         # Viewer-overlay donut mirrors header donut; shares state.
         self._viewer_donut = Gtk.DrawingArea()
@@ -5440,6 +5441,8 @@ class MainWindow(Adw.ApplicationWindow):
         path = self._current_photo_path()
         if not path:
             return
+        # Keep the chrome visible while the info popover is open.
+        self._cancel_fade()
         # Read metadata off the main thread (ffprobe/EXIF can be slow), then fill.
         self._fill_info_box([(_("Loading…"), "")])
         self.info_popover.popup()
@@ -6499,6 +6502,12 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _start_fade(self):
         self._fade_timer_id = None
+        # Keep the chrome (filmstrip, buttons) up while the info popover is open —
+        # re-arm so it fades normally once the popover closes.
+        if getattr(self, "info_popover", None) is not None \
+                and self.info_popover.get_visible():
+            self._reset_fade_timer()
+            return False
         self._fade_step = 0
         self._fade_anim_id = GLib.timeout_add(50, self._fade_tick)
         return False
