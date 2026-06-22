@@ -4470,14 +4470,16 @@ class MainWindow(Adw.ApplicationWindow):
         place photos fall back to their stored address; GPS-less photos say so."""
         if location:
             self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
+        elif searching:
+            # Lookup pending → show the spinner, not a half address that then
+            # gets replaced (which made the street pop in and out on fast nav).
+            self._set_viewer_location("searching")
         elif getattr(self, "_viewer_place", None):
             addr = getattr(self, "_viewer_place_addr", "") or ""
             base = f"📍 {addr}" if addr else ""
             self._set_viewer_location("done", self._decorate_location(base))
-        elif searching:
-            self._set_viewer_location("searching")
         else:
-            self._set_viewer_location("done", f"📍 {_('Location unavailable')}")
+            self._set_viewer_location("done", f"📍 {_('No location for this photo')}")
 
     def _photo_place_kind(self, path):
         """'main' (taken at the main home), 'extra' (another saved place), or None."""
@@ -5394,10 +5396,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._viewer_zoom = 1.0
             self._viewer_offset = [0.0, 0.0]
             self.photo_picture.set_pixbuf(pixbuf)
-            if searching:
-                self._set_viewer_location("searching")
-            elif location:
-                self._set_viewer_location("done", self._decorate_location(f"📍 {location}"))
+            self._apply_initial_location(location, searching)
             return False
 
         self._stop_video()

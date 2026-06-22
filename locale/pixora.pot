@@ -2176,5 +2176,5 @@ msgstr ""
 msgid "Restore"
 msgstr ""
 
-msgid "Location unavailable"
+msgid "No location for this photo"
 msgstr ""
