@@ -1610,6 +1610,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._heic_detail = ""
         # Stop re-checking/nagging this session once swept clean or dismissed.
         self._heic_sweep_dismissed = False
+        self._video_sweep_dismissed = False
         # Orphan state: files on USB not in Pixora. Warn after silent backup.
         self._last_scan_orphan_count = 0
         self._last_scan_orphan_rels = []
@@ -10451,8 +10452,10 @@ class MainWindow(Adw.ApplicationWindow):
             return False
         self._structure_startup_scanned = True
         self._periodic_scan()
-        # Sweep leftover HEICs a bit later so it doesn't fight the startup load.
+        # Sweep leftover HEICs a bit later so it doesn't fight the startup load;
+        # video sweep is staggered after it (they share the conversion slot).
         GLib.timeout_add_seconds(8, self._maybe_run_heic_sweep)
+        GLib.timeout_add_seconds(12, self._maybe_run_video_sweep)
         return False
 
     def _trigger_structure_scan(self):
@@ -10502,10 +10505,11 @@ class MainWindow(Adw.ApplicationWindow):
             self._on_reorganize_scan_done(moves, dups, True)
             return False
         self._maybe_trigger_backup_now()
-        # Last step of the maintenance pass: convert leftover HEICs, but only
-        # once backup isn't running — so it's one donut at a time.
+        # Last step of the maintenance pass: convert leftover HEICs/videos, but
+        # only once backup isn't running — so it's one donut at a time.
         if not self._backup_scanning and not self._backup_running:
             self._maybe_run_heic_sweep()
+            self._maybe_run_video_sweep()
         return False
 
     def _maybe_trigger_backup_now(self):
@@ -10598,10 +10602,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         def _scan():
             files = self._collect_library_videos()
-            GLib.idle_add(self._start_video_library_conversion, files)
+            GLib.idle_add(self._start_video_library_conversion, files, False)
         threading.Thread(target=_scan, daemon=True).start()
 
-    def _start_video_library_conversion(self, files):
+    def _start_video_library_conversion(self, files, silent=False):
         if self._heic_converting or not files:
             return False
         self._heic_converting = True
@@ -10620,10 +10624,10 @@ class MainWindow(Adw.ApplicationWindow):
         log_info("Video library conversion started: {} files".format(len(files)))
         threading.Thread(
             target=self._convert_video_library_thread,
-            args=(files,), daemon=True).start()
+            args=(files, silent), daemon=True).start()
         return False
 
-    def _convert_video_library_thread(self, files):
+    def _convert_video_library_thread(self, files, silent=False):
         from importer_page import convert_video
         total = len(files)
         done = converted = failed = 0
@@ -10663,9 +10667,9 @@ class MainWindow(Adw.ApplicationWindow):
                 failed += 1
             done += 1
             GLib.idle_add(self._set_heic_progress, done, total, fp.name)
-        GLib.idle_add(self._finish_video_library_conversion, converted, failed)
+        GLib.idle_add(self._finish_video_library_conversion, converted, failed, silent)
 
-    def _finish_video_library_conversion(self, converted, failed):
+    def _finish_video_library_conversion(self, converted, failed, silent=False):
         self._heic_converting = False
         self._heic_fraction = 0.0
         self._heic_detail = ""
@@ -10681,7 +10685,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.reload_photos()
         except Exception:
             pass
-        if (converted + failed) > 0:
+        if not silent and (converted + failed) > 0:
             if failed:
                 body = _("Converted %(c)d of %(t)d videos. %(f)d could not be converted and were left as-is.") % {
                     "c": converted, "t": converted + failed, "f": failed}
@@ -10799,6 +10803,55 @@ class MainWindow(Adw.ApplicationWindow):
                 self._start_library_conversion(files, silent=False)
             else:
                 self._heic_sweep_dismissed = True  # don't nag again this session
+        dlg.connect("response", _resp)
+        self._present_dialog(dlg)
+        return False
+
+    def _maybe_run_video_sweep(self):
+        """Periodic/startup sweep: convert leftover library videos to MP4. Defers
+        while other maintenance runs; prompts first unless auto-confirm is on."""
+        if (self._heic_converting or self._video_sweep_dismissed
+                or self._structure_scanning or self._backup_scanning
+                or self._backup_running or self._reorganize_active):
+            return False
+        if not self.settings.get("convert_videos", False):
+            return False
+        threading.Thread(
+            target=self._video_sweep_scan_thread, daemon=True).start()
+        return False
+
+    def _video_sweep_scan_thread(self):
+        files = self._collect_library_videos()
+        GLib.idle_add(self._on_video_sweep_scanned, files)
+
+    def _on_video_sweep_scanned(self, files):
+        if not files:
+            # Clean — stop walking the library every cycle this session.
+            self._video_sweep_dismissed = True
+            return False
+        if self._heic_converting:
+            return False
+        if self.settings.get("auto_confirm"):
+            self._start_video_library_conversion(files, silent=True)
+            return False
+        n = len(files)
+        dlg = Adw.AlertDialog(
+            heading=_("Convert videos?"),
+            body=ngettext(
+                "Pixora found %d video to convert to MP4. Convert it now?",
+                "Pixora found %d videos to convert to MP4. Convert them now?",
+                n) % n)
+        dlg.add_response("later", _("Later"))
+        dlg.add_response("go", _("Convert"))
+        dlg.set_response_appearance("go", Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("go")
+        dlg.set_close_response("later")
+
+        def _resp(d, r):
+            if r == "go":
+                self._start_video_library_conversion(files, silent=False)
+            else:
+                self._video_sweep_dismissed = True  # don't nag again this session
         dlg.connect("response", _resp)
         self._present_dialog(dlg)
         return False

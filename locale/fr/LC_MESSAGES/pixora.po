@@ -2631,6 +2631,14 @@ msgid_plural "Pixora found %d HEIC photos to convert to JPEG. Convert them now?"
 msgstr[0] "Pixora a trouvé %d photo HEIC à convertir en JPEG. Convertir maintenant ?"
 msgstr[1] "Pixora a trouvé %d photos HEIC à convertir en JPEG. Convertir maintenant ?"
 
+msgid "Convert videos?"
+msgstr "Convertir les vidéos ?"
+
+msgid "Pixora found %d video to convert to MP4. Convert it now?"
+msgid_plural "Pixora found %d videos to convert to MP4. Convert them now?"
+msgstr[0] "Pixora a trouvé %d vidéo à convertir en MP4. Convertir maintenant ?"
+msgstr[1] "Pixora a trouvé %d vidéos à convertir en MP4. Convertir maintenant ?"
+
 msgid "Reorganize folders now"
 msgstr "Réorganiser les dossiers maintenant"
 

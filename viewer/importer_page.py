@@ -569,6 +569,20 @@ def _video_codec(path: Path) -> str:
         return ""
 
 
+def _video_location(path: Path) -> str:
+    """Apple's ISO6709 GPS string (e.g. '+52.0907+5.1214/'), if the clip has one."""
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json",
+             "-show_format", str(path)],
+            capture_output=True, text=True, timeout=15)
+        tags = json.loads(r.stdout).get("format", {}).get("tags", {})
+        return (tags.get("location")
+                or tags.get("com.apple.quicktime.location.ISO6709") or "").strip()
+    except Exception:
+        return ""
+
+
 def convert_video(src: Path, dst: Path) -> bool:
     """Smart MOV→MP4 for broader compatibility. Already-H.264 video is just
     remuxed into an .mp4 container (lossless, fast); HEVC and the rest are
@@ -576,12 +590,17 @@ def convert_video(src: Path, dst: Path) -> bool:
     Date + location metadata are carried over. src must be a local file."""
     try:
         codec = _video_codec(src)
+        # -map_metadata drops Apple's QuickTime location atom, so re-add it
+        # explicitly as the standard mp4 'location' tag the viewer reads back.
+        loc = _video_location(src)
+        loc_args = ["-metadata", "location=" + loc] if loc else []
         if codec in ("h264", "avc1"):
             cmd = ["ffmpeg", "-y", "-i", str(src), "-c", "copy",
-                   "-map_metadata", "0", "-movflags", "+faststart", str(dst)]
+                   "-map_metadata", "0", *loc_args,
+                   "-movflags", "+faststart", str(dst)]
         else:
             cmd = ["ffmpeg", "-y", "-i", str(src), "-map_metadata", "0",
-                   "-c:v", "libx264", "-crf", "20", "-preset", "fast",
+                   *loc_args, "-c:v", "libx264", "-crf", "20", "-preset", "fast",
                    "-c:a", "aac", "-b:a", "192k",
                    "-movflags", "+faststart", str(dst)]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
