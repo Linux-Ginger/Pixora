@@ -171,6 +171,42 @@ class VersionTests(unittest.TestCase):
         self.assertFalse(common.is_newer_version("", "1.67.0"))
 
 
+class UpdateChannelTests(unittest.TestCase):
+    RELEASES = [
+        {"tag_name": "v1.69.0-pre.2", "prerelease": True, "draft": False},
+        {"tag_name": "v1.69.0-pre.1", "prerelease": True, "draft": False},
+        {"tag_name": "v1.70.0", "prerelease": False, "draft": True},
+        {"tag_name": "v1.68.0", "prerelease": False, "draft": False},
+        {"tag_name": "v1.69.0-pre.3", "prerelease": False, "draft": False},  # mislabelled
+    ]
+
+    def _fetch(self, pre):
+        import io
+        import json
+        from unittest import mock
+        body = io.BytesIO(json.dumps(self.RELEASES).encode())
+        cm = mock.MagicMock()
+        cm.__enter__.return_value = body
+        with mock.patch("urllib.request.urlopen", return_value=cm):
+            return common._fetch_latest_release(pre)
+
+    def test_normal_users_only_get_normal_releases(self):
+        self.assertEqual(self._fetch(False)["tag"], "v1.68.0")
+
+    def test_testers_only_get_prereleases(self):
+        self.assertEqual(self._fetch(True)["tag"], "v1.69.0-pre.3")
+
+    def test_prerelease_ordering(self):
+        self.assertTrue(common.is_newer_version("1.69.0", "1.69.0-pre.3"))
+        self.assertTrue(common.is_newer_version("1.69.0-pre.10", "1.69.0-pre.9"))
+        self.assertFalse(common.is_newer_version("1.68.0", "1.69.0-pre.1"))
+
+    def test_testing_channel_needs_developer_mode(self):
+        self.assertFalse(common.wants_prerelease_updates({"prerelease_updates": True}))
+        self.assertTrue(common.wants_prerelease_updates(
+            {"prerelease_updates": True, "dev_mode": True}))
+
+
 class LivePhotoTests(unittest.TestCase):
     def test_motion_is_paired_and_hidden(self):
         paths = ["/l/IMG_1.HEIC", "/l/IMG_1.MOV", "/l/IMG_2.MOV", "/other/IMG_1.MOV"]

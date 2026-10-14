@@ -3351,3 +3351,9 @@ msgstr "pkexec niet gevonden. Voer de installatieopdracht in een terminal uit."
 
 msgid "Installation was cancelled (no password given)."
 msgstr "Installatie geannuleerd (geen wachtwoord ingevoerd)."
+
+msgid "Test pre-releases"
+msgstr "Pre-releases testen"
+
+msgid "For testing only: updates then come from pre-releases, never from normal releases. Off = normal updates."
+msgstr "Alleen om te testen: updates komen dan uit pre-releases, nooit uit gewone releases. Uit = gewone updates."

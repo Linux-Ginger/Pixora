@@ -65,9 +65,18 @@ if [ ! -d "$INSTALL_DIR/.git" ]; then
     as_user git clone -q "$REPO_URL" "$INSTALL_DIR" >/dev/null 2>&1
 fi
 as_user git -C "$INSTALL_DIR" fetch -q --tags --force origin >/dev/null 2>&1
-# Install the newest published release (what "Check for updates" compares
-# against); only fall back to main while no release exists yet.
-TARGET_REF="$(as_user git -C "$INSTALL_DIR" tag -l 'v*' --sort=-v:refname | head -n1)"
+# Install the release the app's update check picked (PIXORA_TARGET_TAG; a
+# pre-release only in the dev-mode testing channel). Otherwise the newest
+# normal release: tags like v1.68.0 — pre-release tags (v1.69.0-pre.1) are
+# never chosen here. Only while no release exists yet, fall back to main.
+TARGET_REF=""
+if printf '%s' "${PIXORA_TARGET_TAG:-}" | grep -Eq '^v[0-9][0-9A-Za-z.-]*$' \
+        && as_user git -C "$INSTALL_DIR" rev-parse -q --verify "refs/tags/$PIXORA_TARGET_TAG" >/dev/null; then
+    TARGET_REF="$PIXORA_TARGET_TAG"
+fi
+if [ -z "$TARGET_REF" ]; then
+    TARGET_REF="$(as_user git -C "$INSTALL_DIR" tag -l 'v*' --sort=-v:refname | grep -v -- '-' | head -n1)"
+fi
 [ -n "$TARGET_REF" ] || TARGET_REF="origin/main"
 as_user git -C "$INSTALL_DIR" reset --hard "$TARGET_REF" -q >/dev/null 2>&1
 step_done clone

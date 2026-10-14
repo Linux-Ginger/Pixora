@@ -219,7 +219,7 @@ LICENSE_PATH     = os.path.abspath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "LICENSE"
 ))
 INSTALL_DIR      = os.path.expanduser("~/.local/share/pixora")
-GITHUB_RELEASES_API = "https://api.github.com/repos/Linux-Ginger/Pixora/releases/latest"
+GITHUB_RELEASES_API = "https://api.github.com/repos/Linux-Ginger/Pixora/releases?per_page=30"
 CONFIG_PATH      = os.path.expanduser("~/.config/pixora/settings.json")
 FAVORITES_PATH   = os.path.expanduser("~/.config/pixora/favorites.json")
 CACHE_DIR        = os.path.expanduser("~/.cache/pixora/thumbnails")
@@ -292,13 +292,26 @@ def trash_file(path):
     Gio.File.new_for_path(str(path)).trash(None)
 
 
-def version_tuple(v):
-    """'v1.67.0' → (1, 67, 0) for ordering; junk parts count as 0."""
+def _num_parts(s):
     out = []
-    for part in str(v or "").strip().lstrip("vV").split("."):
+    for part in s.split("."):
         digits = "".join(ch for ch in part if ch.isdigit())
         out.append(int(digits) if digits else 0)
-    return tuple(out)
+    return out
+
+
+def version_tuple(v):
+    """Sort key: 'v1.68.0' → ((1, 68, 0), 1, ()), 'v1.69.0-pre.2' →
+    ((1, 69, 0), 0, (2,)). A pre-release sorts just below its final release."""
+    v = str(v or "").strip().lstrip("vV")
+    main, _sep, pre = v.partition("-")
+    nums = (_num_parts(main) + [0, 0, 0])[:3]
+    return (tuple(nums), 0 if pre else 1, tuple(_num_parts(pre)) if pre else ())
+
+
+def is_prerelease_version(v):
+    """Pre-release tags carry a suffix: v1.69.0-pre.1 (stable: v1.69.0)."""
+    return "-" in str(v or "")
 
 
 def is_newer_version(remote, local):
@@ -309,6 +322,12 @@ def is_newer_version(remote, local):
     if not local:
         return True
     return version_tuple(remote) > version_tuple(local)
+
+
+def wants_prerelease_updates(settings):
+    """Pre-release updates are for testing only: they need developer mode
+    AND the switch, so normal use never gets one."""
+    return bool(settings.get("dev_mode") and settings.get("prerelease_updates"))
 
 
 def is_video(path):
@@ -397,12 +416,14 @@ def _walk_rel_files(base):
 INSTALLED_VERSION_FILE = os.path.expanduser("~/.config/pixora/installed_version")
 
 
-def _fetch_latest_release():
-    """Latest published GitHub release as {version, body, url}.
+def _fetch_latest_release(prerelease=False):
+    """Newest published GitHub release as {version, tag, body, url}.
 
-    Raises on network failure; returns None when the repo has no release yet.
-    This is the single source of truth for "is there an update" — Pixora tracks
-    tagged releases, not every commit on main.
+    prerelease=False: only normal releases. prerelease=True: only releases
+    marked "pre-release" (the testing channel). Raises on network failure;
+    returns None when there is no such release. This is the single source of
+    truth for "is there an update" — Pixora tracks tagged releases, not every
+    commit on main.
     """
     req = urllib.request.Request(
         GITHUB_RELEASES_API,
@@ -418,12 +439,29 @@ def _fetch_latest_release():
         if e.code == 404:
             return None  # no release published yet
         raise
-    tag = (data.get("tag_name") or data.get("name") or "").strip()
-    version = tag[1:] if tag[:1] in ("v", "V") else tag
+    best = None
+    for rel in data if isinstance(data, list) else []:
+        if rel.get("draft"):
+            continue
+        tag = (rel.get("tag_name") or "").strip()
+        if not tag:
+            continue
+        # Both the GitHub flag and the tag name must agree on the channel,
+        # so a mislabelled release can never reach normal users.
+        is_pre = bool(rel.get("prerelease")) or is_prerelease_version(tag)
+        if is_pre != bool(prerelease):
+            continue
+        if best is None or version_tuple(tag) > version_tuple(best["tag_name"]):
+            best = rel
+    if best is None:
+        return None
+    tag = best["tag_name"].strip()
     return {
-        "version": version,
-        "body": (data.get("body") or "").strip(),
-        "url": data.get("html_url") or "",
+        "version": tag[1:] if tag[:1] in ("v", "V") else tag,
+        "tag": tag,
+        "body": (best.get("body") or "").strip(),
+        "url": best.get("html_url") or "",
+        "prerelease": bool(prerelease),
     }
 
 

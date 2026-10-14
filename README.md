@@ -140,7 +140,7 @@ python3 -m unittest discover tests
 
 **Translations** live in `locale/<lang>/LC_MESSAGES/pixora.po`; Pixora compiles them on start. To refresh the template: `xgettext --language=Python --keyword=_ --keyword=ngettext:1,2 -o locale/pixora.pot viewer/*.py installer.py`.
 
-**Releases**: bump `viewer/version.py`, then publish a GitHub release tagged `v<version>`. The in-app updater installs the newest release tag.
+**Releases**: bump `viewer/version.py`, then publish a GitHub release tagged `v<version>` (e.g. `v1.68.0`). Normal users only ever get these. **Pre-releases** are tagged `v<version>-pre.<n>` (e.g. `v1.69.0-pre.1`) and marked *Pre-release* on GitHub; only Pixora's in developer mode with *Settings → About → Test pre-releases* switched on look at them. Pixora is alpha, so older releases (and their tags) are removed when a new one is published.
 
 </details>
 

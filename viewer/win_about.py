@@ -14,6 +14,7 @@ import time
 from pixora_i18n import _
 from common import (Adw, Gdk, GLib, Gtk, INSTALLED_VERSION_FILE,
     LICENSE_PATH, is_newer_version, log_error, log_info, log_warn,
+    wants_prerelease_updates,
     _fetch_latest_release)
 
 
@@ -31,7 +32,7 @@ class AboutMixin:
                 return
             with open(INSTALLED_VERSION_FILE) as f:
                 local_version = f.read().strip()
-            rel = _fetch_latest_release()
+            rel = _fetch_latest_release(wants_prerelease_updates(self.settings))
             if rel and is_newer_version(rel["version"], local_version):
                 self._pending_update_version = rel["version"]
                 self._latest_release = rel
@@ -196,9 +197,17 @@ class AboutMixin:
         updater_path = os.path.abspath(os.path.join(
             os.path.dirname(__file__), "updater.py"
         ))
+        # Tell the updater exactly which release the check found (stable or,
+        # in the testing channel, a pre-release); without it, it installs the
+        # newest stable release.
+        env = dict(os.environ)
+        env.pop("PIXORA_TARGET_TAG", None)
+        rel = getattr(self, "_latest_release", None)
+        if rel and rel.get("tag"):
+            env["PIXORA_TARGET_TAG"] = rel["tag"]
         try:
             subprocess.Popen([sys.executable, updater_path],
-                             start_new_session=True)
+                             start_new_session=True, env=env)
         except Exception as e:
             log_error(_("GUI updater failed to start: {err}").format(err=e))
             return
@@ -426,7 +435,7 @@ class AboutMixin:
             if os.path.exists(INSTALLED_VERSION_FILE):
                 with open(INSTALLED_VERSION_FILE) as f:
                     local_version = f.read().strip()
-            rel = _fetch_latest_release()
+            rel = _fetch_latest_release(wants_prerelease_updates(self.settings))
         except Exception:
             GLib.idle_add(self._settings_update_result, None, None, None)
             return
@@ -472,7 +481,7 @@ class AboutMixin:
         """Fetch the latest release notes in the background for the About page."""
         def _work():
             try:
-                rel = _fetch_latest_release()
+                rel = _fetch_latest_release(wants_prerelease_updates(self.settings))
             except Exception:
                 rel = None
             GLib.idle_add(self._apply_about_changelog, rel)

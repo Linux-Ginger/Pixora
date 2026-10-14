@@ -3333,3 +3333,9 @@ msgstr "pkexec not found. Run the install command in a terminal instead."
 
 msgid "Installation was cancelled (no password given)."
 msgstr "Installation was cancelled (no password given)."
+
+msgid "Test pre-releases"
+msgstr "Test pre-releases"
+
+msgid "For testing only: updates then come from pre-releases, never from normal releases. Off = normal updates."
+msgstr "For testing only: updates then come from pre-releases, never from normal releases. Off = normal updates."

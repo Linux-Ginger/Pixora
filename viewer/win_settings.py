@@ -1076,6 +1076,26 @@ class SettingsMixin:
         self._update_check_row.add_suffix(self._update_check_btn)
 
         about_group.add(self._update_check_row)
+
+        # Testing channel: developer mode only, so normal use never gets a
+        # pre-release (see common.wants_prerelease_updates).
+        pre_switch = Gtk.Switch()
+        pre_switch.set_valign(Gtk.Align.CENTER)
+        pre_switch.set_active(bool(self.settings.get("prerelease_updates", False)))
+        pre_switch.connect("notify::active", self._on_prerelease_toggled)
+        pre_row = Adw.ActionRow(
+            title=_("Test pre-releases"),
+            subtitle=_("For testing only: updates then come from pre-releases, "
+                       "never from normal releases. Off = normal updates."))
+        pre_row.add_prefix(Gtk.Image.new_from_icon_name("applications-science-symbolic"))
+        pre_row.add_suffix(pre_switch)
+        pre_row.set_activatable_widget(pre_switch)
+        try:
+            pre_row.set_subtitle_lines(2)
+        except Exception:
+            pass
+        pre_row.set_visible(bool(self.settings.get("dev_mode", False)))
+        about_group.add(pre_row)
         about_box.append(about_group)
 
         # Startup check already found update → pulse now.
@@ -1594,6 +1614,15 @@ class SettingsMixin:
             log_error(_("Restart error: {err}").format(err=e))
         self.get_application().quit()
         return False
+
+    def _on_prerelease_toggled(self, switch, _pspec):
+        self.settings["prerelease_updates"] = switch.get_active()
+        save_settings(self.settings)
+        # Forget what the other channel found and look again right away.
+        self._pending_update_version = None
+        self._latest_release = None
+        self._set_update_state("idle")  # else a pending "Update" would install
+        self._on_settings_check_update(None)
 
     def _on_live_motion_toggled(self, switch, _pspec):
         self.settings["import_live_motion"] = switch.get_active()

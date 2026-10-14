@@ -255,10 +255,13 @@ class UpdaterWindow(Adw.ApplicationWindow):
             return
 
         uid = str(os.getuid())
-        cmd = [
-            "pkexec", "env", f"PKEXEC_UID={uid}",
-            "bash", script_path,
-        ]
+        cmd = ["pkexec", "env", f"PKEXEC_UID={uid}"]
+        # The release Pixora's update check picked (pkexec drops our
+        # environment, so pass it explicitly). Only plain tag names.
+        tag = os.environ.get("PIXORA_TARGET_TAG", "")
+        if re.fullmatch(r"v[0-9][0-9A-Za-z.\-]*", tag):
+            cmd.append(f"PIXORA_TARGET_TAG={tag}")
+        cmd += ["bash", script_path]
         try:
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

@@ -338,16 +338,21 @@ class InstallerWindow(Adw.ApplicationWindow):
             )
             with urllib.request.urlopen(req, timeout=6) as r:
                 releases = json.loads(r.read())
-            tags = [rel["tag_name"] for rel in releases if not rel.get("draft")]
+            published = [rel for rel in releases if not rel.get("draft")]
+            tags = [rel["tag_name"] for rel in published]
+            # "Latest" is the newest normal release; pre-releases (tagged
+            # v1.69.0-pre.1) can still be picked by hand from the list.
+            stable = [rel["tag_name"] for rel in published
+                      if not rel.get("prerelease") and "-" not in rel["tag_name"]]
         except Exception:
-            pass
+            stable = []
 
-        # Latest published release is the version to compare against.
-        if tags:
-            latest = tags[0].strip()
+        # Latest published normal release is the version to compare against.
+        if stable:
+            latest = stable[0].strip()
             remote_version = latest[1:] if latest[:1] in ("v", "V") else latest
 
-        self._latest_tag = tags[0] if tags else None
+        self._latest_tag = stable[0] if stable else None
         GLib.idle_add(self._update_version_list, tags)
         if self._already_installed and remote_version:
             GLib.idle_add(self._update_install_status, remote_version)
