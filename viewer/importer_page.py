@@ -805,17 +805,28 @@ _COREDATA_EPOCH = 978307200.0
 
 
 def load_capture_dates(mountpoint: Path) -> dict:
-    """Read iOS's photo database for the authoritative capture date per asset.
+    """{relative_posix_path_lowercased: unix_timestamp} — see load_photo_db."""
+    return load_photo_db(mountpoint)["dates"]
 
-    PhotoData/Photos.sqlite is what the iOS Photos app sorts by, so matching
-    files against it makes Pixora's order identical to the phone — including
-    screenshots, edited photos and iCloud-library files that have no usable
-    EXIF date. Returns {relative_posix_path_lowercased: unix_timestamp};
-    empty on any failure so callers transparently fall back to EXIF/mtime.
+
+def load_photo_db(mountpoint: Path) -> dict:
+    """Read iOS's photo database (PhotoData/Photos.sqlite).
+
+    Returns {"dates": {key: unix_timestamp}, "trashed": {key}, "album": {key}}
+    keyed by the file's path relative to the mount, lowercased:
+      - dates: the capture date the Photos app sorts by, so Pixora's order
+        matches the phone — including screenshots, edited photos and
+        iCloud-library files without a usable EXIF date;
+      - trashed: assets in "Recently Deleted" (their files stay in DCIM for
+        30 days, so only the database tells them apart);
+      - album: what the Photos app counts in the library (not deleted, not
+        an internal/invisible asset).
+    Empty on any failure, so callers transparently fall back to EXIF/mtime.
     """
+    empty = {"dates": {}, "trashed": set(), "album": set()}
     db = mountpoint / "PhotoData" / "Photos.sqlite"
     if not db.exists():
-        return {}
+        return empty
 
     import sqlite3
 
@@ -829,27 +840,38 @@ def load_capture_dates(mountpoint: Path) -> dict:
                 shutil.copy2(s, tmp / s.name)
         con = sqlite3.connect(f"file:{tmp / 'Photos.sqlite'}?mode=ro", uri=True)
         try:
+            cols = {r[1] for r in con.execute("PRAGMA table_info(ZASSET)")}
+            trashed_col = "ZTRASHEDSTATE" if "ZTRASHEDSTATE" in cols else "0"
+            visible_col = "ZVISIBILITYSTATE" if "ZVISIBILITYSTATE" in cols else "0"
             dates: dict = {}
-            for zdir, zfn, zdate in con.execute(
-                    "SELECT ZDIRECTORY, ZFILENAME, ZDATECREATED FROM ZASSET "
-                    "WHERE ZFILENAME IS NOT NULL AND ZDATECREATED IS NOT NULL"):
+            trashed: set = set()
+            album: set = set()
+            for zdir, zfn, zdate, ztrash, zvis in con.execute(
+                    f"SELECT ZDIRECTORY, ZFILENAME, ZDATECREATED, {trashed_col}, "
+                    f"{visible_col} FROM ZASSET WHERE ZFILENAME IS NOT NULL"):
                 key = (f"{zdir}/{zfn}" if zdir else zfn).lower()
-                dates[key] = float(zdate) + _COREDATA_EPOCH
+                if zdate is not None:
+                    dates[key] = float(zdate) + _COREDATA_EPOCH
+                if ztrash:
+                    trashed.add(key)
+                elif not zvis:
+                    album.add(key)
         finally:
             con.close()
         try:
             from common import log_info
-            log_info("load_capture_dates: %d dates from Photos.sqlite" % len(dates))
+            log_info("photo db: %d dates, %d in album, %d recently deleted"
+                     % (len(dates), len(album), len(trashed)))
         except Exception:
             pass
-        return dates
+        return {"dates": dates, "trashed": trashed, "album": album}
     except Exception as e:
         try:
             from common import log_warn
-            log_warn("load_capture_dates failed: %r" % (e,))
+            log_warn("load_photo_db failed: %r" % (e,))
         except Exception:
             pass
-        return {}
+        return empty
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -1025,6 +1047,25 @@ def _square_thumb_to_cache(src: Path, cache: Path) -> bool:
         return False
 
 
+_SELECT_THUMB_MAX_AGE = 30 * 86400
+
+
+def purge_old_select_thumbs():
+    """Delete import previews not used for 30 days. They show photos that
+    may be long gone from the phone — no reason to keep them around."""
+    cutoff = time.time() - _SELECT_THUMB_MAX_AGE
+    try:
+        entries = list(IMPORT_THUMB_DIR.iterdir())
+    except OSError:
+        return
+    for p in entries:
+        try:
+            if p.is_file() and p.stat().st_mtime < cutoff:
+                p.unlink()
+        except OSError:
+            pass
+
+
 def _on_phone(path: Path) -> bool:
     try:
         Path(path).relative_to(MOUNT_POINT)
@@ -1044,7 +1085,12 @@ def load_select_thumb(photo_path: Path):
 
     if cache.exists():
         try:
-            return GdkPixbuf.Pixbuf.new_from_file(str(cache))
+            pb = GdkPixbuf.Pixbuf.new_from_file(str(cache))
+            try:
+                os.utime(cache)  # "still in use" for purge_old_select_thumbs
+            except OSError:
+                pass
+            return pb
         except Exception:
             cache.unlink(missing_ok=True)
 
@@ -1170,6 +1216,7 @@ class ImporterPage(Gtk.Box):
         self._imported_so_far = 0
         self._show_state(STATE_WAITING)
         threading.Thread(target=ensure_services, daemon=True).start()
+        threading.Thread(target=purge_old_select_thumbs, daemon=True).start()
         self._start_detection_poll()
 
     def deactivate(self):
@@ -1937,14 +1984,47 @@ class ImporterPage(Gtk.Box):
         # self so the import phase can fold the same date into folders/names.
         GLib.idle_add(self.progress_subtitle.set_text,
                       _("Reading photo order from the device…"))
-        capture_dates = load_capture_dates(MOUNT_POINT)
+        photo_db = load_photo_db(MOUNT_POINT)
+        capture_dates = photo_db["dates"]
         self._capture_dates = capture_dates
 
-        def db_date(f):
+        def rel_key(f):
             try:
-                return capture_dates.get(f.relative_to(MOUNT_POINT).as_posix().lower())
+                return f.relative_to(MOUNT_POINT).as_posix().lower()
             except Exception:
                 return None
+
+        def db_date(f):
+            return capture_dates.get(rel_key(f))
+
+        # "Recently Deleted" isn't a folder on the phone: deleted photos stay
+        # in DCIM for 30 days and only the database marks them. Leave them
+        # out — plus the movie half of a deleted Live Photo (same folder and
+        # name, but not a database entry of its own).
+        trashed = photo_db["trashed"]
+        self._trashed_skipped = 0
+        if trashed:
+            trashed_stems = {os.path.splitext(k)[0] for k in trashed}
+            keep = []
+            for f in files:
+                k = rel_key(f)
+                if k in trashed or (f.suffix.lower() in _VIDEO_EXT
+                                    and k not in capture_dates
+                                    and k is not None
+                                    and os.path.splitext(k)[0] in trashed_stems):
+                    if k in trashed:
+                        self._trashed_skipped += 1
+                    continue
+                keep.append(f)
+            files = keep
+            dcim_files = [f for f in dcim_files if rel_key(f) not in trashed]
+            cpl_files = [f for f in cpl_files if rel_key(f) not in trashed]
+            cpl_set = set(cpl_files)
+            total = len(files)
+        # Library items whose file isn't on the phone at all: "Optimise
+        # iPhone Storage" keeps only a preview, the original is in iCloud.
+        on_phone = {rel_key(f) for f in files}
+        self._cloud_only = sum(1 for k in photo_db["album"] if k not in on_phone)
 
         # CPLAssets also stores secondary resources — an iCloud Live Photo's
         # movie has its own GUID (so DCIM-style name matching misses it) and is
@@ -2172,9 +2252,25 @@ class ImporterPage(Gtk.Box):
     def _show_selecting(self, files: list[Path]):
         n = len(files)
         self.select_title.set_text(ngettext("%d file found", "%d files found", n) % n)
-        self.select_subtitle.set_text(
-            _("Choose which photos and videos to import.\n💡 Tip: empty the trash on your iPhone first to exclude deleted photos.")
-        )
+        # Explain every difference with the count on the phone, so nobody
+        # wonders whether photos went missing.
+        lines = [_("Choose which photos and videos to import.")]
+        deleted = getattr(self, "_trashed_skipped", 0)
+        if deleted:
+            lines.append(ngettext(
+                "%d item in “Recently Deleted” is left out.",
+                "%d items in “Recently Deleted” are left out.", deleted) % deleted)
+        cloud = getattr(self, "_cloud_only", 0)
+        if cloud:
+            lines.append(ngettext(
+                "ℹ️ %d item from your library has no file on this iPhone (usually: "
+                "it's only in iCloud), so it can't be imported. To include it, on "
+                "your iPhone choose Settings → Apps → Photos → Download and Keep Originals.",
+                "ℹ️ %d items from your library have no file on this iPhone (usually: "
+                "they're only in iCloud), so they can't be imported. To include them, "
+                "on your iPhone choose Settings → Apps → Photos → Download and Keep Originals.",
+                cloud) % cloud)
+        self.select_subtitle.set_text("\n".join(lines))
 
         self.selected_files = {str(f) for f in files}
         self._update_select_count()

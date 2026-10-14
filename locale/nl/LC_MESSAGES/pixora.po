@@ -3363,3 +3363,16 @@ msgstr "🔧 Verbinden met je toestel…"
 
 msgid "⚠️ Your device isn't showing up. Unplug it and plug it back in, or repair the connection (asks for your password)."
 msgstr "⚠️ Je toestel verschijnt niet. Haal het eruit en steek het opnieuw in, of herstel de verbinding (vraagt om je wachtwoord)."
+
+msgid "Choose which photos and videos to import."
+msgstr "Kies welke foto's en video's je wilt importeren."
+
+msgid "%d item in “Recently Deleted” is left out."
+msgid_plural "%d items in “Recently Deleted” are left out."
+msgstr[0] "%d item uit “Recent verwijderd” wordt overgeslagen."
+msgstr[1] "%d items uit “Recent verwijderd” worden overgeslagen."
+
+msgid "ℹ️ %d item from your library has no file on this iPhone (usually: it's only in iCloud), so it can't be imported. To include it, on your iPhone choose Settings → Apps → Photos → Download and Keep Originals."
+msgid_plural "ℹ️ %d items from your library have no file on this iPhone (usually: they're only in iCloud), so they can't be imported. To include them, on your iPhone choose Settings → Apps → Photos → Download and Keep Originals."
+msgstr[0] "ℹ️ Van %d item uit je bibliotheek staat geen bestand op deze iPhone (meestal: het staat alleen in iCloud), dus het kan niet geïmporteerd worden. Wil je het toch: kies op je iPhone Instellingen → Apps → Foto's → Download en bewaar originelen."
+msgstr[1] "ℹ️ Van %d items uit je bibliotheek staat geen bestand op deze iPhone (meestal: ze staan alleen in iCloud), dus ze kunnen niet geïmporteerd worden. Wil je ze toch: kies op je iPhone Instellingen → Apps → Foto's → Download en bewaar originelen."

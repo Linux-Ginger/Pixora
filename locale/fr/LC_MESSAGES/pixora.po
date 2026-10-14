@@ -3390,3 +3390,16 @@ msgstr "🔧 Connexion à votre appareil…"
 
 msgid "⚠️ Your device isn't showing up. Unplug it and plug it back in, or repair the connection (asks for your password)."
 msgstr "⚠️ Votre appareil n’apparaît pas. Débranchez-le puis rebranchez-le, ou réparez la connexion (demande votre mot de passe)."
+
+msgid "Choose which photos and videos to import."
+msgstr "Choisissez les photos et vidéos à importer."
+
+msgid "%d item in “Recently Deleted” is left out."
+msgid_plural "%d items in “Recently Deleted” are left out."
+msgstr[0] "%d élément de « Supprimés récemment » est ignoré."
+msgstr[1] "%d éléments de « Supprimés récemment » sont ignorés."
+
+msgid "ℹ️ %d item from your library has no file on this iPhone (usually: it's only in iCloud), so it can't be imported. To include it, on your iPhone choose Settings → Apps → Photos → Download and Keep Originals."
+msgid_plural "ℹ️ %d items from your library have no file on this iPhone (usually: they're only in iCloud), so they can't be imported. To include them, on your iPhone choose Settings → Apps → Photos → Download and Keep Originals."
+msgstr[0] "ℹ️ %d élément de votre bibliothèque n’a pas de fichier sur cet iPhone (en général : il n’est que dans iCloud), il ne peut donc pas être importé. Pour l’inclure, sur l’iPhone choisissez Réglages → Apps → Photos → Télécharger et garder les originaux."
+msgstr[1] "ℹ️ %d éléments de votre bibliothèque n’ont pas de fichier sur cet iPhone (en général : ils ne sont que dans iCloud), ils ne peuvent donc pas être importés. Pour les inclure, sur l’iPhone choisissez Réglages → Apps → Photos → Télécharger et garder les originaux."

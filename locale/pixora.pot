@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Pixora\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-14 16:23+0200\n"
+"POT-Creation-Date: 2026-10-14 17:15+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -270,10 +270,26 @@ msgid_plural "%d files found"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid ""
-"Choose which photos and videos to import.\n"
-"💡 Tip: empty the trash on your iPhone first to exclude deleted photos."
+msgid "Choose which photos and videos to import."
 msgstr ""
+
+#, python-format
+msgid "%d item in “Recently Deleted” is left out."
+msgid_plural "%d items in “Recently Deleted” are left out."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid ""
+"ℹ️ %d item from your library has no file on this iPhone (usually: it's only "
+"in iCloud), so it can't be imported. To include it, on your iPhone choose "
+"Settings → Apps → Photos → Download and Keep Originals."
+msgid_plural ""
+"ℹ️ %d items from your library have no file on this iPhone (usually: they're "
+"only in iCloud), so they can't be imported. To include them, on your iPhone "
+"choose Settings → Apps → Photos → Download and Keep Originals."
+msgstr[0] ""
+msgstr[1] ""
 
 #, python-brace-format
 msgid "{n} of {total} selected"

@@ -3373,3 +3373,16 @@ msgstr "🔧 Verbindung zu deinem Gerät…"
 
 msgid "⚠️ Your device isn't showing up. Unplug it and plug it back in, or repair the connection (asks for your password)."
 msgstr "⚠️ Dein Gerät wird nicht erkannt. Zieh es ab und steck es wieder ein, oder repariere die Verbindung (fragt nach deinem Passwort)."
+
+msgid "Choose which photos and videos to import."
+msgstr "Wähle, welche Fotos und Videos importiert werden sollen."
+
+msgid "%d item in “Recently Deleted” is left out."
+msgid_plural "%d items in “Recently Deleted” are left out."
+msgstr[0] "%d Objekt aus „Zuletzt gelöscht“ wird ausgelassen."
+msgstr[1] "%d Objekte aus „Zuletzt gelöscht“ werden ausgelassen."
+
+msgid "ℹ️ %d item from your library has no file on this iPhone (usually: it's only in iCloud), so it can't be imported. To include it, on your iPhone choose Settings → Apps → Photos → Download and Keep Originals."
+msgid_plural "ℹ️ %d items from your library have no file on this iPhone (usually: they're only in iCloud), so they can't be imported. To include them, on your iPhone choose Settings → Apps → Photos → Download and Keep Originals."
+msgstr[0] "ℹ️ Für %d Objekt deiner Mediathek gibt es keine Datei auf diesem iPhone (meist: es liegt nur in iCloud), daher kann es nicht importiert werden. Um es einzubeziehen, wähle auf dem iPhone Einstellungen → Apps → Fotos → Originale laden & behalten."
+msgstr[1] "ℹ️ Für %d Objekte deiner Mediathek gibt es keine Datei auf diesem iPhone (meist: sie liegen nur in iCloud), daher können sie nicht importiert werden. Um sie einzubeziehen, wähle auf dem iPhone Einstellungen → Apps → Fotos → Originale laden & behalten."
