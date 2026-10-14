@@ -16,7 +16,6 @@ import json
 import math
 import subprocess
 import threading
-import urllib.request
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -118,11 +117,12 @@ class SetupWizard(Adw.Window):
         self._chosen_lang = _lang  # from settings or detected locale
         self._chosen_thumb_size = 200
         self._chosen_structure = "year_month"
-        # Fetched async; empty on network failure → license shows "Pixora" only.
-        self._released_version = ""
-        threading.Thread(
-            target=self._fetch_released_version, daemon=True
-        ).start()
+        # The version that is installed — no network call during setup.
+        try:
+            from version import __version__ as _app_version
+        except Exception:
+            _app_version = ""
+        self._released_version = _app_version
         self._chosen_backup_mode = "backup"  # vs "sync"
         self._chosen_backup_dedup = True
         self._chosen_backup_silent = False
@@ -947,21 +947,6 @@ class SetupWizard(Adw.Window):
             return f"© 2024 – {year_now} {product} · LinuxGinger"
         return f"© 2024 {product} · LinuxGinger"
 
-    def _fetch_released_version(self):
-        """Fetch latest release tag from GitHub; silent failure so UI never stalls."""
-        try:
-            req = urllib.request.Request(
-                "https://api.github.com/repos/Linux-Ginger/Pixora/releases/latest",
-                headers={"User-Agent": "Pixora-Setup/1.0"},
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                data = json.loads(resp.read())
-            tag = (data.get("tag_name") or "").lstrip("v").strip()
-            if tag:
-                GLib.idle_add(self._apply_released_version, tag)
-        except Exception:
-            pass
-
     def _apply_released_version(self, version):
         self._released_version = version
         # Refresh copyright label if license page already built.
@@ -1065,12 +1050,20 @@ class SetupWizard(Adw.Window):
             self.folder_entry.set_text(self._chosen_folder)
         if hasattr(self, "backup_switch") and hasattr(self, "_chosen_backup_enabled"):
             self.backup_switch.set_active(self._chosen_backup_enabled)
-        if hasattr(self, "drive_combo") and hasattr(self, "_chosen_drive_idx"):
-            try:
-                if self._chosen_drive_idx < len(self.drives):
-                    self.drive_combo.set_selected(self._chosen_drive_idx)
-            except Exception:
-                pass
+        if hasattr(self, "drive_combo") and self.drives:
+            # The rebuilt page starts with an empty drive list: refill it.
+            drives = list(self.drives)
+            kept_path = self.selected_backup_path
+            self.drives = []
+            self._update_drives(drives)
+            self.selected_backup_path = kept_path
+            idx = getattr(self, "_chosen_drive_idx", 0)
+            if 0 <= idx < len(self.drives):
+                self.drive_combo.handler_block_by_func(self._on_drive_selected)
+                self.drive_combo.set_selected(idx)
+                self.drive_combo.handler_unblock_by_func(self._on_drive_selected)
+        if hasattr(self, "backup_folder_row") and self.selected_backup_path:
+            self.backup_folder_row.set_subtitle(self.selected_backup_path)
         if hasattr(self, "dup_switch") and hasattr(self, "_chosen_dup"):
             self.dup_switch.set_active(self._chosen_dup)
         if hasattr(self, "conv_switch") and hasattr(self, "_chosen_conv"):
@@ -1081,13 +1074,18 @@ class SetupWizard(Adw.Window):
 
         if page == "folder":
             if not self.folder_entry.get_text().strip():
-                dialog = Adw.MessageDialog(
-                    transient_for=self,
+                dialog = Adw.AlertDialog(
                     heading=_("No folder chosen"),
                     body=_("Choose a folder where your photos will be saved.")
                 )
                 dialog.add_response("ok", _("OK"))
-                dialog.present()
+                dialog.present(self)
+                return
+            err = self._check_photo_folder(self._photo_folder())
+            if err:
+                dialog = Adw.AlertDialog(heading=_("Can't use this folder"), body=err)
+                dialog.add_response("ok", _("OK"))
+                dialog.present(self)
                 return
 
         if page == "backup":
@@ -1189,18 +1187,23 @@ class SetupWizard(Adw.Window):
         self.backup_error.set_visible(False)
 
     def _get_mountpoint_for_uuid(self, uuid):
+        from drives import get_mountpoint_for_uuid, _lsblk_data
+        _lsblk_data(force=True)
+        return get_mountpoint_for_uuid(uuid)
+
+    def _photo_folder(self):
+        """The typed folder as a clean absolute path (~ expanded)."""
+        text = self.folder_entry.get_text().strip()
+        return os.path.abspath(os.path.expanduser(text)) if text else ""
+
+    def _check_photo_folder(self, path):
+        """None if Pixora can store photos in `path` (creating it), else why not."""
         try:
-            result = subprocess.run(
-                ["lsblk", "-o", "UUID,MOUNTPOINT", "-J"],
-                capture_output=True, text=True, timeout=5
-            )
-            data = json.loads(result.stdout)
-            for device in data.get("blockdevices", []):
-                for child in device.get("children", [device]):
-                    if child.get("uuid") == uuid:
-                        return child.get("mountpoint")
-        except Exception:
-            pass
+            os.makedirs(path, exist_ok=True)
+        except OSError as e:
+            return _("Pixora can't create {p}: {err}").format(p=path, err=e.strerror or e)
+        if not os.access(path, os.W_OK):
+            return _("You don't have permission to save files in {p}.").format(p=path)
         return None
 
     def _on_refresh_drives(self, btn):
@@ -1248,17 +1251,34 @@ class SetupWizard(Adw.Window):
         self.refresh_btn.set_icon_name("view-refresh-symbolic")
         self.refresh_btn.set_sensitive(True)
 
-        while self.drive_model.get_n_items() > 0:
-            self.drive_model.remove(0)
-
-        self.drives = drives
+        # Keep the drive the user picked, even if the list order changes; a
+        # refresh must never pair the chosen folder with a different drive.
+        prev_uuid = None
+        sel = self.drive_combo.get_selected()
+        if self.drives and 0 <= sel < len(self.drives):
+            prev_uuid = self.drives[sel][0]
+        self.drive_combo.handler_block_by_func(self._on_drive_selected)
+        try:
+            while self.drive_model.get_n_items() > 0:
+                self.drive_model.remove(0)
+            self.drives = drives
+            if drives:
+                for uuid, label in drives:
+                    self.drive_model.append(label)
+            else:
+                self.drive_model.append(_("No external drives found"))
+            new_idx = next((i for i, (u, _l) in enumerate(drives)
+                            if u == prev_uuid), 0)
+            self.drive_combo.set_selected(new_idx)
+        finally:
+            self.drive_combo.handler_unblock_by_func(self._on_drive_selected)
+        new_uuid = drives[new_idx][0] if drives else None
+        if new_uuid != prev_uuid:
+            self.selected_backup_path = None
+            if hasattr(self, "backup_folder_row"):
+                self.backup_folder_row.set_subtitle(_("No folder chosen yet"))
         # Keep combo usable when backup is on but no drives yet (for refresh retry).
         backup_on = self.backup_switch.get_active() if hasattr(self, "backup_switch") else True
-        if drives:
-            for uuid, label in drives:
-                self.drive_model.append(label)
-        else:
-            self.drive_model.append(_("No external drives found"))
         self.drive_combo.set_sensitive(backup_on and bool(drives))
         # Explicit toggle: re-selecting index 0 may not fire notify::selected.
         if hasattr(self, "backup_folder_row"):
@@ -1290,7 +1310,7 @@ class SetupWizard(Adw.Window):
 
     def _save_and_finish(self):
         settings = {
-            "photo_path":          self.folder_entry.get_text(),
+            "photo_path":          self._photo_folder(),
             "structure":           self._chosen_structure,
             "backup_enabled":      self.backup_switch.get_active(),
             "backup_uuid":         self._get_backup_uuid(),
@@ -1298,6 +1318,9 @@ class SetupWizard(Adw.Window):
             "backup_mode":         self._chosen_backup_mode,
             "backup_dedup":        self._chosen_backup_dedup,
             "backup_silent":       self._chosen_backup_silent,
+            # One "run without asking" switch in Settings drives all tasks.
+            "auto_confirm":        self._chosen_backup_silent,
+            "reorganize_silent":   self._chosen_backup_silent,
             "duplicate_threshold": self._get_threshold(),
             "convert_heic":        self.conv_switch.get_active(),
             "language":            self._chosen_lang,
@@ -1305,12 +1328,33 @@ class SetupWizard(Adw.Window):
         }
 
         # Atomic write + 0600: crash mid-write leaves prior file (or none) intact, never half-JSON.
-        os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-        tmp = CONFIG_PATH + ".tmp"
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as f:
-            json.dump(settings, f, indent=2)
-        os.replace(tmp, CONFIG_PATH)
+        try:
+            os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+            tmp = CONFIG_PATH + ".tmp"
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as f:
+                json.dump(settings, f, indent=2)
+            os.replace(tmp, CONFIG_PATH)
+        except OSError as e:
+            dialog = Adw.AlertDialog(
+                heading=_("Settings could not be saved"),
+                body=_("Pixora could not write {p}: {err}").format(
+                    p=CONFIG_PATH, err=e.strerror or e))
+            dialog.add_response("ok", _("OK"))
+            dialog.present(self)
+            return
+
+        if self._chosen_lang != _lang:
+            # The rest of Pixora picked its language when it was imported;
+            # restart once so everything opens in the language just chosen.
+            try:
+                sentinel = os.path.expanduser("~/.cache/pixora/.restart_pending")
+                os.makedirs(os.path.dirname(sentinel), exist_ok=True)
+                open(sentinel, "w").close()
+                self.app.quit()
+                return
+            except OSError:
+                pass  # fall through: open now, language applies next start
 
         from main_window import MainWindow
         win = MainWindow(self.app, settings)

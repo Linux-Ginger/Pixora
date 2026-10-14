@@ -6,16 +6,15 @@
 #  by LinuxGinger
 # ─────────────────────────────────────────────
 
-import hashlib
-import json
 import math
 import os
 import shutil
 import threading
 from pixora_i18n import _
-from common import (Adw, cairo, GdkPixbuf, GLib, INSTALL_DIR, is_video,
+from common import (Adw, cairo, GdkPixbuf, GLib, is_video,
     log_error, log_info)
 from media import get_cache_path
+import originals
 
 
 class EditorMixin:
@@ -26,6 +25,14 @@ class EditorMixin:
         # Editing is photo-only; videos can't be rotated/cropped here.
         if path != "?" and is_video(path):
             return
+        # While the next photo is still loading the previous frame stays on
+        # screen; editing then would crop/rotate the wrong picture.
+        if (self._viewer_pixbuf is None
+                or getattr(self, "_viewer_current_path", None) != path):
+            return
+        # Crop handles assume an unzoomed image.
+        self._reset_viewer_transform()
+        self._stop_live_motion()
         log_info(_("Editor opened for: {name}").format(name=os.path.basename(path)))
         self._editor_active         = True
         self._editor_rotation       = 0
@@ -77,60 +84,14 @@ class EditorMixin:
         self._reset_fade_timer()
 
     # ── Original backup / restore ────────────────────────────────────
-    def _originals_dir(self):
-        d = os.path.join(INSTALL_DIR, "originals")
-        os.makedirs(d, exist_ok=True)
-        try:
-            os.chmod(d, 0o700)  # keep originals private to the user
-        except OSError:
-            pass
-        return d
-
-    def _load_originals_index(self):
-        try:
-            with open(os.path.join(self._originals_dir(), "index.json")) as f:
-                return json.load(f)
-        except Exception:
-            return {}
-
-    def _save_originals_index(self, idx):
-        try:
-            with open(os.path.join(self._originals_dir(), "index.json"), "w") as f:
-                json.dump(idx, f)
-        except Exception:
-            pass
-
     def _has_original_backup(self, path):
-        entry = self._load_originals_index().get(path)
-        return bool(entry and os.path.exists(
-            os.path.join(self._originals_dir(), entry["backup"])))
-
-    def _backup_original_once(self, path):
-        """Stash the untouched original the first time a photo is edited so it can
-        be restored later. No-op once a backup for this photo already exists."""
-        if self._has_original_backup(path):
-            return
-        try:
-            idx = self._load_originals_index()
-            backup_name = hashlib.md5(path.encode()).hexdigest() + \
-                os.path.splitext(path)[1]
-            dst = os.path.join(self._originals_dir(), backup_name)
-            shutil.copy2(path, dst)
-            try:
-                os.chmod(dst, 0o600)
-            except OSError:
-                pass
-            idx[path] = {"backup": backup_name, "orig": os.path.basename(path)}
-            self._save_originals_index(idx)
-        except Exception as e:
-            log_error("original backup failed: {}".format(e))
+        return originals.has_backup(path)
 
     def on_editor_restore(self, btn=None):
         cur = self._current_photo_path()
         if not cur or not self._has_original_backup(cur):
             return
-        dlg = Adw.MessageDialog(
-            transient_for=self,
+        dlg = Adw.AlertDialog(
             heading=_("Restore the original?"),
             body=_("This undoes every edit and brings the photo back exactly as it was imported."),
         )
@@ -141,35 +102,56 @@ class EditorMixin:
         dlg.set_close_response("cancel")
         dlg.connect("response",
                     lambda d, r: self._do_restore_original(cur) if r == "restore" else None)
-        dlg.present()
+        dlg.present(self)
 
     def _do_restore_original(self, cur):
-        idx = self._load_originals_index()
-        entry = idx.get(cur)
-        if not entry:
+        entry = originals.entry_for(cur)
+        backup = originals.backup_path_for(cur)
+        if not entry or not backup:
             return
-        backup = os.path.join(self._originals_dir(), entry["backup"])
-        if not os.path.exists(backup):
-            return
-        try:
-            restored = os.path.join(os.path.dirname(cur), entry["orig"])
-            for p in (cur, restored):
-                try:
-                    c = get_cache_path(p)
-                    if os.path.exists(c):
-                        os.remove(c)
-                except Exception:
-                    pass
-            shutil.copy2(backup, restored)
-            # Drop the edited file if its name differs (e.g. HEIC was saved as JPG).
-            if os.path.abspath(restored) != os.path.abspath(cur) and os.path.exists(cur):
-                os.remove(cur)
-            os.remove(backup)
-            idx.pop(cur, None)
-            self._save_originals_index(idx)
-        except Exception as e:
-            log_error("restore original failed: {}".format(e))
-            return
+
+        def _work():
+            try:
+                folder = os.path.dirname(cur)
+                restored = os.path.join(folder, entry["orig"])
+                if (os.path.abspath(restored) != os.path.abspath(cur)
+                        and os.path.exists(restored)):
+                    # Another file took the original name meanwhile: don't
+                    # overwrite it, restore next to it.
+                    stem, ext = os.path.splitext(entry["orig"])
+                    n = 1
+                    while os.path.exists(restored):
+                        restored = os.path.join(folder, f"{stem}_{n}{ext}")
+                        n += 1
+                for p in (cur, restored):
+                    try:
+                        c = get_cache_path(p)
+                        if os.path.exists(c):
+                            os.remove(c)
+                    except Exception:
+                        pass
+                tmp = os.path.join(folder, "." + os.path.basename(restored) + ".part")
+                shutil.copy2(backup, tmp)
+                os.replace(tmp, restored)
+                # Drop the edited file if its name differs (e.g. HEIC was saved as JPG).
+                if os.path.abspath(restored) != os.path.abspath(cur) and os.path.exists(cur):
+                    os.remove(cur)
+                originals.drop(cur)
+            except Exception as e:
+                log_error(_("Restoring the original failed: {err}").format(err=e))
+                GLib.idle_add(self._show_editor_error, _("Restore failed"), str(e))
+                return
+            GLib.idle_add(self._after_restore_original, cur, restored)
+
+        threading.Thread(target=_work, daemon=True).start()
+
+    def _show_editor_error(self, heading, body):
+        dialog = Adw.AlertDialog(heading=heading, body=body)
+        dialog.add_response("ok", _("OK"))
+        dialog.present(self)
+        return False
+
+    def _after_restore_original(self, cur, restored):
         # Move references over and refresh viewer + grid.
         self.photos = [restored if p == cur else p for p in self.photos]
         self._filmstrip_order_cache = None
@@ -186,6 +168,7 @@ class EditorMixin:
         threading.Thread(target=self._load_full_photo,
                          args=(restored, load_id), daemon=True).start()
         GLib.timeout_add(300, self.start_load)
+        return False
 
     def _reset_crop(self):
         self._editor_crop_mode = False
@@ -486,21 +469,30 @@ class EditorMixin:
                              max(p1[0], p2[0]) / dw, max(p1[1], p2[1]) / dh)
 
         self.on_editor_cancel()
+        if rotation == 0 and not crop_frac and not filt:
+            # Nothing changed: don't re-encode (or convert a HEIC) for nothing.
+            log_info(_("Editor save: no changes, nothing written"))
+            return
 
         def _do_save():
+            folder = os.path.dirname(path)
+            tmp_path = None
             try:
-                from PIL import Image
+                from PIL import Image, ImageOps
                 original_mtime = os.path.getmtime(path)
                 # Keep the untouched original so edits can be undone later.
-                self._backup_original_once(path)
+                # If that fails, stop: never overwrite a photo without a copy.
+                originals.backup_once(path)
                 old_cache = get_cache_path(path)
-                from PIL import ImageOps
                 img = Image.open(path)
                 if img.mode == "P" and "transparency" in img.info:
                     img = img.convert("RGBA")
                 ext = os.path.splitext(path)[1].lower()
                 is_jpeg = ext in (".jpg", ".jpeg")
                 is_png  = ext == ".png"
+                # iPhone photos are Display P3: without the ICC profile the
+                # saved photo comes out with duller, shifted colours.
+                icc = img.info.get("icc_profile")
 
                 # Carry the original EXIF across the edit (GPS + capture date +
                 # orientation). Preload the GPS and Exif sub-IFDs so tobytes()
@@ -536,11 +528,9 @@ class EditorMixin:
                 if filt:
                     img = self._apply_named_filter(img, filt)
 
-                out_path = path
-                if is_jpeg:
-                    img.save(path, "JPEG", quality=95, exif=exif_out)
-                elif is_png:
-                    img.save(path, "PNG")
+                extra = {"icc_profile": icc} if icc else {}
+                if is_jpeg or is_png:
+                    out_path = path
                 else:
                     # PIL can't write HEIC & co. — saving PNG bytes under the old
                     # extension corrupts the file. Replace with a max-quality JPEG
@@ -552,15 +542,34 @@ class EditorMixin:
                         counter += 1
                     if img.mode not in ("RGB", "L"):
                         img = img.convert("RGB")
-                    img.save(out_path, "JPEG", quality=95, exif=exif_out)
+                # Write next to the photo under a hidden name, then swap it in:
+                # a crash or full disk mid-save leaves the photo untouched.
+                tmp_path = os.path.join(
+                    folder, "." + os.path.basename(out_path) + ".pixora-tmp")
+                if is_png:
+                    img.save(tmp_path, "PNG", **extra)
+                else:
+                    if img.mode not in ("RGB", "L"):
+                        img = img.convert("RGB")
+                    img.save(tmp_path, "JPEG", quality=95, exif=exif_out, **extra)
+                os.utime(tmp_path, (original_mtime, original_mtime))
+                os.replace(tmp_path, out_path)
+                tmp_path = None
+                if out_path != path:
                     os.remove(path)
                 if os.path.exists(old_cache):
                     os.remove(old_cache)
-                os.utime(out_path, (original_mtime, original_mtime))
                 GLib.idle_add(_after_save, out_path)
             except Exception as e:
                 log_error(_("Editor save failed: {err}").format(err=e))
-                GLib.idle_add(_save_error, str(e))
+                GLib.idle_add(self._show_editor_error, _("Save failed"),
+                              _("The photo was not changed.") + "\n\n" + str(e))
+            finally:
+                if tmp_path:
+                    try:
+                        os.remove(tmp_path)
+                    except OSError:
+                        pass
 
         def _after_save(new_path):
             if new_path != path:
@@ -568,10 +577,7 @@ class EditorMixin:
                 self.photos = [new_path if p == path else p for p in self.photos]
                 self._filmstrip_order_cache = None
                 # Re-key the original backup so Restore still finds it.
-                idx = self._load_originals_index()
-                if path in idx:
-                    idx[new_path] = idx.pop(path)
-                    self._save_originals_index(idx)
+                originals.rekey(path, new_path)
                 if path in self._favorites:
                     self._favorites.discard(path)
                     self._favorites.add(new_path)
@@ -590,14 +596,5 @@ class EditorMixin:
             ).start()
             GLib.timeout_add(300, self.start_load)
             return False
-
-        def _save_error(msg):
-            dialog = Adw.MessageDialog(
-                transient_for=self,
-                heading=_("Save failed"),
-                body=msg
-            )
-            dialog.add_response("ok", _("OK"))
-            dialog.present()
 
         threading.Thread(target=_do_save, daemon=True).start()

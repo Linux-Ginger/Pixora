@@ -9,8 +9,8 @@
 import threading
 from pixora_i18n import _
 from common import Adw, GLib, Gtk, log_error, save_settings, _lang
-from metadata import (COUNTRIES, geocode_address, _LOCALE_COUNTRY, _mk,
-    _titlecase)
+from metadata import (COUNTRIES, geocode_address, GeocodeOffline,
+    _LOCALE_COUNTRY, _mk, _titlecase)
 
 
 class PlacesMixin:
@@ -33,8 +33,7 @@ class PlacesMixin:
     def _on_remove_home(self, btn=None):
         if self.settings.get("home_lat") is None:
             return
-        dlg = Adw.MessageDialog(
-            transient_for=self,
+        dlg = Adw.AlertDialog(
             heading=_("Remove your main home?"),
             body=_("Your main home will be removed. Your photos are not affected."))
         dlg.add_response("cancel", _("Cancel"))
@@ -42,13 +41,14 @@ class PlacesMixin:
         dlg.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
         dlg.set_default_response("cancel")
         dlg.connect("response", self._do_remove_home)
-        dlg.present()
+        self._present_dialog(dlg)
 
     def _do_remove_home(self, dlg, response):
         if response != "remove":
             return
         for k in ("home_lat", "home_lon", "home_zoom", "home_country",
-                  "home_city", "home_postcode", "home_street", "home_addition"):
+                  "home_city", "home_postcode", "home_street",
+                  "home_house_number", "home_addition"):
             self.settings.pop(k, None)
         try:
             save_settings(self.settings)
@@ -118,7 +118,7 @@ class PlacesMixin:
         # Main home (priority) — flagged with a 'Main home' accent badge.
         home_set = self.settings.get("home_lat") is not None
         main_row = Adw.ActionRow(title=_("My home"))
-        main_row.set_subtitle(self._home_address_text())
+        main_row.set_subtitle(_mk(self._home_address_text()))
         main_row.add_suffix(self._accent_badge(_("Main home")))
         if home_set:
             main_row.add_prefix(_verified_check())
@@ -184,8 +184,7 @@ class PlacesMixin:
         else:
             data = self.settings.get("extra_places", [])[index]
 
-        dlg = Adw.MessageDialog(
-            transient_for=self,
+        dlg = Adw.AlertDialog(
             heading=_("My home") if is_main else _("Place"),
             body=_("Fill in your address so it can be looked up exactly. It’s "
                    "looked up once via OpenStreetMap, then stored only on this "
@@ -252,7 +251,7 @@ class PlacesMixin:
         rows = (name_row, country_row, city_row, postcode_row, street_row,
                 housenr_row, addition_row)
         dlg.connect("response", self._on_place_response, index, rows)
-        dlg.present()
+        self._present_dialog(dlg)
 
     def _on_place_response(self, dlg, response, index, rows):
         if response != "save":
@@ -280,22 +279,35 @@ class PlacesMixin:
                   "house_number": house_number, "addition": addition}
 
         def _lookup():
-            res = geocode_address(street=full_street, city=city,
-                                  postcode=postcode, country=country)
-            loose = False
-            if res is None:
-                # Wrong/missing city? Retry without it to suggest a match.
-                res = geocode_address(street=full_street, postcode=postcode,
-                                      country=country, loose=True)
-                loose = res is not None
+            try:
+                res = geocode_address(street=full_street, city=city,
+                                      postcode=postcode, country=country)
+                loose = False
+                if res is None:
+                    # Wrong/missing city? Retry without it to suggest a match.
+                    res = geocode_address(street=full_street, postcode=postcode,
+                                          country=country, loose=True)
+                    loose = res is not None
+            except GeocodeOffline:
+                GLib.idle_add(self._show_place_offline)
+                return
             GLib.idle_add(self._confirm_place, index, res, fields, loose)
 
         threading.Thread(target=_lookup, daemon=True).start()
 
+    def _show_place_offline(self):
+        dlg = Adw.AlertDialog(
+            heading=_("No internet connection"),
+            body=_("Looking up an address needs the internet once. Check your "
+                   "connection and try again."),
+        )
+        dlg.add_response("ok", _("OK"))
+        dlg.present(self)
+        return False
+
     def _confirm_place(self, index, result, fields, was_loose):
         if not result:
-            dlg = Adw.MessageDialog(
-                transient_for=self,
+            dlg = Adw.AlertDialog(
                 heading=_("Address not found"),
                 body=_("Couldn’t find that address. Check the fields and "
                        "try again."))
@@ -304,12 +316,12 @@ class PlacesMixin:
             dlg.connect("response", lambda d, r: (
                 self._open_place_dialog(index, prefill=fields)
                 if r == "edit" else None))
-            dlg.present()
+            self._present_dialog(dlg)
             return False
         lat, lon, display = result
         heading = _("Did you mean this?") if was_loose else _("Confirm location")
-        dlg = Adw.MessageDialog(
-            transient_for=self, heading=heading, body=display or "")
+        dlg = Adw.AlertDialog(
+            heading=heading, body=display or "")
         dlg.add_response("edit", _("Edit"))
         dlg.add_response("save", _("Save here"))
         dlg.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
@@ -321,7 +333,7 @@ class PlacesMixin:
             elif r == "edit":
                 self._open_place_dialog(index, prefill=fields)
         dlg.connect("response", _resp)
-        dlg.present()
+        self._present_dialog(dlg)
         return False
 
     def _save_place(self, index, coords, fields):
@@ -371,8 +383,7 @@ class PlacesMixin:
         if not (0 <= index < len(places)):
             return
         name = places[index].get("name") or _("this place")
-        dlg = Adw.MessageDialog(
-            transient_for=self,
+        dlg = Adw.AlertDialog(
             heading=_("Remove place?"),
             body=_("Remove “{name}”? Your photos are not affected.").format(name=name))
         dlg.add_response("cancel", _("Cancel"))
@@ -382,7 +393,7 @@ class PlacesMixin:
         dlg.connect("response",
                     lambda d, r, idx=index: self._do_remove_place(idx)
                     if r == "remove" else None)
-        dlg.present()
+        self._present_dialog(dlg)
 
     def _do_remove_place(self, index):
         places = self.settings.get("extra_places", [])

@@ -11,10 +11,28 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pixora_i18n import _, ngettext
-from common import (Adw, GLib, Gtk, is_video, log_info, log_warn,
-    save_settings, TILE_CACHE_DIR, _MONTH_KEYS)
-from metadata import get_gps_coords, get_video_gps_coords, reverse_geocode
+from common import (Adw, format_date_header, GLib, Gtk, is_video, log_info, log_warn,
+    save_settings, TILE_CACHE_DIR)
+from metadata import (get_gps_coords, get_photo_date, get_video_gps_coords,
+    reverse_geocode)
 from map_widget import MapWidget
+
+
+def _capture_ts(path):
+    """Capture time as the grid sorts by it (cached), or None if unusable."""
+    try:
+        ts = get_photo_date(path)
+    except Exception:
+        return None
+    # Filter pre-2000 timestamps to avoid "1 Jan 1970".
+    return ts if ts and ts >= 946684800 else None
+
+
+def _short_date(ts):
+    if not ts:
+        return ""
+    dt = datetime.datetime.fromtimestamp(ts)
+    return format_date_header(dt)
 
 
 class MapMixin:
@@ -104,23 +122,19 @@ class MapMixin:
                 return None
             lat, lon = coords
             filename = os.path.basename(path)
-            try:
-                mtime = os.path.getmtime(path)
-                if mtime > 0 and mtime >= 946684800:
-                    dt = datetime.datetime.fromtimestamp(mtime)
-                    datum = f"{dt.day} {_(_MONTH_KEYS[dt.month])} {dt.year}"
-                else:
-                    datum = ""
-            except Exception:
-                datum = ""
+            # Same capture date the grid sorts by (EXIF), not the file mtime.
+            datum = _short_date(_capture_ts(path))
             return (lat, lon, filename, datum, path)
 
         markers = []
         seen_paths = set()
         # Live Photos are HEIC+MOV pairs → dedup on (lat, lon, stem).
         grouped = {}  # key → (lat, lon, filename, datum, [paths])
+        # Always the whole library — not a cluster/favourite subset still
+        # shown in the grid.
+        library = self._library_photos()
         with ThreadPoolExecutor(max_workers=8) as pool:
-            for result in pool.map(scan_one, self.photos):
+            for result in pool.map(scan_one, library):
                 if result is None:
                     continue
                 lat, lon, filename, datum, path = result
@@ -139,7 +153,7 @@ class MapMixin:
             markers.append((lat, lon, filename, datum, paths[0]))
         log_info(
             _("Map: {m} markers from {p} photos (GPS), out of {t} total").format(
-                m=len(markers), p=len(seen_paths), t=len(self.photos)
+                m=len(markers), p=len(seen_paths), t=len(library)
             )
         )
         # Warm the tile cache around photo locations so the first view is fast.
@@ -276,8 +290,7 @@ class MapMixin:
         GLib.timeout_add(400, self._show_map_intro)
 
     def _show_map_intro(self):
-        dlg = Adw.MessageDialog(
-            transient_for=self,
+        dlg = Adw.AlertDialog(
             heading=_("Welcome to the map"),
             body=_("This is your first time here. The map shows where your "
                    "photos were taken. Add your home and the places that matter "
@@ -289,47 +302,45 @@ class MapMixin:
         dlg.set_default_response("add")
         dlg.set_close_response("later")
         dlg.connect("response", self._on_map_intro_response)
-        dlg.present()
+        self._present_dialog(dlg)
         return False
 
     def _on_map_intro_response(self, dlg, response):
         if response == "add":
             self._open_place_dialog()  # main home
 
+    def _library_photos(self):
+        """The full photo list, even while the grid shows a cluster subset."""
+        return getattr(self, "_photos_before_cluster", None) or self.photos
+
     def _open_photo_from_map(self, paths):
         if isinstance(paths, str):
             paths = [paths]
-        photos_set = set(self.photos)
+        library = self._library_photos()
+        photos_set = set(library)
         valid = [p for p in paths if p in photos_set]
         if not valid:
             return
         self.close_map()
         if len(valid) == 1:
+            if valid[0] not in self.photos:
+                self.on_clear_cluster_filter()  # photo is outside the subset
             index = self.photos.index(valid[0])
             GLib.idle_add(self.open_photo, index)
         else:
-            # Cluster click → filter grid.
-            self._photos_before_cluster = self.photos
+            # Cluster click → filter grid. Remember the FULL list only once,
+            # so a second cluster click can't overwrite it with a subset.
+            if not getattr(self, "_photos_before_cluster", None):
+                self._photos_before_cluster = self.photos
             self.photos = valid
             self._filmstrip_order_cache = None
             # Date range for the info banner.
             date_range = ""
             try:
-                dates = []
-                for p in valid:
-                    try:
-                        mt = os.path.getmtime(p)
-                        # Filter pre-2000 mtimes to avoid "1 Jan 1970".
-                        if mt > 0 and mt >= 946684800:
-                            dates.append(mt)
-                    except Exception:
-                        pass
+                dates = [t for t in (_capture_ts(p) for p in valid) if t]
                 if dates:
-                    dts = [datetime.datetime.fromtimestamp(t) for t in dates]
-                    earliest = min(dts)
-                    latest = max(dts)
-                    e_str = f"{earliest.day} {_(_MONTH_KEYS[earliest.month])} {earliest.year}"
-                    l_str = f"{latest.day} {_(_MONTH_KEYS[latest.month])} {latest.year}"
+                    e_str = _short_date(min(dates))
+                    l_str = _short_date(max(dates))
                     if e_str == l_str:
                         date_range = e_str
                     else:
@@ -337,12 +348,13 @@ class MapMixin:
             except Exception:
                 pass
 
+            self._cluster_token = getattr(self, "_cluster_token", 0) + 1
             loc = self._photo_location.get(valid[0], "")
             if not loc:
                 # Not cached → async lookup may resolve later.
                 threading.Thread(
                     target=self._fetch_cluster_location,
-                    args=(valid[0],),
+                    args=(valid[0], self._cluster_token),
                     daemon=True,
                 ).start()
 
@@ -357,7 +369,7 @@ class MapMixin:
             self.photo_count_label.set_text(self._media_count_text(valid))
             GLib.idle_add(self.start_load)
 
-    def _fetch_cluster_location(self, sample_path):
+    def _fetch_cluster_location(self, sample_path, token):
         """Async geocode for cluster-filter label."""
         try:
             if is_video(sample_path):
@@ -369,12 +381,15 @@ class MapMixin:
             loc = reverse_geocode(coords[0], coords[1]).get("text", "")
             if loc:
                 self._photo_location[sample_path] = loc
-                GLib.idle_add(self._apply_cluster_location, loc)
+                GLib.idle_add(self._apply_cluster_location, loc, token)
         except Exception:
             pass
 
-    def _apply_cluster_location(self, loc):
-        # Only apply while filter bar visible (user may have ✕'d).
+    def _apply_cluster_location(self, loc, token):
+        # Only for the cluster still shown (a slow lookup for an earlier
+        # cluster must not rename a newer one), and only while visible.
+        if token != getattr(self, "_cluster_token", 0):
+            return False
         try:
             if self.filter_info_bar.get_visible():
                 self.filter_title_lbl.set_text(loc)

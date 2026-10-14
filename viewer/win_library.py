@@ -7,13 +7,71 @@
 # ─────────────────────────────────────────────
 
 import datetime
+import json
 import os
 import threading
 import time
 from pixora_i18n import _, ngettext
-from common import (Adw, GLib, Gtk, is_video, log_info, log_warn, Pango,
+from common import (Adw, GLib, Gtk, is_video, log_info, log_warn, Pango, trash_file,
     save_settings)
 from media import get_cache_path, load_thumbnail
+import originals
+
+
+_CONVERT_FAILED_PATH = os.path.expanduser("~/.cache/pixora/conversion_failed.json")
+
+
+def _file_key(path):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return f"{path}|{st.st_size}|{int(st.st_mtime)}"
+
+
+def _load_failed_conversions():
+    try:
+        with open(_CONVERT_FAILED_PATH) as f:
+            data = json.load(f)
+        return set(data) if isinstance(data, list) else set()
+    except Exception:
+        return set()
+
+
+def _remember_failed_conversions(paths):
+    """Files that failed to convert are skipped by later automatic sweeps (the
+    same broken file would otherwise be retried — and re-encoded — forever)."""
+    if not paths:
+        return
+    known = _load_failed_conversions()
+    known.update(k for k in (_file_key(p) for p in paths) if k)
+    try:
+        os.makedirs(os.path.dirname(_CONVERT_FAILED_PATH), exist_ok=True)
+        tmp = _CONVERT_FAILED_PATH + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(sorted(known), f)
+        os.replace(tmp, _CONVERT_FAILED_PATH)
+    except OSError:
+        pass
+
+
+def _collect_library_files(photo_path, exts, skip_failed):
+    from pathlib import Path as _P
+    out = []
+    if not photo_path or not os.path.isdir(photo_path):
+        return out
+    failed = _load_failed_conversions() if skip_failed else set()
+    for root, dirs, fnames in os.walk(photo_path):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for fn in fnames:
+            if fn.startswith("."):
+                continue
+            if os.path.splitext(fn)[1].lower() in exts:
+                p = os.path.join(root, fn)
+                if failed and _file_key(p) in failed:
+                    continue
+                out.append(_P(p))
+    return out
 
 
 class LibraryMixin:
@@ -99,6 +157,7 @@ class LibraryMixin:
             dest_path as _dest_path, SUPPORTED_EXT,
             _EXIF_DATE_TAGS, _VIDEO_EXT, _get_video_date,
         )
+        from common import live_photo_pairs
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
         if not photo_path.is_dir():
             return [], []
@@ -106,48 +165,68 @@ class LibraryMixin:
         moves = []
         dups = []
         reserved_targets = set()
-        for root, _dirs, files in os.walk(str(photo_path)):
+        all_files = []
+        for root, dirs, files in os.walk(str(photo_path)):
+            # Hidden folders/files (.thumbnails, half-written .part files)
+            # are not library content: never move or flatten them.
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
             for fn in files:
+                if fn.startswith("."):
+                    continue
                 src = _P(root) / fn
-                if src.suffix.lower() not in SUPPORTED_EXT:
-                    continue
-                try:
-                    st = src.stat()
-                except OSError:
-                    continue
+                if src.suffix.lower() in SUPPORTED_EXT:
+                    all_files.append(src)
+        # A Live Photo's movie must stay next to its still under the same
+        # name, so it follows the still instead of its own (slightly
+        # different) video date.
+        motion_of = {_P(m): _P(s) for s, m in
+                     live_photo_pairs([str(f) for f in all_files]).items()}
+        all_files.sort(key=lambda f: f in motion_of)  # stills first
+        still_dst = {}
+        for src in all_files:
+            try:
+                st = src.stat()
+            except OSError:
+                continue
+            still = motion_of.get(src)
+            if still is not None and still in still_dst:
+                dst = still_dst[still].with_suffix(src.suffix)
+            else:
                 photo_dt = self._photo_date_for_structure(
                     src, st, _EXIF_DATE_TAGS, _VIDEO_EXT, _get_video_date,
                 )
                 dst = _dest_path(photo_path, structure, src.name, photo_dt)
-                if src.resolve() == dst.resolve():
-                    reserved_targets.add(str(dst.resolve()))
-                    continue
-                # Target exists or reserved by another src.
-                dst_str = str(dst.resolve() if dst.exists() else dst)
-                if dst.exists() or dst_str in reserved_targets:
-                    try:
-                        if dst.exists():
-                            dst_st = dst.stat()
-                            if dst_st.st_size == st.st_size \
-                                    and int(dst_st.st_mtime) == int(st.st_mtime):
-                                # Keeper = the file already filed correctly (dst).
-                                dups.append((dst, src))
-                                continue
-                    except OSError:
-                        pass
-                    # Not identical → unique suffix.
-                    stem = dst.stem
-                    ext = dst.suffix
-                    counter = 1
-                    while True:
-                        cand = dst.parent / f"{stem}_{counter}{ext}"
-                        cand_str = str(cand.resolve() if cand.exists() else cand)
-                        if not cand.exists() and cand_str not in reserved_targets:
-                            dst = cand
-                            break
-                        counter += 1
-                reserved_targets.add(str(dst.resolve() if dst.exists() else dst))
-                moves.append((src, dst))
+            if src.resolve() == dst.resolve():
+                reserved_targets.add(str(dst.resolve()))
+                still_dst[src] = dst
+                continue
+            # Target exists or reserved by another src.
+            dst_str = str(dst.resolve() if dst.exists() else dst)
+            if dst.exists() or dst_str in reserved_targets:
+                try:
+                    if dst.exists():
+                        dst_st = dst.stat()
+                        if dst_st.st_size == st.st_size \
+                                and int(dst_st.st_mtime) == int(st.st_mtime):
+                            # Keeper = the file already filed correctly (dst).
+                            dups.append((dst, src))
+                            continue
+                except OSError:
+                    pass
+                # Not identical → unique suffix.
+                stem = dst.stem
+                ext = dst.suffix
+                counter = 1
+                while True:
+                    cand = dst.parent / f"{stem}_{counter}{ext}"
+                    cand_str = str(cand.resolve() if cand.exists() else cand)
+                    if not cand.exists() and cand_str not in reserved_targets:
+                        dst = cand
+                        break
+                    counter += 1
+            reserved_targets.add(str(dst.resolve() if dst.exists() else dst))
+            still_dst[src] = dst
+            moves.append((src, dst))
         return moves, dups
 
     # ── Archive duplicate cleanup ─────────────────────────────────────────
@@ -185,7 +264,6 @@ class LibraryMixin:
         # connected component becomes one group. This is order-independent —
         # the old greedy pass could "absorb" a copy into the wrong group or
         # drop it, so the same photo was sometimes missed.
-        import re as _re
         n = len(items)
         parent = list(range(n))
 
@@ -311,7 +389,7 @@ class LibraryMixin:
         cancel = Gtk.Button(label=_("Cancel"))
         cancel.connect("clicked", lambda b: win.close())
         bar.pack_end(cancel)
-        self._dup_delete_btn = Gtk.Button(label=_("Delete selected"))
+        self._dup_delete_btn = Gtk.Button(label=_("Move selected to trash"))
         self._dup_delete_btn.add_css_class("destructive-action")
         self._dup_delete_btn.set_sensitive(False)
         self._dup_delete_btn.connect("clicked", self._on_delete_dupes)
@@ -319,7 +397,16 @@ class LibraryMixin:
         tv.add_bottom_bar(bar)
 
         win.set_content(tv)
+        # Closing without deleting = "not now": the background tidy-up must
+        # not reopen this window every few minutes for the same files.
+        win.connect("close-request", self._on_dup_window_closed)
+        self._dup_deleted_any = False
         win.present()
+
+    def _on_dup_window_closed(self, _win):
+        if not getattr(self, "_dup_deleted_any", False):
+            self._dup_review_dismissed = True
+        return False
 
     def _prompt_find_duplicates(self, btn=None):
         self._open_dup_window(scanning=True)
@@ -507,20 +594,22 @@ class LibraryMixin:
         lbl.add_css_class("dim-label")
         self._dup_win_box.append(sp)
         self._dup_win_box.append(lbl)
+        self._dup_deleted_any = True
         threading.Thread(
             target=self._delete_dupes_thread, args=(to_delete,), daemon=True).start()
 
     def _delete_dupes_thread(self, to_delete):
-        deleted = 0
+        deleted = []
         for p in to_delete:
-            # Cache key uses the file's mtime, so resolve it before the remove.
+            # Cache key uses the file's mtime, so resolve it before the move.
             try:
                 cache = get_cache_path(p)
             except OSError:
                 cache = None
             try:
-                os.remove(p)
-                deleted += 1
+                trash_file(p)  # recoverable from the trash
+                deleted.append(p)
+                originals.drop(p)
                 if cache and os.path.exists(cache):
                     os.remove(cache)
             except Exception as e:
@@ -528,9 +617,14 @@ class LibraryMixin:
         GLib.idle_add(self._after_delete_dupes, to_delete, deleted)
 
     def _after_delete_dupes(self, to_delete, deleted):
-        for p in to_delete:
-            self._favorites.discard(p)
-        log_info(_("Duplicate cleanup: removed {n} files").format(n=deleted))
+        fav_changed = False
+        for p in deleted:
+            if p in self._favorites:
+                self._favorites.discard(p)
+                fav_changed = True
+        if fav_changed:
+            self._schedule_save_favorites()
+        log_info(_("Duplicate cleanup: moved {n} files to the trash").format(n=len(deleted)))
         if getattr(self, "_dup_win", None):
             self._dup_win.close()
             self._dup_win = None
@@ -572,6 +666,8 @@ class LibraryMixin:
         silent_moves = self.settings.get("reorganize_silent", False) or from_button
         if not moves:
             self._reorganize_active = False
+            if from_startup and getattr(self, "_dup_review_dismissed", False):
+                return False  # already reviewed (and skipped) this session
             self._review_reorganize_dups(dups)
             return False
         if silent_moves:
@@ -690,12 +786,24 @@ class LibraryMixin:
         removed_photos = 0
         removed_videos = 0
         first_err_logged = False
+        renames = []
+        touched_dirs = set()
         for (src, dst), sz in zip(moves, sizes_moves):
             self._reorganize_current_name = src.name
             is_vid = is_video(str(src))
             try:
+                if not src.exists():
+                    raise FileNotFoundError(str(src))
+                # The plan was made earlier (the dialog may have sat open while
+                # an import ran): re-check, never move onto an existing file.
+                if dst.exists():
+                    from importer_page import unique_path
+                    dst = unique_path(dst)
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 _sh.move(str(src), str(dst))
+                renames.append((str(src), str(dst)))
+                touched_dirs.add(str(src.parent))
+                originals.rekey(str(src), str(dst))
                 moved += 1
                 if is_vid:
                     moved_videos += 1
@@ -720,15 +828,18 @@ class LibraryMixin:
             self._reorganize_done_count = done
             self._reorganize_done_bytes += sz
             self._reorganize_fraction = done / total
-        # Prune empty dirs bottom-up (never the root).
-        for root, _dirs, _files in os.walk(str(photo_path), topdown=False):
-            if root == str(photo_path):
-                continue
-            try:
-                if not os.listdir(root):
-                    os.rmdir(root)
-            except OSError:
-                pass
+        # Prune folders this run emptied (and their emptied parents); folders
+        # the user made themselves, even empty ones, are left alone.
+        root_str = str(photo_path)
+        for d in sorted(touched_dirs, key=len, reverse=True):
+            while d != root_str and d.startswith(root_str + os.sep):
+                try:
+                    os.rmdir(d)  # only succeeds when empty
+                except OSError:
+                    break
+                d = os.path.dirname(d)
+        if renames:
+            GLib.idle_add(self._follow_renames, renames)
         log_info(_("Reorganize: {m} moved, {d} possible duplicates to review, {e} errors").format(
             m=moved, d=len(dups), e=len(errors),
         ))
@@ -738,8 +849,20 @@ class LibraryMixin:
             moved_photos, moved_videos, removed_photos, removed_videos,
         )
         # Hand any possible duplicates to the review window (never auto-deleted).
-        if dups:
+        if dups and not getattr(self, "_dup_review_dismissed", False):
             GLib.idle_add(self._review_reorganize_dups, dups)
+
+    def _follow_renames(self, renames):
+        """Favourites are keyed by path: carry them over to the new location."""
+        changed = False
+        for old, new in renames:
+            if old in self._favorites:
+                self._favorites.discard(old)
+                self._favorites.add(new)
+                changed = True
+        if changed:
+            self._schedule_save_favorites()
+        return False
 
     def _reorganize_done(self, moved, removed, errors,
                          moved_photos=0, moved_videos=0,
@@ -988,6 +1111,8 @@ class LibraryMixin:
             return
         if self._heic_converting:
             return
+        if self._importer_open():
+            return  # never move files around while an import writes them
         self._structure_scanning = True
         self._backup_scan_phase = 0.0
         tip = _("Checking folder structure…")
@@ -1082,38 +1207,49 @@ class LibraryMixin:
             self._convert_lib_btn.set_sensitive(True)
 
     def on_video_convert_toggled(self, switch, _pspec):
-        self.settings["convert_videos"] = switch.get_active()
+        if not switch.get_active():
+            def _off():
+                self.settings["convert_videos"] = False
+                save_settings(self.settings)
+                if hasattr(self, "_video_lib_btn"):
+                    self._video_lib_btn.set_sensitive(False)
+            self._confirm_switch_off(
+                switch, self.on_video_convert_toggled,
+                _("Turn off video conversion?"),
+                _("New imports will keep the iPhone's original MOV videos. They play fine in Pixora, but some other apps and devices can't open them. Videos already converted to MP4 are not changed back."),
+                _off)
+            return
+        self.settings["convert_videos"] = True
+        # Turning conversion back on → allow the sweep to re-check this session.
+        self._video_sweep_dismissed = False
         save_settings(self.settings)
         if hasattr(self, "_video_lib_btn"):
-            self._video_lib_btn.set_sensitive(switch.get_active())
+            self._video_lib_btn.set_sensitive(True)
 
-    def _collect_library_videos(self):
+    def _collect_library_videos(self, skip_failed=True):
         """Every .mov/.m4v/.3gp file currently in the photo library."""
-        from pathlib import Path as _P
         photo_path = self.settings.get("photo_path") or os.path.join(
             os.path.expanduser("~"), "Photos")
-        out = []
-        if not os.path.isdir(photo_path):
-            return out
-        for root, _dirs, fnames in os.walk(photo_path):
-            for fn in fnames:
-                if os.path.splitext(fn)[1].lower() in (".mov", ".m4v", ".3gp"):
-                    out.append(_P(root) / fn)
-        return out
+        return _collect_library_files(photo_path, (".mov", ".m4v", ".3gp"),
+                                      skip_failed)
 
     def _on_convert_videos_library_clicked(self, btn):
         if self._heic_converting:   # shared 'library conversion busy' flag
             return
 
         def _scan():
-            files = self._collect_library_videos()
+            # "Run now" retries files that failed before.
+            files = self._collect_library_videos(skip_failed=False)
             GLib.idle_add(self._start_video_library_conversion, files, False)
         threading.Thread(target=_scan, daemon=True).start()
 
     def _start_video_library_conversion(self, files, silent=False):
         if self._heic_converting or not files:
             return False
+        if self._reorganize_moving or self._backup_running:
+            return False  # files are being moved/copied right now
         self._heic_converting = True
+        self._conversion_kind = "video"
         self._heic_fraction = 0.0
         self._heic_detail = ""
         if hasattr(self, "_video_lib_btn"):
@@ -1133,20 +1269,16 @@ class LibraryMixin:
         return False
 
     def _convert_video_library_thread(self, files, silent=False):
-        from importer_page import convert_video
+        from importer_page import convert_video, unique_path
         total = len(files)
         done = converted = failed = 0
+        renames, failed_paths = [], []
         for fp in files:
             try:
                 ts = fp.stat().st_mtime
             except OSError:
                 ts = None
-            dst = fp.with_suffix(".mp4")
-            if dst.exists():
-                stem, parent, n = dst.stem, dst.parent, 1
-                while dst.exists():
-                    dst = parent / ("%s_%d.mp4" % (stem, n))
-                    n += 1
+            dst = unique_path(fp.with_suffix(".mp4"))
             ok = False
             try:
                 ok = convert_video(fp, dst)
@@ -1162,6 +1294,8 @@ class LibraryMixin:
                     fp.unlink()
                 except OSError:
                     pass
+                renames.append((str(fp), str(dst)))
+                originals.rekey(str(fp), str(dst))
                 converted += 1
             else:
                 try:
@@ -1170,8 +1304,12 @@ class LibraryMixin:
                 except OSError:
                     pass
                 failed += 1
+                failed_paths.append(str(fp))
             done += 1
             GLib.idle_add(self._set_heic_progress, done, total, fp.name)
+        _remember_failed_conversions(failed_paths)
+        if renames:
+            GLib.idle_add(self._follow_renames, renames)
         GLib.idle_add(self._finish_video_library_conversion, converted, failed, silent)
 
     def _finish_video_library_conversion(self, converted, failed, silent=False):
@@ -1237,19 +1375,11 @@ class LibraryMixin:
         return badge
 
     # ── HEIC → JPEG library conversion ───────────────────────────────
-    def _collect_library_heics(self):
+    def _collect_library_heics(self, skip_failed=True):
         """Every .heic/.heif file currently in the photo library."""
-        from pathlib import Path as _P
         photo_path = self.settings.get("photo_path") or os.path.join(
             os.path.expanduser("~"), "Photos")
-        out = []
-        if not os.path.isdir(photo_path):
-            return out
-        for root, _dirs, fnames in os.walk(photo_path):
-            for fn in fnames:
-                if os.path.splitext(fn)[1].lower() in (".heic", ".heif"):
-                    out.append(_P(root) / fn)
-        return out
+        return _collect_library_files(photo_path, (".heic", ".heif"), skip_failed)
 
     def _on_convert_library_clicked(self, btn):
         # No confirmation popup (same feel as the update button): just start,
@@ -1259,7 +1389,7 @@ class LibraryMixin:
         self._heic_sweep_dismissed = False
 
         def _scan():
-            files = self._collect_library_heics()
+            files = self._collect_library_heics(skip_failed=False)
             GLib.idle_add(self._start_library_conversion, files, True)
         threading.Thread(target=_scan, daemon=True).start()
 
@@ -1268,7 +1398,8 @@ class LibraryMixin:
         other maintenance runs; prompts first unless auto-confirm is on."""
         if (self._heic_converting or self._heic_sweep_dismissed
                 or self._structure_scanning or self._backup_scanning
-                or self._backup_running or self._reorganize_active):
+                or self._backup_running or self._reorganize_active
+                or self._importer_open()):
             return False
         if not self.settings.get("convert_heic", False):
             return False
@@ -1317,7 +1448,8 @@ class LibraryMixin:
         while other maintenance runs; prompts first unless auto-confirm is on."""
         if (self._heic_converting or self._video_sweep_dismissed
                 or self._structure_scanning or self._backup_scanning
-                or self._backup_running or self._reorganize_active):
+                or self._backup_running or self._reorganize_active
+                or self._importer_open()):
             return False
         if not self.settings.get("convert_videos", False):
             return False
@@ -1364,7 +1496,10 @@ class LibraryMixin:
     def _start_library_conversion(self, files, silent=False):
         if self._heic_converting or not files:
             return False
+        if self._reorganize_moving or self._backup_running:
+            return False  # files are being moved/copied right now
         self._heic_converting = True
+        self._conversion_kind = "heic"
         self._heic_fraction = 0.0
         self._heic_detail = ""
         if hasattr(self, "_convert_lib_btn"):
@@ -1392,21 +1527,17 @@ class LibraryMixin:
         return False
 
     def _convert_library_thread(self, files, silent):
-        from importer_page import convert_image
+        from importer_page import convert_image, unique_path
         total = len(files)
         done = converted = failed = 0
+        renames, failed_paths = [], []
         for fp in files:
             try:
                 ts = fp.stat().st_mtime
             except OSError:
                 ts = None
-            dst = fp.with_suffix(".jpg")
             # Don't clobber an existing JPEG that shares the stem.
-            if dst.exists():
-                stem, parent, n = dst.stem, dst.parent, 1
-                while dst.exists():
-                    dst = parent / ("%s_%d.jpg" % (stem, n))
-                    n += 1
+            dst = unique_path(fp.with_suffix(".jpg"))
             ok = False
             try:
                 ok = convert_image(fp, dst, "jpeg")
@@ -1422,6 +1553,8 @@ class LibraryMixin:
                     fp.unlink()  # replace the original, per user's choice
                 except OSError:
                     pass
+                renames.append((str(fp), str(dst)))
+                originals.rekey(str(fp), str(dst))
                 converted += 1
             else:
                 try:
@@ -1430,8 +1563,12 @@ class LibraryMixin:
                 except OSError:
                     pass
                 failed += 1
+                failed_paths.append(str(fp))
             done += 1
             GLib.idle_add(self._set_heic_progress, done, total, fp.name)
+        _remember_failed_conversions(failed_paths)
+        if renames:
+            GLib.idle_add(self._follow_renames, renames)
         GLib.idle_add(self._finish_library_conversion, converted, failed, silent)
 
     def _finish_library_conversion(self, converted, failed, silent):

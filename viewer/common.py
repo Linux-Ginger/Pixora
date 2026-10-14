@@ -149,7 +149,7 @@ if _DEV_MODE:
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, GdkPixbuf, Gdk, Pango, GObject
+from gi.repository import Gtk, Adw, GLib, Gio, GdkPixbuf, Gdk, Pango, GObject
 gi.require_foreign("cairo")
 import cairo
 
@@ -191,8 +191,6 @@ os.environ.setdefault("WEBKIT_FORCE_COMPOSITING_MODE", "1")
 # EGL/DMA-BUF beats GLX in VMs (VMware SVGA3D).
 os.environ.setdefault("WEBKIT_USE_EGL", "1")
 os.environ.setdefault("GDK_GL", "gles")
-# JSC uses SIGUSR1 for GC by default, clobbering our dev-mode faulthandler.
-os.environ.setdefault("JSC_SIGNAL_FOR_GC", "12")
 
 # Prefer WebKit 6.0 (GTK4-native), then WebKit2 4.1 / 4.0.
 try:
@@ -286,6 +284,33 @@ def drop_live_motion(paths):
     return [p for p in paths if p not in motions]
 
 
+def trash_file(path):
+    """Move a file to the desktop trash (recoverable), never delete it outright.
+
+    Raises GLib.Error when the file system has no trash; callers then tell the
+    user instead of falling back to a permanent delete."""
+    Gio.File.new_for_path(str(path)).trash(None)
+
+
+def version_tuple(v):
+    """'v1.67.0' → (1, 67, 0) for ordering; junk parts count as 0."""
+    out = []
+    for part in str(v or "").strip().lstrip("vV").split("."):
+        digits = "".join(ch for ch in part if ch.isdigit())
+        out.append(int(digits) if digits else 0)
+    return tuple(out)
+
+
+def is_newer_version(remote, local):
+    """True only when `remote` is a higher version than `local` — a local
+    build ahead of the latest release must never be offered a 'downgrade'."""
+    if not remote:
+        return False
+    if not local:
+        return True
+    return version_tuple(remote) > version_tuple(local)
+
+
 def is_video(path):
     return os.path.splitext(path)[1].lower() in VIDEO_EXTENSIONS
 
@@ -355,10 +380,16 @@ def format_viewer_date(dt):
 
 
 def _walk_rel_files(base):
-    """Yield (abs_path, rel_path) for every file under base."""
+    """Yield (abs_path, rel_path) for every non-hidden file under base.
+
+    Hidden entries (.Trash-1000, .thumbnails, Pixora's own .part/.tmp files)
+    are never library content, so backup and tidy-up ignore them."""
     base = str(base)
-    for root, _dirs, files in os.walk(base):
+    for root, dirs, files in os.walk(base):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
         for fn in files:
+            if fn.startswith("."):
+                continue
             fp = os.path.join(root, fn)
             yield fp, os.path.relpath(fp, base)
 
@@ -394,19 +425,6 @@ def _fetch_latest_release():
         "body": (data.get("body") or "").strip(),
         "url": data.get("html_url") or "",
     }
-
-
-def _fetch_versions():
-    """(local, remote) version strings; raises on network failure.
-
-    remote is "" when no release is published yet.
-    """
-    local_version = ""
-    if os.path.exists(INSTALLED_VERSION_FILE):
-        with open(INSTALLED_VERSION_FILE) as f:
-            local_version = f.read().strip()
-    rel = _fetch_latest_release()
-    return local_version, (rel["version"] if rel else "")
 
 
 def format_duration(seconds):

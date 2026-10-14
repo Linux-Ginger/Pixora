@@ -13,7 +13,7 @@ import subprocess
 from pixora_i18n import _
 import common
 from common import (GdkPixbuf, GLib, Gtk, log_error, log_info, log_warn,
-    TILE_CACHE_DIR, WebKit2, WEBKIT_AVAILABLE, _webkit_load_error)
+    TILE_CACHE_DIR, WebKit2, WEBKIT_AVAILABLE, _LOG_PATH, _webkit_load_error)
 from media import get_cache_path
 
 
@@ -52,7 +52,7 @@ class MapWidget(Gtk.Box):
             self._show_fallback(
                 _("Map view failed to start.") + "\n\n"
                 + _("Error: {err}").format(err=e) + "\n\n"
-                + _("Check /home/beau/.cache/pixora/pixora.log for more.")
+                + _("Check {path} for more.").format(path=_LOG_PATH)
             )
 
     def _show_fallback(self, msg):

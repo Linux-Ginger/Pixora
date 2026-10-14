@@ -23,6 +23,35 @@ def get_cache_path(photo_path, thumb_size=None):
     return os.path.join(CACHE_DIR, key + ".png")
 
 
+# Thumbnails that could not be made this session (unreadable files): don't
+# re-run ffmpeg/PIL on them every time the grid scrolls past.
+_THUMB_FAILED = set()
+
+
+def _video_thumb(photo_path, thumb_size, cache_path):
+    tmp = cache_path + ".tmp.png"
+    # 1 s in skips black first frames; clips shorter than that (Live Photo
+    # movies can be) fall back to the very first frame.
+    for seek in ("00:00:01", "00:00:00"):
+        try:
+            # Fixed height; -2 = width divisible by 2.
+            subprocess.run(
+                ["ffmpeg", "-ss", seek, "-i", photo_path, "-vframes", "1",
+                 "-vf", f"scale=-2:{thumb_size}", "-f", "image2", tmp, "-y"],
+                capture_output=True, timeout=15
+            )
+        except Exception:
+            continue
+        if os.path.exists(tmp) and os.path.getsize(tmp) > 0:
+            os.replace(tmp, cache_path)
+            return GdkPixbuf.Pixbuf.new_from_file(cache_path)
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+    return None
+
+
 def load_thumbnail(photo_path, thumb_size=None):
     if thumb_size is None:
         thumb_size = common.THUMB_SIZE
@@ -32,19 +61,17 @@ def load_thumbnail(photo_path, thumb_size=None):
             return GdkPixbuf.Pixbuf.new_from_file(cache_path)
         except Exception:
             pass
+    if cache_path in _THUMB_FAILED:
+        return None
     os.makedirs(CACHE_DIR, exist_ok=True)
     if is_video(photo_path):
         try:
-            # Fixed height; -2 = width divisible by 2.
-            subprocess.run(
-                ["ffmpeg", "-i", photo_path, "-ss", "00:00:01", "-vframes", "1",
-                 "-vf", f"scale=-2:{thumb_size}",
-                 cache_path, "-y"],
-                capture_output=True, timeout=15
-            )
-            return GdkPixbuf.Pixbuf.new_from_file(cache_path)
+            pb = _video_thumb(photo_path, thumb_size, cache_path)
         except Exception:
-            return None
+            pb = None
+        if pb is None:
+            _THUMB_FAILED.add(cache_path)
+        return pb
     try:
         from PIL import Image, ImageOps
         with Image.open(photo_path) as img:
@@ -55,14 +82,21 @@ def load_thumbnail(photo_path, thumb_size=None):
             if h > 0:
                 new_w = max(1, int(w * thumb_size / h))
                 img = img.resize((new_w, thumb_size), Image.LANCZOS)
-            img.save(cache_path, "PNG")
+            # Written whole, then swapped in: a crash never leaves a broken
+            # thumbnail that would be "cached" forever.
+            tmp = cache_path + ".tmp.png"
+            img.save(tmp, "PNG")
+            os.replace(tmp, cache_path)
         return GdkPixbuf.Pixbuf.new_from_file(cache_path)
     except Exception:
         try:
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(photo_path, thumb_size, thumb_size, True)
-            pixbuf.savev(cache_path, "png", [], [])
+            tmp = cache_path + ".tmp.png"
+            pixbuf.savev(tmp, "png", [], [])
+            os.replace(tmp, cache_path)
             return pixbuf
         except Exception:
+            _THUMB_FAILED.add(cache_path)
             return None
 
 

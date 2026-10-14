@@ -19,8 +19,51 @@ from drives import (get_available_drives, get_mountpoint_for_uuid,
 from widgets import BackupFolderPicker
 
 
+# Sync mode deletes files from the drive that are no longer in the library.
+# A deletion this large is always shown to the user first, even when backups
+# run without asking — it usually means the library folder went missing.
+_MASS_DELETE_MIN = 20
+_MASS_DELETE_SHARE = 0.25
+
+
+def _library_has_files(photo_path):
+    """True when the library folder exists and holds at least one file.
+
+    Guards Sync mode: an unmounted or empty library folder would otherwise
+    mirror "nothing" onto the backup drive and wipe it."""
+    try:
+        if not os.path.isdir(str(photo_path)):
+            return False
+        for _f in _walk_rel_files(photo_path):
+            return True
+    except OSError:
+        return False
+    return False
+
+
 class BackupMixin:
     """Backup to an external drive (mixed into MainWindow)."""
+
+    def _resolve_backup_dest(self, drive_root):
+        """(backup_dest, error) for the mounted backup drive.
+
+        The saved folder must live on the drive itself: if the drive was
+        remounted elsewhere, the old absolute path would point at the internal
+        disk and the backup would silently land there instead."""
+        from pathlib import Path as _P
+        backup_path_str = self.settings.get("backup_path")
+        if not backup_path_str:
+            return drive_root / "Pixora", None
+        dest = _P(backup_path_str)
+        try:
+            dest.resolve().relative_to(drive_root.resolve())
+        except (ValueError, OSError):
+            return None, _(
+                "The backup folder {p} is not on the backup drive (it may now be "
+                "mounted somewhere else). Choose the backup folder again in "
+                "Settings."
+            ).format(p=backup_path_str)
+        return dest, None
 
     def on_settings_backup_toggle(self, switch, _pspec):
         active = switch.get_active()
@@ -54,8 +97,6 @@ class BackupMixin:
         if hasattr(self, "settings_dedup_row"):
             dup_on_now = self.settings.get("duplicate_threshold", 2) != 0
             self.settings_dedup_row.set_sensitive(active and drive_present and dup_on_now)
-        if hasattr(self, "settings_silent_row"):
-            self.settings_silent_row.set_sensitive(active and drive_present)
         if hasattr(self, "settings_manual_scan_row"):
             self.settings_manual_scan_row.set_sensitive(active and drive_present)
         self.settings["backup_enabled"] = active
@@ -111,52 +152,11 @@ class BackupMixin:
             self.settings_backup_folder_btn.set_label(_("Set up"))
         # Rebuild drive list to drop the forgotten drive.
         if hasattr(self, "settings_drive_model"):
-            while self.settings_drive_model.get_n_items() > 0:
-                self.settings_drive_model.remove(0)
-            self.settings_drives = self._build_settings_drive_list()
-            if self.settings_drives:
-                for uuid, label in self.settings_drives:
-                    self.settings_drive_model.append(label)
-            else:
-                self.settings_drive_model.append(_("No external drives found"))
+            self._rebuild_drive_model()
 
     def on_backup_dedup_toggle(self, switch, _pspec):
         self.settings["backup_dedup"] = switch.get_active()
         save_settings(self.settings)
-
-    def on_backup_silent_toggle(self, switch, _pspec):
-        active = switch.get_active()
-        if active and not self.settings.get("backup_silent"):
-            # Enable: confirm first, revert on cancel.
-            def _confirm():
-                dlg = Adw.AlertDialog(
-                    heading=_("Turn on auto-confirm?"),
-                    body=_("Pixora will start backup/sync immediately without a confirmation dialog when there is work to do. Only error messages will still appear."),
-                )
-                dlg.add_response("cancel", _("Cancel"))
-                dlg.add_response("enable", _("Turn on"))
-                dlg.set_response_appearance("enable", Adw.ResponseAppearance.SUGGESTED)
-                dlg.set_close_response("cancel")
-                dlg.connect("response", self._on_silent_confirm_response)
-                self._present_dialog(dlg)
-                return False
-            GLib.idle_add(_confirm)
-            return
-        self.settings["backup_silent"] = active
-        save_settings(self.settings)
-
-    def _on_silent_confirm_response(self, dlg, response):
-        if response == "enable":
-            self.settings["backup_silent"] = True
-            save_settings(self.settings)
-        else:
-            self.settings_silent_switch.handler_block_by_func(
-                self.on_backup_silent_toggle
-            )
-            self.settings_silent_switch.set_active(False)
-            self.settings_silent_switch.handler_unblock_by_func(
-                self.on_backup_silent_toggle
-            )
 
     def on_settings_manual_scan(self, btn):
         if self._backup_running or self._backup_scanning:
@@ -244,7 +244,7 @@ class BackupMixin:
 
     def on_settings_drive_selected(self, combo, _pspec):
         selected = combo.get_selected()
-        if self.settings_drives and selected < len(self.settings_drives):
+        if self.settings_drives and 0 <= selected < len(self.settings_drives):
             new_uuid, new_label = self.settings_drives[selected]
             if new_uuid != self.settings.get("backup_uuid"):
                 # Different drive → old path invalid.
@@ -257,24 +257,38 @@ class BackupMixin:
             if hasattr(self, "settings_drive_reset_btn"):
                 self.settings_drive_reset_btn.set_visible(True)
 
+    def _rebuild_drive_model(self):
+        """Refill the drive dropdown without touching the saved drive.
+
+        Emptying and refilling the model makes the DropDown auto-select item 0,
+        which used to fire on_settings_drive_selected and silently switch the
+        backup to whatever drive happened to be first."""
+        combo = self.settings_drive_combo
+        combo.handler_block_by_func(self.on_settings_drive_selected)
+        try:
+            while self.settings_drive_model.get_n_items() > 0:
+                self.settings_drive_model.remove(0)
+            self.settings_drives = self._build_settings_drive_list()
+            if self.settings_drives:
+                for _uuid, label in self.settings_drives:
+                    self.settings_drive_model.append(label)
+            else:
+                self.settings_drive_model.append(_("No external drives found"))
+            saved_uuid = self.settings.get("backup_uuid")
+            selected = Gtk.INVALID_LIST_POSITION
+            for i, (uuid, _l) in enumerate(self.settings_drives):
+                if uuid == saved_uuid:
+                    selected = i
+                    break
+            combo.set_selected(selected)
+        finally:
+            combo.handler_unblock_by_func(self.on_settings_drive_selected)
+
     def on_settings_refresh_drives(self, btn):
         # User asked for fresh data; bypass cache.
         _lsblk_data(force=True)
-        while self.settings_drive_model.get_n_items() > 0:
-            self.settings_drive_model.remove(0)
-        self.settings_drives = self._build_settings_drive_list()
+        self._rebuild_drive_model()
         backup_on = bool(self.settings.get("backup_enabled"))
-        if self.settings_drives:
-            for uuid, label in self.settings_drives:
-                self.settings_drive_model.append(label)
-        else:
-            self.settings_drive_model.append(_("No external drives found"))
-        saved_uuid = self.settings.get("backup_uuid")
-        if saved_uuid:
-            for i, (uuid, _l) in enumerate(self.settings_drives):
-                if uuid == saved_uuid:
-                    self.settings_drive_combo.set_selected(i)
-                    break
         drive_present = self._backup_drive_mountpoint() is not None
         self.settings_drive_combo.set_sensitive(backup_on and drive_present)
 
@@ -323,8 +337,6 @@ class BackupMixin:
             if hasattr(self, "settings_dedup_row"):
                 dup_on_now = self.settings.get("duplicate_threshold", 2) != 0
                 self.settings_dedup_row.set_sensitive(backup_on and drive_present and dup_on_now)
-            if hasattr(self, "settings_silent_row"):
-                self.settings_silent_row.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_manual_scan_row"):
                 self.settings_manual_scan_row.set_sensitive(backup_on and drive_present)
             if hasattr(self, "settings_backup_group"):
@@ -390,17 +402,30 @@ class BackupMixin:
     def _backup_scan_thread(self):
         from pathlib import Path as _P
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
-        backup_path_str = self.settings.get("backup_path")
         drive_root = self._backup_drive_mountpoint()
         if not drive_root:
             GLib.idle_add(self._handle_scan_result, None)
             return
-        backup_dest = _P(backup_path_str) if backup_path_str else drive_root / "Pixora"
+        backup_dest, dest_err = self._resolve_backup_dest(drive_root)
+        if dest_err:
+            GLib.idle_add(self._handle_scan_result, {"error": dest_err})
+            return
         try:
             backup_dest.mkdir(parents=True, exist_ok=True)
         except Exception:
             pass
         mode = self.settings.get("backup_mode", "backup")
+        if not _library_has_files(photo_path):
+            # Missing/unmounted/empty library: never treat the whole backup
+            # as "stale". Nothing to copy either, so report in-sync-with-note.
+            log_warn(_("Backup scan: library folder {p} is missing or empty — "
+                       "nothing will be removed from the drive").format(p=photo_path))
+            GLib.idle_add(self._handle_scan_result,
+                          {"error": _("Your photo folder {p} is missing or empty, "
+                                      "so Pixora did not back up or sync anything. "
+                                      "Is the drive with your photos connected?"
+                                      ).format(p=photo_path)})
+            return
 
         # Python set-diff on rel paths (rsync --dry-run blocks minutes on FAT/exFAT).
         # Dedup runs in backup thread so scan stays fast.
@@ -416,19 +441,30 @@ class BackupMixin:
             GLib.idle_add(self._handle_scan_result, None)
             return
 
-        dest_rels = set()
+        dest_files = {}
         if backup_dest.is_dir():
             try:
-                dest_rels = {rel for _fp, rel in _walk_rel_files(backup_dest)}
+                for df, rel in _walk_rel_files(backup_dest):
+                    try:
+                        dest_files[rel] = os.path.getsize(df)
+                    except OSError:
+                        dest_files[rel] = -1
             except Exception:
                 pass  # partial walk → missing treated as "new"
+        dest_rels = set(dest_files)
 
         src_rels = set(src_files.keys())
-        to_transfer_rels = sorted(src_rels - dest_rels)
+        # Edited photos keep their name but change size: back those up too,
+        # or edits would never reach the drive.
+        changed_rels = [rel for rel in src_rels & dest_rels
+                        if src_files[rel] != dest_files[rel]]
+        to_transfer_rels = sorted(src_rels - dest_rels) + sorted(changed_rels)
         orphan_rels = sorted(dest_rels - src_rels)
         new_count = len(to_transfer_rels)
         delete_count = len(orphan_rels)
         bytes_to_transfer = sum(src_files[rel] for rel in to_transfer_rels)
+        mass_delete = (mode == "sync" and delete_count >= _MASS_DELETE_MIN
+                       and delete_count > _MASS_DELETE_SHARE * max(1, len(dest_rels)))
 
         GLib.idle_add(
             self._handle_scan_result,
@@ -437,9 +473,9 @@ class BackupMixin:
                 "bytes": bytes_to_transfer,
                 "delete": delete_count,
                 "orphans": orphan_rels,
-                "dup_count": 0,
-                "excluded": [],
                 "mode": mode,
+                "mass_delete": mass_delete,
+                "dest": backup_dest,
             },
         )
 
@@ -459,24 +495,26 @@ class BackupMixin:
                 self._set_donuts_visible(self._backup_running)
             self._set_manual_scan_state("idle")
             return False
+        if result.get("error"):
+            self._report_backup_problem(result["error"], manual_requested)
+            if hasattr(self, "_backup_donut_btn"):
+                self._set_donuts_visible(self._backup_running)
+            self._set_manual_scan_state("idle")
+            return False
         new_count = result["new"]
         delete_count = result["delete"]
         bytes_to_transfer = result["bytes"]
-        dup_count = result.get("dup_count", 0)
+        dup_count = 0
         mode = result.get("mode", self.settings.get("backup_mode", "backup"))
         # Remember orphans: backup-mode uses count for post-review, sync uses rels.
         orphans = result.get("orphans", [])
         self._last_scan_orphan_count = delete_count if mode == "backup" else 0
         self._last_scan_orphan_rels = list(orphans)
         # Remember backup_dest for orphan review.
-        drive_root = self._backup_drive_mountpoint()
-        if drive_root:
-            from pathlib import Path as _P
-            backup_path_str = self.settings.get("backup_path")
-            self._last_scan_backup_dest = (
-                _P(backup_path_str) if backup_path_str
-                else drive_root / "Pixora"
-            )
+        self._last_scan_backup_dest = result.get("dest")
+        if result.get("mass_delete"):
+            # Never auto-run a sync that would empty a large part of the drive.
+            silent = False
 
         # Backup-mode orphans are informational (kept); ignore for "synced" check.
         actionable_delete = delete_count if mode == "sync" else 0
@@ -528,10 +566,25 @@ class BackupMixin:
         if hasattr(self, "_backup_donut_btn"):
             self._set_donuts_visible(self._backup_running)
         self._show_backup_scan_dialog(
-            new_count, delete_count, bytes_to_transfer, dup_count, mode
+            new_count, delete_count, bytes_to_transfer, dup_count, mode,
+            mass_delete=bool(result.get("mass_delete")),
         )
         self._set_manual_scan_state("idle")
         return False
+
+    def _report_backup_problem(self, message, force=False):
+        """Log a backup blocker; show it once per session (or on manual check)."""
+        log_warn(message)
+        shown = getattr(self, "_backup_problems_shown", set())
+        self._backup_problems_shown = shown
+        if message in shown and not force:
+            return
+        shown.add(message)
+        dlg = Adw.AlertDialog(heading=_("Backup paused"), body=message)
+        dlg.add_response("ok", _("OK"))
+        dlg.set_default_response("ok")
+        dlg.set_close_response("ok")
+        self._present_dialog(dlg)
 
     def _show_orphans_only_dialog(self, orphan_count):
         dlg = Adw.AlertDialog(
@@ -572,16 +625,16 @@ class BackupMixin:
         return _("± {h} h {m} min").format(h=hours, m=rem)
 
     def _show_backup_scan_dialog(self, new_count, delete_count, bytes_to_transfer,
-                                 dup_count=0, mode="backup"):
+                                 dup_count=0, mode="backup", mass_delete=False):
         if self._backup_scan_dialog_open:
-            return
+            return False
         # Defer during startup (home-grid <2s) so popup avoids half-loaded UI.
         ready_at = getattr(self, "_home_ready_at", None)
         if ready_at is None or (time.time() - ready_at) < 2.0:
             GLib.timeout_add(500, self._show_backup_scan_dialog,
                              new_count, delete_count, bytes_to_transfer,
-                             dup_count, mode)
-            return
+                             dup_count, mode, mass_delete)
+            return False
         self._backup_scan_dialog_open = True
         lines = []
         if new_count > 0:
@@ -613,6 +666,10 @@ class BackupMixin:
         lines.append(_("Estimated time: {eta}").format(
             eta=self._format_eta(bytes_to_transfer)
         ))
+        if mass_delete:
+            lines.append("")
+            lines.append(_("⚠ That is a large part of your backup. Only continue "
+                           "if you really removed these photos from Pixora."))
         body = "\n".join(lines)
         if mode == "sync":
             heading = _("Sync ready to start")
@@ -623,11 +680,16 @@ class BackupMixin:
         dlg = Adw.AlertDialog(heading=heading, body=body)
         dlg.add_response("later", _("Later"))
         dlg.add_response("now", now_label)
-        dlg.set_response_appearance("now", Adw.ResponseAppearance.SUGGESTED)
-        dlg.set_default_response("now")
+        if mass_delete:
+            dlg.set_response_appearance("now", Adw.ResponseAppearance.DESTRUCTIVE)
+            dlg.set_default_response("later")
+        else:
+            dlg.set_response_appearance("now", Adw.ResponseAppearance.SUGGESTED)
+            dlg.set_default_response("now")
         dlg.set_close_response("later")
         dlg.connect("response", self._on_scan_dialog_response)
         self._present_dialog(dlg)
+        return False
 
     def _on_scan_dialog_response(self, dlg, response):
         self._backup_scan_dialog_open = False
@@ -720,9 +782,25 @@ class BackupMixin:
 
     def _poll_backup_drive(self):
         """Drive attach → scan for diff; detach → grey settings + banner."""
-        # Force-refresh lsblk so cache can't lie about attach state.
-        _lsblk_data(force=True)
-        drive_now = self._backup_drive_mountpoint() is not None
+        if getattr(self, "_drive_poll_busy", False):
+            return True
+        self._drive_poll_busy = True
+
+        def _probe():
+            # Force-refresh lsblk so cache can't lie about attach state. Runs
+            # off the main thread: lsblk can take seconds on a busy USB bus.
+            try:
+                _lsblk_data(force=True)
+                drive_now = self._backup_drive_mountpoint() is not None
+            except Exception:
+                drive_now = self._backup_drive_last_seen
+            GLib.idle_add(self._apply_backup_drive_state, drive_now)
+
+        threading.Thread(target=_probe, daemon=True).start()
+        return True
+
+    def _apply_backup_drive_state(self, drive_now):
+        self._drive_poll_busy = False
         just_attached = drive_now and not self._backup_drive_last_seen
         just_detached = (not drive_now) and self._backup_drive_last_seen
         self._backup_drive_last_seen = drive_now
@@ -740,7 +818,7 @@ class BackupMixin:
             self._show_backup_pending_banner()
         if just_attached or just_detached:
             GLib.idle_add(self._refresh_settings_drive_state)
-        return True
+        return False
 
     def _on_close_guard_response(self, dlg, response):
         if response == "close":
@@ -877,13 +955,20 @@ class BackupMixin:
     def _backup_thread(self):
         from pathlib import Path as _P
         photo_path = _P(self.settings.get("photo_path") or _P.home() / "Photos")
-        backup_uuid = self.settings.get("backup_uuid")
-        backup_path_str = self.settings.get("backup_path")
         drive_root = self._backup_drive_mountpoint()
         if not drive_root:
             GLib.idle_add(self._backup_finished, False, _("Backup drive not found."))
             return
-        backup_dest = _P(backup_path_str) if backup_path_str else drive_root / "Pixora"
+        backup_dest, dest_err = self._resolve_backup_dest(drive_root)
+        if dest_err:
+            GLib.idle_add(self._backup_finished, False, dest_err)
+            return
+        if not _library_has_files(photo_path):
+            GLib.idle_add(self._backup_finished, False, _(
+                "Your photo folder {p} is missing or empty, so Pixora did not "
+                "back up or sync anything. Is the drive with your photos "
+                "connected?").format(p=photo_path))
+            return
         # NTFS/exFAT read-only after unsafe eject: warn early instead of rsync crash.
         ro_msg = self._check_backup_dest_writable(drive_root, backup_dest)
         if ro_msg is not None:
@@ -905,6 +990,13 @@ class BackupMixin:
                         pass
 
         mode = self.settings.get("backup_mode", "backup")
+        allow_delete = mode == "sync"
+        if allow_delete and backup_dest.resolve() == drive_root.resolve():
+            # Old setups could pick the drive root; mirroring it would delete
+            # every other file on the drive. Copy only.
+            log_warn(_("Sync into the drive root is not allowed — copying "
+                       "without removing anything"))
+            allow_delete = False
         # Dedup before rsync: scan dialog stays instant; pHash shows donut progress.
         excluded = self._dedup_for_backup(photo_path, backup_dest)
         exclude_file = None
@@ -912,9 +1004,11 @@ class BackupMixin:
         if _cmd_available_bk("rsync"):
             proc = None
             try:
+                # Hidden entries (.Trash-1000, temp files) are neither copied
+                # nor deleted; excluded files are also safe from --delete.
                 rsync_cmd = ["rsync", "-a", "--info=progress2",
-                             "--modify-window=2"]
-                if mode == "sync":
+                             "--modify-window=2", "--exclude=.*"]
+                if allow_delete:
                     rsync_cmd.append("--delete")
                 if excluded:
                     import tempfile
@@ -964,7 +1058,7 @@ class BackupMixin:
                         pass
         else:
             success = self._manual_backup(
-                photo_path, backup_dest, mode == "sync", excluded=set(excluded)
+                photo_path, backup_dest, allow_delete, excluded=set(excluded)
             )
             rsync_err = ""
 
@@ -997,13 +1091,19 @@ class BackupMixin:
                     continue
                 df = os.path.join(str(dst), rel)
                 os.makedirs(os.path.dirname(df), exist_ok=True)
-                if not os.path.exists(df):
+                if (not os.path.exists(df)
+                        or os.path.getsize(df) != os.path.getsize(sf)):
+                    # Copy to a hidden temp name first: an unplugged drive
+                    # never leaves a half-written photo under the real name.
                     import shutil as _sh
-                    _sh.copy2(sf, df)
+                    tmp = os.path.join(os.path.dirname(df),
+                                       "." + os.path.basename(df) + ".part")
+                    _sh.copy2(sf, tmp)
+                    os.replace(tmp, df)
                 frac = (i + 1) / total if total > 0 else 1.0
                 GLib.idle_add(self._update_backup_progress, frac,
                               f"{i + 1} / {total}")
-            if delete_extraneous:
+            if delete_extraneous and src_rels:
                 for df, rel in _walk_rel_files(dst):
                     if rel not in src_rels:
                         try:
@@ -1159,7 +1259,10 @@ class BackupMixin:
             pct = f"{pct_val}%"
             detail = self._reorganize_current_name or ""
         elif self._heic_converting:
-            title = _("Converting HEIC to JPEG…")
+            if getattr(self, "_conversion_kind", "heic") == "video":
+                title = _("Converting videos to MP4…")
+            else:
+                title = _("Converting HEIC to JPEG…")
             pct = f"{int(max(0.0, min(1.0, self._heic_fraction)) * 100)}%"
             detail = (self._heic_detail or "").strip()
         elif self._structure_scanning:
@@ -1425,19 +1528,20 @@ class BackupMixin:
         dlg.set_default_response("keep")
         dlg.set_close_response("keep")
 
+        reviewed_dest = self._last_scan_backup_dest
+
         def _on_resp(_d, resp):
             if resp == "delete" and dup_rels:
                 threading.Thread(
                     target=self._delete_orphans_thread,
-                    args=(list(dup_rels),),
+                    args=(list(dup_rels), reviewed_dest),
                     daemon=True,
                 ).start()
         dlg.connect("response", _on_resp)
         self._present_dialog(dlg)
         return False
 
-    def _delete_orphans_thread(self, rels):
-        backup_dest = self._last_scan_backup_dest
+    def _delete_orphans_thread(self, rels, backup_dest):
         if not backup_dest or not backup_dest.is_dir():
             return
         deleted = 0

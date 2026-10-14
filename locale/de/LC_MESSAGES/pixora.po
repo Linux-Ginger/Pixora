@@ -3160,3 +3160,195 @@ msgstr "Vorhandene Fotos jetzt umwandeln"
 
 msgid "Convert existing videos now"
 msgstr "Vorhandene Videos jetzt umwandeln"
+
+msgid "iPhone"
+msgstr "iPhone"
+
+msgid "Stop importing?"
+msgstr "Import abbrechen?"
+
+msgid "Files that were already copied stay in your library. The rest stays on your device."
+msgstr "Bereits kopierte Dateien bleiben in deiner Bibliothek. Der Rest bleibt auf deinem Gerät."
+
+msgid "Stop"
+msgstr "Abbrechen"
+
+msgid "The connection to your device was lost.\nReconnect the device, unlock it and try again."
+msgstr "Die Verbindung zu deinem Gerät wurde unterbrochen.\nSchließe das Gerät erneut an, entsperre es und versuche es noch einmal."
+
+msgid "Reading your device failed: {err}"
+msgstr "Das Gerät konnte nicht gelesen werden: {err}"
+
+msgid "The device was disconnected — %d file was not imported."
+msgid_plural "The device was disconnected — %d files were not imported."
+msgstr[0] "Das Gerät wurde getrennt — %d Datei wurde nicht importiert."
+msgstr[1] "Das Gerät wurde getrennt — %d Dateien wurden nicht importiert."
+
+msgid "%d file could not be imported"
+msgid_plural "%d files could not be imported"
+msgstr[0] "%d Datei konnte nicht importiert werden"
+msgstr[1] "%d Dateien konnten nicht importiert werden"
+
+msgid "Not imported: {names}"
+msgstr "Nicht importiert: {names}"
+
+msgid "Pixora (Dev Mode)"
+msgstr "Pixora (Entwicklermodus)"
+
+msgid "Could not create the photo folder: {err}"
+msgstr "Der Fotoordner konnte nicht erstellt werden: {err}"
+
+msgid "The “{r}” rendering backend made Pixora crash, so it has been switched back to Automatic."
+msgstr "Das Render-Backend „{r}“ hat Pixora abstürzen lassen und wurde deshalb auf Automatisch zurückgesetzt."
+
+msgid "⚠️ Your device isn't showing up. Repair the connection? (asks for your password)"
+msgstr "⚠️ Dein Gerät wird nicht erkannt. Verbindung reparieren? (fragt nach deinem Passwort)"
+
+msgid "Repair"
+msgstr "Reparieren"
+
+msgid "Pixora is converting photos or videos. Closing now stops the conversion; files not yet converted stay as they are."
+msgstr "Pixora wandelt gerade Fotos oder Videos um. Wenn du jetzt schließt, stoppt die Umwandlung; noch nicht umgewandelte Dateien bleiben unverändert."
+
+msgid "Pixora is importing from your device. Closing now stops the import; files already copied stay in your library."
+msgstr "Pixora importiert gerade von deinem Gerät. Wenn du jetzt schließt, stoppt der Import; bereits kopierte Dateien bleiben in deiner Bibliothek."
+
+msgid "Check {path} for more."
+msgstr "Mehr dazu in {path}."
+
+msgid "JS run error: {err}"
+msgstr "JS-Fehler: {err}"
+
+msgid "Can't use this folder"
+msgstr "Dieser Ordner kann nicht verwendet werden"
+
+msgid "Pixora can't create {p}: {err}"
+msgstr "Pixora kann {p} nicht erstellen: {err}"
+
+msgid "You don't have permission to save files in {p}."
+msgstr "Du hast keine Berechtigung, Dateien in {p} zu speichern."
+
+msgid "Settings could not be saved"
+msgstr "Einstellungen konnten nicht gespeichert werden"
+
+msgid "Pixora could not write {p}: {err}"
+msgstr "Pixora konnte {p} nicht schreiben: {err}"
+
+msgid "Root of USB drive — backups go into a “Pixora” folder here"
+msgstr "Hauptordner des USB-Laufwerks — Backups landen hier in einem Ordner „Pixora“"
+
+msgid "The backup folder {p} is not on the backup drive (it may now be mounted somewhere else). Choose the backup folder again in Settings."
+msgstr "Der Backup-Ordner {p} liegt nicht auf dem Backup-Laufwerk (es ist vielleicht an anderer Stelle eingehängt). Wähle den Backup-Ordner in den Einstellungen neu."
+
+msgid "Backup scan: library folder {p} is missing or empty — nothing will be removed from the drive"
+msgstr "Backup-Prüfung: Fotoordner {p} fehlt oder ist leer — es wird nichts vom Laufwerk entfernt"
+
+msgid "Your photo folder {p} is missing or empty, so Pixora did not back up or sync anything. Is the drive with your photos connected?"
+msgstr "Dein Fotoordner {p} fehlt oder ist leer, daher hat Pixora nichts gesichert oder synchronisiert. Ist das Laufwerk mit deinen Fotos angeschlossen?"
+
+msgid "Backup paused"
+msgstr "Backup pausiert"
+
+msgid "⚠ That is a large part of your backup. Only continue if you really removed these photos from Pixora."
+msgstr "⚠ Das ist ein großer Teil deines Backups. Fahre nur fort, wenn du diese Fotos wirklich aus Pixora entfernt hast."
+
+msgid "Sync into the drive root is not allowed — copying without removing anything"
+msgstr "Synchronisieren in den Hauptordner des Laufwerks ist nicht erlaubt — es wird nur kopiert, nichts entfernt"
+
+msgid "Move to trash?"
+msgstr "In den Papierkorb verschieben?"
+
+msgid "'{name}' will be moved to the trash. You can restore it from there."
+msgstr "„{name}“ wird in den Papierkorb verschoben. Dort kannst du es wiederherstellen."
+
+msgid "Move to trash"
+msgstr "In den Papierkorb"
+
+msgid "Moved to trash: {p}"
+msgstr "In den Papierkorb verschoben: {p}"
+
+msgid "Could not move the Live Photo movie to the trash: {err}"
+msgstr "Das Live-Photo-Video konnte nicht in den Papierkorb verschoben werden: {err}"
+
+msgid "Could not move to trash"
+msgstr "Konnte nicht in den Papierkorb verschoben werden"
+
+msgid "{names} could not be moved to the trash, so nothing was deleted.\n\n{err}"
+msgstr "{names} konnte nicht in den Papierkorb verschoben werden, daher wurde nichts gelöscht.\n\n{err}"
+
+msgid "Move %d item to trash?"
+msgid_plural "Move %d items to trash?"
+msgstr[0] "%d Element in den Papierkorb verschieben?"
+msgstr[1] "%d Elemente in den Papierkorb verschieben?"
+
+msgid "You can restore them from the trash."
+msgstr "Du kannst sie aus dem Papierkorb wiederherstellen."
+
+msgid "Restoring the original failed: {err}"
+msgstr "Wiederherstellen des Originals fehlgeschlagen: {err}"
+
+msgid "Restore failed"
+msgstr "Wiederherstellen fehlgeschlagen"
+
+msgid "Editor save: no changes, nothing written"
+msgstr "Editor speichern: keine Änderungen, nichts geschrieben"
+
+msgid "The photo was not changed."
+msgstr "Das Foto wurde nicht verändert."
+
+msgid "Move selected to trash"
+msgstr "Auswahl in den Papierkorb"
+
+msgid "Duplicate cleanup: moved {n} files to the trash"
+msgstr "Duplikate aufräumen: {n} Dateien in den Papierkorb verschoben"
+
+msgid "Turn off video conversion?"
+msgstr "Videoumwandlung ausschalten?"
+
+msgid "New imports will keep the iPhone's original MOV videos. They play fine in Pixora, but some other apps and devices can't open them. Videos already converted to MP4 are not changed back."
+msgstr "Neue Importe behalten die originalen MOV-Videos des iPhones. Sie laufen in Pixora problemlos, aber manche anderen Apps und Geräte können sie nicht öffnen. Bereits in MP4 umgewandelte Videos werden nicht zurückverwandelt."
+
+msgid "Tile prefetch skipped: {err}"
+msgstr "Vorladen der Kartenkacheln übersprungen: {err}"
+
+msgid "Tile proxy unavailable, using OSM directly: {err}"
+msgstr "Lokaler Kartencache nicht verfügbar, OSM wird direkt genutzt: {err}"
+
+msgid "Could not remove home: {err}"
+msgstr "Zuhause konnte nicht entfernt werden: {err}"
+
+msgid "No internet connection"
+msgstr "Keine Internetverbindung"
+
+msgid "Looking up an address needs the internet once. Check your connection and try again."
+msgstr "Zum Nachschlagen einer Adresse wird einmalig Internet benötigt. Prüfe deine Verbindung und versuche es erneut."
+
+msgid "Could not save place: {err}"
+msgstr "Ort konnte nicht gespeichert werden: {err}"
+
+msgid "Live Photos: also import the short video"
+msgstr "Live Photos: auch das kurze Video importieren"
+
+msgid "Press LIVE in the viewer to play it. Off = only the photo."
+msgstr "Tippe im Betrachter auf LIVE, um es abzuspielen. Aus = nur das Foto."
+
+msgid "Every few minutes Pixora runs the tasks you've enabled — folder tidy-up, USB backup and photo/video conversion. By default it asks first."
+msgstr "Alle paar Minuten führt Pixora die aktivierten Aufgaben aus — Ordner aufräumen, USB-Backup und Foto-/Videoumwandlung. Standardmäßig fragt es vorher."
+
+msgid "Restart sentinel write failed: {err}"
+msgstr "Neustart-Markierung konnte nicht geschrieben werden: {err}"
+
+msgid "Restart watcher spawn failed: {err}"
+msgstr "Neustart-Überwachung konnte nicht gestartet werden: {err}"
+
+msgid "Restart scheduled"
+msgstr "Neustart geplant"
+
+msgid "Play Live Photo"
+msgstr "Live Photo abspielen"
+
+msgid "LIVE"
+msgstr "LIVE"
+
+msgid "Live Photo could not be played: {err}"
+msgstr "Live Photo konnte nicht abgespielt werden: {err}"

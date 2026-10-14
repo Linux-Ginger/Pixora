@@ -3132,3 +3132,195 @@ msgstr "Convert existing photos now"
 
 msgid "Convert existing videos now"
 msgstr "Convert existing videos now"
+
+msgid "iPhone"
+msgstr "iPhone"
+
+msgid "Stop importing?"
+msgstr "Stop importing?"
+
+msgid "Files that were already copied stay in your library. The rest stays on your device."
+msgstr "Files that were already copied stay in your library. The rest stays on your device."
+
+msgid "Stop"
+msgstr "Stop"
+
+msgid "The connection to your device was lost.\nReconnect the device, unlock it and try again."
+msgstr "The connection to your device was lost.\nReconnect the device, unlock it and try again."
+
+msgid "Reading your device failed: {err}"
+msgstr "Reading your device failed: {err}"
+
+msgid "The device was disconnected — %d file was not imported."
+msgid_plural "The device was disconnected — %d files were not imported."
+msgstr[0] "The device was disconnected — %d file was not imported."
+msgstr[1] "The device was disconnected — %d files were not imported."
+
+msgid "%d file could not be imported"
+msgid_plural "%d files could not be imported"
+msgstr[0] "%d file could not be imported"
+msgstr[1] "%d files could not be imported"
+
+msgid "Not imported: {names}"
+msgstr "Not imported: {names}"
+
+msgid "Pixora (Dev Mode)"
+msgstr "Pixora (Dev Mode)"
+
+msgid "Could not create the photo folder: {err}"
+msgstr "Could not create the photo folder: {err}"
+
+msgid "The “{r}” rendering backend made Pixora crash, so it has been switched back to Automatic."
+msgstr "The “{r}” rendering backend made Pixora crash, so it has been switched back to Automatic."
+
+msgid "⚠️ Your device isn't showing up. Repair the connection? (asks for your password)"
+msgstr "⚠️ Your device isn't showing up. Repair the connection? (asks for your password)"
+
+msgid "Repair"
+msgstr "Repair"
+
+msgid "Pixora is converting photos or videos. Closing now stops the conversion; files not yet converted stay as they are."
+msgstr "Pixora is converting photos or videos. Closing now stops the conversion; files not yet converted stay as they are."
+
+msgid "Pixora is importing from your device. Closing now stops the import; files already copied stay in your library."
+msgstr "Pixora is importing from your device. Closing now stops the import; files already copied stay in your library."
+
+msgid "Check {path} for more."
+msgstr "Check {path} for more."
+
+msgid "JS run error: {err}"
+msgstr "JS run error: {err}"
+
+msgid "Can't use this folder"
+msgstr "Can't use this folder"
+
+msgid "Pixora can't create {p}: {err}"
+msgstr "Pixora can't create {p}: {err}"
+
+msgid "You don't have permission to save files in {p}."
+msgstr "You don't have permission to save files in {p}."
+
+msgid "Settings could not be saved"
+msgstr "Settings could not be saved"
+
+msgid "Pixora could not write {p}: {err}"
+msgstr "Pixora could not write {p}: {err}"
+
+msgid "Root of USB drive — backups go into a “Pixora” folder here"
+msgstr "Root of USB drive — backups go into a “Pixora” folder here"
+
+msgid "The backup folder {p} is not on the backup drive (it may now be mounted somewhere else). Choose the backup folder again in Settings."
+msgstr "The backup folder {p} is not on the backup drive (it may now be mounted somewhere else). Choose the backup folder again in Settings."
+
+msgid "Backup scan: library folder {p} is missing or empty — nothing will be removed from the drive"
+msgstr "Backup scan: library folder {p} is missing or empty — nothing will be removed from the drive"
+
+msgid "Your photo folder {p} is missing or empty, so Pixora did not back up or sync anything. Is the drive with your photos connected?"
+msgstr "Your photo folder {p} is missing or empty, so Pixora did not back up or sync anything. Is the drive with your photos connected?"
+
+msgid "Backup paused"
+msgstr "Backup paused"
+
+msgid "⚠ That is a large part of your backup. Only continue if you really removed these photos from Pixora."
+msgstr "⚠ That is a large part of your backup. Only continue if you really removed these photos from Pixora."
+
+msgid "Sync into the drive root is not allowed — copying without removing anything"
+msgstr "Sync into the drive root is not allowed — copying without removing anything"
+
+msgid "Move to trash?"
+msgstr "Move to trash?"
+
+msgid "'{name}' will be moved to the trash. You can restore it from there."
+msgstr "'{name}' will be moved to the trash. You can restore it from there."
+
+msgid "Move to trash"
+msgstr "Move to trash"
+
+msgid "Moved to trash: {p}"
+msgstr "Moved to trash: {p}"
+
+msgid "Could not move the Live Photo movie to the trash: {err}"
+msgstr "Could not move the Live Photo movie to the trash: {err}"
+
+msgid "Could not move to trash"
+msgstr "Could not move to trash"
+
+msgid "{names} could not be moved to the trash, so nothing was deleted.\n\n{err}"
+msgstr "{names} could not be moved to the trash, so nothing was deleted.\n\n{err}"
+
+msgid "Move %d item to trash?"
+msgid_plural "Move %d items to trash?"
+msgstr[0] "Move %d item to trash?"
+msgstr[1] "Move %d items to trash?"
+
+msgid "You can restore them from the trash."
+msgstr "You can restore them from the trash."
+
+msgid "Restoring the original failed: {err}"
+msgstr "Restoring the original failed: {err}"
+
+msgid "Restore failed"
+msgstr "Restore failed"
+
+msgid "Editor save: no changes, nothing written"
+msgstr "Editor save: no changes, nothing written"
+
+msgid "The photo was not changed."
+msgstr "The photo was not changed."
+
+msgid "Move selected to trash"
+msgstr "Move selected to trash"
+
+msgid "Duplicate cleanup: moved {n} files to the trash"
+msgstr "Duplicate cleanup: moved {n} files to the trash"
+
+msgid "Turn off video conversion?"
+msgstr "Turn off video conversion?"
+
+msgid "New imports will keep the iPhone's original MOV videos. They play fine in Pixora, but some other apps and devices can't open them. Videos already converted to MP4 are not changed back."
+msgstr "New imports will keep the iPhone's original MOV videos. They play fine in Pixora, but some other apps and devices can't open them. Videos already converted to MP4 are not changed back."
+
+msgid "Tile prefetch skipped: {err}"
+msgstr "Tile prefetch skipped: {err}"
+
+msgid "Tile proxy unavailable, using OSM directly: {err}"
+msgstr "Tile proxy unavailable, using OSM directly: {err}"
+
+msgid "Could not remove home: {err}"
+msgstr "Could not remove home: {err}"
+
+msgid "No internet connection"
+msgstr "No internet connection"
+
+msgid "Looking up an address needs the internet once. Check your connection and try again."
+msgstr "Looking up an address needs the internet once. Check your connection and try again."
+
+msgid "Could not save place: {err}"
+msgstr "Could not save place: {err}"
+
+msgid "Live Photos: also import the short video"
+msgstr "Live Photos: also import the short video"
+
+msgid "Press LIVE in the viewer to play it. Off = only the photo."
+msgstr "Press LIVE in the viewer to play it. Off = only the photo."
+
+msgid "Every few minutes Pixora runs the tasks you've enabled — folder tidy-up, USB backup and photo/video conversion. By default it asks first."
+msgstr "Every few minutes Pixora runs the tasks you've enabled — folder tidy-up, USB backup and photo/video conversion. By default it asks first."
+
+msgid "Restart sentinel write failed: {err}"
+msgstr "Restart sentinel write failed: {err}"
+
+msgid "Restart watcher spawn failed: {err}"
+msgstr "Restart watcher spawn failed: {err}"
+
+msgid "Restart scheduled"
+msgstr "Restart scheduled"
+
+msgid "Play Live Photo"
+msgstr "Play Live Photo"
+
+msgid "LIVE"
+msgstr "LIVE"
+
+msgid "Live Photo could not be played: {err}"
+msgstr "Live Photo could not be played: {err}"

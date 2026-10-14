@@ -11,8 +11,9 @@ import os
 import subprocess
 import threading
 from collections import OrderedDict
+from pixora_i18n import _
 from common import (FILM_THUMB, format_duration, format_viewer_date, Gdk,
-    GdkPixbuf, GLib, Gtk)
+    GdkPixbuf, GLib, Gtk, log_warn)
 from metadata import get_photo_date, get_video_duration
 
 
@@ -22,6 +23,10 @@ class VideoMixin:
     def _show_video(self, path, location="", searching=False):
         self._hide_photo_spinner()
         self._stop_video()
+        # The previous photo's pixels must not be mistaken for this video's
+        # (the delete animation shreds _viewer_pixbuf).
+        self._viewer_pixbuf = None
+        self._update_live_badge(None)
         self._preview_cache = OrderedDict()
         self._preview_pending = None
         self._viewer_zoom   = 1.0
@@ -125,7 +130,86 @@ class VideoMixin:
             except OSError:
                 pass
 
+    # ── Live Photos ──────────────────────────────────────────────────
+    def _build_live_photo_ui(self, viewer_area):
+        """'LIVE' button under the title; click plays the still's movie once."""
+        self._live_media = None
+        self._current_live_motion = None
+        if not hasattr(self, "_live_pairs"):
+            self._live_pairs = {}
+        btn = Gtk.Button()
+        btn.add_css_class("flat")
+        btn.set_halign(Gtk.Align.START)
+        btn.set_tooltip_text(_("Play Live Photo"))
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        box.append(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+        box.append(Gtk.Label(label=_("LIVE")))
+        btn.set_child(box)
+        btn.set_visible(False)
+        btn.connect("clicked", self._play_live_motion)
+        self.live_btn = btn
+        self.viewer_title_box.append(btn)
+
+    def _update_live_badge(self, path):
+        motion = self._live_pairs.get(path) if path else None
+        if motion and not os.path.exists(motion):
+            motion = None
+        self._current_live_motion = motion
+        self.live_btn.set_visible(bool(motion)
+                                  and not getattr(self, "_editor_active", False))
+
+    def _play_live_motion(self, *_args):
+        motion = self._current_live_motion
+        if not motion or self._live_media is not None:
+            return
+        try:
+            media = Gtk.MediaFile.new_for_filename(motion)
+        except Exception as e:
+            log_warn(_("Live Photo could not be played: {err}").format(err=e))
+            return
+        media.set_loop(False)
+        media.set_muted(True)  # like Photos on a quick tap: motion, no sound
+        self._live_media = media
+        self._live_ended_hid = media.connect("notify::ended", self._on_live_ended)
+        self._live_error_hid = media.connect("notify::error", self._on_live_error)
+        self.live_picture.set_paintable(media)
+        self.live_picture.set_visible(True)
+        self.live_btn.set_sensitive(False)
+        media.play()
+
+    def _on_live_ended(self, media, _pspec):
+        if media.get_ended():
+            self._stop_live_motion()
+
+    def _on_live_error(self, media, _pspec):
+        err = media.get_error()
+        if err is not None:
+            log_warn(_("Live Photo could not be played: {err}").format(err=err.message))
+            self._stop_live_motion()
+
+    def _stop_live_motion(self):
+        media = getattr(self, "_live_media", None)
+        if media is None:
+            return
+        self._live_media = None
+        for attr in ("_live_ended_hid", "_live_error_hid"):
+            hid = getattr(self, attr, None)
+            if hid is not None:
+                try:
+                    media.disconnect(hid)
+                except Exception:
+                    pass
+                setattr(self, attr, None)
+        try:
+            media.pause()
+        except Exception:
+            pass
+        self.live_picture.set_visible(False)
+        self.live_picture.set_paintable(None)
+        self.live_btn.set_sensitive(True)
+
     def _stop_video(self):
+        self._stop_live_motion()
         self._stop_video_poll()
         self._cancel_fade()
         if self._video_seek_pending_id:
@@ -146,6 +230,11 @@ class VideoMixin:
                 self._video_ended_hid = None
             self._video_media.pause()
             self._video_media = None
+            # Detach the paused stream so its decoder can be freed.
+            try:
+                self.video_display.set_paintable(None)
+            except Exception:
+                pass
 
     def _start_video_poll(self):
         self._stop_video_poll()
@@ -489,6 +578,7 @@ class VideoMixin:
 
     def _extract_preview_frame(self, path, ts_s, load_id):
         import tempfile
+        tmp = None
         try:
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
                 tmp = f.name
@@ -507,13 +597,14 @@ class VideoMixin:
                     while len(self._preview_cache) > 400:
                         self._preview_cache.popitem(last=False)
                 GLib.idle_add(self._apply_preview_frame, key, load_id)
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
         except Exception:
             pass
         finally:
+            if tmp:
+                try:
+                    os.unlink(tmp)  # also when ffmpeg/pixbuf loading failed
+                except OSError:
+                    pass
             self._preview_extracting = False
             # A newer hover may have arrived while ffmpeg ran — service it now,
             # otherwise the preview would freeze on the old frame.

@@ -1,1604 +1,149 @@
-# Template.
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the Pixora package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
 msgid ""
 msgstr ""
+"Project-Id-Version: Pixora\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 15:37+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
-msgid "0 photos"
+msgid "Unknown date"
 msgstr ""
 
-msgid "0 selected"
+#, python-brace-format
+msgid "{month} {day}, {year}  {time}"
 msgstr ""
 
-msgid "0:00 / 0:00"
+#, python-brace-format
+msgid "Drive detection error: {err}"
 msgstr ""
 
-msgid "2024/   2025/"
+msgid "External drive"
 msgstr ""
 
-msgid "2024/2024-03/   2024/2024-04/"
-msgstr ""
-
-msgid "Active"
-msgstr ""
-
-msgid "Activate"
-msgstr ""
-
-msgid "Import all"
-msgstr ""
-
-msgid "Skip all"
-msgstr ""
-
-msgid "Only exactly identical photos"
-msgstr ""
-
-msgid "External drives only"
-msgstr ""
-
-msgid "Only external drives are shown"
-msgstr ""
-
-msgid "Show only favorites"
-msgstr ""
-
-msgid "Everything in one folder"
-msgstr ""
-
-msgid "Cancel"
-msgstr ""
-
-msgid "Device"
-msgstr ""
-
-msgid "Device found"
-msgstr ""
-
-msgid "Apple USB device connected (vendor=05ac) — check after 2.5s"
-msgstr ""
-
-msgid "Automatic backup"
-msgstr ""
-
-msgid "Backup to external USB drive after each import"
-msgstr ""
-
-msgid "Backup drive"
-msgstr ""
-
-msgid "Working…"
-msgstr ""
-
-msgid "Near-identical photos are detected"
-msgstr ""
-
-msgid "Crop"
-msgstr ""
-
-msgid "Update"
-msgstr ""
-
-msgid "Browse…"
-msgstr ""
-
-msgid "Cache: {p}"
-msgstr ""
-
-msgid "Cluster filter off → all photos"
-msgstr ""
-
-msgid "Config: {p}"
-msgstr ""
-
-msgid "Configuration + services"
-msgstr ""
-
-msgid "Configuration and services"
-msgstr ""
-
-msgid "Check"
-msgstr ""
-
-msgid "Check for updates"
-msgstr ""
-
-msgid "Check failed"
-msgstr ""
-
-msgid "Date (newest first)"
-msgstr ""
-
-msgid "Date (oldest first)"
-msgstr ""
-
-msgid "Deactivate"
-msgstr ""
-
-msgid "Deselect all"
-msgstr ""
-
-msgid "Runs Pixora in a terminal with debug output, plus extra tools. Only enable if you know what you're doing."
-msgstr ""
-
-msgid "'Recently Deleted' is empty — photos still in there are on the device and would be imported too"
-msgstr ""
-
-msgid "Pixora will restart in a terminal so you can see what it's doing. Updates run there too."
-msgstr ""
-
-msgid "Continue"
-msgstr ""
-
-msgid "Continue importing"
-msgstr ""
-
-msgid "Downloading"
-msgstr ""
-
-msgid "Rotate left"
-msgstr ""
-
-msgid "Rotate right"
-msgstr ""
-
-msgid "Duplicate detection"
-msgstr ""
-
-msgid "Editor cancelled"
-msgstr ""
-
-msgid "Editor: rotate left (-90°)"
-msgstr ""
-
-msgid "Editor: rotate right (+90°)"
-msgstr ""
-
-msgid "An error occurred"
-msgstr ""
-
-msgid "Photo &amp; video manager by LinuxGinger"
-msgstr ""
-
-msgid "Edit photo"
-msgstr ""
-
-msgid "Photo folder"
-msgstr ""
-
-msgid "Loading photos..."
-msgstr ""
-
-msgid "GUI updater started"
-msgstr ""
-
-msgid "Advanced"
-msgstr ""
-
-msgid "No external drives found"
-msgstr ""
-
-msgid "No photos found"
-msgstr ""
-
-msgid "No terminal found for dev-mode; Pixora starts without."
-msgstr ""
-
-msgid "Restart"
-msgstr ""
-
-msgid "Pixora must be restarted to load a new language"
-msgstr ""
-
-msgid "How photos are displayed in the grid"
-msgstr ""
-
-msgid "How strict duplicate detection is"
-msgstr ""
-
-msgid "How your photos are organized"
-msgstr ""
-
-msgid "Current folder"
-msgstr ""
-
-msgid "Import complete"
-msgstr ""
-
-msgid "Import from iPhone or iPad"
-msgstr ""
-
-msgid "Import"
-msgstr ""
-
-msgid "Inactive"
-msgstr ""
-
-msgid "Install required packages"
-msgstr ""
-
-msgid "Installing"
-msgstr ""
-
-msgid "Settings"
-msgstr ""
-
-msgid "Settings opened"
-msgstr ""
-
-msgid "Yes"
-msgstr ""
-
-msgid "Your device is connected and ready to import."
-msgstr ""
-
-msgid "You have the latest version"
-msgstr ""
-
-msgid "Map closed"
-msgstr ""
-
-msgid "Map → first tiles loaded"
-msgstr ""
-
-msgid "Map → offline / tile errors"
-msgstr ""
-
-msgid "Map-ready timeout — showing map anyway"
-msgstr ""
-
-msgid "Map view"
-msgstr ""
-
-msgid "Choose a folder…"
-msgstr ""
-
-msgid "Choose photo folder"
-msgstr ""
-
-msgid "Choose folder on backup drive"
-msgstr ""
-
-msgid "Choose…"
-msgstr ""
-
-msgid "Click cluster to view filtered"
-msgstr ""
-
-msgid "Click to open"
-msgstr ""
-
-msgid "Later"
-msgstr ""
-
-msgid "Creating launcher"
-msgstr ""
-
-msgid "Folder on backup drive"
-msgstr ""
-
-msgid "Folder structure"
-msgstr ""
-
-msgid "Mark as favorite (F)"
-msgstr ""
-
-msgid "Possible duplicates"
-msgstr ""
-
-msgid "Name (A-Z)"
-msgstr ""
-
-msgid "Name (Z-A)"
-msgstr ""
-
-msgid "No"
-msgstr ""
-
-msgid "Not configured"
-msgstr ""
-
-msgid "Latest version"
-msgstr ""
-
-msgid "No folder chosen yet"
-msgstr ""
-
-msgid "No drive selected yet"
-msgstr ""
-
-msgid "Normal"
-msgstr ""
-
-msgid "OK"
-msgstr ""
-
-msgid "Unknown"
-msgstr ""
-
-msgid "Lightly edited photos are also detected"
-msgstr ""
-
-msgid "Reinstall"
-msgstr ""
-
-msgid "Try again"
-msgstr ""
-
-msgid "Save"
-msgstr ""
-
-msgid "Save to"
-msgstr ""
-
-msgid "About"
-msgstr ""
-
-msgid "PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks"
-msgstr ""
-
-msgid "Clear pair records — confirmation requested"
-msgstr ""
-
-msgid "By year"
-msgstr ""
-
-msgid "By year/month"
-msgstr ""
-
-msgid "Pixora"
-msgstr ""
-
-msgid "Pixora Installer"
-msgstr ""
-
-msgid "Pixora Updater"
-msgstr ""
-
-msgid "Downloading Pixora files"
-msgstr ""
-
-msgid "Update Pixora"
-msgstr ""
-
-msgid "Pixora is already installed"
-msgstr ""
-
-msgid "Fetching Pixora from GitHub"
-msgstr ""
-
-msgid "Start Pixora"
-msgstr ""
-
-msgid "Pixora shutting down — cleaning up…"
-msgstr ""
-
-msgid "Pixora is starting…"
-msgstr ""
-
-msgid "Pixora Setup"
-msgstr ""
-
-msgid "Flat"
-msgstr ""
-
-msgid "Installing Python packages"
-msgstr ""
-
-msgid "Compiling travel story…"
-msgstr ""
-
-msgid "Reset usbmuxd invoked (settings)"
-msgstr ""
-
-msgid "Restart scheduled (1.2s delay for GApplication unregister)"
-msgstr ""
-
-msgid "Select all"
-msgstr ""
-
-msgid "Select which version to install"
-msgstr ""
-
-msgid "Select"
-msgstr ""
-
-msgid "Activating services"
-msgstr ""
-
-msgid "Close this window to quit Pixora."
-msgstr ""
-
-msgid "Connect your iPhone or iPad to import photos"
-msgstr ""
-
-msgid "Close"
-msgstr ""
-
-msgid "Loose"
-msgstr ""
-
-msgid "Sorting..."
-msgstr ""
-
-msgid "Failed to save sort_index: {e}"
-msgstr ""
-
-msgid "Starting"
-msgstr ""
-
-msgid "Startup phase 1: MainWindow __init__ started"
-msgstr ""
-
-msgid "Startup phase 2: building pages…"
-msgstr ""
-
-msgid "Startup phase 3: pages ready"
-msgstr ""
-
-msgid "Startup phase 4: loading photos scheduled via idle_add"
-msgstr ""
-
-msgid "Strict"
-msgstr ""
-
-msgid "Synchronizes after each import"
-msgstr ""
-
-msgid "Syncs to external drive after each import"
-msgstr ""
-
-msgid "Checking system packages"
-msgstr ""
-
-msgid "Installing system packages"
-msgstr ""
-
-msgid "Language"
-msgstr ""
-
-msgid "Changing language…"
+msgid "iPhone"
 msgstr ""
 
 msgid "Back"
 msgstr ""
 
-msgid "Back to gallery"
+msgid "Import"
 msgstr ""
 
-msgid "Back to default (200 px)"
+msgid "Stop importing?"
 msgstr ""
 
-msgid "Thumbnail size"
+msgid ""
+"Files that were already copied stay in your library. The rest stays on your "
+"device."
 msgstr ""
 
-msgid "Thumbnail load done: {n} photos — UI ready"
+msgid "Continue"
 msgstr ""
 
-msgid "Thumbs: {px}px — favorites: {n}"
-msgstr ""
-
-msgid "Update available"
-msgstr ""
-
-msgid "Update available: {v}"
+msgid "Stop"
 msgstr ""
 
 msgid "Connect your iPhone or iPad"
 msgstr ""
 
-msgid "Connecting to map server…"
+msgid ""
+"Connect your iPhone or iPad via a USB cable and unlock the screen.\n"
+"If your device asks to trust this computer, tap 'Trust'."
 msgstr ""
 
-msgid "Refresh"
+msgid "USB cable"
 msgstr ""
 
-msgid "Version"
+msgid "Preferably use the original Apple cable"
 msgstr ""
 
-msgid "Choose version"
+msgid "Trust this computer"
 msgstr ""
 
-msgid "Version {v} available"
+msgid "Tap 'Trust' if your device asks"
 msgstr ""
 
-msgid "Delete"
+msgid "Unlocked screen"
 msgstr ""
 
-msgid "Empty folder removed: {p}"
-msgstr ""
-
-msgid "Viewer closed → back to grid"
-msgstr ""
-
-msgid "Next"
-msgstr ""
-
-msgid "Preparing"
-msgstr ""
-
-msgid "Where do you want to save your photos?"
-msgstr ""
-
-msgid "Where your photos are stored"
-msgstr ""
-
-msgid "Waiting for sudo…"
-msgstr ""
-
-msgid "Installing WebKit typelib"
-msgstr ""
-
-msgid "Display"
-msgstr ""
-
-msgid "Welcome to Pixora!"
-msgstr ""
-
-msgid "Change"
-msgstr ""
-
-msgid "Clear"
+msgid "Make sure your device is unlocked during import"
 msgstr ""
 
 msgid "Searching for device…"
 msgstr ""
 
-msgid "other photos in this cluster"
+msgid "Device found"
 msgstr ""
 
-msgid "April"
+msgid "Your device is connected and ready to import."
 msgstr ""
 
-msgid "August"
+msgid "Device"
 msgstr ""
 
-msgid "December"
+msgid "Save to"
 msgstr ""
 
-msgid "February"
+msgid "Folder structure"
 msgstr ""
 
-msgid "iPhone still unrecognised after reset"
-msgstr ""
-
-msgid "iPhone directly recognised by usbmuxd"
-msgstr ""
-
-msgid "iPhone recognised after reset"
-msgstr ""
-
-msgid "iPhone not recognised by usbmuxd — starting auto-recovery"
-msgstr ""
-
-msgid "January"
-msgstr ""
-
-msgid "July"
-msgstr ""
-
-msgid "June"
-msgstr ""
-
-msgid "load_photos: photo_path empty or missing — empty state"
-msgstr ""
-
-msgid "load_photos: scanning in {p}"
-msgstr ""
-
-msgid "load_photos: {n} files found"
-msgstr ""
-
-msgid "March"
-msgstr ""
-
-msgid "May"
-msgstr ""
-
-msgid "November"
-msgstr ""
-
-msgid "October"
-msgstr ""
-
-msgid "register_script_message_handler failed with all variants"
-msgstr ""
-
-msgid "September"
-msgstr ""
-
-msgid "signal"
-msgstr ""
-
-msgid "─── Pixora (dev mode) ───"
-msgstr ""
-
-msgid "═══ Pixora started in Developer Mode ═══"
-msgstr ""
-
-msgid "⚠ No internet connection — map tiles cannot be loaded"
-msgstr ""
-
-msgid "⚠️ iPhone not recognised — try Settings > iPhone connection"
-msgstr ""
-
-msgid "✅ iPhone ready — tap Trust on your iPhone if asked"
-msgstr ""
-
-msgid "✅ iPhone connected"
-msgstr ""
-
-msgid "✕ Show all photos"
-msgstr ""
-
-msgid "📱 iPhone detected, please wait…"
-msgstr ""
-
-msgid "🔧 Restoring connection, please wait…"
-msgstr ""
-
-msgid "🗺"
-msgstr ""
-
-msgid "🗺 loading..."
-msgstr ""
-
-msgid "Set up"
-msgstr ""
-
-msgid "Choose backup folder"
-msgstr ""
-
-msgid "Root of USB drive"
-msgstr ""
-
-msgid "New folder"
-msgstr ""
-
-msgid "Use this folder"
-msgstr ""
-
-msgid "Enter a name for the new folder:"
-msgstr ""
-
-msgid "Folder name"
-msgstr ""
-
-msgid "Create"
-msgstr ""
-
-msgid "Could not create folder"
-msgstr ""
-
-msgid "No subfolders"
-msgstr ""
-
-msgid "Create one with the button below"
-msgstr ""
-
-msgid "No backup drive"
-msgstr ""
-
-msgid "Plug in a USB drive first and select it under 'Backup drive'."
-msgstr ""
-
-msgid "Backup started via settings setup"
-msgstr ""
-
-msgid "Backup"
-msgstr ""
-
-msgid "Sync"
-msgstr ""
-
-msgid "Copies photos to USB. Deleting from Pixora leaves the backup intact."
-msgstr ""
-
-msgid "Mirrors Pixora to USB. Deleting from Pixora also deletes on USB."
-msgstr ""
-
-msgid "Scanning…"
-msgstr ""
-
-msgid "Scanning for new photos…"
-msgstr ""
-
-msgid "This may take a while on a USB drive"
+msgid "Before you import"
 msgstr ""
 
 msgid ""
-"Duplicate check skipped: USB is too empty ({d} photos vs {s} in "
-"Pixora)"
-msgstr ""
-
-msgid "Duplicate check: {n} new photos against {u} on USB"
-msgstr ""
-
-msgid "Duplicate check: {c} / {t}"
-msgstr ""
-
-msgid "Duplicate check…"
-msgstr ""
-
-msgid "Duplicate check done: {n} duplicates will be skipped"
-msgstr ""
-
-msgid "Backup complete — note"
-msgstr ""
-
-msgid "Silent mode: backup complete, {n} orphans reported"
+"Tick all of these — they make sure ALL your photos are found. If some are "
+"missing afterwards, it’s usually one of these."
 msgstr ""
 
 msgid ""
-"There is {n} photo on your USB that is not in Pixora (e.g. a manually "
-"copied folder). It is kept as an archive."
-msgid_plural ""
-"There are {n} photos on your USB that are not in Pixora (e.g. a "
-"manually copied folder). They are kept as an archive."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid ""
-"All photos from Pixora are on the USB. Note: there is {n} photo on "
-"your USB that is not in Pixora (kept as an archive)."
-msgid_plural ""
-"All photos from Pixora are on the USB. Note: there are {n} photos on "
-"your USB that are not in Pixora (kept as an archive)."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Backup complete, orphan analysis started ({n} orphans)"
+"iCloud Photos is off, or set to 'Download and Keep Originals' — so your "
+"photos are on the device, not only in the cloud"
 msgstr ""
 
-msgid "Manual scan: orphan analysis started ({n} orphans)"
+msgid "Settings → Photos → 'Transfer to Mac or PC' → 'Keep Originals'"
 msgstr ""
 
-msgid "Analyzing for duplicate copies…"
-msgstr ""
-
-msgid "Analyzing: {c} / {t}"
-msgstr ""
-
-msgid "Building hash cache: {c} / {t}"
+msgid "Your screen stays unlocked during the import"
 msgstr ""
 
 msgid ""
-"Pre-sync review: {d} duplicate copies, {u} unique — waiting for choice"
-msgstr ""
-
-msgid "Pre-sync review: user chose '{c}'"
-msgstr ""
-
-msgid "Sync wants to remove photos from the USB"
-msgstr ""
-
-msgid "Sync wants to remove {n} photo from the USB that is not in Pixora:"
-msgid_plural ""
-"Sync wants to remove {n} photos from the USB that are not in Pixora:"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "• {n} duplicate copy (same image as a photo in Pixora)"
-msgid_plural "• {n} duplicate copies (same image as photos in Pixora)"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid ""
-"• {n} unique photo (no match in Pixora — possibly previously removed)"
-msgid_plural ""
-"• {n} unique photos (no match in Pixora — possibly previously removed)"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Remove all"
-msgstr ""
-
-msgid "Remove duplicates only"
-msgstr ""
-
-msgid "Cancel sync"
-msgstr ""
-
-msgid "Remove and continue"
-msgstr ""
-
-msgid "Sync cancelled"
-msgstr ""
-
-msgid "The USB has not been changed."
-msgstr ""
-
-msgid "Orphan analysis skipped: {err}"
-msgstr ""
-
-msgid "Orphan analysis: {d} duplicate copies, {u} unique on USB"
-msgstr ""
-
-msgid "Photos on USB that are not in Pixora"
+"'Recently Deleted' is empty — photos still in there are on the device and "
+"would be imported too"
 msgstr ""
 
 msgid ""
-"{n} duplicate copy — same image as a photo in Pixora, but under a "
-"different name or in a different folder."
-msgid_plural ""
-"{n} duplicate copies — same image as photos in Pixora, but under "
-"different names or in different folders."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{n} unique photo — on USB but not in Pixora."
-msgid_plural "{n} unique photos — on USB but not in Pixora."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Do you want to remove the duplicate copies from the USB?"
-msgstr ""
-
-msgid "Remove duplicate copies"
-msgstr ""
-
-msgid "Keep everything"
-msgstr ""
-
-msgid "Could not delete orphan: {p} ({err})"
-msgstr ""
-
-msgid "Orphans removed: {n}"
-msgstr ""
-
-msgid "Cleanup complete"
-msgstr ""
-
-msgid "{n} duplicate copy removed from the USB."
-msgid_plural "{n} duplicate copies removed from the USB."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Backup scan started"
-msgstr ""
-
-msgid "Backup scan started manually"
-msgstr ""
-
-msgid "Scan error: {err}"
-msgstr ""
-
-msgid "Backup scan did not complete"
-msgstr ""
-
-msgid "Backup scan: everything in sync"
-msgstr ""
-
-msgid "Backup scan: {n} new, {d} to delete, {b} bytes"
-msgstr ""
-
-msgid "less than a minute"
-msgstr ""
-
-msgid "± {h} h {m} min"
-msgstr ""
-
-msgid "Estimated time: {eta}"
-msgstr ""
-
-msgid "Backup ready to start"
-msgstr ""
-
-msgid "Drive not connected"
-msgstr ""
-
-msgid "Drive not connected — plug in your USB drive to use the backup."
-msgstr ""
-
-msgid "± {n} minute"
-msgid_plural "± {n} minutes"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "± {n} hour"
-msgid_plural "± {n} hours"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{n} new photo (±{s})"
-msgid_plural "{n} new photos (±{s})"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{n} stale file will be removed from USB"
-msgid_plural "{n} stale files will be removed from USB"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Drive not connected — plug in the USB drive to back up."
-msgstr ""
-
-msgid "Saved backup drive"
-msgstr ""
-
-msgid "Rescan drives"
-msgstr ""
-
-msgid "Forget saved backup drive"
-msgstr ""
-
-msgid "Forget backup drive?"
-msgstr ""
-
-msgid ""
-"The chosen drive and folder will be unlinked from Pixora. Files on "
-"the drive are left untouched."
-msgstr ""
-
-msgid "Forget"
-msgstr ""
-
-msgid "Turn off automatic backup?"
-msgstr ""
-
-msgid ""
-"Pixora will stop backing up until you turn it back on. The current "
-"settings are preserved."
-msgstr ""
-
-msgid "Turn off"
-msgstr ""
-
-msgid "All photos are on the USB drive."
-msgstr ""
-
-msgid "Unknown error."
-msgstr ""
-
-msgid "Check for existing photos during import"
-msgstr ""
-
-msgid "On"
-msgstr ""
-
-msgid "Off"
-msgstr ""
-
-msgid "Strict check for near-identical photos"
-msgstr ""
-
-msgid "No duplicate checking during import"
-msgstr ""
-
-msgid "Backup duplicate detector"
-msgstr ""
-
-msgid "Photos already on USB (even under a different name) will be skipped"
-msgstr ""
-
-msgid "Dedup check skipped: {err}"
-msgstr ""
-
-msgid "Backup scan: everything in sync, {d} duplicates skipped"
-msgstr ""
-
-msgid ""
-"Backup scan: {n} new, {d} to delete, {b} bytes, {u} duplicates skipped"
-msgstr ""
-
-msgid "{n} duplicate will be skipped"
-msgid_plural "{n} duplicates will be skipped"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Check now"
-msgstr ""
-
-msgid "Scan USB for missing photos"
-msgstr ""
-
-msgid "Already in sync"
-msgstr ""
-
-msgid "Your USB drive already has the same photos as Pixora."
-msgstr ""
-
-msgid "How it works"
-msgstr ""
-
-msgid ""
-"Pixora visually compares each new photo with your library and asks "
-"per match what you want to do: skip, import anyway, or keep both."
-msgstr ""
-
-msgid ""
-"Pixora visually compares new photos with your library\nand flags "
-"visual copies so you can skip them."
-msgstr ""
-
-msgid ""
-"On a match Pixora asks per photo what you want: skip, import anyway, "
-"or keep both."
-msgstr ""
-
-msgid "Looking up location…"
-msgstr ""
-
-msgid "Enable"
-msgstr ""
-
-msgid "How imported photos are saved in your library."
-msgstr ""
-
-msgid "All together"
-msgstr ""
-
-msgid "All photos go into a single folder — no subfolders."
-msgstr ""
-
-msgid "Separate folder per year — e.g. 2024/, 2025/."
-msgstr ""
-
-msgid "By year and month"
-msgstr ""
-
-msgid "Year folder with month subfolders — e.g. 2024/2024-03/."
-msgstr ""
-
-msgid "New photos are checked against your library. On a match you choose: skip, import anyway, or keep both."
-msgstr ""
-
-msgid ""
-"One-way copy: additions only. Photos you delete in Pixora stay on the "
-"USB as an archive."
-msgstr ""
-
-msgid ""
-"Exact mirror: photos you delete in Pixora are also removed from the USB on "
-"the next backup."
-msgstr ""
-
-msgid ""
-"Skips photos already on the USB, even under a different name or folder. "
-"Requires duplicate detection."
-msgstr ""
-
-msgid "Made with ❤ by LinuxGinger"
-msgstr ""
-
-msgid "GitHub"
-msgstr ""
-
-msgid "Open Pixora's GitHub page"
-msgstr ""
-
-msgid "Failed to open GitHub: {err}"
-msgstr ""
-
-msgid "Preview"
-msgstr ""
-
-msgid "How large your thumbnails will be at this setting"
-msgstr ""
-
-msgid "Apply"
-msgstr ""
-
-msgid "Change thumbnail size?"
-msgstr ""
-
-msgid ""
-"Pixora will regenerate all thumbnails at {n} px. This can take a "
-"while for large libraries."
-msgstr ""
-
-msgid "Restart scheduled (1.5s delay for GApplication unregister)"
-msgstr ""
-
-msgid "Language relaunch scheduled (1.5s delay, log: {p})"
-msgstr ""
-
-msgid "Check on import"
-msgstr ""
-
-msgid "GitHub® and the Invertocat logo are trademarks of GitHub, Inc."
-msgstr ""
-
-msgid "© {year} Pixora"
-msgstr ""
-
-msgid "© {year} Pixora — LinuxGinger"
-msgstr ""
-
-msgid "License"
-msgstr ""
-
-msgid "GNU General Public License v3.0"
-msgstr ""
-
-msgid "View"
-msgstr ""
-
-msgid ""
-"Pixora is free software under GPL-3.0. You may use, modify and share "
-"it — as long as you respect those same rights for others."
-msgstr ""
-
-msgid "Permitted"
-msgstr ""
-
-msgid "Required"
-msgstr ""
-
-msgid "Not permitted"
-msgstr ""
-
-msgid "Full license text"
-msgstr ""
-
-msgid "Could not load license: {err}"
-msgstr ""
-
-msgid "Private and commercial use"
-msgstr ""
-
-msgid "Modify the code"
-msgstr ""
-
-msgid "Distribute (original or modified)"
-msgstr ""
-
-msgid "Patent licenses from contributors"
-msgstr ""
-
-msgid "Include source code when distributing"
-msgstr ""
-
-msgid "Use the same GPL-3 license"
-msgstr ""
-
-msgid "Mark modifications clearly"
-msgstr ""
-
-msgid "Keep the copyright notice"
-msgstr ""
-
-msgid "Include in proprietary software"
-msgstr ""
-
-msgid "Claim warranty (there is none)"
-msgstr ""
-
-msgid "Hold authors liable"
-msgstr ""
-
-msgid "Backup failed"
-msgstr ""
-
-msgid "Could not start {term}: {err}"
-msgstr ""
-
-msgid "Updater script download failed: {err}"
-msgstr ""
-
-msgid "pixora.desktop repaired: Icon={p}"
-msgstr ""
-
-msgid "New version available — click to update"
-msgstr ""
-
-msgid "Everything in Pixora is on the USB"
-msgstr ""
-
-msgid ""
-"Backup scan: {n} new, {d} orphans (mode={m}), {b} bytes, {u} "
-"duplicates"
-msgstr ""
-
-msgid "Structure scan started"
-msgstr ""
-
-msgid "Structure scan done: {m} moves, {d} duplicates"
-msgstr ""
-
-msgid "Structure scan done: structure is correct"
-msgstr ""
-
-msgid "Checking folder structure…"
-msgstr ""
-
-msgid "Backup scan after reorganize cooldown"
-msgstr ""
-
-msgid ""
-"There is {n} photo on the USB that is no longer in Pixora. In Backup "
-"mode it stays as an archive."
-msgid_plural ""
-"There are {n} photos on the USB that are no longer in Pixora. In "
-"Backup mode they stay as an archive."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{n} photo on USB no longer in Pixora (kept)"
-msgid_plural "{n} photos on USB no longer in Pixora (kept)"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid ""
-"Backup drive is mounted read-only. This often happens with NTFS/exFAT "
-"after an unsafe eject on Windows.\n\nFix: unmount the drive in your "
-"file manager and reconnect it, or run in a terminal:\n  sudo ntfsfix "
-"/dev/sdXN\n(replace sdXN with your USB device, e.g. sdb1)"
-msgstr ""
-
-msgid "No write permission on {p}: {err}"
-msgstr ""
-
-msgid "Error writing to {p}: {err}"
-msgstr ""
-
-msgid ""
-"USB is mounted read-only. Unmount and reconnect it, or run `sudo "
-"ntfsfix /dev/sdXN` in a terminal."
-msgstr ""
-
-msgid "Backup failed: {err}"
-msgstr ""
-
-msgid "Sync ready to start"
-msgstr ""
-
-msgid "Sync now"
-msgstr ""
-
-msgid "Sync complete"
-msgstr ""
-
-msgid "Your USB drive is now identical to Pixora."
-msgstr ""
-
-msgid "Sync failed"
-msgstr ""
-
-msgid "Auto-confirm"
-msgstr ""
-
-msgid ""
-"Skip the pop-up and start backup/sync immediately when there is work "
-"to do."
-msgstr ""
-
-msgid ""
-"Skip the pop-up and start cleaning up immediately when there is work "
-"to do."
-msgstr ""
-
-msgid "Starts right away when there's work to do, without interrupting."
-msgstr ""
-
-msgid "Scanning backup…"
-msgstr ""
-
-msgid "Sync in progress"
-msgstr ""
-
-msgid "Scanning sync…"
-msgstr ""
-
-msgid "Scanning {pct}%"
-msgstr ""
-
-msgid "Scanning 0%"
-msgstr ""
-
-msgid "Silent mode: backup starts automatically without dialog"
-msgstr ""
-
-msgid "Silent mode: backup completed without popup"
-msgstr ""
-
-msgid "Turn on"
-msgstr ""
-
-msgid "Turn on auto-confirm?"
-msgstr ""
-
-msgid ""
-"Pixora will start backup/sync immediately without a confirmation "
-"dialog when there is work to do. Only error messages will still "
-"appear."
-msgstr ""
-
-msgid "Folder structure is already correct"
-msgstr ""
-
-msgid "All photos already match your chosen structure."
-msgstr ""
-
-msgid "Chosen structure: {s}"
-msgstr ""
-
-msgid "Reorganize folder structure?"
-msgstr ""
-
-msgid "Organize now"
-msgstr ""
-
-msgid "Folder structure updated"
-msgstr ""
-
-msgid "Updating folder structure…"
-msgstr ""
-
-msgid "Updating folder structure"
-msgstr ""
-
-msgid "Run silently"
-msgstr ""
-
-msgid ""
-"On automatic detection, clean up immediately without popup or "
-"fullscreen. Manual 'Clean up' works as usual."
-msgstr ""
-
-msgid "Silent reorganize started: {m} moves, {d} dups"
-msgstr ""
-
-msgid ""
-"Pixora is cleaning up the folder structure. Closing now may leave "
-"photos half-moved."
-msgstr ""
-
-msgid "{n} photo"
-msgid_plural "{n} photos"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{n} video"
-msgid_plural "{n} videos"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{a} and {b}"
-msgstr ""
-
-msgid "{c} will be moved to the right folder."
-msgstr ""
-
-msgid "{c} are exact duplicates and will be removed."
-msgstr ""
-
-msgid "{c} moved"
-msgstr ""
-
-msgid "{c} removed (duplicate)"
-msgstr ""
-
-msgid "{done} of {total_label}"
-msgstr ""
-
-msgid "{done} of {total} photo"
-msgid_plural "{done} of {total} photos"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{counts} · {dg:.2f} / {tg:.2f} GB · about {eta} left"
-msgstr ""
-
-msgid "unknown"
-msgstr ""
-
-msgid "{n} second"
-msgid_plural "{n} seconds"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{n} minute"
-msgid_plural "{n} minutes"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "No changes needed"
-msgstr ""
-
-msgid "Tidy up"
-msgstr ""
-
-msgid "Reorganize current folders"
-msgstr ""
-
-msgid ""
-"Scan the photo folder and move photos to match the chosen structure. "
-"Bit-identical duplicates are removed."
-msgstr ""
-
-msgid "Reorganize: {m} moved, {r} duplicates removed, {e} errors"
-msgstr ""
-
-msgid "{n} photo will be moved to the correct folder."
-msgid_plural "{n} photos will be moved to the correct folder."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{n} exact same photo in another location will be removed."
-msgid_plural "{n} exact same photos in other locations will be removed."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{n} photo moved"
-msgid_plural "{n} photos moved"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{n} duplicate removed"
-msgid_plural "{n} duplicates removed"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "{n} error — see dev log."
-msgid_plural "{n} errors — see dev log."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Sorting photos…"
-msgstr ""
-
-msgid "Installing dependencies"
-msgstr ""
-
-msgid "Larger thumbnails are easier to see but use more memory.\nThe default (200 px) works well on most machines."
-msgstr ""
-
-msgid "Size"
-msgstr ""
-
-msgid "200–500 pixels"
-msgstr ""
-
-msgid "200–500 pixels · default 200"
-msgstr ""
-
-msgid "Language:"
-msgstr ""
-
-msgid "Switching language…"
-msgstr ""
-
-msgid "Open the full license text"
-msgstr ""
-
-msgid "Click Finish below to start Pixora."
-msgstr ""
-
-msgid "Pixora is free software."
-msgstr ""
-
-msgid "View full license text"
-msgstr ""
-
-msgid "Pick a folder where your photos will be kept."
-msgstr ""
-
-msgid "Choose how Pixora sorts your photos into folders."
-msgstr ""
-
-msgid "Automatically save a copy to an external drive."
-msgstr ""
-
-msgid "Recognize photos you already have."
-msgstr ""
-
-msgid "How big photos appear in the grid."
-msgstr ""
-
-msgid "⚠️  The selected drive is not mounted"
-msgstr ""
-
-msgid "Performance"
-msgstr ""
-
-msgid "Turn off animations for a faster, snappier feel on slow systems (VMs, no GPU acceleration)."
-msgstr ""
-
-msgid "Reduce animations"
-msgstr ""
-
-msgid "Disables fade/slide transitions between views."
-msgstr ""
-
-msgid "Failed to save animations_enabled: {e}"
-msgstr ""
-
-msgid "Pixora is running slowly on this system"
-msgstr ""
-
-msgid "This can happen without GPU acceleration. You can reduce animations under Settings → Advanced → Performance to make Pixora feel smoother."
-msgstr ""
-
-msgid "Don't show again"
-msgstr ""
-
-msgid "Open Settings"
-msgstr ""
-
-msgid "Failed to save perf_warning_dismissed: {e}"
-msgstr ""
-
-msgid "Automatic"
-msgstr ""
-
-msgid "GPU (GL)"
-msgstr ""
-
-msgid "Software (Cairo)"
-msgstr ""
-
-msgid "Rendering backend"
-msgstr ""
-
-msgid "Only change if Pixora is slow or crashes. Requires a restart."
-msgstr ""
-
-msgid "Failed to save gsk_renderer: {e}"
-msgstr ""
-
-msgid "Restarting Pixora…"
+"Photos are copied to your library; the originals on your device are kept and "
+"duplicates are reviewed first"
 msgstr ""
 
-msgid "Pixora has crashed"
+msgid "Select all"
 msgstr ""
 
-msgid "Switched back to the Automatic rendering backend."
+msgid "Deselect all"
 msgstr ""
-
-msgid "Try '{r}' anyway?"
-msgstr ""
-
-msgid "This backend crashed Pixora last time."
-msgstr ""
-
-msgid "Try anyway"
-msgstr ""
-
-msgid "Waiting for trust…"
-msgstr ""
-
-msgid "Tap 'Trust' on your iPhone and enter your passcode.\nImporting continues automatically once you confirm."
-msgstr ""
-
-msgid "The device was disconnected. Reconnect it and try again."
-msgstr ""
-
-msgid "Could not pair with the device. Unlock your iPhone, tap 'Trust', then try again."
-msgstr ""
-
-msgid "Sorting and processing…"
-msgstr ""
-
-msgid "Reading photo order from the device…"
-msgstr ""
-
-msgid "⭐ Showing favorites only"
-msgstr ""
-
-msgid "Show all"
-msgstr ""
-
-msgid "{done} / {total}  ·  {fps} items/s  ·  {mb} MB/s"
-msgstr ""
-
-msgid "about {eta} remaining  ·  {name}"
-msgstr ""
-
-msgid "%d file is being copied and prepared."
-msgid_plural "%d files are being copied and prepared."
-msgstr[0] ""
-msgstr[1] ""
 
-msgid "🔌 iPhone disconnected"
+msgid "Possible duplicates"
 msgstr ""
 
-msgid "{done} / {total}  ·  {fps}/s  ·  {mb} MB/s  ·  {eta} remaining"
+msgid "Skip all"
 msgstr ""
 
-msgid "{done} / {total}  ·  {eta} remaining"
+msgid "Import all"
 msgstr ""
 
-msgid "{fps} photos/s  ·  {mb} MB/s"
+msgid "Continue importing"
 msgstr ""
 
 msgid "Possibly damaged files"
@@ -1610,11 +155,174 @@ msgstr ""
 msgid "Re-import all"
 msgstr ""
 
-msgid "Checking imported files…"
+msgid "Import complete"
 msgstr ""
 
-msgid "Verifying that everything copied over correctly."
+msgid "Back to gallery"
 msgstr ""
+
+msgid "An error occurred"
+msgstr ""
+
+msgid "Install required packages"
+msgstr ""
+
+msgid "Try again"
+msgstr ""
+
+msgid "Everything in one folder"
+msgstr ""
+
+msgid "By year"
+msgstr ""
+
+msgid "By year/month"
+msgstr ""
+
+msgid "Device disconnected"
+msgstr ""
+
+msgid ""
+"The connection to your device was lost.\n"
+"Reconnect the device, unlock it and try again."
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Mounting device…"
+msgstr ""
+
+msgid "Please wait, this takes just a moment."
+msgstr ""
+
+msgid ""
+"ifuse or libimobiledevice is not installed. Install the required packages "
+"below."
+msgstr ""
+
+msgid ""
+"Could not mount the device. Make sure the screen is unlocked and tap 'Trust' "
+"when asked."
+msgstr ""
+
+msgid "The device was disconnected. Reconnect it and try again."
+msgstr ""
+
+msgid "Waiting for trust…"
+msgstr ""
+
+msgid ""
+"Tap 'Trust' on your iPhone and enter your passcode.\n"
+"Importing continues automatically once you confirm."
+msgstr ""
+
+msgid ""
+"Could not pair with the device. Unlock your iPhone, tap 'Trust', then try "
+"again."
+msgstr ""
+
+msgid "Sorting and processing…"
+msgstr ""
+
+msgid "Searching for photos and videos on your device."
+msgstr ""
+
+#, python-brace-format
+msgid "Reading your device failed: {err}"
+msgstr ""
+
+#, python-format
+msgid "%d file found…"
+msgid_plural "%d files found…"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Reading photo order from the device…"
+msgstr ""
+
+msgid ""
+"No photos or videos found on the device.\n"
+"All media may already have been imported."
+msgstr ""
+
+msgid "Checking duplicates…"
+msgstr ""
+
+msgid "Photos are being compared with your existing archive."
+msgstr ""
+
+#, python-brace-format
+msgid "Duplicate check failed: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Scanning archive: {i}/{total}"
+msgstr ""
+
+#, python-brace-format
+msgid "Scanning device: {i}/{total}"
+msgstr ""
+
+#, python-format
+msgid "%d file found"
+msgid_plural "%d files found"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"Choose which photos and videos to import.\n"
+"💡 Tip: empty the trash on your iPhone first to exclude deleted photos."
+msgstr ""
+
+#, python-brace-format
+msgid "{n} of {total} selected"
+msgstr ""
+
+#, python-format
+msgid ""
+"%d photo may already be in your archive. Choose what to do, or use the "
+"buttons below."
+msgid_plural ""
+"%d photos may already be in your archive. Choose per photo what to do, or "
+"use the buttons below for all at once."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "📱 iPhone — new"
+msgstr ""
+
+msgid "🗂️ Archive — existing"
+msgstr ""
+
+msgid "Keep existing"
+msgstr ""
+
+msgid "Import new"
+msgstr ""
+
+msgid "Keep both"
+msgstr ""
+
+#, python-format
+msgid ""
+"%d file is still damaged after re-importing — the original on your phone may "
+"be incomplete."
+msgid_plural ""
+"%d files are still damaged after re-importing — the originals on your phone "
+"may be incomplete."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid ""
+"%d imported file looks damaged. Choose whether to re-import it from your "
+"phone or keep it as is."
+msgid_plural ""
+"%d imported files look damaged. Choose per file whether to re-import from "
+"your phone or keep them, or use the buttons below."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "⚠️ Still damaged after re-importing."
 msgstr ""
@@ -1634,30 +342,1456 @@ msgstr ""
 msgid "Copying fresh versions from your phone."
 msgstr ""
 
-msgid "%d file is still damaged after re-importing — the original on your phone may be incomplete."
-msgid_plural "%d files are still damaged after re-importing — the originals on your phone may be incomplete."
+msgid "Importing…"
+msgstr ""
+
+#, python-format
+msgid "%d file is being copied."
+msgid_plural "%d files are being copied."
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "%d imported file looks damaged. Choose whether to re-import it from your phone or keep it as is."
-msgid_plural "%d imported files look damaged. Choose per file whether to re-import from your phone or keep them, or use the buttons below."
+#, python-format
+msgid "The device was disconnected — %d file was not imported."
+msgid_plural "The device was disconnected — %d files were not imported."
 msgstr[0] ""
 msgstr[1] ""
 
-
-msgid "Find duplicates"
+msgid "Checking imported files…"
 msgstr ""
 
-msgid "Clean up duplicates"
+msgid "Verifying that everything copied over correctly."
 msgstr ""
 
-msgid "Scan your archive for duplicate photos (including edited copies) and review them with thumbnails before deleting."
+#, python-brace-format
+msgid "{done} / {total}  ·  {eta} remaining"
+msgstr ""
+
+#, python-brace-format
+msgid "{fps} photos/s  ·  {mb} MB/s"
+msgstr ""
+
+#, python-format
+msgid "%d file imported"
+msgid_plural "%d files imported"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%d duplicate found"
+msgid_plural "%d duplicates found"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%d skipped"
+msgid_plural "%d skipped"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%d file could not be imported"
+msgid_plural "%d files could not be imported"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "Not imported: {names}"
+msgstr ""
+
+msgid "─── Pixora (dev mode) ───"
+msgstr ""
+
+msgid "Close this window to quit Pixora."
+msgstr ""
+
+#, python-brace-format
+msgid "Could not start {term}: {err}"
+msgstr ""
+
+msgid "No terminal found for dev-mode; Pixora starts without."
+msgstr ""
+
+msgid "═══ Pixora started in Developer Mode ═══"
+msgstr ""
+
+#, python-brace-format
+msgid "Config: {p}"
+msgstr ""
+
+#, python-brace-format
+msgid "Cache: {p}"
+msgstr ""
+
+#, python-brace-format
+msgid "Thumbs: {px}px — favorites: {n}"
+msgstr ""
+
+#, python-brace-format
+msgid "PID: {p} — on hang: 'kill -USR1 {p}' dumps thread-stacks"
+msgstr ""
+
+msgid "Startup phase 1: MainWindow __init__ started"
+msgstr ""
+
+msgid "Pixora (Dev Mode)"
+msgstr ""
+
+msgid "Startup phase 2: building pages…"
+msgstr ""
+
+msgid "Startup phase 3: pages ready"
+msgstr ""
+
+msgid "OK"
+msgstr ""
+
+msgid "⭐ Showing favorites only"
+msgstr ""
+
+msgid "Show all"
+msgstr ""
+
+msgid "Pixora is starting…"
+msgstr ""
+
+#, python-brace-format
+msgid "Could not create the photo folder: {err}"
+msgstr ""
+
+msgid "Startup phase 4: loading photos scheduled via idle_add"
+msgstr ""
+
+msgid "Pixora has crashed"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"The “{r}” rendering backend made Pixora crash, so it has been switched back "
+"to Automatic."
+msgstr ""
+
+msgid "Pixora is running slowly on this system"
+msgstr ""
+
+msgid ""
+"This can happen without GPU acceleration. You can reduce animations under "
+"Settings → Advanced → Performance to make Pixora feel smoother."
+msgstr ""
+
+msgid "Don't show again"
+msgstr ""
+
+msgid "Open Settings"
+msgstr ""
+
+#, python-brace-format
+msgid "Failed to save perf_warning_dismissed: {e}"
+msgstr ""
+
+#, python-brace-format
+msgid "GUdev monitor failed to start: {err}"
+msgstr ""
+
+msgid "Apple USB device connected (vendor=05ac) — check after 2.5s"
+msgstr ""
+
+msgid "📱 iPhone or iPad detected…"
+msgstr ""
+
+msgid "📱 Tap “Trust” on your device to continue"
+msgstr ""
+
+msgid ""
+"⚠️ Your device isn't showing up. Repair the connection? (asks for your "
+"password)"
+msgstr ""
+
+msgid "Repair"
+msgstr ""
+
+msgid "🔧 Restoring connection, please wait…"
+msgstr ""
+
+msgid "✅ Connected — tap Trust on your device if asked"
+msgstr ""
+
+msgid "✅ Connected — your device is ready"
+msgstr ""
+
+msgid "⚠️ Device not recognised — unplug it, reconnect, and tap Trust"
+msgstr ""
+
+msgid "iPhone or iPad detected — click to import"
+msgstr ""
+
+msgid "Import from iPhone or iPad"
+msgstr ""
+
+msgid "🔌 iPhone disconnected"
+msgstr ""
+
+#, python-brace-format
+msgid "Favorites save error: {err}"
+msgstr ""
+
+msgid ""
+"Pixora is backing up to your USB drive. Closing now will interrupt the "
+"backup."
+msgstr ""
+
+msgid ""
+"Pixora is cleaning up the folder structure. Closing now may leave photos "
+"half-moved."
+msgstr ""
+
+msgid ""
+"Pixora is converting photos or videos. Closing now stops the conversion; "
+"files not yet converted stay as they are."
+msgstr ""
+
+msgid ""
+"Pixora is importing from your device. Closing now stops the import; files "
+"already copied stay in your library."
+msgstr ""
+
+msgid "Quit Pixora?"
+msgstr ""
+
+msgid "Close anyway"
+msgstr ""
+
+msgid "Pixora shutting down — cleaning up…"
+msgstr ""
+
+#, python-brace-format
+msgid "Cleanup error: {err}"
+msgstr ""
+
+msgid "Pixora process forcing exit (lingering threads)"
+msgstr ""
+
+msgid "Date (newest first)"
+msgstr ""
+
+msgid "Date (oldest first)"
+msgstr ""
+
+msgid "Filter"
+msgstr ""
+
+msgid "🗺"
+msgstr ""
+
+msgid "Map view"
+msgstr ""
+
+msgid "Select"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Backup in progress"
+msgstr ""
+
+msgid "Welcome to Pixora"
+msgstr ""
+
+msgid ""
+"All your photos and videos in one place — neatly organised and private on "
+"your own computer."
+msgstr ""
+
+msgid ""
+"Plug in your iPhone or iPad and import in one go. Your edits come along, and "
+"duplicates are skipped automatically."
+msgstr ""
+
+msgid "Automatically organised"
+msgstr ""
+
+msgid ""
+"Every photo is filed by date automatically. HEIC photos open everywhere — "
+"and your originals stay untouched."
+msgstr ""
+
+msgid "Map"
+msgstr ""
+
+msgid ""
+"See on the map where your photos were taken. Mark the places that matter, "
+"like home, and jump back with one click."
+msgstr ""
+
+msgid "Backup"
+msgstr ""
+
+msgid ""
+"Plug in a USB drive and Pixora backs up after every import — so you always "
+"have a second copy."
+msgstr ""
+
+msgid "You’re all set"
+msgstr ""
+
+msgid "You can change everything later in Settings. Enjoy Pixora!"
+msgstr ""
+
+msgid "Welcome"
+msgstr ""
+
+msgid "Skip"
+msgstr ""
+
+msgid "Next"
+msgstr ""
+
+msgid "Got it"
+msgstr ""
+
+#, python-brace-format
+msgid "Importer opened (iOS device {state})"
+msgstr ""
+
+msgid "present"
+msgstr ""
+
+msgid "not detected"
+msgstr ""
+
+msgid "Importer closed"
+msgstr ""
+
+msgid "WebKitGTK failed to load."
+msgstr ""
+
+msgid "Install one of:"
+msgstr ""
+
+msgid "Technical error"
+msgstr ""
+
+#, python-brace-format
+msgid "WebKit unavailable: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"WebView init crashed:\n"
+"{tb}"
+msgstr ""
+
+msgid "Map view failed to start."
+msgstr ""
+
+#, python-brace-format
+msgid "Error: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Check {path} for more."
+msgstr ""
+
+#, python-brace-format
+msgid "NetworkSession sandbox-disable failed: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "WebContext sandbox-disable failed: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "WebView settings not fully applied: {err}"
+msgstr ""
+
+msgid "register_script_message_handler failed with all variants"
+msgstr ""
+
+#, python-brace-format
+msgid "WebView bridge setup error: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"Leaflet assets not found:\n"
+"{p}"
+msgstr ""
+
+msgid "other photos in this cluster"
+msgstr ""
+
+msgid "Click cluster to view filtered"
+msgstr ""
+
+msgid "Click to open"
+msgstr ""
+
+msgid "⚠ No internet connection — map tiles cannot be loaded"
+msgstr ""
+
+msgid "Loading map…"
+msgstr ""
+
+msgid "My home"
+msgstr ""
+
+msgid "Home"
+msgstr ""
+
+#, python-brace-format
+msgid "JS run error: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Map → open_photos: {n} photos"
+msgstr ""
+
+#, python-brace-format
+msgid "Map → open_photo: {p}"
+msgstr ""
+
+msgid "Map → first tiles loaded"
+msgstr ""
+
+msgid "Map → offline / tile errors"
+msgstr ""
+
+msgid "Recommended"
+msgstr ""
+
+msgid "Pixora Setup"
+msgstr ""
+
+msgid "Switching language…"
+msgstr ""
+
+msgid "Welcome to Pixora!"
+msgstr ""
+
+msgid ""
+"Pixora imports photos and videos from your iPhone,\n"
+"detects duplicates and makes automatic backups.\n"
+"\n"
+"This wizard helps you set up Pixora in a few steps."
+msgstr ""
+
+msgid "Language:"
+msgstr ""
+
+msgid "Where do you want to save your photos?"
+msgstr ""
+
+msgid "Pick a folder where your photos will be kept."
+msgstr ""
+
+msgid "Choose a folder…"
+msgstr ""
+
+msgid "Browse…"
+msgstr ""
+
+msgid "This becomes your tidy library"
+msgstr ""
+
+msgid ""
+"Drop your photos and videos in here however messy you like. Pixora files "
+"them into neat folders for you, using the layout you pick in the next step."
+msgstr ""
+
+msgid "Choose how Pixora sorts your photos into folders."
+msgstr ""
+
+msgid "All together"
+msgstr ""
+
+msgid "All photos go into a single folder — no subfolders."
+msgstr ""
+
+msgid "Separate folder per year — e.g. 2024/, 2025/."
+msgstr ""
+
+msgid "By year and month"
+msgstr ""
+
+msgid "Year folder with month subfolders — e.g. 2024/2024-03/."
+msgstr ""
+
+msgid "Automatic backup"
+msgstr ""
+
+msgid "Automatically save a copy to an external drive."
+msgstr ""
+
+msgid "Syncs to external drive after each import"
+msgstr ""
+
+msgid "No external drives found"
+msgstr ""
+
+msgid "Refresh"
+msgstr ""
+
+msgid "Backup drive"
+msgstr ""
+
+msgid "Only external drives are shown"
+msgstr ""
+
+msgid "Folder on backup drive"
+msgstr ""
+
+msgid "No drive selected yet"
+msgstr ""
+
+msgid "Choose…"
+msgstr ""
+
+msgid ""
+"One-way copy: additions only. Photos you delete in Pixora stay on the USB as "
+"an archive."
+msgstr ""
+
+msgid "Sync"
+msgstr ""
+
+msgid ""
+"Exact mirror: photos you delete in Pixora are also removed from the USB on "
+"the next backup."
+msgstr ""
+
+msgid "Backup duplicate detector"
+msgstr ""
+
+msgid ""
+"Skips photos already on the USB, even under a different name or folder. "
+"Requires duplicate detection."
+msgstr ""
+
+msgid "Auto-confirm"
+msgstr ""
+
+msgid "Starts right away when there's work to do, without interrupting."
+msgstr ""
+
+msgid "⚠️  Choose a backup drive to continue"
+msgstr ""
+
+msgid "Duplicate detection"
+msgstr ""
+
+msgid "Recognize photos you already have."
+msgstr ""
+
+msgid "Strict check for near-identical photos"
+msgstr ""
+
+msgid "How it works"
+msgstr ""
+
+msgid ""
+"On a match Pixora asks per photo what you want: skip, import anyway, or keep "
+"both."
+msgstr ""
+
+msgid "Convert HEIC to JPEG on import"
+msgstr ""
+
+msgid ""
+"Each HEIC is re-saved as a maximum-quality JPEG that replaces the original. "
+"Date and location are kept."
+msgstr ""
+
+msgid "Thumbnail size"
+msgstr ""
+
+msgid "How big photos appear in the grid."
+msgstr ""
+
+msgid "Size"
+msgstr ""
+
+msgid "200–500 pixels"
+msgstr ""
+
+msgid "Back to default (200 px)"
+msgstr ""
+
+msgid "Preview"
+msgstr ""
+
+msgid "How large your thumbnails will be at this setting"
+msgstr ""
+
+msgid "GNU General Public License v3.0"
+msgstr ""
+
+msgid "Permitted"
+msgstr ""
+
+msgid "Private and commercial use"
+msgstr ""
+
+msgid "Modify the code"
+msgstr ""
+
+msgid "Distribute (original or modified)"
+msgstr ""
+
+msgid "Patent licenses from contributors"
+msgstr ""
+
+msgid "Required"
+msgstr ""
+
+msgid "Include source code when distributing"
+msgstr ""
+
+msgid "Use the same GPL-3 license"
+msgstr ""
+
+msgid "Mark modifications clearly"
+msgstr ""
+
+msgid "Keep the copyright notice"
+msgstr ""
+
+msgid "Not permitted"
+msgstr ""
+
+msgid "Include in proprietary software"
+msgstr ""
+
+msgid "Claim warranty (there is none)"
+msgstr ""
+
+msgid "Hold authors liable"
+msgstr ""
+
+msgid "Full license text"
+msgstr ""
+
+#, python-brace-format
+msgid "Could not load license: {err}"
+msgstr ""
+
+msgid "Finish"
+msgstr ""
+
+msgid "No folder chosen"
+msgstr ""
+
+msgid "Choose a folder where your photos will be saved."
+msgstr ""
+
+msgid "Can't use this folder"
+msgstr ""
+
+msgid "⚠️  Also choose a folder on the backup drive"
+msgstr ""
+
+msgid "Choose photo folder"
+msgstr ""
+
+msgid "No folder chosen yet"
+msgstr ""
+
+msgid "⚠️  The selected drive is not mounted"
+msgstr ""
+
+#, python-brace-format
+msgid "Pixora can't create {p}: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "You don't have permission to save files in {p}."
+msgstr ""
+
+msgid "Settings could not be saved"
+msgstr ""
+
+#, python-brace-format
+msgid "Pixora could not write {p}: {err}"
+msgstr ""
+
+msgid "Pixora Updater"
+msgstr ""
+
+msgid "Update Pixora"
+msgstr ""
+
+msgid "by LinuxGinger"
+msgstr ""
+
+msgid "Waiting for sudo…"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "Start Pixora"
+msgstr ""
+
+#, python-brace-format
+msgid "Updater script download failed: {err}"
+msgstr ""
+
+msgid "pkexec not found. Install policykit-1."
+msgstr ""
+
+msgid "Pixora has been updated."
+msgstr ""
+
+msgid "Update failed."
+msgstr ""
+
+msgid "Choose backup folder"
+msgstr ""
+
+msgid "New folder"
+msgstr ""
+
+msgid "Use this folder"
+msgstr ""
+
+msgid "Root of USB drive — backups go into a “Pixora” folder here"
+msgstr ""
+
+msgid "No subfolders"
+msgstr ""
+
+msgid "Create one with the button below"
+msgstr ""
+
+msgid "Enter a name for the new folder:"
+msgstr ""
+
+msgid "Folder name"
+msgstr ""
+
+msgid "Create"
+msgstr ""
+
+msgid "Could not create folder"
+msgstr ""
+
+msgid "Update available"
+msgstr ""
+
+#, python-brace-format
+msgid "Pixora {v} is available. Update now?"
+msgstr ""
+
+msgid "Later"
+msgstr ""
+
+msgid "Update"
+msgstr ""
+
+#, python-brace-format
+msgid "pixora.desktop repaired: Icon={p}"
+msgstr ""
+
+msgid "GUI updater started"
+msgstr ""
+
+#, python-brace-format
+msgid "GUI updater failed to start: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Failed to open GitHub: {err}"
+msgstr ""
+
+msgid "License"
+msgstr ""
+
+msgid ""
+"Pixora is free software under GPL-3.0. You may use, modify and share it — as "
+"long as you respect those same rights for others."
+msgstr ""
+
+msgid "New version available — click to update"
+msgstr ""
+
+msgid "Check failed"
+msgstr ""
+
+msgid "You have the latest version"
+msgstr ""
+
+#, python-brace-format
+msgid "Version {v} available"
+msgstr ""
+
+msgid "No release notes available."
+msgstr ""
+
+#, python-brace-format
+msgid "What changed in Pixora {v}"
+msgstr ""
+
+msgid "Release notes from the latest version"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"The backup folder {p} is not on the backup drive (it may now be mounted "
+"somewhere else). Choose the backup folder again in Settings."
+msgstr ""
+
+msgid "Turn off automatic backup?"
+msgstr ""
+
+msgid ""
+"Pixora will stop backing up until you turn it back on. The current settings "
+"are preserved."
+msgstr ""
+
+msgid "Turn off"
+msgstr ""
+
+msgid "Forget backup drive?"
+msgstr ""
+
+msgid ""
+"The chosen drive and folder will be unlinked from Pixora. Files on the drive "
+"are left untouched."
+msgstr ""
+
+msgid "Forget"
+msgstr ""
+
+msgid "Not configured"
+msgstr ""
+
+msgid "Set up"
+msgstr ""
+
+msgid "Backup scan started manually"
+msgstr ""
+
+msgid "Saved backup drive"
+msgstr ""
+
+msgid "No backup drive"
+msgstr ""
+
+msgid "Plug in a USB drive first and select it under 'Backup drive'."
+msgstr ""
+
+msgid "Change"
+msgstr ""
+
+msgid "Drive not connected — plug in the USB drive to back up."
+msgstr ""
+
+msgid "Backup to external USB drive after each import"
+msgstr ""
+
+msgid "This may take a while on a USB drive"
+msgstr ""
+
+msgid "Scanning for new photos…"
+msgstr ""
+
+msgid "Backup scan started"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"Backup scan: library folder {p} is missing or empty — nothing will be "
+"removed from the drive"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"Your photo folder {p} is missing or empty, so Pixora did not back up or sync "
+"anything. Is the drive with your photos connected?"
+msgstr ""
+
+#, python-brace-format
+msgid "Scan error: {err}"
+msgstr ""
+
+msgid "Backup scan did not complete"
+msgstr ""
+
+msgid "Backup scan: everything in sync"
+msgstr ""
+
+#, python-brace-format
+msgid "Manual scan: orphan analysis started ({n} orphans)"
+msgstr ""
+
+msgid "Already in sync"
+msgstr ""
+
+msgid "Your USB drive already has the same photos as Pixora."
+msgstr ""
+
+#, python-brace-format
+msgid "Backup scan: {n} new, {d} orphans (mode={m}), {b} bytes, {u} duplicates"
+msgstr ""
+
+msgid "Silent mode: backup starts automatically without dialog"
+msgstr ""
+
+msgid "Backup paused"
+msgstr ""
+
+msgid "Everything in Pixora is on the USB"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"There is {n} photo on the USB that is no longer in Pixora. In Backup mode it "
+"stays as an archive."
+msgid_plural ""
+"There are {n} photos on the USB that are no longer in Pixora. In Backup mode "
+"they stay as an archive."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "less than a minute"
+msgstr ""
+
+#, python-brace-format
+msgid "± {n} minute"
+msgid_plural "± {n} minutes"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "± {n} hour"
+msgid_plural "± {n} hours"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "± {h} h {m} min"
+msgstr ""
+
+#, python-brace-format
+msgid "{n} new photo (±{s})"
+msgid_plural "{n} new photos (±{s})"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "{n} stale file will be removed from USB"
+msgid_plural "{n} stale files will be removed from USB"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "{n} photo on USB no longer in Pixora (kept)"
+msgid_plural "{n} photos on USB no longer in Pixora (kept)"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "{n} duplicate will be skipped"
+msgid_plural "{n} duplicates will be skipped"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "Estimated time: {eta}"
+msgstr ""
+
+msgid ""
+"⚠ That is a large part of your backup. Only continue if you really removed "
+"these photos from Pixora."
+msgstr ""
+
+msgid "Sync ready to start"
+msgstr ""
+
+msgid "Sync now"
+msgstr ""
+
+msgid "Backup ready to start"
+msgstr ""
+
+msgid "Back up now"
+msgstr ""
+
+msgid "Backup started"
+msgstr ""
+
+msgid ""
+"Backup drive is mounted read-only. This often happens with NTFS/exFAT after "
+"an unsafe eject on Windows.\n"
+"\n"
+"Fix: unmount the drive in your file manager and reconnect it, or run in a "
+"terminal:\n"
+"  sudo ntfsfix /dev/sdXN\n"
+"(replace sdXN with your USB device, e.g. sdb1)"
+msgstr ""
+
+#, python-brace-format
+msgid "No write permission on {p}: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Error writing to {p}: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Duplicate check skipped: USB is too empty ({d} photos vs {s} in Pixora)"
+msgstr ""
+
+#, python-brace-format
+msgid "Duplicate check: {n} new photos against {u} on USB"
+msgstr ""
+
+#, python-brace-format
+msgid "Dedup check skipped: {err}"
+msgstr ""
+
+msgid "Duplicate check…"
+msgstr ""
+
+#, python-brace-format
+msgid "Duplicate check: {c} / {t}"
+msgstr ""
+
+#, python-brace-format
+msgid "Duplicate check done: {n} duplicates will be skipped"
+msgstr ""
+
+msgid "Backup drive not found."
+msgstr ""
+
+msgid ""
+"Sync into the drive root is not allowed — copying without removing anything"
+msgstr ""
+
+#, python-brace-format
+msgid "Backup error: {err}"
+msgstr ""
+
+msgid ""
+"USB is mounted read-only. Unmount and reconnect it, or run `sudo ntfsfix /"
+"dev/sdXN` in a terminal."
+msgstr ""
+
+#, python-brace-format
+msgid "Backup failed: {err}"
+msgstr ""
+
+msgid "Backup partially failed."
+msgstr ""
+
+#, python-brace-format
+msgid "Backup: {pct}%"
+msgstr ""
+
+msgid "Updating folder structure"
+msgstr ""
+
+msgid "Converting videos to MP4…"
+msgstr ""
+
+msgid "Converting HEIC to JPEG…"
+msgstr ""
+
+msgid "Checking folder structure…"
+msgstr ""
+
+msgid "Analyzing for duplicate copies…"
+msgstr ""
+
+msgid "Sync in progress"
+msgstr ""
+
+msgid "Scanning sync…"
+msgstr ""
+
+msgid "Scanning backup…"
+msgstr ""
+
+msgid "Backup complete"
+msgstr ""
+
+#, python-brace-format
+msgid "Backup failed: {note}"
+msgstr ""
+
+#, python-brace-format
+msgid "Backup complete, orphan analysis started ({n} orphans)"
+msgstr ""
+
+#, python-brace-format
+msgid "Silent mode: backup complete, {n} orphans reported"
+msgstr ""
+
+msgid "Backup complete — note"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"There is {n} photo on your USB that is not in Pixora (e.g. a manually copied "
+"folder). It is kept as an archive."
+msgid_plural ""
+"There are {n} photos on your USB that are not in Pixora (e.g. a manually "
+"copied folder). They are kept as an archive."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Silent mode: backup completed without popup"
+msgstr ""
+
+msgid "Sync complete"
+msgstr ""
+
+msgid "Your USB drive is now identical to Pixora."
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"All photos from Pixora are on the USB. Note: there is {n} photo on your USB "
+"that is not in Pixora (kept as an archive)."
+msgid_plural ""
+"All photos from Pixora are on the USB. Note: there are {n} photos on your "
+"USB that are not in Pixora (kept as an archive)."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "All photos are on the USB drive."
+msgstr ""
+
+msgid "Sync failed"
+msgstr ""
+
+msgid "Backup failed"
+msgstr ""
+
+msgid "Unknown error."
+msgstr ""
+
+#, python-brace-format
+msgid "Orphan analysis skipped: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Building hash cache: {c} / {t}"
+msgstr ""
+
+#, python-brace-format
+msgid "Analyzing: {c} / {t}"
+msgstr ""
+
+#, python-brace-format
+msgid "Orphan analysis: {d} duplicate copies, {u} unique on USB"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"{n} duplicate copy — same image as a photo in Pixora, but under a different "
+"name or in a different folder."
+msgid_plural ""
+"{n} duplicate copies — same image as photos in Pixora, but under different "
+"names or in different folders."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "{n} unique photo — on USB but not in Pixora."
+msgid_plural "{n} unique photos — on USB but not in Pixora."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Do you want to remove the duplicate copies from the USB?"
+msgstr ""
+
+msgid "Photos on USB that are not in Pixora"
+msgstr ""
+
+msgid "Remove duplicate copies"
+msgstr ""
+
+msgid "Keep everything"
+msgstr ""
+
+#, python-brace-format
+msgid "Could not delete orphan: {p} ({err})"
+msgstr ""
+
+#, python-brace-format
+msgid "Orphans removed: {n}"
+msgstr ""
+
+msgid "Cleanup complete"
+msgstr ""
+
+#, python-brace-format
+msgid "{n} duplicate copy removed from the USB."
+msgid_plural "{n} duplicate copies removed from the USB."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "Delete confirmation requested: {p}"
+msgstr ""
+
+msgid "Move to trash?"
+msgstr ""
+
+#, python-brace-format
+msgid "'{name}' will be moved to the trash. You can restore it from there."
+msgstr ""
+
+msgid "Move to trash"
+msgstr ""
+
+#, python-brace-format
+msgid "Delete cancelled: {p}"
+msgstr ""
+
+#, python-brace-format
+msgid "Moved to trash: {p}"
+msgstr ""
+
+#, python-brace-format
+msgid "File already gone from disk: {p}"
+msgstr ""
+
+#, python-brace-format
+msgid "Delete failed: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Could not move the Live Photo movie to the trash: {err}"
+msgstr ""
+
+msgid "Could not move to trash"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"{names} could not be moved to the trash, so nothing was deleted.\n"
+"\n"
+"{err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Shred animation pre-render error: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Shred animation draw error: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Empty folder removed: {p}"
+msgstr ""
+
+#, python-brace-format
+msgid "photos list: {before} → {after}"
+msgstr ""
+
+#, python-format
+msgid "Move %d item to trash?"
+msgid_plural "Move %d items to trash?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "You can restore them from the trash."
+msgstr ""
+
+#, python-brace-format
+msgid "Editor opened for: {name}"
+msgstr ""
+
+msgid "Editor cancelled"
+msgstr ""
+
+msgid "Restore the original?"
+msgstr ""
+
+msgid ""
+"This undoes every edit and brings the photo back exactly as it was imported."
+msgstr ""
+
+msgid "Restore"
+msgstr ""
+
+#, python-brace-format
+msgid "Restoring the original failed: {err}"
+msgstr ""
+
+msgid "Restore failed"
+msgstr ""
+
+msgid "Editor: rotate left (-90°)"
+msgstr ""
+
+msgid "Editor: rotate right (+90°)"
+msgstr ""
+
+#, python-brace-format
+msgid "Editor crop mode: {state}"
+msgstr ""
+
+msgid "on"
+msgstr ""
+
+msgid "off"
+msgstr ""
+
+#, python-brace-format
+msgid "Editor save: rotation={rot}° crop={crop} path={p}"
+msgstr ""
+
+msgid "Editor save: no changes, nothing written"
+msgstr ""
+
+#, python-brace-format
+msgid "Editor save failed: {err}"
+msgstr ""
+
+msgid "Save failed"
+msgstr ""
+
+msgid "The photo was not changed."
+msgstr ""
+
+msgid "Clear filter"
+msgstr ""
+
+msgid "Loading photos..."
+msgstr ""
+
+msgid "No photos found"
+msgstr ""
+
+msgid "Connect your iPhone or iPad to import photos"
+msgstr ""
+
+#, python-format
+msgid "%d photo"
+msgid_plural "%d photos"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%d video"
+msgid_plural "%d videos"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%d selected"
+msgid_plural "%d selected"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Delete"
+msgstr ""
+
+#, python-brace-format
+msgid "Selection mode: {state}"
+msgstr ""
+
+#, python-brace-format
+msgid "load_photos: scanning in {p}"
+msgstr ""
+
+msgid "load_photos: photo_path empty or missing — empty state"
+msgstr ""
+
+msgid "Sorting photos…"
+msgstr ""
+
+#, python-brace-format
+msgid "load_photos: {n} files found"
+msgstr ""
+
+#, python-format
+msgid "%d favorite"
+msgid_plural "%d favorites"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "Loading photos… {loaded} / {total}"
+msgstr ""
+
+#, python-brace-format
+msgid "viewport hydrate error: {err}"
+msgstr ""
+
+#, python-brace-format
+msgid "Thumbnail load done: {n} photos — UI ready"
+msgstr ""
+
+msgid "deselect"
+msgstr ""
+
+msgid "select"
+msgstr ""
+
+#, python-brace-format
+msgid "Thumbnail {action}: idx={i} path={p}"
+msgstr ""
+
+#, python-brace-format
+msgid "Thumbnail clicked → open photo: idx={i} path={p}"
+msgstr ""
+
+msgid "Date newest"
+msgstr ""
+
+msgid "Date oldest"
+msgstr ""
+
+#, python-brace-format
+msgid "Sorting changed: {opt}"
+msgstr ""
+
+#, python-brace-format
+msgid "Failed to save sort_index: {e}"
+msgstr ""
+
+msgid "Sorting..."
+msgstr ""
+
+msgid "Only favorites"
+msgstr ""
+
+msgid "Favorites"
+msgstr ""
+
+#, python-brace-format
+msgid "{n} photo"
+msgid_plural "{n} photos"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "{n} video"
+msgid_plural "{n} videos"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "{a} and {b}"
+msgstr ""
+
+msgid "Review duplicates"
 msgstr ""
 
 msgid "Scanning your archive for duplicates…"
 msgstr ""
 
-msgid "Delete selected"
+msgid "Move selected to trash"
+msgstr ""
+
+msgid ""
+"While tidying up, Pixora found photos that look like duplicates. Nothing has "
+"been deleted — pick which copies to remove. The original is always kept."
 msgstr ""
 
 msgid "No duplicates found"
@@ -1666,152 +1800,477 @@ msgstr ""
 msgid "Your archive looks clean."
 msgstr ""
 
-msgid "✅ Keep (original)"
-msgstr ""
-
-msgid "Duplicate delete failed for {p}: {e}"
-msgstr ""
-
-msgid "Duplicate cleanup: removed {n} files"
-msgstr ""
-
-msgid "Found %d duplicate to review. The original is kept; checked copies are deleted."
-msgid_plural "Found %d duplicates to review. The first of each group is kept; checked copies are deleted."
+#, python-format
+msgid ""
+"Found %d possible duplicate. The original (the one without a _number) is "
+"kept; checked copies are deleted."
+msgid_plural ""
+"Found %d possible duplicates. The original (the one without a _number) of "
+"each set is kept; checked copies are deleted."
 msgstr[0] ""
 msgstr[1] ""
 
+#, python-brace-format
+msgid "Video {n}"
+msgstr ""
 
-msgid "Convert HEIC photos"
+#, python-brace-format
+msgid "Photo {n}"
+msgstr ""
+
+msgid "✅ Keep (original)"
+msgstr ""
+
+msgid "Deleting…"
+msgstr ""
+
+#, python-brace-format
+msgid "Duplicate delete failed for {p}: {e}"
+msgstr ""
+
+#, python-brace-format
+msgid "Duplicate cleanup: moved {n} files to the trash"
+msgstr ""
+
+msgid "Folder structure is already correct"
+msgstr ""
+
+msgid "All photos already match your chosen structure."
+msgstr ""
+
+#, python-brace-format
+msgid "Silent reorganize started: {m} moves, {d} possible duplicates"
+msgstr ""
+
+#, python-brace-format
+msgid "Chosen structure: {s}"
+msgstr ""
+
+#, python-brace-format
+msgid "{c} will be moved to the right folder."
+msgstr ""
+
+#, python-format
+msgid ""
+"%d possible duplicate will be shown afterwards so you can review it — "
+"nothing is deleted automatically."
+msgid_plural ""
+"%d possible duplicates will be shown afterwards so you can review them — "
+"nothing is deleted automatically."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Reorganize folder structure?"
+msgstr ""
+
+msgid "Organize now"
+msgstr ""
+
+#, python-brace-format
+msgid "Reorganize: {m} moved, {d} possible duplicates to review, {e} errors"
+msgstr ""
+
+#, python-brace-format
+msgid "{c} moved"
+msgstr ""
+
+#, python-brace-format
+msgid "{c} removed (duplicate)"
+msgstr ""
+
+msgid "No changes needed"
+msgstr ""
+
+#, python-brace-format
+msgid "{n} error — see dev log."
+msgid_plural "{n} errors — see dev log."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Folder structure updated"
+msgstr ""
+
+msgid "Updating folder structure…"
+msgstr ""
+
+#, python-brace-format
+msgid "{done} of {total_label}"
+msgstr ""
+
+#, python-brace-format
+msgid "{counts} · {dg:.2f} / {tg:.2f} GB · about {eta} left"
+msgstr ""
+
+msgid "unknown"
+msgstr ""
+
+#, python-brace-format
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-brace-format
+msgid "{n} minute"
+msgid_plural "{n} minutes"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Backup scan after reorganize cooldown"
+msgstr ""
+
+msgid "Structure scan started"
+msgstr ""
+
+#, python-brace-format
+msgid "Structure scan done: {m} moves, {d} duplicates"
+msgstr ""
+
+msgid "Structure scan done: structure is correct"
+msgstr ""
+
+msgid "Turn off HEIC conversion?"
 msgstr ""
 
 msgid ""
-"HEIC is Apple's iPhone photo format — hard to open outside Apple. Pixora "
-"converts each one to a maximum-quality JPEG: visually lossless, with date "
-"and location kept."
+"New imports will be kept as the original HEIC files. HEIC opens fine in "
+"Pixora, but can't easily be opened outside it — many other apps and devices "
+"don't support it. Photos already converted to JPEG are not changed back."
 msgstr ""
 
-msgid "Convert HEIC to JPEG on import"
+msgid "Turn off video conversion?"
 msgstr ""
 
-msgid "Recommended"
-msgstr ""
-
-msgid "HEIC photos are converted on import so they open outside Pixora too."
-msgstr ""
-
-msgid "Convert to"
-msgstr ""
-
-
-msgid "Convert existing library now"
-msgstr ""
-
-msgid "Find every HEIC photo already in your library and convert it to JPEG, replacing the originals. Runs in the background — you can keep using Pixora."
-msgstr ""
-
-msgid "Run now"
+msgid ""
+"New imports will keep the iPhone's original MOV videos. They play fine in "
+"Pixora, but some other apps and devices can't open them. Videos already "
+"converted to MP4 are not changed back."
 msgstr ""
 
 msgid "Converting…"
 msgstr ""
 
-msgid "No HEIC photos found"
+msgid "Run now"
 msgstr ""
 
-msgid "Your library has no HEIC photos left to convert."
+#, python-format
+msgid ""
+"Converted %(c)d of %(t)d videos. %(f)d could not be converted and were left "
+"as-is."
 msgstr ""
 
-msgid "Convert library to JPEG?"
+#, python-format
+msgid "Converted %d video to MP4."
+msgid_plural "Converted %d videos to MP4."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Conversion complete"
 msgstr ""
 
-msgid "Convert %d HEIC photo to JPEG? The original HEIC file is replaced — this can't be undone."
-msgid_plural "Convert %d HEIC photos to JPEG? The original HEIC files are replaced — this can't be undone."
+msgid "Convert HEIC photos?"
+msgstr ""
+
+#, python-format
+msgid "Pixora found %d HEIC photo to convert to JPEG. Convert it now?"
+msgid_plural ""
+"Pixora found %d HEIC photos to convert to JPEG. Convert them now?"
 msgstr[0] ""
 msgstr[1] ""
 
 msgid "Convert"
 msgstr ""
 
-msgid "Converting HEIC to JPEG…"
-msgstr ""
-
-msgid "Conversion complete"
-msgstr ""
-
-msgid "Converted %(c)d of %(t)d photos. %(f)d could not be converted and were left as HEIC."
-msgstr ""
-
-msgid "Converted %d photo to JPEG."
-msgid_plural "Converted %d photos to JPEG."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "HEIC library conversion started: {n} files"
-msgstr ""
-
-msgid "HEIC library conversion done: {c} converted, {f} failed"
-msgstr ""
-
-msgid "Background tasks"
-msgstr ""
-
-msgid ""
-"Every few minutes Pixora runs the tasks you've enabled — folder tidy-up, "
-"USB backup and HEIC conversion. By default it asks first."
-msgstr ""
-
-msgid "Run automatically without asking"
-msgstr ""
-
-msgid "Skip the confirmation popups and just run these tasks in the background. Pixora won't interrupt you."
-msgstr ""
-
-msgid "Convert HEIC photos?"
-msgstr ""
-
-msgid "Pixora found %d HEIC photo to convert to JPEG. Convert it now?"
-msgid_plural "Pixora found %d HEIC photos to convert to JPEG. Convert them now?"
-msgstr[0] ""
-msgstr[1] ""
-
 msgid "Convert videos?"
 msgstr ""
 
+#, python-format
 msgid "Pixora found %d video to convert to MP4. Convert it now?"
 msgid_plural "Pixora found %d videos to convert to MP4. Convert them now?"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Reorganize folders now"
+#, python-brace-format
+msgid "HEIC library conversion started: {n} files"
 msgstr ""
 
-msgid "Run the folder tidy-up right now: scans your library and moves photos into the structure chosen above, removing bit-identical duplicates. Pixora also does this automatically in the background."
+#, python-brace-format
+msgid "HEIC library conversion done: {c} converted, {f} failed"
 msgstr ""
 
-msgid "Clean up now"
-msgstr ""
-
+#, python-format
 msgid ""
-"Finds duplicates already in your library, including edited copies. You "
-"review everything first — the original is always kept."
+"Converted %(c)d of %(t)d photos. %(f)d could not be converted and were left "
+"as HEIC."
 msgstr ""
 
-msgid "Convert HEIC photos already in your library right now: each one becomes a visually-lossless JPEG, the original HEIC is replaced, and the date/location is kept. Runs in the background with a progress donut — you can keep using Pixora. Pixora also sweeps for leftover HEICs automatically."
-msgstr ""
-
-msgid "Turn off HEIC conversion?"
-msgstr ""
-
-msgid "New imports will be kept as the original HEIC files. HEIC opens fine in Pixora, but can't easily be opened outside it — many other apps and devices don't support it. Photos already converted to JPEG are not changed back."
-msgstr ""
-
-msgid "Keep on"
-msgstr ""
+#, python-format
+msgid "Converted %d photo to JPEG."
+msgid_plural "Converted %d photos to JPEG."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Turn off duplicate detection?"
 msgstr ""
 
-msgid "During import Pixora will no longer warn you about photos you already have, so the same photo can be imported twice. Photos already in your library are not affected."
+msgid ""
+"During import Pixora will no longer warn you about photos you already have, "
+"so the same photo can be imported twice. Photos already in your library are "
+"not affected."
+msgstr ""
+
+msgid "Go to my home"
+msgstr ""
+
+msgid "Refresh map"
+msgstr ""
+
+msgid "Compiling travel story…"
+msgstr ""
+
+#, python-brace-format
+msgid "Map opened ({n} photos going to GPS scan)"
+msgstr ""
+
+msgid "🗺 loading..."
+msgstr ""
+
+#, python-brace-format
+msgid "Map: {m} markers from {p} photos (GPS), out of {t} total"
+msgstr ""
+
+#, python-brace-format
+msgid "Tile prefetch skipped: {err}"
+msgstr ""
+
+msgid "Connecting to map server…"
+msgstr ""
+
+#, python-brace-format
+msgid "Tile proxy unavailable, using OSM directly: {err}"
+msgstr ""
+
+msgid "Map-ready timeout — showing map anyway"
+msgstr ""
+
+#, python-brace-format
+msgid "Map → go home ({lat}, {lon})"
+msgstr ""
+
+msgid "Welcome to the map"
+msgstr ""
+
+msgid ""
+"This is your first time here. The map shows where your photos were taken. "
+"Add your home and the places that matter to you — they get marked here and "
+"you can filter your photos by them. That’s it!"
+msgstr ""
+
+msgid "Maybe later"
+msgstr ""
+
+msgid "Add my home"
+msgstr ""
+
+msgid "Filtered location"
+msgstr ""
+
+msgid "Cluster filter off → all photos"
+msgstr ""
+
+msgid "Map closed"
+msgstr ""
+
+msgid "Remove your main home?"
+msgstr ""
+
+msgid "Your main home will be removed. Your photos are not affected."
+msgstr ""
+
+msgid "Remove"
+msgstr ""
+
+#, python-brace-format
+msgid "Could not remove home: {err}"
+msgstr ""
+
+msgid "Not set"
+msgstr ""
+
+msgid "Address verified"
+msgstr ""
+
+msgid "Main home"
+msgstr ""
+
+msgid "Add"
+msgstr ""
+
+msgid "Place"
+msgstr ""
+
+msgid "Add a place"
+msgstr ""
+
+msgid "e.g. Grandma & Grandpa — labels photos taken there"
+msgstr ""
+
+msgid ""
+"Fill in your address so it can be looked up exactly. It’s looked up once via "
+"OpenStreetMap, then stored only on this computer."
+msgstr ""
+
+msgid "Name (e.g. Grandma & Grandpa)"
+msgstr ""
+
+msgid "Country"
+msgstr ""
+
+msgid "Street"
+msgstr ""
+
+msgid "House number"
+msgstr ""
+
+msgid "Addition (optional)"
+msgstr ""
+
+msgid "Postcode"
+msgstr ""
+
+msgid "City"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "No internet connection"
+msgstr ""
+
+msgid ""
+"Looking up an address needs the internet once. Check your connection and try "
+"again."
+msgstr ""
+
+msgid "Address not found"
+msgstr ""
+
+msgid "Couldn’t find that address. Check the fields and try again."
+msgstr ""
+
+msgid "Edit"
+msgstr ""
+
+msgid "Did you mean this?"
+msgstr ""
+
+msgid "Confirm location"
+msgstr ""
+
+msgid "Save here"
+msgstr ""
+
+#, python-brace-format
+msgid "Could not save place: {err}"
+msgstr ""
+
+msgid "this place"
+msgstr ""
+
+msgid "Remove place?"
+msgstr ""
+
+#, python-brace-format
+msgid "Remove “{name}”? Your photos are not affected."
+msgstr ""
+
+msgid "Settings opened"
+msgstr ""
+
+msgid "Photo folder"
+msgstr ""
+
+msgid "Where your photos are stored"
+msgstr ""
+
+msgid "Current folder"
+msgstr ""
+
+msgid "Home & places"
+msgstr ""
+
+msgid ""
+"Your address is looked up once via OpenStreetMap to get its coordinates, "
+"then stored only on this computer — never shared. Place names shown on the "
+"map and in the viewer are likewise fetched once from OpenStreetMap and "
+"cached locally."
+msgstr ""
+
+msgid "Display"
+msgstr ""
+
+msgid "How photos are displayed in the grid"
+msgstr ""
+
+msgid "Apply"
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
+msgid "Pixora must be restarted to load a new language"
+msgstr ""
+
+msgid "Performance"
+msgstr ""
+
+msgid ""
+"Turn off animations for a faster, snappier feel on slow systems (VMs, no GPU "
+"acceleration)."
+msgstr ""
+
+msgid "Reduce animations"
+msgstr ""
+
+msgid "Disables fade/slide transitions between views."
+msgstr ""
+
+msgid "Automatic"
+msgstr ""
+
+msgid "GPU (GL)"
+msgstr ""
+
+msgid "Software (Cairo)"
+msgstr ""
+
+msgid "Rendering backend"
+msgstr ""
+
+msgid "Only change if Pixora is slow or crashes. Requires a restart."
+msgstr ""
+
+msgid "Advanced"
+msgstr ""
+
+msgid ""
+"Runs Pixora in a terminal with debug output, plus extra tools. Only enable "
+"if you know what you're doing."
+msgstr ""
+
+msgid "Developer mode"
+msgstr ""
+
+msgid "Active"
+msgstr ""
+
+msgid "Inactive"
+msgstr ""
+
+msgid "Deactivate"
+msgstr ""
+
+msgid "Activate"
 msgstr ""
 
 msgid "Reset"
@@ -1825,38 +2284,16 @@ msgid ""
 "touched."
 msgstr ""
 
-msgid "Reset to factory settings?"
-msgstr ""
-
-msgid "This clears all your Pixora settings — chosen folder, backup setup, language and switches — and restarts Pixora in the setup wizard.\n\nYour photos and library on disk are NOT touched."
-msgstr ""
-
-msgid "Factory reset: settings cleared, restarting…"
-msgstr ""
-
-msgid "Factory reset error: {err}"
-msgstr ""
-
-msgid ""
-"Each HEIC is re-saved as a maximum-quality JPEG that replaces the original. "
-"Date and location are kept."
+msgid "How imported photos are saved in your library."
 msgstr ""
 
 msgid "Photos are filed by date in the layout below."
 msgstr ""
 
-msgid ""
-"After each import your new photos are copied to the USB drive in the "
-"background — so you always have a second copy."
+msgid "Tidy up"
 msgstr ""
 
-msgid "Review duplicates"
-msgstr ""
-
-msgid "Photo {n}"
-msgstr ""
-
-msgid "While tidying up, Pixora found photos that look like duplicates. Nothing has been deleted — pick which copies to remove. The original is always kept."
+msgid "Reorganize folders now"
 msgstr ""
 
 msgid ""
@@ -1864,381 +2301,273 @@ msgid ""
 "shown for review — never deleted automatically."
 msgstr ""
 
-msgid "Silent reorganize started: {m} moves, {d} possible duplicates"
+msgid "Check for existing photos during import"
 msgstr ""
 
-msgid "Reorganize: {m} moved, {d} possible duplicates to review, {e} errors"
+msgid ""
+"New photos are checked against your library. On a match you choose: skip, "
+"import anyway, or keep both."
 msgstr ""
 
-msgid "Found %d possible duplicate. The original (the one without a _number) is kept; checked copies are deleted."
-msgid_plural "Found %d possible duplicates. The original (the one without a _number) of each set is kept; checked copies are deleted."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "%d possible duplicate will be shown afterwards so you can review it — nothing is deleted automatically."
-msgid_plural "%d possible duplicates will be shown afterwards so you can review them — nothing is deleted automatically."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Video {n}"
-msgstr ""
-
-msgid "Deleting…"
-msgstr ""
-
-msgid "Duplicate check failed: {err}"
-msgstr ""
-
-msgid "%d file failed — see pixora.log"
-msgid_plural "%d files failed — see pixora.log"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Loading map…"
-msgstr ""
-
-msgid "Home"
-msgstr ""
-
-msgid "Go to my home"
-msgstr ""
-
-msgid "Set current view as home"
-msgstr ""
-
-msgid "No home set yet"
-msgstr ""
-
-msgid "Open the map where you live, then choose “Set current view as home”."
-msgstr ""
-
-msgid "Home saved"
-msgstr ""
-
-msgid "This map spot is now your home. It’s stored only on this computer and never shared."
-msgstr ""
-
-msgid "Refresh map"
-msgstr ""
-
-msgid "Set home address…"
-msgstr ""
-
-msgid "Set home address"
-msgstr ""
-
-msgid "Enter your home address. It’s looked up once via OpenStreetMap to find the spot, then stored only on this computer."
-msgstr ""
-
-msgid "e.g. Dam 1, Amsterdam"
-msgstr ""
-
-msgid "Address not found"
-msgstr ""
-
-msgid "Couldn’t find that address. Check the spelling and try again."
-msgstr ""
-
-msgid "Set your home address first using the home button."
-msgstr ""
-
-msgid "Your home is set and stored only on this computer — never shared."
-msgstr ""
-
-msgid "Country"
-msgstr ""
-
-msgid "City"
-msgstr ""
-
-msgid "Postcode"
-msgstr ""
-
-msgid "Street"
-msgstr ""
-
-msgid "House number"
-msgstr ""
-
-msgid "Add"
-msgstr ""
-
-msgid "Addition (optional)"
-msgstr ""
-
-msgid "My home"
-msgstr ""
-
-msgid "Fill in your address so it can be looked up exactly. It’s looked up once via OpenStreetMap, then stored only on this computer."
-msgstr ""
-
-msgid "Couldn’t find that address. Check the fields and try again."
-msgstr ""
-
-msgid "Map → go home ({lat}, {lon})"
-msgstr ""
-
-msgid "Skip"
-msgstr ""
-
-msgid "Got it"
-msgstr ""
-
-msgid "Welcome"
-msgstr ""
-
-msgid "Home location"
-msgstr ""
-
-msgid "Home address"
-msgstr ""
-
-msgid "Not set"
-msgstr ""
-
-msgid "Welcome to Pixora"
-msgstr ""
-
-msgid "All your photos and videos in one place — neatly organised and private on your own computer."
-msgstr ""
-
-msgid "Plug in your iPhone or iPad and import in one go. Your edits come along, and duplicates are skipped automatically."
-msgstr ""
-
-msgid "Automatically organised"
-msgstr ""
-
-msgid "Every photo is filed by date automatically. HEIC photos open everywhere — and your originals stay untouched."
-msgstr ""
-
-msgid "Map"
-msgstr ""
-
-msgid "See on the map where your photos were taken. Mark the places that matter, like home, and jump back with one click."
-msgstr ""
-
-msgid "Plug in a USB drive and Pixora backs up after every import — so you always have a second copy."
-msgstr ""
-
-msgid "You’re all set"
-msgstr ""
-
-msgid "Welcome to the map"
-msgstr ""
-
-msgid "This is your first time here. The map shows where your photos were taken. Add your home and the places that matter to you — they get marked here and you can filter your photos by them. That’s it!"
-msgstr ""
-
-msgid "Maybe later"
-msgstr ""
-
-msgid "Add my home"
-msgstr ""
-
-msgid "You can change everything later in Settings. Enjoy Pixora!"
-msgstr ""
-
-msgid "Remove"
-msgstr ""
-
-msgid "Favorites"
-msgstr ""
-
-msgid "%d video"
-msgid_plural "%d videos"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "I understand"
-msgstr ""
-
-msgid "Photos and videos are copied to your library — the originals on your device are kept. Possible duplicates are shown for review first and never deleted automatically."
-msgstr ""
-
-msgid "Shown as a pin on the map and used by the home button. Stored only on this computer."
+msgid "Clean up now"
 msgstr ""
 
-msgid "Filter"
+msgid "Clean up duplicates"
 msgstr ""
 
-msgid "Only favorites"
+msgid ""
+"Finds duplicates already in your library, including edited copies. You "
+"review everything first — the original is always kept."
 msgstr ""
 
-msgid "Only home"
+msgid "Improve compatibility"
 msgstr ""
 
-msgid "Your address is looked up once via OpenStreetMap to get its coordinates, then stored only on this computer — never shared. Place names shown on the map and in the viewer are likewise fetched once from OpenStreetMap and cached locally."
+msgid ""
+"iPhone photos (HEIC) and videos (MOV/HEVC) are hard to open outside Apple. "
+"Pixora can convert them to JPEG and MP4 (H.264) so they work everywhere — "
+"date and location are kept."
 msgstr ""
 
-msgid "Place"
+msgid "Convert existing photos now"
 msgstr ""
 
-msgid "Add a place"
+msgid "Convert MOV to MP4 (H.264) on import"
 msgstr ""
 
-msgid "Home & places"
+msgid ""
+"H.264 video is repackaged instantly; HEVC is re-encoded (slower, can be "
+"larger)."
 msgstr ""
 
-msgid "Name (e.g. Grandma & Grandpa)"
+msgid "Convert existing videos now"
 msgstr ""
 
-msgid "e.g. Grandma & Grandpa — labels photos taken there"
+msgid "Live Photos: also import the short video"
 msgstr ""
 
-msgid "Address verified"
+msgid "Press LIVE in the viewer to play it. Off = only the photo."
 msgstr ""
 
-msgid "Did you mean this?"
+msgid ""
+"After each import your new photos are copied to the USB drive in the "
+"background — so you always have a second copy."
 msgstr ""
 
-msgid "Confirm location"
+msgid "Synchronizes after each import"
 msgstr ""
 
-msgid "Save here"
+msgid "Rescan drives"
 msgstr ""
 
-msgid "Edit"
+msgid "Forget saved backup drive"
 msgstr ""
 
-msgid "Main home"
+msgid "External drives only"
 msgstr ""
 
-msgid "Remove your main home?"
+msgid "Check"
 msgstr ""
 
-msgid "Your main home will be removed. Your photos are not affected."
+msgid "Check now"
 msgstr ""
 
-msgid "Remove place?"
+msgid "Scan USB for missing photos"
 msgstr ""
 
-msgid "Remove “{name}”? Your photos are not affected."
+msgid "Background tasks"
 msgstr ""
 
-msgid "this place"
+msgid ""
+"Every few minutes Pixora runs the tasks you've enabled — folder tidy-up, USB "
+"backup and photo/video conversion. By default it asks first."
 msgstr ""
 
-msgid "Before you import"
+msgid "Run automatically without asking"
 msgstr ""
 
-msgid "Tick all of these — they make sure ALL your photos are found. If some are missing afterwards, it’s usually one of these."
+msgid "About"
 msgstr ""
 
-msgid "iCloud Photos is off, or set to 'Download and Keep Originals' — so your photos are on the device, not only in the cloud"
+msgid "Pixora"
 msgstr ""
 
-msgid "Settings → Photos → 'Transfer to Mac or PC' → 'Keep Originals'"
+msgid "Made with ❤ by LinuxGinger"
 msgstr ""
 
-msgid "Your screen stays unlocked during the import"
+msgid "GitHub"
 msgstr ""
 
-msgid "Photos are copied to your library; the originals on your device are kept and duplicates are reviewed first"
+msgid "Open Pixora's GitHub page"
 msgstr ""
 
-msgid "This becomes your tidy library"
+msgid "Unknown"
 msgstr ""
 
-msgid "Drop your photos and videos in here however messy you like. Pixora files them into neat folders for you, using the layout you pick in the next step."
+msgid "Version"
 msgstr ""
 
 msgid "What's new?"
 msgstr ""
 
-msgid "Release notes from the latest version"
-msgstr ""
-
-msgid "What changed in Pixora {v}"
-msgstr ""
-
 msgid "Loading release notes…"
 msgstr ""
 
-msgid "No release notes available."
+msgid "Check for updates"
 msgstr ""
 
-msgid "📱 iPhone or iPad detected…"
+msgid "GitHub® and the Invertocat logo are trademarks of GitHub, Inc."
 msgstr ""
 
-msgid "📱 Tap “Trust” on your device to continue"
+#, python-brace-format
+msgid "© {year} Pixora — LinuxGinger"
 msgstr ""
 
-msgid "✅ Connected — tap Trust on your device if asked"
+msgid "Open the full license text"
 msgstr ""
 
-msgid "✅ Connected — your device is ready"
+msgid "View"
 msgstr ""
 
-msgid "⚠️ Device not recognised — unplug it, reconnect, and tap Trust"
+msgid "Change thumbnail size?"
 msgstr ""
 
-msgid "Restore original"
+#, python-brace-format
+msgid ""
+"Pixora will regenerate all thumbnails at {n} px. This can take a while for "
+"large libraries."
 msgstr ""
 
-msgid "Restore the original?"
+#, python-brace-format
+msgid "Thumbnail size changed: {old}px → {new}px"
 msgstr ""
 
-msgid "This undoes every edit and brings the photo back exactly as it was imported."
+#, python-brace-format
+msgid "Language changed to: {lang} — Pixora restarting"
 msgstr ""
 
-msgid "Restore"
+msgid "Changing language…"
 msgstr ""
 
-msgid "No location for this photo"
+#, python-brace-format
+msgid "Restart sentinel write failed: {err}"
 msgstr ""
 
-msgid "No location for this video"
+#, python-brace-format
+msgid "Failed to save animations_enabled: {e}"
+msgstr ""
+
+#, python-brace-format
+msgid "Try '{r}' anyway?"
+msgstr ""
+
+msgid "This backend crashed Pixora last time."
+msgstr ""
+
+msgid "Try anyway"
+msgstr ""
+
+#, python-brace-format
+msgid "Failed to save gsk_renderer: {e}"
+msgstr ""
+
+msgid "Restarting Pixora…"
+msgstr ""
+
+#, python-brace-format
+msgid "Restart watcher spawn failed: {err}"
+msgstr ""
+
+msgid "Activate developer mode?"
+msgstr ""
+
+msgid ""
+"Pixora will restart in a terminal so you can see what it's doing. Updates "
+"run there too."
+msgstr ""
+
+msgid "Deactivate developer mode?"
+msgstr ""
+
+msgid "Pixora will then start without a terminal and use the GUI updater."
+msgstr ""
+
+msgid "No"
+msgstr ""
+
+msgid "Yes"
+msgstr ""
+
+#, python-brace-format
+msgid "Dev mode toggle cancelled (was: {was})"
+msgstr ""
+
+#, python-brace-format
+msgid "Dev mode {state} → restarting…"
+msgstr ""
+
+msgid "activated"
+msgstr ""
+
+msgid "deactivated"
+msgstr ""
+
+msgid "Reset to factory settings?"
+msgstr ""
+
+msgid ""
+"This clears all your Pixora settings — chosen folder, backup setup, language "
+"and switches — and restarts Pixora in the setup wizard.\n"
+"\n"
+"Your photos and library on disk are NOT touched."
+msgstr ""
+
+msgid "Factory reset: settings cleared, restarting…"
+msgstr ""
+
+#, python-brace-format
+msgid "Factory reset error: {err}"
+msgstr ""
+
+msgid "Restart scheduled"
+msgstr ""
+
+#, python-brace-format
+msgid "Restart error: {err}"
+msgstr ""
+
+msgid "Keep on"
+msgstr ""
+
+msgid "Play Live Photo"
+msgstr ""
+
+msgid "LIVE"
+msgstr ""
+
+#, python-brace-format
+msgid "Live Photo could not be played: {err}"
+msgstr ""
+
+msgid "Edit photo"
 msgstr ""
 
 msgid "Photo & video details"
 msgstr ""
 
-msgid "Loading…"
+msgid "Mark as favorite"
 msgstr ""
 
-msgid "File size"
+msgid "Rotate left"
 msgstr ""
 
-msgid "Type"
+msgid "Rotate right"
 msgstr ""
 
-msgid "Taken"
+msgid "Crop"
 msgstr ""
 
-msgid "Resolution"
-msgstr ""
-
-msgid "Megapixels"
-msgstr ""
-
-msgid "Camera"
-msgstr ""
-
-msgid "ISO"
-msgstr ""
-
-msgid "Aperture"
-msgstr ""
-
-msgid "Shutter"
-msgstr ""
-
-msgid "Focal length"
-msgstr ""
-
-msgid "Duration"
-msgstr ""
-
-msgid "Frame rate"
-msgstr ""
-
-msgid "Codec"
-msgstr ""
-
-msgid "Location"
-msgstr ""
-
-msgid "Filename"
+msgid "Restore original"
 msgstr ""
 
 msgid "Filters"
@@ -2262,46 +2591,156 @@ msgstr ""
 msgid "Vivid"
 msgstr ""
 
-msgid "Filter strength"
+msgid "Previous"
 msgstr ""
 
-msgid "Convert videos"
+msgid "0:00 / 0:00"
 msgstr ""
 
-msgid "Make videos play on more devices. iPhone .mov becomes .mp4: H.264 video is repackaged losslessly, HEVC is re-encoded to H.264 at high quality. Date and location are kept."
+msgid "No location for this video"
 msgstr ""
 
-msgid "Convert MOV to MP4 (H.264) on import"
+msgid "No location for this photo"
 msgstr ""
 
-msgid "Heads-up"
+msgid "video"
 msgstr ""
 
-msgid "Re-encoding HEVC takes time and can make files larger; H.264 videos convert instantly."
+msgid "photo"
 msgstr ""
 
-msgid "Improve compatibility"
+#, python-brace-format
+msgid "open_photo: {kind} idx={i} path={p}"
 msgstr ""
 
-msgid "iPhone photos (HEIC) and videos (MOV/HEVC) are hard to open outside Apple. Pixora can convert them to JPEG and MP4 (H.264) so they work everywhere — date and location are kept."
+msgid "Looking up location…"
 msgstr ""
 
-msgid "H.264 video is repackaged instantly; HEVC is re-encoded (slower, can be larger)."
+msgid "Loading…"
 msgstr ""
 
-msgid "Converting videos to MP4…"
+msgid "File size"
 msgstr ""
 
-msgid "Converted %(c)d of %(t)d videos. %(f)d could not be converted and were left as-is."
+msgid "Type"
 msgstr ""
 
-msgid "Converted %d video to MP4."
-msgid_plural "Converted %d videos to MP4."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Convert existing photos now"
+msgid "Taken"
 msgstr ""
 
-msgid "Convert existing videos now"
+msgid "Resolution"
+msgstr ""
+
+msgid "Megapixels"
+msgstr ""
+
+msgid "Duration"
+msgstr ""
+
+msgid "Frame rate"
+msgstr ""
+
+msgid "Codec"
+msgstr ""
+
+msgid "Camera"
+msgstr ""
+
+msgid "ISO"
+msgstr ""
+
+msgid "Aperture"
+msgstr ""
+
+msgid "Shutter"
+msgstr ""
+
+msgid "Focal length"
+msgstr ""
+
+msgid "Location"
+msgstr ""
+
+msgid "Filename"
+msgstr ""
+
+#, python-brace-format
+msgid "Previous photo: idx={i} → {name}"
+msgstr ""
+
+#, python-brace-format
+msgid "Next photo: idx={i} → {name}"
+msgstr ""
+
+msgid "Viewer closed → back to grid"
+msgstr ""
+
+msgid "Remove from favorites"
+msgstr ""
+
+#, python-brace-format
+msgid "Favorite removed: {p}"
+msgstr ""
+
+#, python-brace-format
+msgid "Favorite added: {p}"
+msgstr ""
+
+msgid "Downloading"
+msgstr ""
+
+msgid "Downloading Pixora files"
+msgstr ""
+
+msgid "Installing"
+msgstr ""
+
+msgid "Installing system packages"
+msgstr ""
+
+msgid "Installing Python packages"
+msgstr ""
+
+msgid "Creating launcher"
+msgstr ""
+
+msgid "Starting"
+msgstr ""
+
+msgid "Activating services"
+msgstr ""
+
+msgid "Pixora Installer"
+msgstr ""
+
+msgid "Pixora is already installed"
+msgstr ""
+
+msgid "Latest version"
+msgstr ""
+
+msgid "Choose version"
+msgstr ""
+
+msgid "Select which version to install"
+msgstr ""
+
+#, python-brace-format
+msgid "Version {v} — up to date"
+msgstr ""
+
+msgid "Reinstall"
+msgstr ""
+
+#, python-brace-format
+msgid "Update available: {local} → {remote}"
+msgstr ""
+
+msgid "download failed"
+msgstr ""
+
+msgid "apt failed"
+msgstr ""
+
+msgid "pip failed"
 msgstr ""

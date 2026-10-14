@@ -25,8 +25,9 @@ from datetime import datetime
 try:
     import pillow_heif
     pillow_heif.register_heif_opener()
+    HAS_HEIF = True
 except ImportError:
-    pass
+    HAS_HEIF = False
 
 try:
     from PIL import Image
@@ -49,6 +50,9 @@ SKIP_DIRS      = {".Trash", "Recently Deleted", "Onlangs verwijderd", ".recently
 THRESHOLD_MAP = {1: 2, 2: 6, 3: 12}
 
 IMPORT_THUMB_DIR = Path.home() / ".cache" / "pixora" / "import_thumbs"
+# Local scratch space: decoding/ffmpeg straight off the phone's FUSE mount is
+# unreliable, so files are staged here first (never in the library itself).
+STAGING_DIR      = CACHE_DIR / "import-staging"
 SELECT_THUMB     = 160  # px
 
 
@@ -83,11 +87,14 @@ def perceptual_hash(path: Path, copy_first: bool = False) -> str | None:
     stays False)."""
     if not HAS_IMAGEHASH:
         return None
+    if path.suffix.lower() in _VIDEO_EXT:
+        return None  # not an image; copying a whole clip off the phone is wasted
     src = path
     tmp = None
     if copy_first:
         try:
-            tmp = Path(tempfile.gettempdir()) / ("pxhash_" + path.name)
+            STAGING_DIR.mkdir(parents=True, exist_ok=True)
+            tmp = STAGING_DIR / ("hash_" + path.name)
             shutil.copy2(path, tmp)
             src = tmp
         except Exception:
@@ -103,6 +110,41 @@ def perceptual_hash(path: Path, copy_first: bool = False) -> str | None:
                 tmp.unlink()
             except OSError:
                 pass
+
+
+def unique_path(dst: Path) -> Path:
+    """dst, or dst with _1, _2… appended until the name is free."""
+    if not dst.exists():
+        return dst
+    stem, suffix = dst.stem, dst.suffix
+    counter = 1
+    while True:
+        cand = dst.parent / f"{stem}_{counter}{suffix}"
+        if not cand.exists():
+            return cand
+        counter += 1
+
+
+def part_path(dst: Path) -> Path:
+    """Hidden temp name next to dst; swapped in with os.replace when complete."""
+    return dst.parent / f".{dst.name}.part"
+
+
+def copy_atomic(src: Path, dst: Path):
+    """Copy src to dst so dst only ever exists complete.
+
+    Unplugging the phone or closing Pixora mid-copy leaves at most a hidden
+    .part file — never a truncated photo under the real name."""
+    tmp = part_path(dst)
+    try:
+        shutil.copy2(src, tmp)
+        os.replace(tmp, dst)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def dest_path(base: Path, structure: str, filename: str, mtime: datetime) -> Path:
@@ -134,16 +176,29 @@ def ensure_services():
         pass
 
 
-def detect_iphone() -> str | None:
+def detect_iphone_state() -> tuple[str, str | None]:
+    """('found', udid) | ('none', None) | ('unknown', None).
+
+    'unknown' means the check itself failed (busy usbmuxd while the phone is
+    streaming files, timeout): that must never count as "unplugged"."""
     try:
         result = subprocess.run(
             ["idevice_id", "-l"],
-            capture_output=True, text=True, timeout=3
+            capture_output=True, text=True, timeout=6
         )
-        lines = [l.strip() for l in result.stdout.splitlines() if l.strip()]
-        return lines[0] if lines else None
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return None
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return "unknown", None
+    lines = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+    if lines:
+        return "found", lines[0]
+    if result.returncode != 0 and "no device" not in (result.stderr or "").lower():
+        return "unknown", None
+    return "none", None
+
+
+def detect_iphone() -> str | None:
+    state, udid = detect_iphone_state()
+    return udid if state == "found" else None
 
 
 def get_device_name(udid: str) -> str:
@@ -153,9 +208,9 @@ def get_device_name(udid: str) -> str:
             capture_output=True, text=True, timeout=3
         )
         name = result.stdout.strip()
-        return name if name else "iPhone"
+        return name if name else _("iPhone")
     except Exception:
-        return "iPhone"
+        return _("iPhone")
 
 
 def mount_iphone(udid: str, mountpoint: Path) -> bool:
@@ -180,14 +235,24 @@ def mount_iphone(udid: str, mountpoint: Path) -> bool:
         mountpoint.mkdir(parents=True, exist_ok=True)
     except Exception:
         return False
-    try:
-        result = subprocess.run(
-            ["ifuse", "--udid", udid, str(mountpoint)],
-            capture_output=True, text=True, timeout=15
-        )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+    # Right after "Trust" the phone often refuses the first AFC session;
+    # a couple of patient retries turn that into a normal import.
+    for attempt in range(3):
+        try:
+            result = subprocess.run(
+                ["ifuse", "--udid", udid, str(mountpoint)],
+                capture_output=True, text=True, timeout=20
+            )
+            if result.returncode == 0:
+                return True
+        except FileNotFoundError:
+            return False
+        except subprocess.TimeoutExpired:
+            pass
+        subprocess.run(["fusermount", "-uz", str(mountpoint)],
+                       capture_output=True, timeout=5)
+        time.sleep(2.0 + attempt)
+    return False
 
 
 def unmount_iphone(mountpoint: Path):
@@ -336,6 +401,8 @@ def video_looks_corrupt(path: Path) -> bool:
         if r.returncode != 0:
             return True
         return "video" not in (r.stdout or "")
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False  # no ffprobe / too slow to tell: not evidence of damage
     except Exception:
         return True
 
@@ -352,6 +419,8 @@ def file_looks_corrupt(path: Path) -> bool:
         return True
     if size == 0:
         return True
+    if ext in (".heic", ".heif") and not HAS_HEIF:
+        return False  # can't decode HEIC here, so we can't judge it
     if ext in (".heic", ".heif", ".jpg", ".jpeg", ".dng"):
         try:
             from PIL import Image
@@ -425,8 +494,11 @@ def get_photo_date(path: Path) -> float:
             from PIL import Image
             with Image.open(path) as img:
                 exif = img.getexif()
+                # DateTimeOriginal/Digitized live in the Exif sub-IFD;
+                # getexif() alone only exposes IFD0's DateTime.
+                sub_ifd = exif.get_ifd(0x8769)
             for tag in _EXIF_DATE_TAGS:
-                val = exif.get(tag)
+                val = sub_ifd.get(tag) or exif.get(tag)
                 if val:
                     dt = datetime.strptime(val[:19], "%Y:%m:%d %H:%M:%S")
                     return dt.timestamp()
@@ -515,7 +587,7 @@ def apply_aae_edits(image_path: Path, aae_path: Path):
                 return image_path
             elif ext in (".heic", ".heif"):
                 # Pillow can't write HEIC; re-save as JPEG and drop the original.
-                jpeg_path = image_path.with_suffix(".jpg")
+                jpeg_path = unique_path(image_path.with_suffix(".jpg"))
                 img.save(jpeg_path, "JPEG", quality=95, exif=orig_exif)
                 img.close()
                 if jpeg_path != image_path and image_path.exists():
@@ -552,9 +624,18 @@ def convert_image(src: Path, dst: Path, fmt: str = "jpeg") -> bool:
             save_kw = {"quality": 100, "subsampling": 0, "optimize": True}
             if exif:
                 save_kw["exif"] = exif
-            rgb.save(dst, "JPEG", **save_kw)
+            icc = img.info.get("icc_profile")
+            if icc:
+                save_kw["icc_profile"] = icc  # keep Display-P3 colours
+            tmp = part_path(dst)
+            rgb.save(tmp, "JPEG", **save_kw)
+        os.replace(tmp, dst)
         return True
     except Exception:
+        try:
+            part_path(dst).unlink()
+        except OSError:
+            pass
         return False
 
 
@@ -594,19 +675,27 @@ def convert_video(src: Path, dst: Path) -> bool:
         # explicitly as the standard mp4 'location' tag the viewer reads back.
         loc = _video_location(src)
         loc_args = ["-metadata", "location=" + loc] if loc else []
+        tmp = part_path(dst)
         if codec in ("h264", "avc1"):
             cmd = ["ffmpeg", "-y", "-i", str(src), "-c", "copy",
                    "-map_metadata", "0", *loc_args,
-                   "-movflags", "+faststart", str(dst)]
+                   "-movflags", "+faststart", "-f", "mp4", str(tmp)]
         else:
             cmd = ["ffmpeg", "-y", "-i", str(src), "-map_metadata", "0",
                    *loc_args, "-c:v", "libx264", "-crf", "20", "-preset", "fast",
                    "-c:a", "aac", "-b:a", "192k",
-                   "-movflags", "+faststart", str(dst)]
+                   "-movflags", "+faststart", "-f", "mp4", str(tmp)]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
-        return r.returncode == 0 and dst.exists() and dst.stat().st_size > 0
+        if r.returncode == 0 and tmp.exists() and tmp.stat().st_size > 0:
+            os.replace(tmp, dst)
+            return True
     except Exception:
-        return False
+        pass
+    try:
+        part_path(dst).unlink()
+    except OSError:
+        pass
+    return False
 
 
 def _walk_media(directory: Path, files: list[Path], progress_cb, counters: dict) -> None:
@@ -788,8 +877,11 @@ def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
     hashes = {}
 
     all_files = []
-    for root, _, files in os.walk(photo_path):
+    for root, dirs, files in os.walk(photo_path):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
         for fn in files:
+            if fn.startswith("."):
+                continue  # temp/partial files
             if Path(fn).suffix.lower() in SUPPORTED_EXT:
                 all_files.append(Path(root) / fn)
 
@@ -854,25 +946,6 @@ def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
 
     save_hash_cache(cache)
     return hashes
-
-
-def min_hash_distance(ph_str: str, library_hashes: dict):
-    """Smallest Hamming distance from ph_str to any archive hash (for diagnosis)."""
-    if not ph_str or not HAS_IMAGEHASH or not library_hashes:
-        return None
-    try:
-        ph = imagehash.hex_to_hash(ph_str)
-    except Exception:
-        return None
-    best = None
-    for lib_ph_str in library_hashes.values():
-        try:
-            d = ph - imagehash.hex_to_hash(lib_ph_str)
-            if best is None or d < best:
-                best = d
-        except Exception:
-            continue
-    return best
 
 
 def find_duplicate(ph_str: str, library_hashes: dict, max_dist: int) -> str | None:
@@ -1006,6 +1079,15 @@ class ImporterPage(Gtk.Box):
         self.to_import: list[Path] = []
         self.duplicate_decisions: dict[str, str] = {}
         self.import_count = 0
+        self.import_failed_names: list[str] = []
+        # Bumped whenever the user leaves or a step restarts; every worker
+        # thread carries the value it started with and quietly stops (and its
+        # UI callbacks are dropped) once it no longer matches.
+        self._job = 0
+        self._miss_count = 0        # consecutive polls that saw no device
+        self._services_checked_at = 0.0
+        self._imported_so_far = 0
+        self._live_motion: dict = {}
 
         self._poll_timer_id: int | None = None
         self._disconnect_dialog_open = False
@@ -1048,11 +1130,18 @@ class ImporterPage(Gtk.Box):
 
     def activate(self):
         self.settings = load_settings()
+        # Settings may have changed since the page was built.
+        self.dest_row.set_subtitle(self._photo_path_text())
+        self.struct_row.set_subtitle(self._structure_text())
+        self._job += 1
+        self._miss_count = 0
+        self._imported_so_far = 0
         self._show_state(STATE_WAITING)
         threading.Thread(target=ensure_services, daemon=True).start()
         self._start_detection_poll()
 
     def deactivate(self):
+        self._job += 1  # stop any worker still running
         if self._poll_timer_id is not None:
             try:
                 GLib.source_remove(self._poll_timer_id)
@@ -1065,8 +1154,35 @@ class ImporterPage(Gtk.Box):
         self._thumb_load_gen += 1
         unmount_iphone(MOUNT_POINT)
 
+    _BUSY_STATES = (STATE_MOUNTING, STATE_SCANNING, STATE_HASHING,
+                    STATE_IMPORTING)
+
     def _on_back_clicked(self, _btn):
+        if self.state in self._BUSY_STATES:
+            dlg = Adw.AlertDialog(
+                heading=_("Stop importing?"),
+                body=_("Files that were already copied stay in your library. "
+                       "The rest stays on your device."),
+            )
+            dlg.add_response("continue", _("Continue"))
+            dlg.add_response("stop", _("Stop"))
+            dlg.set_response_appearance("stop", Adw.ResponseAppearance.DESTRUCTIVE)
+            dlg.set_default_response("continue")
+            dlg.set_close_response("continue")
+            dlg.connect("response", self._on_stop_response)
+            dlg.present(self.get_root())
+            return
+        self._leave()
+
+    def _on_stop_response(self, _dlg, response):
+        if response == "stop":
+            self._leave()
+
+    def _leave(self):
+        copied = self._imported_so_far if self.state == STATE_IMPORTING else 0
         self.deactivate()
+        if copied:
+            self.on_done_cb(copied)  # reload the grid, offer the backup
         self.on_back_cb()
 
     def _build_waiting_page(self):
@@ -1167,21 +1283,15 @@ class ImporterPage(Gtk.Box):
 
         self.dest_row = Adw.ActionRow()
         self.dest_row.set_title(_("Save to"))
-        self.dest_row.set_subtitle(self.settings.get("photo_path") or "~")
+        self.dest_row.set_subtitle(self._photo_path_text())
         ic2 = Gtk.Image.new_from_icon_name("folder-symbolic")
         ic2.set_pixel_size(16)
         self.dest_row.add_prefix(ic2)
         info_group.add(self.dest_row)
 
-        struct = self.settings.get("structure", "year_month")
-        struct_labels = {
-            "flat":       _("Everything in one folder"),
-            "year":       _("By year"),
-            "year_month": _("By year/month"),
-        }
         self.struct_row = Adw.ActionRow()
         self.struct_row.set_title(_("Folder structure"))
-        self.struct_row.set_subtitle(struct_labels.get(struct, struct))
+        self.struct_row.set_subtitle(self._structure_text())
         ic3 = Gtk.Image.new_from_icon_name("folder-open-symbolic")
         ic3.set_pixel_size(16)
         self.struct_row.add_prefix(ic3)
@@ -1570,81 +1680,125 @@ class ImporterPage(Gtk.Box):
                                STATE_REVIEWING, STATE_SCANNING):
             self._poll_timer_id = None
             return False
-        threading.Thread(target=self._check_iphone, daemon=True).start()
+        threading.Thread(target=self._check_iphone, args=(self._job,),
+                         daemon=True).start()
         return True
 
-    def _check_iphone(self):
-        ensure_services()
-        udid = detect_iphone()
-        GLib.idle_add(self._on_detection_result, udid)
+    def _check_iphone(self, job):
+        state, udid = detect_iphone_state()
+        if state == "none" and time.monotonic() - self._services_checked_at > 10:
+            self._services_checked_at = time.monotonic()
+            ensure_services()
+        GLib.idle_add(self._on_detection_result, state, udid, job)
 
-    def _on_detection_result(self, udid: str | None):
-        if self.state == STATE_SCANNING:
-            if not udid:
-                self._on_iphone_disconnected()
-            return
-        if self.state in (STATE_SELECTING, STATE_REVIEWING):
-            if not udid:
-                self._on_iphone_disconnected()
-            return
+    def _on_detection_result(self, state: str, udid: str | None, job: int):
+        if job != self._job or state == "unknown":
+            return False  # a failed check says nothing about the cable
+        if self.state in (STATE_SCANNING, STATE_SELECTING, STATE_REVIEWING):
+            # The phone is busy streaming files; one missed answer is normal.
+            # Only three misses in a row (~6 s) mean it was really unplugged.
+            if state == "none":
+                self._miss_count += 1
+                if self._miss_count >= 3:
+                    self._on_iphone_disconnected()
+            else:
+                self._miss_count = 0
+            return False
         if self.state not in (STATE_WAITING, STATE_DETECTED):
-            return
+            return False
         if udid and self.state == STATE_WAITING:
             self.udid = udid
-            self.device_name = get_device_name(udid)
+            self._miss_count = 0
+            self.device_name = _("iPhone")
             self.device_row.set_subtitle(self.device_name)
-            self.dest_row.set_subtitle(self.settings.get("photo_path") or "~")
+            self.dest_row.set_subtitle(self._photo_path_text())
             self._show_state(STATE_DETECTED)
+            # ideviceinfo can take seconds; never block the window on it.
+            threading.Thread(target=self._fetch_device_name,
+                             args=(udid, job), daemon=True).start()
         elif not udid and self.state == STATE_DETECTED:
             self.udid = None
             self._show_state(STATE_WAITING)
+        return False
+
+    def _fetch_device_name(self, udid, job):
+        name = get_device_name(udid)
+
+        def _apply():
+            if job == self._job and self.udid == udid:
+                self.device_name = name
+                self.device_row.set_subtitle(name)
+            return False
+        GLib.idle_add(_apply)
+
+    def _photo_path_text(self):
+        return self.settings.get("photo_path") or str(Path.home() / "Photos")
+
+    def _structure_text(self):
+        struct = self.settings.get("structure", "year_month")
+        return {
+            "flat":       _("Everything in one folder"),
+            "year":       _("By year"),
+            "year_month": _("By year/month"),
+        }.get(struct, struct)
 
     def _on_iphone_disconnected(self):
         if self._disconnect_dialog_open:
             return
         self._disconnect_dialog_open = True
+        self._job += 1  # drop the scan that was reading from the phone
         unmount_iphone(MOUNT_POINT)
 
-        window = self.get_root()
-
-        dialog = Adw.MessageDialog.new(
-            window,
-            _("Device disconnected"),
-            _("Your device was disconnected while selecting photos.\nReconnect the device and try again.")
+        dialog = Adw.AlertDialog(
+            heading=_("Device disconnected"),
+            body=_("The connection to your device was lost.\nReconnect the "
+                   "device, unlock it and try again."),
         )
         dialog.add_response("cancel", _("Cancel"))
         dialog.add_response("retry", _("Try again"))
         dialog.set_default_response("retry")
         dialog.set_close_response("cancel")
         dialog.connect("response", self._on_disconnect_response)
-        dialog.present()
+        dialog.present(self.get_root())
 
     def _on_disconnect_response(self, dialog, response: str):
         self._disconnect_dialog_open = False
+        self._miss_count = 0
+        if response == "cancel":
+            self._leave()
+            return
         self._show_state(STATE_WAITING)
         self._start_detection_poll()
 
     def _on_import_clicked(self, _btn):
         self._set_progress(_("Mounting device…"), _("Please wait, this takes just a moment."))
         self._show_state(STATE_MOUNTING)
-        threading.Thread(target=self._do_mount, daemon=True).start()
+        self._job += 1
+        threading.Thread(target=self._do_mount, args=(self._job,),
+                         daemon=True).start()
 
-    def _do_mount(self):
+    def _do_mount(self, job):
         if not _cmd_available("ifuse") or not _cmd_available("idevice_id"):
             GLib.idle_add(self._show_error,
                 _("ifuse or libimobiledevice is not installed. Install the required packages below."), True)
             return
         # Patiently wait for trust instead of failing on the first try; iOS
         # pairing can take up to a minute the first time you tap Trust.
-        if not self._ensure_paired():
+        if not self._ensure_paired(job):
+            return
+        if job != self._job:
             return
         if not mount_iphone(self.udid, MOUNT_POINT):
-            GLib.idle_add(self._show_error,
-                _("Could not mount the device. Make sure the screen is unlocked and tap 'Trust' when asked."), False)
+            if job == self._job:
+                GLib.idle_add(self._show_error,
+                    _("Could not mount the device. Make sure the screen is unlocked and tap 'Trust' when asked."), False)
             return
-        GLib.idle_add(self._start_scan)
+        if job != self._job:
+            unmount_iphone(MOUNT_POINT)
+            return
+        GLib.idle_add(self._start_scan, job)
 
-    def _ensure_paired(self) -> bool:
+    def _ensure_paired(self, job) -> bool:
         """Block until the device is trusted, auto-triggering the trust dialog.
 
         Runs on the mount worker thread. Returns False (after showing a
@@ -1653,6 +1807,8 @@ class ImporterPage(Gtk.Box):
         deadline = time.monotonic() + 90
         asked = False
         while time.monotonic() < deadline:
+            if job != self._job:
+                return False  # user left the importer
             if not self.udid:
                 GLib.idle_add(self._show_error,
                     _("The device was disconnected. Reconnect it and try again."), False)
@@ -1676,12 +1832,16 @@ class ImporterPage(Gtk.Box):
             _("Could not pair with the device. Unlock your iPhone, tap 'Trust', then try again."), False)
         return False
 
-    def _start_scan(self):
+    def _start_scan(self, job):
+        if job != self._job:
+            return False
         self._set_progress(_("Sorting and processing…"), _("Searching for photos and videos on your device."))
         self._show_state(STATE_SCANNING)
+        self._miss_count = 0
         self._start_detection_poll()
         self._start_progress_pulse()
-        threading.Thread(target=self._do_scan, daemon=True).start()
+        threading.Thread(target=self._do_scan, args=(job,), daemon=True).start()
+        return False
 
     def _start_progress_pulse(self):
         """Indeterminate progress bar while total unknown."""
@@ -1706,7 +1866,21 @@ class ImporterPage(Gtk.Box):
             self._pulse_timer = None
         self.progress_bar.set_show_text(True)
 
-    def _do_scan(self):
+    def _do_scan(self, job):
+        try:
+            self._scan_worker(job)
+        except Exception as e:
+            try:
+                from common import log_warn
+                log_warn("device scan crashed: %r" % (e,))
+            except Exception:
+                pass
+            if job == self._job:
+                GLib.idle_add(self._show_error,
+                              _("Reading your device failed: {err}").format(err=e),
+                              False)
+
+    def _scan_worker(self, job):
         def on_progress(count):
             GLib.idle_add(
                 self.progress_subtitle.set_text,
@@ -1722,7 +1896,7 @@ class ImporterPage(Gtk.Box):
         files = dcim_files + cpl_files
         total = len(files)
         if total == 0:
-            GLib.idle_add(self._on_scan_done, files)
+            GLib.idle_add(self._on_scan_done, files, job)
             return
 
         # iOS's own capture dates (Photos.sqlite) — the source of truth the
@@ -1798,6 +1972,10 @@ class ImporterPage(Gtk.Box):
         with ThreadPoolExecutor(max_workers=4) as pool:
             futures = {pool.submit(process, f): f for f in files}
             for fut in as_completed(futures):
+                if job != self._job:
+                    for other in futures:
+                        other.cancel()
+                    return
                 try:
                     f, d = fut.result()
                 except Exception:
@@ -1838,7 +2016,8 @@ class ImporterPage(Gtk.Box):
         files.sort(key=lambda p: date_cache.get(p, 0), reverse=True)
 
         # Fold Live Photos: the movie half is hidden from the grid but its
-        # mapping is kept so import copies it alongside the still. This makes
+        # mapping is kept so import copies it alongside the still (same name,
+        # same folder — that's how the library pairs them again). This makes
         # the count and tiles match the Photos app (1 item per Live Photo).
         files, motion_of = pair_live_photos(files)
         self._live_motion = motion_of
@@ -1850,7 +2029,7 @@ class ImporterPage(Gtk.Box):
             except Exception:
                 pass
 
-        GLib.idle_add(self._on_scan_done, files)
+        GLib.idle_add(self._on_scan_done, files, job)
 
     def _begin_sort_progress(self, total):
         self._stop_progress_pulse()
@@ -1858,7 +2037,9 @@ class ImporterPage(Gtk.Box):
         self.progress_bar.set_text("0%")
         return False
 
-    def _on_scan_done(self, files: list[Path]):
+    def _on_scan_done(self, files: list[Path], job: int):
+        if job != self._job:
+            return False
         self.iphone_files = files
         if not files:
             unmount_iphone(MOUNT_POINT)
@@ -1871,36 +2052,39 @@ class ImporterPage(Gtk.Box):
         self._set_progress(_("Checking duplicates…"),
                            _("Photos are being compared with your existing archive."))
         self._show_state(STATE_HASHING)
-        threading.Thread(target=self._do_hashing, args=(files,), daemon=True).start()
+        threading.Thread(target=self._do_hashing, args=(files, self._job),
+                         daemon=True).start()
 
-    def _do_hashing(self, iphone_files: list[Path]):
+    def _do_hashing(self, iphone_files: list[Path], job: int):
         # Any uncaught error here would kill the thread and leave the wizard
         # stuck on the progress page forever — surface it instead.
         try:
-            self._hash_worker(iphone_files)
+            self._hash_worker(iphone_files, job)
         except Exception as e:
             try:
                 from common import log_warn
                 log_warn("duplicate check crashed: %r" % (e,))
             except Exception:
                 pass
-            GLib.idle_add(self._show_error,
-                          _("Duplicate check failed: {err}").format(err=e), False)
+            if job == self._job:
+                GLib.idle_add(self._show_error,
+                              _("Duplicate check failed: {err}").format(err=e), False)
 
-    def _hash_worker(self, iphone_files: list[Path]):
+    def _hash_worker(self, iphone_files: list[Path], job: int):
         photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
         threshold_key = self.settings.get("duplicate_threshold", 2)
         try:
-            from common import log_info, log_warn
+            from common import log_info
         except Exception:
-            log_info = log_warn = lambda *a, **k: None
+            log_info = lambda *a, **k: None
         log_info("dedup: imagehash=%s threshold=%s files=%d path=%s"
                  % (HAS_IMAGEHASH, threshold_key, len(iphone_files), photo_path))
         # threshold 0 = detection off; treat everything as new.
         if threshold_key == 0:
-            GLib.idle_add(self._on_hashing_done, [], list(iphone_files))
+            GLib.idle_add(self._on_hashing_done, [], list(iphone_files), job)
             return
-        max_dist = THRESHOLD_MAP.get(threshold_key, 6)
+        # Settings only store 0 (off) or 1 (on); older configs may lack the key.
+        max_dist = THRESHOLD_MAP.get(threshold_key, THRESHOLD_MAP[1])
 
         def lib_progress(i, total, name):
             frac = (i / total) * 0.5 if total > 0 else 0
@@ -1918,6 +2102,8 @@ class ImporterPage(Gtk.Box):
         hashed_none = 0
 
         for i, fp in enumerate(iphone_files):
+            if job != self._job:
+                return
             frac = 0.5 + (i / total) * 0.5 if total > 0 else 0.5
             GLib.idle_add(self._update_progress, frac,
                           _("Scanning device: {i}/{total}").format(i=i + 1, total=total), fp.name)
@@ -1932,18 +2118,17 @@ class ImporterPage(Gtk.Box):
                     duplicates.append((fp, Path(dup)))
                 else:
                     new_files.append(fp)
-                    md = min_hash_distance(ph, library_hashes)
-                    log_info("dedup: %s no match (nearest archive distance=%s, "
-                             "max_dist=%d)" % (fp.name, md, max_dist))
             else:
                 hashed_none += 1
                 new_files.append(fp)
 
         log_info("dedup: device hashed_ok=%d none=%d → %d duplicates, %d new"
                  % (hashed_ok, hashed_none, len(duplicates), len(new_files)))
-        GLib.idle_add(self._on_hashing_done, duplicates, new_files)
+        GLib.idle_add(self._on_hashing_done, duplicates, new_files, job)
 
-    def _on_hashing_done(self, duplicates: list, new_files: list):
+    def _on_hashing_done(self, duplicates: list, new_files: list, job: int):
+        if job != self._job:
+            return False
         self.duplicates = duplicates
         self.to_import = new_files[:]
         self.duplicate_decisions = {}
@@ -2248,20 +2433,25 @@ class ImporterPage(Gtk.Box):
         return ph
 
     def _on_skip_all(self, _btn):
-        for iphone_path, _ in self.duplicates:
+        for iphone_path, _lib in self.duplicates:
             self.duplicate_decisions[str(iphone_path)] = "skip"
         self._on_review_continue(None)
 
     def _on_import_all(self, _btn):
-        for iphone_path, _ in self.duplicates:
+        for iphone_path, _lib in self.duplicates:
             self.duplicate_decisions[str(iphone_path)] = "import"
         self._on_review_continue(None)
 
     def _on_review_continue(self, _btn):
-        for iphone_path, _ in self.duplicates:
+        # "Import new" replaces the archive copy (which goes to the trash);
+        # "Keep both" stores the new one next to it.
+        self._replace_existing = {}
+        for iphone_path, lib_path in self.duplicates:
             decision = self.duplicate_decisions.get(str(iphone_path), "skip")
             if decision in ("import", "both"):
                 self.to_import.append(iphone_path)
+            if decision == "import":
+                self._replace_existing[str(iphone_path)] = lib_path
         self._start_import()
 
     # ── Post-import integrity review ──────────────────────────────────────
@@ -2363,28 +2553,36 @@ class ImporterPage(Gtk.Box):
         self._set_progress(_("Re-importing…"),
                            _("Copying fresh versions from your phone."))
         self._show_state(STATE_IMPORTING)
-        threading.Thread(target=self._do_reimport, args=(todo,), daemon=True).start()
+        threading.Thread(target=self._do_reimport, args=(todo, self._job),
+                         daemon=True).start()
 
-    def _do_reimport(self, todo):
+    def _do_reimport(self, todo, job):
+        photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
+        structure = self.settings.get("structure", "year_month")
         still_bad = []
         total = len(todo)
         for i, (src, dst) in enumerate(todo):
+            if job != self._job:
+                return
             try:
-                if src.exists():
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(src, dst)
+                # Same pipeline as the first import (edited render, HEIC/MOV
+                # conversion), written over the damaged copy — a raw copy would
+                # put HEIC bytes into a .jpg.
+                new_dst = self._import_one(src, photo_path, structure, target=dst)
                 # Re-check; a transfer glitch is fixed, an incomplete original
                 # on the device stays damaged.
-                if file_looks_corrupt(dst):
-                    still_bad.append((src, dst))
+                if file_looks_corrupt(new_dst):
+                    still_bad.append((src, new_dst))
             except Exception:
                 still_bad.append((src, dst))
             if total:
                 GLib.idle_add(self._update_progress, (i + 1) / total,
                               _("Re-importing…"), "")
-        GLib.idle_add(self._after_reimport, still_bad)
+        GLib.idle_add(self._after_reimport, still_bad, job)
 
-    def _after_reimport(self, still_bad):
+    def _after_reimport(self, still_bad, job):
+        if job != self._job:
+            return False
         if still_bad:
             self._show_corrupt(still_bad, attempted=True)
         else:
@@ -2402,13 +2600,130 @@ class ImporterPage(Gtk.Box):
             ) % total
         )
         self._show_state(STATE_IMPORTING)
-        threading.Thread(target=self._do_import, daemon=True).start()
+        threading.Thread(target=self._do_import, args=(self._job,),
+                         daemon=True).start()
 
-    def _do_import(self):
+    def _capture_time(self, src: Path) -> float:
+        """The phone's own capture date (Photos.sqlite), else the file mtime."""
+        capture_dates = getattr(self, "_capture_dates", {})
+        ts = None
+        try:
+            ts = capture_dates.get(src.relative_to(MOUNT_POINT).as_posix().lower())
+        except Exception:
+            ts = None
+        if ts is None:
+            ts = src.stat().st_mtime
+        return ts
+
+    def _import_one(self, src: Path, photo_path: Path, structure: str,
+                    target: Path | None = None, stem: str | None = None,
+                    folder: Path | None = None) -> Path:
+        """Copy (and optionally convert) one device file into the library.
+
+        Returns the final library path. `target` re-imports onto an existing
+        library file (damaged-file repair); `stem` forces the file name stem
+        and `folder` its directory (a Live Photo's movie must sit next to its
+        still under the same name). Never overwrites
+        any other file, never leaves a partial file under a real name."""
+        ts = self._capture_time(src)
+        mtime = datetime.fromtimestamp(ts)
+
+        # Prefer the phone-rendered edit so crops/filters come over
+        # exactly as shown on the device; fall back to the master.
+        render = find_edited_render(src)
+        copy_src = render if render is not None else src
+        # Optionally convert HEIC to a universally-viewable format, and
+        # MOV/HEVC video to H.264 .mp4 for broader compatibility.
+        convert = (self.settings.get("convert_heic", False)
+                   and copy_src.suffix.lower() in (".heic", ".heif"))
+        vid_convert = (self.settings.get("convert_videos", False)
+                       and copy_src.suffix.lower() in (".mov", ".m4v", ".3gp"))
+        if convert:
+            out_ext = ".jpg"
+        elif vid_convert:
+            out_ext = ".mp4"
+        else:
+            out_ext = copy_src.suffix
+
+        if target is not None:
+            dst = target.with_suffix(out_ext)
+            if dst != target and dst.exists():
+                dst = unique_path(dst)
+        else:
+            if stem is not None:
+                out_name = stem + out_ext
+            elif "CPLAssets" in src.parts:
+                # CPLAssets masters are GUID-named; give them a readable,
+                # date-based name instead of a meaningless UUID in the archive.
+                out_name = "IMG_" + mtime.strftime("%Y%m%d_%H%M%S") + out_ext
+            else:
+                out_name = src.stem + out_ext
+            if folder is not None:
+                dst = unique_path(folder / out_name)
+            else:
+                dst = unique_path(dest_path(photo_path, structure, out_name, mtime))
+
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if convert or vid_convert:
+            # Stage a reliable local copy first (decoding/ffmpeg off FUSE
+            # is garbled), then convert; fall back to the original on error.
+            STAGING_DIR.mkdir(parents=True, exist_ok=True)
+            tmp = STAGING_DIR / ("src_" + copy_src.name)
+            try:
+                shutil.copy2(copy_src, tmp)
+                ok = (convert_image(tmp, dst, "jpeg") if convert
+                      else convert_video(tmp, dst))
+                if ok:
+                    try:
+                        os.utime(dst, (ts, ts))
+                    except OSError:
+                        pass
+                else:
+                    # Keep the original format instead — under a free name,
+                    # never on top of an existing library file.
+                    fallback = dst.with_suffix(copy_src.suffix)
+                    if target is None or fallback != target:
+                        fallback = unique_path(fallback)
+                    copy_atomic(tmp, fallback)
+                    dst = fallback
+            finally:
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+        else:
+            copy_atomic(copy_src, dst)
+        if target is not None and dst != target and target.exists():
+            target.unlink()  # the damaged copy had a different extension
+
+        # The render already has edits baked in; only reconstruct from
+        # the AAE sidecar when we copied the unedited master.
+        if render is None:
+            aae = src.with_suffix(".AAE")
+            if not aae.exists():
+                aae = src.with_suffix(".aae")
+            if aae.exists() and dst.suffix.lower() in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng"):
+                edited = apply_aae_edits(dst, aae)
+                if edited is not None:
+                    dst = edited  # HEIC becomes .jpg; track the real file
+        return dst
+
+    def _device_gone(self) -> bool:
+        try:
+            if not os.path.ismount(MOUNT_POINT):
+                return True
+        except OSError:
+            return True
+        return detect_iphone_state()[0] == "none"
+
+    def _do_import(self, job):
         photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
         structure = self.settings.get("structure", "year_month")
         total = len(self.to_import)
         imported = 0
+        self._imported_so_far = 0
+        live_on = self.settings.get("import_live_motion", True)
+        replace = getattr(self, "_replace_existing", {})
 
         # Best-effort total size for live speed/ETA (metadata reads are cheap).
         total_bytes = 0
@@ -2421,101 +2736,47 @@ class ImporterPage(Gtk.Box):
         start = time.monotonic()
         done_bytes = 0
 
-        capture_dates = getattr(self, "_capture_dates", {})
         # (phone source, archive destination) for each imported file, so the
         # post-import integrity check can re-import a damaged one from the phone.
         self._imported_pairs = []
         failed: list[str] = []
+        note = None
 
         for i, src in enumerate(self.to_import):
-            copy_src = src
+            if job != self._job:
+                return  # user stopped the import
             try:
-                # Use the phone's own capture date for folders/naming so the
-                # archive matches what the Photos app shows; fall back to mtime.
-                ts = None
-                try:
-                    ts = capture_dates.get(
-                        src.relative_to(MOUNT_POINT).as_posix().lower())
-                except Exception:
-                    ts = None
-                if ts is None:
-                    ts = src.stat().st_mtime
-                mtime = datetime.fromtimestamp(ts)
-
-                # Prefer the phone-rendered edit so crops/filters come over
-                # exactly as shown on the device; fall back to the master.
-                render = find_edited_render(src)
-                if render is not None:
-                    copy_src = render
-                # Optionally convert HEIC to a universally-viewable format, and
-                # MOV/HEVC video to H.264 .mp4 for broader compatibility.
-                convert = (self.settings.get("convert_heic", False)
-                           and copy_src.suffix.lower() in (".heic", ".heif"))
-                vid_convert = (self.settings.get("convert_videos", False)
-                               and copy_src.suffix.lower() in (".mov", ".m4v", ".3gp"))
-                if convert:
-                    out_ext = ".jpg"
-                elif vid_convert:
-                    out_ext = ".mp4"
-                else:
-                    out_ext = copy_src.suffix
-                # CPLAssets masters are GUID-named; give them a readable,
-                # date-based name instead of a meaningless UUID in the archive.
-                if "CPLAssets" in src.parts:
-                    out_name = "IMG_" + mtime.strftime("%Y%m%d_%H%M%S") + out_ext
-                else:
-                    out_name = src.stem + out_ext
-                dst = dest_path(photo_path, structure, out_name, mtime)
-
-                # "keep both" case: find a unique filename.
-                if dst.exists():
-                    stem, suffix = dst.stem, dst.suffix
-                    counter = 1
-                    while dst.exists():
-                        dst = dst.parent / f"{stem}_{counter}{suffix}"
-                        counter += 1
-
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                if convert or vid_convert:
-                    # Stage a reliable local copy first (decoding/ffmpeg off FUSE
-                    # is garbled), then convert; fall back to the original on error.
-                    tmp = dst.parent / (dst.stem + "_src" + copy_src.suffix)
+                old = replace.get(str(src))
+                if old is not None and Path(old).exists():
                     try:
-                        shutil.copy2(copy_src, tmp)
-                        ok = (convert_image(tmp, dst, "jpeg") if convert
-                              else convert_video(tmp, dst))
-                        if ok:
-                            try:
-                                os.utime(dst, (ts, ts))
-                            except OSError:
-                                pass
-                        else:
-                            dst = dst.with_suffix(copy_src.suffix)
-                            shutil.copy2(copy_src, dst)
-                    finally:
+                        from common import trash_file
+                        trash_file(old)
+                    except Exception as e:
+                        # Couldn't trash the old copy: keep both instead.
                         try:
-                            tmp.unlink()
-                        except OSError:
+                            from common import log_warn
+                            log_warn("could not replace %s: %r" % (old, e))
+                        except Exception:
                             pass
-                else:
-                    shutil.copy2(copy_src, dst)
-
-                # The render already has edits baked in; only reconstruct from
-                # the AAE sidecar when we copied the unedited master.
-                if render is None:
-                    aae = src.with_suffix(".AAE")
-                    if not aae.exists():
-                        aae = src.with_suffix(".aae")
-                    if aae.exists() and dst.suffix.lower() in (".jpg", ".jpeg", ".heic", ".heif", ".png", ".dng"):
-                        edited = apply_aae_edits(dst, aae)
-                        if edited is not None:
-                            dst = edited  # HEIC becomes .jpg; track the real file
-
-                # Live Photo: import only the still — the motion movie is
-                # skipped on purpose (cleaner archive, no stray video).
-
-                self._imported_pairs.append((copy_src, dst))
+                dst = self._import_one(src, photo_path, structure)
+                self._imported_pairs.append((src, dst))
                 imported += 1
+                self._imported_so_far = imported
+
+                # Live Photo: bring the short movie along under the still's
+                # name, so the library pairs them and the viewer can play it.
+                motion = self._live_motion.get(src)
+                if live_on and motion is not None:
+                    try:
+                        mdst = self._import_one(motion, photo_path, structure,
+                                                stem=dst.stem, folder=dst.parent)
+                        self._imported_pairs.append((motion, mdst))
+                    except Exception as e:
+                        try:
+                            from common import log_warn
+                            log_warn("Live Photo movie failed for %s: %r" % (src, e))
+                        except Exception:
+                            pass
             except Exception as e:
                 # AFC/FUSE reads can fail per file; never let one bad file end
                 # the import, but do tell the user instead of under-counting.
@@ -2525,9 +2786,17 @@ class ImporterPage(Gtk.Box):
                     log_warn("import failed for %s: %r" % (src, e))
                 except Exception:
                     pass
+                if self._device_gone():
+                    rest = total - i - 1
+                    failed.extend(f.name for f in self.to_import[i + 1:])
+                    note = ngettext(
+                        "The device was disconnected — %d file was not imported.",
+                        "The device was disconnected — %d files were not imported.",
+                        rest + 1) % (rest + 1)
+                    break
 
             try:
-                done_bytes += copy_src.stat().st_size
+                done_bytes += src.stat().st_size
             except OSError:
                 pass
 
@@ -2537,12 +2806,15 @@ class ImporterPage(Gtk.Box):
             GLib.idle_add(self._update_progress, frac, text, detail)
 
         self.import_count = imported
-        self.import_failed = len(failed)
-        GLib.idle_add(self._begin_corrupt_scan)
+        self.import_failed_names = failed
+        self._import_note = note
+        GLib.idle_add(self._begin_corrupt_scan, job)
 
-    def _begin_corrupt_scan(self):
+    def _begin_corrupt_scan(self, job):
         """After importing, verify the copied files are readable; flag any that
         look truncated/damaged for the user to review."""
+        if job != self._job:
+            return False
         pairs = getattr(self, "_imported_pairs", [])
         if not pairs:
             self._on_import_done()
@@ -2550,14 +2822,16 @@ class ImporterPage(Gtk.Box):
         self._set_progress(_("Checking imported files…"),
                            _("Verifying that everything copied over correctly."))
         self._show_state(STATE_IMPORTING)
-        threading.Thread(target=self._do_corrupt_scan, args=(pairs,),
+        threading.Thread(target=self._do_corrupt_scan, args=(pairs, job),
                          daemon=True).start()
         return False
 
-    def _do_corrupt_scan(self, pairs):
+    def _do_corrupt_scan(self, pairs, job):
         suspects = []
         total = len(pairs)
         for i, (src, dst) in enumerate(pairs):
+            if job != self._job:
+                return
             try:
                 if file_looks_corrupt(dst):
                     suspects.append((src, dst))
@@ -2567,9 +2841,11 @@ class ImporterPage(Gtk.Box):
                 frac = (i + 1) / total
                 GLib.idle_add(self._update_progress, frac,
                               _("Checking imported files…"), "")
-        GLib.idle_add(self._on_corrupt_scan_done, suspects)
+        GLib.idle_add(self._on_corrupt_scan_done, suspects, job)
 
-    def _on_corrupt_scan_done(self, suspects):
+    def _on_corrupt_scan_done(self, suspects, job):
+        if job != self._job:
+            return False
         if suspects:
             self._show_corrupt(suspects, attempted=False)
         else:
@@ -2614,16 +2890,28 @@ class ImporterPage(Gtk.Box):
             desc_parts.append(
                 ngettext("%d skipped", "%d skipped", skipped) % skipped
             )
-        failed = getattr(self, "import_failed", 0)
+        failed = self.import_failed_names
         if failed:
             desc_parts.append(
-                ngettext("%d file failed — see pixora.log",
-                         "%d files failed — see pixora.log", failed) % failed
+                ngettext("%d file could not be imported",
+                         "%d files could not be imported", len(failed)) % len(failed)
             )
+        note = note or getattr(self, "_import_note", None)
         if note:
             desc_parts.append(note)
 
         self.done_status.set_description(" · ".join(desc_parts))
+        # Name the files that failed, so the user knows what to retry —
+        # the log only exists in developer mode.
+        while child := self.done_stats_box.get_first_child():
+            self.done_stats_box.remove(child)
+        if failed:
+            shown = ", ".join(failed[:12]) + (" …" if len(failed) > 12 else "")
+            lbl = Gtk.Label(label=_("Not imported: {names}").format(names=shown))
+            lbl.set_wrap(True)
+            lbl.set_justify(Gtk.Justification.CENTER)
+            lbl.add_css_class("dim-label")
+            self.done_stats_box.append(lbl)
         self._show_state(STATE_DONE)
         self.on_done_cb(self.import_count)
 
@@ -2634,6 +2922,8 @@ class ImporterPage(Gtk.Box):
         self._show_state(STATE_ERROR)
 
     def _on_retry(self, _btn):
+        self._job += 1
+        self._miss_count = 0
         self._show_state(STATE_WAITING)
         self._start_detection_poll()
 

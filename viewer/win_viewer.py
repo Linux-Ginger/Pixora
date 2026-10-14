@@ -72,6 +72,15 @@ class ViewerMixin:
         self.video_display.set_visible(False)
         viewer_area.add_overlay(self.video_display)
 
+        # Live Photo motion plays here, above the still, then hides again.
+        self.live_picture = Gtk.Picture()
+        self.live_picture.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self.live_picture.set_vexpand(True)
+        self.live_picture.set_hexpand(True)
+        self.live_picture.set_can_target(False)
+        self.live_picture.set_visible(False)
+        viewer_area.add_overlay(self.live_picture)
+
         self.viewer_close_btn = Gtk.Button(icon_name="window-close-symbolic")
         self.viewer_close_btn.add_css_class("osd")
         self.viewer_close_btn.add_css_class("circular")
@@ -311,6 +320,7 @@ class ViewerMixin:
         self.viewer_location.set_halign(Gtk.Align.START)
         self.viewer_location_box.append(self.viewer_location)
         self.viewer_title_box.append(self.viewer_location_box)
+        self._build_live_photo_ui(viewer_area)
 
         viewer_area.add_overlay(self.viewer_title_box)
 
@@ -911,9 +921,10 @@ class ViewerMixin:
         if is_video(path):
             initial, coords = self._determine_initial_location(path)
             # Read GPS here (bg thread) — ffprobe on the main thread froze the UI.
-            self._set_viewer_place(get_video_gps_coords(path))
+            place_coords = get_video_gps_coords(path)
             searching = bool(coords)
             if load_id == self._viewer_load_id:
+                GLib.idle_add(self._set_viewer_place_for, place_coords, load_id)
                 GLib.idle_add(self._show_video, path, initial, searching)
             if coords:
                 self._start_geocode_upgrade(path, coords, load_id)
@@ -933,9 +944,12 @@ class ViewerMixin:
                     while len(self._viewer_pixbuf_cache) > 3:
                         self._viewer_pixbuf_cache.popitem(last=False)
         initial, coords = self._determine_initial_location(path)
-        self._set_viewer_place(coords if coords else get_gps_coords(path))
+        place_coords = coords if coords else get_gps_coords(path)
         searching = bool(coords)
         if load_id == self._viewer_load_id:
+            # Applied on the main thread and only for the photo still being
+            # shown: a slow load for an earlier photo must not tag this one.
+            GLib.idle_add(self._set_viewer_place_for, place_coords, load_id)
             GLib.idle_add(self._show_full_photo, pixbuf, path, initial, searching)
             GLib.idle_add(self._preload_adjacent_photos)
         if coords:
@@ -948,6 +962,11 @@ class ViewerMixin:
         if place and not getattr(self, "_viewer_place", None):
             self._viewer_place = place
         self._set_viewer_location("done", self._decorate_location(text))
+        return False
+
+    def _set_viewer_place_for(self, coords, load_id):
+        if load_id == self._viewer_load_id:
+            self._set_viewer_place(coords)
         return False
 
     def _set_viewer_place(self, coords):
@@ -991,6 +1010,7 @@ class ViewerMixin:
             self._viewer_offset = [0.0, 0.0]
             self.photo_picture.set_pixbuf(pixbuf)
             self._apply_initial_location(location, searching)
+            self._update_live_badge(path)
             return False
 
         self._stop_video()
@@ -1011,6 +1031,7 @@ class ViewerMixin:
         self._viewer_offset = [0.0, 0.0]
         self._reset_viewer_transform()  # clear any leftover zoom from prev media
         self._viewer_pixbuf = pixbuf
+        self._update_live_badge(path)
         if pixbuf:
             incoming_pic.set_pixbuf(pixbuf)
         # Transition type from nav direction + animations toggle.
@@ -1294,28 +1315,33 @@ class ViewerMixin:
             photo_idx = view_order[vp]
             path = photos[photo_idx]
             try:
-                if is_video(path):
-                    pb = load_thumbnail(path)
-                    if pb:
-                        pb = pb.scale_simple(
-                            min(FILM_THUMB, pb.get_width()),
-                            min(FILM_THUMB, pb.get_height()),
-                            GdkPixbuf.InterpType.BILINEAR)
-                else:
+                # The grid's cached thumbnail (decoding every original at
+                # full size was slow on big libraries); keep its aspect ratio,
+                # the draw code crops it to a square.
+                pb = load_thumbnail(path)
+                if pb is None and not is_video(path):
                     pb = decode_pixbuf(path, FILM_THUMB)
+                if pb is not None:
+                    w, h = pb.get_width(), pb.get_height()
+                    s = FILM_THUMB / max(1, min(w, h))
+                    if s < 1:
+                        pb = pb.scale_simple(max(1, int(w * s)), max(1, int(h * s)),
+                                             GdkPixbuf.InterpType.BILINEAR)
             except Exception:
                 pb = None
             return vp, pb
 
+        # queue_draw is cheap and harmless while hidden; asking the widget
+        # whether it is visible from this worker thread is not (GTK isn't
+        # thread-safe).
         with ThreadPoolExecutor(max_workers=3) as pool:
             for count, (vp, pb) in enumerate(pool.map(load_one, order)):
                 if load_id != self._filmstrip_load_id:
                     return
                 self._filmstrip_thumbs[vp] = pb
-                if count % 5 == 0 and self.filmstrip_scroll.get_visible():
+                if count % 5 == 0:
                     GLib.idle_add(self.filmstrip_area.queue_draw)
-        if self.filmstrip_scroll.get_visible():
-            GLib.idle_add(self.filmstrip_area.queue_draw)
+        GLib.idle_add(self.filmstrip_area.queue_draw)
 
     @staticmethod
     def _film_rounded_rect(cr, x, y, w, h, r=6):
@@ -1566,6 +1592,8 @@ class ViewerMixin:
     def on_viewer_scroll(self, ctrl, dx, dy):
         if self.main_stack.get_visible_child_name() != "viewer":
             return False
+        if getattr(self, "_editor_active", False):
+            return True  # the crop box is drawn for an unzoomed photo
         old_z = self._viewer_zoom
         factor = 0.9 if dy > 0 else 1.1
         new_z = max(1.0, min(8.0, old_z * factor))
@@ -1589,7 +1617,7 @@ class ViewerMixin:
         return True
 
     def on_viewer_drag_begin(self, gesture, x, y):
-        if self._viewer_zoom > 1.0:
+        if self._viewer_zoom > 1.0 and not getattr(self, "_editor_active", False):
             self._viewer_drag = (x, y, self._viewer_offset[0], self._viewer_offset[1])
 
     def on_viewer_drag_update(self, gesture, dx, dy):

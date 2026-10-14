@@ -100,10 +100,18 @@ def _cmd_available_bk(cmd):
 
 def get_mountpoint_for_uuid(uuid):
     data = _lsblk_data()
-    if data is None:
+    if data is None or not uuid:
         return None
-    for device in data.get("blockdevices", []):
-        for child in device.get("children", [device]):
-            if child.get("uuid") == uuid:
-                return child.get("mountpoint")
-    return None
+
+    # Walk the whole tree: on encrypted (LUKS) or LVM drives the filesystem
+    # sits two or more levels below the disk, just like get_available_drives
+    # finds it.
+    def _walk(devices):
+        for dev in devices or ():
+            if dev.get("uuid") == uuid and dev.get("mountpoint"):
+                return dev.get("mountpoint")
+            found = _walk(dev.get("children"))
+            if found:
+                return found
+        return None
+    return _walk(data.get("blockdevices", []))

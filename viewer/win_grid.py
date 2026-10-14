@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from version import __version__ as APP_VERSION
 from pixora_i18n import _, ngettext
 import common
-from common import (Adw, BATCH_SIZE, drop_live_motion, format_date_header,
+from common import (Adw, BATCH_SIZE, live_photo_pairs, format_date_header,
     format_duration, Gdk, GdkPixbuf, GLib, Gtk, IMAGE_EXTENSIONS, is_video,
     log_error, log_info, log_warn, save_settings, THUMB_WORKERS)
 from metadata import get_photo_date, get_video_duration
@@ -245,31 +245,46 @@ class GridMixin:
         self.spinner.start()
         self.spinner_label.set_text(_("Sorting photos…"))
 
+        # Snapshot the filter state on the main thread for the scan thread.
+        favorites_only = self._favorites_only
+        favorites = set(self._favorites)
+        place_filter = set(self._place_filter or ())
+
         def _scan_bg():
             photos = []
             for root, dirs, files in os.walk(photo_path):
+                dirs[:] = [d for d in dirs if not d.startswith(".")]
                 for file in files:
+                    if file.startswith("."):
+                        continue  # half-written temp files, hidden junk
                     if os.path.splitext(file)[1].lower() in IMAGE_EXTENSIONS:
                         photos.append(os.path.join(root, file))
-            photos = drop_live_motion(photos)
-            GLib.idle_add(self._on_photos_scanned, photos, photo_path)
+            # Live Photos: one tile per still; the viewer plays the movie.
+            pairs = live_photo_pairs(photos)
+            motions = set(pairs.values())
+            photos = [p for p in photos if p not in motions]
+            self._live_pairs = pairs
+            total = len(photos)
+            if favorites_only or place_filter:
+                # Union: each ticked filter ADDS its photos (favorites and/or
+                # each selected place), so ticking more shows more. Done here,
+                # not on the main thread: a place lookup can mean ffprobe.
+                def _keep(p):
+                    if favorites_only and p in favorites:
+                        return True
+                    if place_filter and self._photo_place(p) in place_filter:
+                        return True
+                    return False
+                photos = [p for p in photos if _keep(p)]
+            GLib.idle_add(self._on_photos_scanned, photos, photo_path, total)
 
         threading.Thread(target=_scan_bg, daemon=True).start()
         return False
 
-    def _on_photos_scanned(self, photos, photo_path):
-        log_info(_("load_photos: {n} files found").format(n=len(photos)))
+    def _on_photos_scanned(self, photos, photo_path, total=None):
+        log_info(_("load_photos: {n} files found").format(
+            n=total if total is not None else len(photos)))
         filtering = self._favorites_only or bool(self._place_filter)
-        if filtering:
-            # Union: each ticked filter ADDS its photos (favorites and/or each
-            # selected place), so ticking more shows more.
-            def _keep(p):
-                if self._favorites_only and p in self._favorites:
-                    return True
-                if self._place_filter and self._photo_place(p) in self._place_filter:
-                    return True
-                return False
-            photos = [p for p in photos if _keep(p)]
         if not photos:
             if filtering:
                 self._show_empty_favorites()
@@ -287,20 +302,33 @@ class GridMixin:
         # Read the combo here (main thread) — GTK isn't thread-safe.
         sort_idx = (self.sort_combo.get_selected()
                     if hasattr(self, "sort_combo") else 0)
-        threading.Thread(target=self._sort_then_load, args=(sort_idx,),
-                         daemon=True).start()
+        self._start_sort(sort_idx)
         return False
 
-    def _sort_then_load(self, sort_idx):
-        photos = list(self.photos)
+    def _start_sort(self, sort_idx):
+        """Sort a copy off the main thread; only the newest sort is applied,
+        and self.photos is only ever replaced on the main thread."""
+        self._sort_token = getattr(self, "_sort_token", 0) + 1
+        self._sort_index = sort_idx
+        threading.Thread(target=self._sort_then_load,
+                         args=(list(self.photos), sort_idx, self._sort_token),
+                         daemon=True).start()
+
+    def _sort_then_load(self, photos, sort_idx, token):
         if photos:
             with ThreadPoolExecutor(max_workers=4) as pool:
                 dates = list(pool.map(get_photo_date, photos))
             date_map = dict(zip(photos, dates))
             photos.sort(key=date_map.get, reverse=(sort_idx == 0))
+        GLib.idle_add(self._apply_sorted, photos, token)
+
+    def _apply_sorted(self, photos, token):
+        if token != self._sort_token:
+            return False  # a newer sort/reload superseded this one
         self.photos = photos
         self._filmstrip_order_cache = None
-        GLib.idle_add(self.start_load)
+        self.start_load()
+        return False
 
     def _show_empty_favorites(self):
         self.spinner.stop()
@@ -347,9 +375,9 @@ class GridMixin:
             except Exception:
                 dt = UNKNOWN
             groups[dt].append(i)
-        sort_idx = (self.sort_combo.get_selected()
-                    if hasattr(self, "sort_combo") else 0)
-        oldest_first = (sort_idx == 1)
+        # Runs on the load thread: use the value captured on the main thread,
+        # never the GTK combo itself.
+        oldest_first = (getattr(self, "_sort_index", 0) == 1)
         sorted_dates = sorted(groups.keys(), reverse=not oldest_first)
 
         def _header(dt):
@@ -786,20 +814,8 @@ class GridMixin:
 
     def _do_sort(self):
         self._sort_timer = None
-        sort_index = self.sort_combo.get_selected()
-        threading.Thread(target=self._do_sort_bg, args=(sort_index,), daemon=True).start()
+        self._start_sort(self.sort_combo.get_selected())
         return False
-
-    def _do_sort_bg(self, sort_index):
-        photos = list(self.photos)
-        if photos:
-            with ThreadPoolExecutor(max_workers=4) as pool:
-                dates = list(pool.map(get_photo_date, photos))
-            date_map = dict(zip(photos, dates))
-            photos.sort(key=date_map.get, reverse=(sort_index == 0))
-        self.photos = photos
-        self._filmstrip_order_cache = None
-        GLib.idle_add(self.start_load)
 
     def _populate_filter_menu(self):
         """(Re)build the filter popover: favorites + one row per saved place.

@@ -740,6 +740,18 @@ class SettingsMixin:
         video_now_row.set_visible(dev_mode)
         convert_group.add(video_now_row)
 
+        live_switch = Gtk.Switch()
+        live_switch.set_valign(Gtk.Align.CENTER)
+        live_switch.set_active(bool(self.settings.get("import_live_motion", True)))
+        live_switch.connect("notify::active", self._on_live_motion_toggled)
+        live_row = Adw.ActionRow(
+            title=_("Live Photos: also import the short video"),
+            subtitle=_("Press LIVE in the viewer to play it. Off = only the photo."))
+        live_row.add_prefix(Gtk.Image.new_from_icon_name("camera-photo-symbolic"))
+        live_row.add_suffix(live_switch)
+        live_row.set_activatable_widget(live_switch)
+        convert_group.add(live_row)
+
         import_box.append(convert_group)
 
         backup_group = Adw.PreferencesGroup()
@@ -947,14 +959,12 @@ class SettingsMixin:
         auto_group.set_title(_("Background tasks"))
         auto_group.set_description(
             _("Every few minutes Pixora runs the tasks you've enabled — "
-              "folder tidy-up, USB backup and HEIC conversion. By default "
+              "folder tidy-up, USB backup and photo/video conversion. By default "
               "it asks first."))
         self._auto_confirm_switch = Gtk.Switch()
         self._auto_confirm_switch.set_valign(Gtk.Align.CENTER)
         self._auto_confirm_switch.set_active(bool(
-            self.settings.get("auto_confirm")
-            or self.settings.get("reorganize_silent")
-            or self.settings.get("backup_silent")))
+            self.settings.get("auto_confirm")))
         self._auto_confirm_switch.connect(
             "notify::active", self._on_auto_confirm_toggle)
         auto_row = Adw.ActionRow(
@@ -1517,15 +1527,15 @@ class SettingsMixin:
         else:
             heading = _("Deactivate developer mode?")
             body = _("Pixora will then start without a terminal and use the GUI updater.")
-        dialog = Adw.MessageDialog(
-            transient_for=self, heading=heading, body=body
+        dialog = Adw.AlertDialog(
+            heading=heading, body=body
         )
         dialog.add_response("cancel", _("No"))
         dialog.add_response("apply", _("Yes"))
         dialog.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
         dialog.set_default_response("cancel")
         dialog.connect("response", self._apply_dev_mode, target, row, btn)
-        dialog.present()
+        self._present_dialog(dialog)
 
     def _apply_dev_mode(self, dialog, response, target, row, btn):
         if response != "apply":
@@ -1584,6 +1594,10 @@ class SettingsMixin:
             log_error(_("Restart error: {err}").format(err=e))
         self.get_application().quit()
         return False
+
+    def _on_live_motion_toggled(self, switch, _pspec):
+        self.settings["import_live_motion"] = switch.get_active()
+        save_settings(self.settings)
 
     def _confirm_switch_off(self, switch, handler, heading, body, apply_off):
         """Destructive-off confirm: revert the switch unless the user confirms."""

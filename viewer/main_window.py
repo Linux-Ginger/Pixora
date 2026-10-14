@@ -55,8 +55,17 @@ class MainWindow(GridMixin,
         # Pre-v1.16 migration: backup_uuid implied backup_enabled.
         if "backup_enabled" not in self.settings and self.settings.get("backup_uuid"):
             self.settings["backup_enabled"] = True
+        # One "run without asking" switch drives the per-task flags; older
+        # setups (and the setup wizard) only set backup_silent.
+        if "auto_confirm" not in self.settings:
+            auto = bool(self.settings.get("backup_silent")
+                        or self.settings.get("reorganize_silent"))
+            self.settings["auto_confirm"] = auto
+            self.settings["backup_silent"] = auto
+            self.settings["reorganize_silent"] = auto
         # Repair .desktop on every start (git-pull users skip updater.sh).
-        self._repair_desktop_entry()
+        # Off the main thread: it may run update-desktop-database.
+        threading.Thread(target=self._repair_desktop_entry, daemon=True).start()
         try:
             common.THUMB_SIZE = max(200, min(500, int(settings.get("thumbnail_size", 200))))
         except Exception:
@@ -171,8 +180,12 @@ class MainWindow(GridMixin,
         self._latest_release = None
         self._update_dialog_shown = False
 
-        self.set_title("Pixora (Dev Mode)" if self.settings.get("dev_mode") else "Pixora")
-        self.set_default_size(9999, 9999)
+        self.set_title(_("Pixora (Dev Mode)") if self.settings.get("dev_mode") else "Pixora")
+        # Opens filling the screen. maximize() (not a giant fixed size) lets
+        # every window manager — GNOME, Cinnamon, Xfce, LXQt — fit it to the
+        # work area instead of pushing the title buttons off-screen.
+        self.set_default_size(1280, 820)
+        self.maximize()
 
         self.style_manager = Adw.StyleManager.get_default()
         self.style_manager.connect("notify::dark", self.on_dark_mode_changed)
@@ -193,10 +206,6 @@ class MainWindow(GridMixin,
         self.main_stack.add_named(self.importer_page,       "importer")
         self.main_stack.add_named(self._build_reorganize_page(), "reorganize")
         log_info(_("Startup phase 3: pages ready"))
-
-        self.update_banner = Adw.Banner(title="", button_label=_("Update"), use_markup=False)
-        self.update_banner.set_revealed(False)
-        self.update_banner.connect("button-clicked", self._on_update_banner_clicked)
 
         self.iphone_banner = Adw.Banner(title="", use_markup=False)
         self.iphone_banner.set_revealed(False)
@@ -223,7 +232,6 @@ class MainWindow(GridMixin,
         self.favorites_banner.connect("button-clicked", self._on_show_all_favorites)
 
         self.toolbar_view = Adw.ToolbarView()
-        self.toolbar_view.add_top_bar(self.update_banner)
         self.toolbar_view.add_top_bar(self.iphone_banner)
         self.toolbar_view.add_top_bar(self.backup_pending_banner)
         self.toolbar_view.add_top_bar(self.backup_done_banner)
@@ -307,13 +315,21 @@ class MainWindow(GridMixin,
         self.set_content(root_overlay)
 
         photo_path = self.settings.get("photo_path", "")
-        if photo_path:
-            os.makedirs(photo_path, exist_ok=True)
+        if photo_path and not os.path.isdir(photo_path):
+            parent = os.path.dirname(os.path.abspath(photo_path))
+            # Create a missing library folder only on a disk that is there.
+            # If its drive is unplugged, the parent is missing too: don't
+            # create an empty look-alike under /media (load_photos then
+            # shows the empty state instead of crashing).
+            if os.path.isdir(parent):
+                try:
+                    os.makedirs(photo_path, exist_ok=True)
+                except OSError as e:
+                    log_warn(_("Could not create the photo folder: {err}").format(err=e))
 
         self.set_hide_on_close(False)
         Gtk.Settings.get_default().set_property("gtk-decoration-layout", "icon:minimize,close")
 
-        self.set_resizable(False)
         log_info(_("Startup phase 4: loading photos scheduled via idle_add"))
         GLib.idle_add(self.load_photos)
         # Welcome tour is scheduled from _load_done (2s after the grid appears),
@@ -336,7 +352,6 @@ class MainWindow(GridMixin,
             GLib.idle_add(self._show_gsk_recovery_popup)
         self._ios_device_present = False
         self._recovery_prompt_active = False
-        self._recovery_cooldown_until = 0.0
         # _poll_import_device returns True to rearm the 10s timer; idle_add
         # would re-fire it as fast as possible, fork-bombing the main thread.
         GLib.idle_add(self._poll_import_device_once)
@@ -366,7 +381,7 @@ class MainWindow(GridMixin,
         return False
 
     def _show_gsk_recovery_popup(self):
-        renderer = self.settings.get("gsk_recent_crash", "")
+        renderer = self.settings.get("gsk_recent_crash", "") or "?"
         # Clear flag immediately so a refresh doesn't re-show it.
         self.settings["gsk_recent_crash"] = ""
         try:
@@ -375,7 +390,8 @@ class MainWindow(GridMixin,
             pass
         dlg = Adw.AlertDialog(
             heading=_("Pixora has crashed"),
-            body=_("Switched back to the Automatic rendering backend."),
+            body=_("The “{r}” rendering backend made Pixora crash, so it has "
+                   "been switched back to Automatic.").format(r=renderer),
         )
         dlg.add_response("ok", _("OK"))
         dlg.set_default_response("ok")
@@ -532,14 +548,9 @@ class MainWindow(GridMixin,
                 pass
 
     def _start_services(self):
-        try:
-            r = subprocess.run(["pgrep", "-x", "usbmuxd"],
-                               capture_output=True, timeout=3)
-            if r.returncode != 0:
-                subprocess.Popen(["usbmuxd"], stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
+        # usbmuxd is started by udev/systemd (as root) when an iPhone is
+        # plugged in; starting it ourselves as a normal user can't work.
+        pass
 
     def _setup_usb_monitor(self):
         """Listen to udev USB events for automatic iPhone detection."""
@@ -560,6 +571,14 @@ class MainWindow(GridMixin,
             except Exception:
                 vendor = None
             if vendor != "05ac":  # Apple
+                return
+            # Apple keyboards, mice and chargers share the vendor id; iPhones
+            # and iPads use product ids 0x12xx. Unknown id → assume a device.
+            try:
+                model = (device.get_property("ID_MODEL_ID") or "").lower()
+            except Exception:
+                model = ""
+            if model and not model.startswith("12"):
                 return
             log_info(_("Apple USB device connected (vendor=05ac) — check after 2.5s"))
             # Wait briefly so usbmuxd sees the device before we check.
@@ -628,34 +647,56 @@ class MainWindow(GridMixin,
                     break
                 time.sleep(1.5)
 
-            # Phase 2 — nothing on the bus: usbmuxd may be wedged. Reset once.
-            log_warn("No device on the bus — resetting usbmuxd")
-            GLib.idle_add(self._set_iphone_banner,
-                          _("🔧 Restoring connection, please wait…"))
-            try:
-                r = subprocess.run(
-                    ["pkexec", "sh", "-c",
-                     "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
-                    capture_output=True, text=True, timeout=40
-                )
-                reset_ok = (r.returncode == 0)
-            except Exception as e:
-                log_error("usbmuxd reset error: {}".format(e))
-                reset_ok = False
-            if not reset_ok:
-                GLib.idle_add(self._iphone_flow_fail)
-                return
-            time.sleep(2.5)
-            udid = self._idevice_udid()
-            if udid and _wait_for_trust(udid):
-                return
-            GLib.idle_add(self._iphone_flow_fail)
+            # Phase 2 — nothing on the bus: usbmuxd may be wedged. Resetting
+            # needs the admin password, so offer it — never pop a password
+            # prompt the user didn't ask for.
+            log_warn("No device on the bus — offering a usbmuxd reset")
+            self._wait_for_trust = _wait_for_trust
+            GLib.idle_add(self._offer_connection_repair)
         except Exception as e:
             log_error("recovery flow error: {}".format(e))
             GLib.idle_add(self._iphone_flow_fail)
 
-    def _idevice_check(self):
-        return bool(self._idevice_udid())
+    def _offer_connection_repair(self):
+        self._recovery_prompt_active = False
+        self.iphone_banner.set_title(
+            _("⚠️ Your device isn't showing up. Repair the connection? "
+              "(asks for your password)"))
+        self.iphone_banner.set_button_label(_("Repair"))
+        if not getattr(self, "_repair_hid", None):
+            self._repair_hid = self.iphone_banner.connect(
+                "button-clicked", self._on_repair_connection_clicked)
+        self.iphone_banner.set_revealed(True)
+        return False
+
+    def _on_repair_connection_clicked(self, _banner):
+        self.iphone_banner.set_button_label(None)
+        if self._recovery_prompt_active:
+            return
+        self._recovery_prompt_active = True
+        self._set_iphone_banner(_("🔧 Restoring connection, please wait…"))
+        threading.Thread(target=self._repair_connection_thread, daemon=True).start()
+
+    def _repair_connection_thread(self):
+        try:
+            r = subprocess.run(
+                ["pkexec", "sh", "-c",
+                 "killall usbmuxd 2>/dev/null; sleep 0.5; usbmuxd"],
+                capture_output=True, text=True, timeout=60
+            )
+            reset_ok = (r.returncode == 0)
+        except Exception as e:
+            log_error("usbmuxd reset error: {}".format(e))
+            reset_ok = False
+        if not reset_ok:
+            GLib.idle_add(self._iphone_flow_fail)
+            return
+        time.sleep(2.5)
+        udid = self._idevice_udid()
+        wait = getattr(self, "_wait_for_trust", None)
+        if udid and wait is not None and wait(udid):
+            return  # wait() already showed "connected" (or stood down)
+        GLib.idle_add(self._iphone_flow_fail)
 
     def _idevice_udid(self):
         """First connected device's UDID, or '' when none is on the bus."""
@@ -698,6 +739,7 @@ class MainWindow(GridMixin,
         return False
 
     def _set_iphone_banner(self, text):
+        self.iphone_banner.set_button_label(None)
         self.iphone_banner.set_title(text)
         self.iphone_banner.set_revealed(True)
         return False
@@ -719,24 +761,11 @@ class MainWindow(GridMixin,
             pass
 
         def check():
-            try:
-                r = subprocess.run(["pgrep", "-x", "usbmuxd"],
-                                   capture_output=True, timeout=2)
-                if r.returncode != 0:
-                    subprocess.Popen(["usbmuxd"], stdout=subprocess.DEVNULL,
-                                     stderr=subprocess.DEVNULL)
-            except Exception:
-                pass
-            has_device = False
-            try:
-                result = subprocess.run(
-                    ["idevice_id", "-l"],
-                    capture_output=True, text=True, timeout=3
-                )
-                has_device = any(l.strip() for l in result.stdout.splitlines())
-            except Exception:
-                has_device = False
-            GLib.idle_add(self._update_import_btn_state, has_device)
+            from importer_page import detect_iphone_state
+            state, _udid = detect_iphone_state()
+            if state == "unknown":
+                return  # a slow/failed check is not an unplugged iPhone
+            GLib.idle_add(self._update_import_btn_state, state == "found")
         threading.Thread(target=check, daemon=True).start()
         return True
 
@@ -890,6 +919,11 @@ class MainWindow(GridMixin,
                 body = _("Pixora is backing up to your USB drive. Closing now will interrupt the backup.")
             elif self._reorganize_moving:
                 body = _("Pixora is cleaning up the folder structure. Closing now may leave photos half-moved.")
+            elif self._heic_converting:
+                body = _("Pixora is converting photos or videos. Closing now stops the conversion; files not yet converted stay as they are.")
+            elif (self._importer_open()
+                  and self.importer_page.state in self.importer_page._BUSY_STATES):
+                body = _("Pixora is importing from your device. Closing now stops the import; files already copied stay in your library.")
             else:
                 body = None
             if body is not None:
@@ -907,6 +941,11 @@ class MainWindow(GridMixin,
                 self._present_dialog(dlg)
                 return True  # dialog decides
         log_info(_("Pixora shutting down — cleaning up…"))
+        # Stop an import and release the phone's FUSE mount.
+        try:
+            self.importer_page.deactivate()
+        except Exception:
+            pass
         # Kill rsync cleanly so backup stops instead of hanging.
         if self._backup_running and self._backup_proc is not None:
             try:
@@ -1190,6 +1229,12 @@ class MainWindow(GridMixin,
         except Exception:
             pass
 
+    def _importer_open(self):
+        try:
+            return self.main_stack.get_visible_child_name() == "importer"
+        except Exception:
+            return False
+
     def open_importer(self, btn=None):
         log_info(_("Importer opened (iOS device {state})").format(
             state=_("present") if self._ios_device_present else _("not detected")
@@ -1207,7 +1252,8 @@ class MainWindow(GridMixin,
         self.main_stack.set_visible_child_name("grid")
 
     def on_import_done(self, count):
-        self.close_importer()
+        # The importer stays on its summary page (incl. any files that failed)
+        # until the user goes back; the library refreshes underneath.
         if count and count > 0:
             self.reload_photos()
             # Mark pending-backup by bumping last_import_time.

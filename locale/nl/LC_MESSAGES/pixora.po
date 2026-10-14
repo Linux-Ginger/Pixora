@@ -3150,3 +3150,195 @@ msgstr "Bestaande foto's nu omzetten"
 
 msgid "Convert existing videos now"
 msgstr "Bestaande video's nu omzetten"
+
+msgid "iPhone"
+msgstr "iPhone"
+
+msgid "Stop importing?"
+msgstr "Importeren stoppen?"
+
+msgid "Files that were already copied stay in your library. The rest stays on your device."
+msgstr "Bestanden die al gekopieerd zijn blijven in je bibliotheek. De rest blijft op je toestel."
+
+msgid "Stop"
+msgstr "Stoppen"
+
+msgid "The connection to your device was lost.\nReconnect the device, unlock it and try again."
+msgstr "De verbinding met je toestel is verbroken.\nSluit het toestel opnieuw aan, ontgrendel het en probeer het nog eens."
+
+msgid "Reading your device failed: {err}"
+msgstr "Je toestel uitlezen is mislukt: {err}"
+
+msgid "The device was disconnected — %d file was not imported."
+msgid_plural "The device was disconnected — %d files were not imported."
+msgstr[0] "Het toestel is losgekoppeld — %d bestand is niet geïmporteerd."
+msgstr[1] "Het toestel is losgekoppeld — %d bestanden zijn niet geïmporteerd."
+
+msgid "%d file could not be imported"
+msgid_plural "%d files could not be imported"
+msgstr[0] "%d bestand kon niet geïmporteerd worden"
+msgstr[1] "%d bestanden konden niet geïmporteerd worden"
+
+msgid "Not imported: {names}"
+msgstr "Niet geïmporteerd: {names}"
+
+msgid "Pixora (Dev Mode)"
+msgstr "Pixora (ontwikkelaarsmodus)"
+
+msgid "Could not create the photo folder: {err}"
+msgstr "Kon de fotomap niet aanmaken: {err}"
+
+msgid "The “{r}” rendering backend made Pixora crash, so it has been switched back to Automatic."
+msgstr "De weergavemotor “{r}” liet Pixora crashen en is daarom teruggezet naar Automatisch."
+
+msgid "⚠️ Your device isn't showing up. Repair the connection? (asks for your password)"
+msgstr "⚠️ Je toestel verschijnt niet. Verbinding herstellen? (vraagt om je wachtwoord)"
+
+msgid "Repair"
+msgstr "Herstellen"
+
+msgid "Pixora is converting photos or videos. Closing now stops the conversion; files not yet converted stay as they are."
+msgstr "Pixora is foto's of video's aan het omzetten. Als je nu sluit, stopt het omzetten; bestanden die nog niet omgezet zijn blijven zoals ze zijn."
+
+msgid "Pixora is importing from your device. Closing now stops the import; files already copied stay in your library."
+msgstr "Pixora is aan het importeren van je toestel. Als je nu sluit, stopt het importeren; bestanden die al gekopieerd zijn blijven in je bibliotheek."
+
+msgid "Check {path} for more."
+msgstr "Kijk in {path} voor meer informatie."
+
+msgid "JS run error: {err}"
+msgstr "JS-fout: {err}"
+
+msgid "Can't use this folder"
+msgstr "Deze map kan niet gebruikt worden"
+
+msgid "Pixora can't create {p}: {err}"
+msgstr "Pixora kan {p} niet aanmaken: {err}"
+
+msgid "You don't have permission to save files in {p}."
+msgstr "Je hebt geen toestemming om bestanden op te slaan in {p}."
+
+msgid "Settings could not be saved"
+msgstr "Instellingen konden niet opgeslagen worden"
+
+msgid "Pixora could not write {p}: {err}"
+msgstr "Pixora kon {p} niet wegschrijven: {err}"
+
+msgid "Root of USB drive — backups go into a “Pixora” folder here"
+msgstr "Hoofdmap van de USB-schijf — backups komen hier in een map “Pixora”"
+
+msgid "The backup folder {p} is not on the backup drive (it may now be mounted somewhere else). Choose the backup folder again in Settings."
+msgstr "De backupmap {p} staat niet op de backupschijf (die is misschien op een andere plek gekoppeld). Kies de backupmap opnieuw in Instellingen."
+
+msgid "Backup scan: library folder {p} is missing or empty — nothing will be removed from the drive"
+msgstr "Backupscan: fotomap {p} ontbreekt of is leeg — er wordt niets van de schijf verwijderd"
+
+msgid "Your photo folder {p} is missing or empty, so Pixora did not back up or sync anything. Is the drive with your photos connected?"
+msgstr "Je fotomap {p} ontbreekt of is leeg, dus Pixora heeft niets geback-upt of gesynchroniseerd. Is de schijf met je foto's aangesloten?"
+
+msgid "Backup paused"
+msgstr "Backup gepauzeerd"
+
+msgid "⚠ That is a large part of your backup. Only continue if you really removed these photos from Pixora."
+msgstr "⚠ Dat is een groot deel van je backup. Ga alleen door als je deze foto's echt uit Pixora hebt verwijderd."
+
+msgid "Sync into the drive root is not allowed — copying without removing anything"
+msgstr "Synchroniseren naar de hoofdmap van de schijf mag niet — er wordt alleen gekopieerd, niets verwijderd"
+
+msgid "Move to trash?"
+msgstr "Naar de prullenbak verplaatsen?"
+
+msgid "'{name}' will be moved to the trash. You can restore it from there."
+msgstr "'{name}' wordt naar de prullenbak verplaatst. Daar kun je het terugzetten."
+
+msgid "Move to trash"
+msgstr "Naar prullenbak"
+
+msgid "Moved to trash: {p}"
+msgstr "Naar prullenbak verplaatst: {p}"
+
+msgid "Could not move the Live Photo movie to the trash: {err}"
+msgstr "Kon het Live Photo-filmpje niet naar de prullenbak verplaatsen: {err}"
+
+msgid "Could not move to trash"
+msgstr "Kon niet naar de prullenbak verplaatsen"
+
+msgid "{names} could not be moved to the trash, so nothing was deleted.\n\n{err}"
+msgstr "{names} kon niet naar de prullenbak verplaatst worden, dus er is niets verwijderd.\n\n{err}"
+
+msgid "Move %d item to trash?"
+msgid_plural "Move %d items to trash?"
+msgstr[0] "%d item naar de prullenbak verplaatsen?"
+msgstr[1] "%d items naar de prullenbak verplaatsen?"
+
+msgid "You can restore them from the trash."
+msgstr "Je kunt ze terugzetten vanuit de prullenbak."
+
+msgid "Restoring the original failed: {err}"
+msgstr "Origineel terugzetten is mislukt: {err}"
+
+msgid "Restore failed"
+msgstr "Terugzetten mislukt"
+
+msgid "Editor save: no changes, nothing written"
+msgstr "Editor opslaan: geen wijzigingen, niets weggeschreven"
+
+msgid "The photo was not changed."
+msgstr "De foto is niet gewijzigd."
+
+msgid "Move selected to trash"
+msgstr "Selectie naar prullenbak"
+
+msgid "Duplicate cleanup: moved {n} files to the trash"
+msgstr "Duplicaten opruimen: {n} bestanden naar de prullenbak"
+
+msgid "Turn off video conversion?"
+msgstr "Video-omzetting uitzetten?"
+
+msgid "New imports will keep the iPhone's original MOV videos. They play fine in Pixora, but some other apps and devices can't open them. Videos already converted to MP4 are not changed back."
+msgstr "Nieuwe imports houden de originele MOV-video's van de iPhone. Die spelen prima af in Pixora, maar sommige andere apps en apparaten kunnen ze niet openen. Video's die al naar MP4 zijn omgezet, worden niet teruggezet."
+
+msgid "Tile prefetch skipped: {err}"
+msgstr "Kaarttegels vooraf laden overgeslagen: {err}"
+
+msgid "Tile proxy unavailable, using OSM directly: {err}"
+msgstr "Lokale kaartcache niet beschikbaar, OSM wordt direct gebruikt: {err}"
+
+msgid "Could not remove home: {err}"
+msgstr "Kon thuis niet verwijderen: {err}"
+
+msgid "No internet connection"
+msgstr "Geen internetverbinding"
+
+msgid "Looking up an address needs the internet once. Check your connection and try again."
+msgstr "Een adres opzoeken heeft één keer internet nodig. Controleer je verbinding en probeer het opnieuw."
+
+msgid "Could not save place: {err}"
+msgstr "Kon plaats niet opslaan: {err}"
+
+msgid "Live Photos: also import the short video"
+msgstr "Live Photos: ook het korte filmpje importeren"
+
+msgid "Press LIVE in the viewer to play it. Off = only the photo."
+msgstr "Druk in de viewer op LIVE om het af te spelen. Uit = alleen de foto."
+
+msgid "Every few minutes Pixora runs the tasks you've enabled — folder tidy-up, USB backup and photo/video conversion. By default it asks first."
+msgstr "Om de paar minuten voert Pixora de taken uit die je hebt aangezet — mappen opruimen, USB-backup en foto/video-omzetting. Standaard vraagt het eerst."
+
+msgid "Restart sentinel write failed: {err}"
+msgstr "Herstartmarkering wegschrijven mislukt: {err}"
+
+msgid "Restart watcher spawn failed: {err}"
+msgstr "Herstartbewaking starten mislukt: {err}"
+
+msgid "Restart scheduled"
+msgstr "Herstart ingepland"
+
+msgid "Play Live Photo"
+msgstr "Live Photo afspelen"
+
+msgid "LIVE"
+msgstr "LIVE"
+
+msgid "Live Photo could not be played: {err}"
+msgstr "Live Photo kon niet afgespeeld worden: {err}"

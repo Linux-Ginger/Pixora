@@ -109,7 +109,8 @@ class BackupFolderPicker(Adw.Dialog):
             self._cursor = self._root
             rel = _P(".")
         if str(rel) == ".":
-            self._path_label.set_label(_("Root of USB drive"))
+            self._path_label.set_label(
+                _("Root of USB drive — backups go into a “Pixora” folder here"))
         else:
             self._path_label.set_label(f"/{rel}")
 
@@ -203,5 +204,20 @@ class BackupFolderPicker(Adw.Dialog):
             self._cursor.relative_to(self._root)
         except ValueError:
             return
-        self._on_selected(str(self._cursor))
+        target = self._cursor
+        if target == self._root:
+            # Never back up into the bare drive root: Sync mode mirrors the
+            # whole destination, which would wipe everything else on the drive.
+            target = self._root / "Pixora"
+            try:
+                target.mkdir(exist_ok=True)
+            except OSError as exc:
+                err = Adw.AlertDialog(
+                    heading=_("Could not create folder"),
+                    body=str(exc),
+                )
+                err.add_response("ok", _("OK"))
+                err.present(self)
+                return
+        self._on_selected(str(target))
         self.close()

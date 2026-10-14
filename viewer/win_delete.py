@@ -11,8 +11,9 @@ import threading
 from pixora_i18n import _, ngettext
 import common
 from common import (Adw, cairo, Gdk, GdkPixbuf, GLib, Gtk, is_video,
-    log_error, log_info, log_warn)
+    log_error, log_info, log_warn, trash_file)
 from media import get_cache_path
+import originals
 
 
 class DeleteMixin:
@@ -25,18 +26,18 @@ class DeleteMixin:
             return
         path = self.photos[self.current_index]
         log_info(_("Delete confirmation requested: {p}").format(p=path))
-        dialog = Adw.MessageDialog(
-            transient_for=self,
-            heading=_("Delete photo?"),
-            body=_("Are you sure you want to delete '{name}'? This cannot be undone.").format(name=os.path.basename(path))
+        dialog = Adw.AlertDialog(
+            heading=_("Move to trash?"),
+            body=_("'{name}' will be moved to the trash. You can restore it "
+                   "from there.").format(name=os.path.basename(path))
         )
         dialog.add_response("cancel", _("Cancel"))
-        dialog.add_response("delete", _("Delete"))
+        dialog.add_response("delete", _("Move to trash"))
         dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
         dialog.connect("response", self._on_delete_current_response, path)
-        dialog.present()
+        dialog.present(self)
 
     def _on_delete_current_response(self, dialog, response, path):
         if response != "delete":
@@ -44,8 +45,59 @@ class DeleteMixin:
             return
         if getattr(self, "_shredding", False):
             return
+        # Trash first, animate after: if the trash refuses, the photo simply
+        # stays on screen with an explanation (no black viewer, no data loss).
+        err = self._trash_media(path)
+        if err:
+            self._show_delete_error([os.path.basename(path)], err)
+            return
         self._shredding = True
         self._play_shred_animation(path, on_done=self._finish_delete_after_shred)
+
+    def _trash_media(self, path):
+        """Trash one library file and its leftovers; None on success, else error text."""
+        # Cache key uses the file's mtime, so resolve it before the move.
+        try:
+            cache_path = get_cache_path(path)
+        except OSError:
+            cache_path = None
+        try:
+            trash_file(path)
+            log_info(_("Moved to trash: {p}").format(p=path))
+        except GLib.Error as e:
+            if not os.path.exists(path):
+                # Already gone (external tool / watcher race).
+                log_warn(_("File already gone from disk: {p}").format(p=path))
+            else:
+                log_error(_("Delete failed: {err}").format(err=e.message))
+                return e.message
+        try:
+            if cache_path and os.path.exists(cache_path):
+                os.remove(cache_path)
+        except OSError:
+            pass
+        # The private "Restore original" copy goes too, or a deleted photo
+        # would quietly live on in ~/.local/share/pixora/originals.
+        originals.drop(path)
+        # A Live Photo's movie belongs to the still: it goes to the trash too.
+        motion = getattr(self, "_live_pairs", {}).pop(path, None)
+        if motion and os.path.exists(motion):
+            try:
+                trash_file(motion)
+            except GLib.Error as e:
+                log_warn(_("Could not move the Live Photo movie to the trash: "
+                           "{err}").format(err=e.message))
+        return None
+
+    def _show_delete_error(self, names, err):
+        shown = ", ".join(names[:5]) + (" …" if len(names) > 5 else "")
+        dlg = Adw.AlertDialog(
+            heading=_("Could not move to trash"),
+            body=_("{names} could not be moved to the trash, so nothing was "
+                   "deleted.\n\n{err}").format(names=shown, err=err),
+        )
+        dlg.add_response("ok", _("OK"))
+        dlg.present(self)
 
     def _play_shred_animation(self, path, on_done):
         """Shredder effect → on_done(path). Videos use cached thumbnail."""
@@ -197,28 +249,8 @@ class DeleteMixin:
             parent = os.path.dirname(parent)
 
     def _finish_delete_after_shred(self, path):
-        """Post-animation: delete + navigate."""
+        """Post-animation (file already in the trash): navigate on."""
         n_before = len(self.photos)
-        # Cache key uses the file's mtime, so resolve it before the remove.
-        try:
-            cache_path = get_cache_path(path)
-        except OSError:
-            cache_path = None
-        try:
-            os.remove(path)
-            log_info(_("Photo deleted: {p}").format(p=path))
-        except FileNotFoundError:
-            # Already gone (external tool / watcher race).
-            log_warn(_("File already gone from disk: {p}").format(p=path))
-        except Exception as e:
-            log_error(_("Delete failed: {err}").format(err=e))
-            self._shredding = False
-            return
-        try:
-            if cache_path and os.path.exists(cache_path):
-                os.remove(cache_path)
-        except OSError:
-            pass
         self._cleanup_empty_parent_dirs(path)
         if path in self._favorites:
             self._favorites.discard(path)
@@ -262,44 +294,31 @@ class DeleteMixin:
         if not self._selected:
             return
         count = len(self._selected)
-        dialog = Adw.MessageDialog(
-            transient_for=self,
-            heading=ngettext("Delete %d photo?", "Delete %d photos?", count) % count,
-            body=ngettext(
-                "Are you sure you want to delete %d photo? This cannot be undone.",
-                "Are you sure you want to delete %d photos? This cannot be undone.",
-                count,
-            ) % count,
+        dialog = Adw.AlertDialog(
+            heading=ngettext("Move %d item to trash?", "Move %d items to trash?",
+                             count) % count,
+            body=_("You can restore them from the trash."),
         )
         dialog.add_response("cancel", _("Cancel"))
-        dialog.add_response("delete", ngettext("Delete %d", "Delete %d", count) % count)
+        dialog.add_response("delete", _("Move to trash"))
         dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
         dialog.connect("response", self._on_delete_selected_response)
-        dialog.present()
+        dialog.present(self)
 
     def _on_delete_selected_response(self, dialog, response):
         if response != "delete":
             return
         paths_to_delete = [self.photos[i] for i in self._selected if i < len(self.photos)]
         fav_changed = False
+        failed, last_err = [], ""
         for path in paths_to_delete:
-            # Cache key uses the file's mtime, so resolve it before the remove.
-            try:
-                cache_path = get_cache_path(path)
-            except OSError:
-                cache_path = None
-            try:
-                os.remove(path)
-            except Exception as e:
-                log_error(_("Delete failed: {err}").format(err=e))
-                cache_path = None
-            try:
-                if cache_path and os.path.exists(cache_path):
-                    os.remove(cache_path)
-            except OSError:
-                pass
+            err = self._trash_media(path)
+            if err:
+                failed.append(os.path.basename(path))
+                last_err = err
+                continue  # still in the library: keep it a favourite
             if path in self._favorites:
                 self._favorites.discard(path)
                 fav_changed = True
@@ -310,3 +329,5 @@ class DeleteMixin:
             self._schedule_save_favorites()
         self.toggle_select_mode()
         self.load_photos()
+        if failed:
+            self._show_delete_error(failed, last_err)

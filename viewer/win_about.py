@@ -13,7 +13,8 @@ import threading
 import time
 from pixora_i18n import _
 from common import (Adw, Gdk, GLib, Gtk, INSTALLED_VERSION_FILE,
-    LICENSE_PATH, log_error, log_info, log_warn, _fetch_latest_release)
+    LICENSE_PATH, is_newer_version, log_error, log_info, log_warn,
+    _fetch_latest_release)
 
 
 class AboutMixin:
@@ -31,7 +32,7 @@ class AboutMixin:
             with open(INSTALLED_VERSION_FILE) as f:
                 local_version = f.read().strip()
             rel = _fetch_latest_release()
-            if rel and rel["version"] and rel["version"] != local_version:
+            if rel and is_newer_version(rel["version"], local_version):
                 self._pending_update_version = rel["version"]
                 self._latest_release = rel
                 GLib.idle_add(self._maybe_show_update_popup)
@@ -132,9 +133,6 @@ class AboutMixin:
             self._open_installer()
         # On "later" we no longer show the top banner — the flashing settings
         # icon is the persistent reminder.
-
-    def _on_update_banner_clicked(self, banner):
-        self._open_installer()
 
     def _repair_desktop_entry(self):
         """Rewrite pixora.desktop if stale. Silent — never blocks startup."""
@@ -446,7 +444,7 @@ class AboutMixin:
                 self._latest_release = rel
                 self._populate_changelog(rel.get("body", ""), rel.get("version", ""))
             # No release yet (remote "") reads as up to date.
-            if not remote_version or local_version == remote_version:
+            if not is_newer_version(remote_version, local_version):
                 self._update_check_row.set_subtitle(_("You have the latest version"))
                 self._set_update_state("uptodate")
             else:
