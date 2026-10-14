@@ -1,0 +1,18 @@
+# System packages Pixora needs (Debian/Ubuntu names). One per line.
+# Read by deps/install-system-deps.sh — the single source of truth for
+# install.sh, the graphical installer and the updater.
+python3
+python3-gi
+python3-gi-cairo
+python3-pip
+gir1.2-gtk-4.0
+gir1.2-adw-1
+gir1.2-gudev-1.0
+git
+gettext
+ifuse
+libimobiledevice-utils
+usbmuxd
+ffmpeg
+rsync
+gstreamer1.0-plugins-good

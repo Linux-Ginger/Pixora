@@ -3324,3 +3324,12 @@ msgstr "LIVE"
 
 msgid "Live Photo could not be played: {err}"
 msgstr "Live Photo could not be played: {err}"
+
+msgid "Install"
+msgstr "Install"
+
+msgid "pkexec not found. Run the install command in a terminal instead."
+msgstr "pkexec not found. Run the install command in a terminal instead."
+
+msgid "Installation was cancelled (no password given)."
+msgstr "Installation was cancelled (no password given)."

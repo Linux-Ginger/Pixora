@@ -24,6 +24,7 @@ import json
 import shutil
 import subprocess
 import threading
+import time
 import urllib.request
 from pathlib import Path
 
@@ -33,6 +34,12 @@ BIN_DIR      = Path.home() / ".local" / "bin"
 DESKTOP_DIR  = Path.home() / ".local" / "share" / "applications"
 REPO_URL     = "https://github.com/Linux-Ginger/Pixora.git"
 RELEASES_API = "https://api.github.com/repos/Linux-Ginger/Pixora/releases"
+# Used only when the chosen (older) release has no deps/ folder yet.
+FALLBACK_PACKAGES = [
+    "python3-gi", "python3-gi-cairo", "gir1.2-gtk-4.0", "gir1.2-adw-1",
+    "gir1.2-gudev-1.0", "ifuse", "libimobiledevice-utils", "usbmuxd",
+    "ffmpeg", "python3-pip", "rsync", "gettext",
+]
 
 
 def _ensure_icon_installed():
@@ -107,6 +114,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         self.set_resizable(False)
 
         self.selected_version = None   # None = main/latest
+        self._latest_tag = None
 
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
@@ -215,7 +223,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         btn_box.set_margin_top(8)
         btn_box.set_margin_bottom(20)
 
-        btn_label = _("Update") if already_installed else _("Installing")  # updated by _fetch_releases
+        btn_label = _("Update") if already_installed else _("Install")  # updated by _fetch_releases
         self.install_btn = Gtk.Button(label=btn_label)
         self.install_btn.add_css_class("suggested-action")
         self.install_btn.add_css_class("pill")
@@ -339,6 +347,7 @@ class InstallerWindow(Adw.ApplicationWindow):
             latest = tags[0].strip()
             remote_version = latest[1:] if latest[:1] in ("v", "V") else latest
 
+        self._latest_tag = tags[0] if tags else None
         GLib.idle_add(self._update_version_list, tags)
         if self._already_installed and remote_version:
             GLib.idle_add(self._update_install_status, remote_version)
@@ -379,7 +388,10 @@ class InstallerWindow(Adw.ApplicationWindow):
     def _on_install_clicked(self, btn):
         selected = self.version_combo.get_selected()
         if selected == 0:
-            self.selected_version = None   # clone main
+            # "Latest version" = the newest published release (what the
+            # in-app update check compares against); main only while no
+            # release exists yet.
+            self.selected_version = self._latest_tag
         else:
             label = self.version_model.get_string(selected)
             self.selected_version = label
@@ -432,60 +444,93 @@ class InstallerWindow(Adw.ApplicationWindow):
     def _clone_repo(self):
         try:
             if (INSTALL_DIR / ".git").exists():
-                subprocess.run(["git", "-C", str(INSTALL_DIR), "fetch", "--tags", "-q"],
-                               check=True, capture_output=True)
+                subprocess.run(["git", "-C", str(INSTALL_DIR), "fetch", "--tags",
+                                "--force", "-q", "origin"],
+                               check=True, capture_output=True, timeout=300)
                 ref = self.selected_version if self.selected_version else "origin/main"
                 subprocess.run(["git", "-C", str(INSTALL_DIR), "reset", "--hard", ref, "-q"],
-                               check=True, capture_output=True)
+                               check=True, capture_output=True, timeout=60)
             else:
                 if INSTALL_DIR.exists():
-                    import shutil
-                    shutil.rmtree(INSTALL_DIR)
+                    # Not a checkout: move it aside rather than deleting it.
+                    INSTALL_DIR.rename(INSTALL_DIR.with_name(
+                        INSTALL_DIR.name + ".old-%d" % int(time.time())))
                 if self.selected_version:
                     subprocess.run(
                         ["git", "clone", "-q", "--branch", self.selected_version,
-                         "--depth", "1", REPO_URL, str(INSTALL_DIR)],
-                        check=True, capture_output=True
+                         REPO_URL, str(INSTALL_DIR)],
+                        check=True, capture_output=True, timeout=600
                     )
                 else:
                     subprocess.run(["git", "clone", "-q", REPO_URL, str(INSTALL_DIR)],
-                                   check=True, capture_output=True)
+                                   check=True, capture_output=True, timeout=600)
             return True, ""
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
             return False, _("download failed")
 
+    def _deps_script(self):
+        return INSTALL_DIR / "deps" / "install-system-deps.sh"
+
+    def _missing_packages(self):
+        """Required system packages that aren't installed (empty = all there)."""
+        script = self._deps_script()
+        if script.exists():
+            r = subprocess.run(["bash", str(script), "--check"],
+                               capture_output=True, text=True, timeout=60)
+            if r.returncode == 0:
+                return []
+            return r.stdout.replace("missing:", "").split() or ["?"]
+        # Older release without deps/: check a minimal list ourselves.
+        missing = []
+        for p in FALLBACK_PACKAGES:
+            r = subprocess.run(["dpkg-query", "-W", "-f=${Status}", p],
+                               capture_output=True, text=True)
+            if "install ok installed" not in r.stdout:
+                missing.append(p)
+        return missing
+
     def _install_apt(self):
-        packages = [
-            "python3-gi", "python3-gi-cairo",
-            "gir1.2-gtk-4.0", "gir1.2-adw-1",
-            "ifuse", "libimobiledevice-utils", "usbmuxd",
-            "ffmpeg", "python3-pip",
-        ]
+        # install.sh already installed everything from the terminal; this
+        # window has no terminal for sudo, so only ask (pkexec's password
+        # window) when something is actually missing.
         try:
-            subprocess.run(["sudo", "apt-get", "install", "-y", "-qq"] + packages,
-                           check=True, capture_output=True)
-        except subprocess.CalledProcessError:
+            missing = self._missing_packages()
+        except Exception:
+            missing = ["?"]
+        if not missing:
+            return True, ""
+        script = self._deps_script()
+        if script.exists():
+            cmd = ["pkexec", "bash", str(script)]
+        else:
+            cmd = ["pkexec", "env", "DEBIAN_FRONTEND=noninteractive",
+                   "apt-get", "install", "-y", "-qq", *missing]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        except FileNotFoundError:
+            return False, _("pkexec not found. Run the install command in a terminal instead.")
+        except subprocess.TimeoutExpired:
             return False, _("apt failed")
-        # WebKit typelib: try 6.0, fall back to 4.1.
-        for wk in ("gir1.2-webkit-6.0", "gir1.2-webkit2-4.1"):
-            try:
-                subprocess.run(["sudo", "apt-get", "install", "-y", "-qq", wk],
-                               check=True, capture_output=True)
-                break
-            except subprocess.CalledProcessError:
-                continue
+        if r.returncode in (126, 127):
+            return False, _("Installation was cancelled (no password given).")
+        if r.returncode != 0:
+            return False, _("apt failed")
         return True, ""
 
     def _install_pip(self):
         packages = ["Pillow", "pillow-heif", "imagehash", "watchdog"]
+        lst = INSTALL_DIR / "deps" / "python-packages.txt"
+        if lst.exists():
+            packages = [l.strip() for l in lst.read_text().splitlines()
+                        if l.strip() and not l.strip().startswith("#")]
         try:
             subprocess.run(
-                [sys.executable, "-m", "pip", "install", "-q",
+                [sys.executable, "-m", "pip", "install", "-q", "--user",
                  "--break-system-packages"] + packages,
-                check=True, capture_output=True
+                check=True, capture_output=True, timeout=1800
             )
             return True, ""
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             return False, _("pip failed")
 
     def _create_launcher(self):
@@ -548,42 +593,19 @@ class InstallerWindow(Adw.ApplicationWindow):
             return False, str(e)
 
     def _start_services(self):
-        try:
-            subprocess.run(["sudo", "systemctl", "enable", "--now", "usbmuxd"],
-                           check=True, capture_output=True)
-        except subprocess.CalledProcessError:
-            pass
-        self._install_apparmor_profile()
+        # usbmuxd and the AppArmor profile are set up by
+        # deps/install-system-deps.sh. Only re-run it (one password prompt)
+        # when the map's AppArmor profile is missing on a system that needs it.
+        needs_profile = (os.path.exists("/etc/apparmor.d/abi/4.0")
+                         and not os.path.exists("/etc/apparmor.d/pixora"))
+        script = self._deps_script()
+        if needs_profile and script.exists():
+            try:
+                subprocess.run(["pkexec", "bash", str(script)],
+                               capture_output=True, timeout=1800)
+            except Exception:
+                pass  # the map still works, just without WebKit's sandbox
         return True, ""
-
-    def _install_apparmor_profile(self):
-        # Ubuntu 24.04+ blocks userns via AppArmor; grant it only to Pixora
-        # so WebKit's sandbox (map view) works without loosening global policy.
-        if not os.path.isdir("/etc/apparmor.d"):
-            return
-        profile_path = "/etc/apparmor.d/pixora"
-        profile_content = (
-            "abi <abi/4.0>,\n"
-            "include <tunables/global>\n\n"
-            "profile pixora flags=(unconfined) {\n"
-            "  userns,\n"
-            "  include if exists <local/pixora>\n"
-            "}\n"
-        )
-        try:
-            tmp = Path("/tmp/pixora-apparmor-profile")
-            tmp.write_text(profile_content)
-            subprocess.run(
-                ["sudo", "install", "-m", "0644", str(tmp), profile_path],
-                check=True, capture_output=True
-            )
-            tmp.unlink(missing_ok=True)
-            subprocess.run(
-                ["sudo", "systemctl", "reload", "apparmor"],
-                check=False, capture_output=True
-            )
-        except Exception:
-            pass
 
     def _launch_app(self):
         try:

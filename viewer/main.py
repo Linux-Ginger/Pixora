@@ -85,7 +85,7 @@ def _check_gsk_crash_recovery():
     except Exception:
         return
     if settings.get("gsk_renderer") != pending:
-        print(f"Pixora: user already changed renderer, not clobbering.",
+        print("Pixora: user already changed renderer, not clobbering.",
               flush=True)
         return
     settings["gsk_renderer"] = "auto"
@@ -197,13 +197,22 @@ def _launch_dev_terminal():
         f"exec {run_cmd}"
     )
 
+    # Ubuntu 26.04 ships Ptyxis, older GNOME gnome-terminal / Console (kgx);
+    # Mint, Kubuntu, Xubuntu and Lubuntu bring their own. x-terminal-emulator
+    # is Debian's "whatever the user picked" fallback.
     for term, args in [
+        ("ptyxis",         ["--new-window", "--", "bash", "-c", bash_cmd]),
         ("gnome-terminal", ["--title=Pixora (dev)", "--",
                             "bash", "-c", bash_cmd]),
+        ("kgx",            ["--", "bash", "-c", bash_cmd]),
         ("konsole",        ["--title", "Pixora (dev)", "-e",
                             "bash", "-c", bash_cmd]),
         ("xfce4-terminal", ["--disable-server", "--title=Pixora (dev)",
                             "-x", "bash", "-c", bash_cmd]),
+        ("mate-terminal",  ["--title=Pixora (dev)", "--",
+                            "bash", "-c", bash_cmd]),
+        ("qterminal",      ["-e", "bash", "-c", bash_cmd]),
+        ("x-terminal-emulator", ["-e", "bash", "-c", bash_cmd]),
         ("xterm",          ["-T", "Pixora (dev)", "-e",
                             "bash", "-c", bash_cmd]),
     ]:
@@ -261,6 +270,18 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio
 
+# Dialogs and windows use libadwaita 1.5 widgets (Ubuntu 24.04, Mint 22,
+# Debian 13 and newer). On older systems say so instead of crashing later.
+_ADW_MIN = (1, 5)
+_ADW_HAVE = (Adw.get_major_version(), Adw.get_minor_version())
+
+
+def _too_old_message():
+    return ("Pixora needs libadwaita %d.%d or newer, this system has %d.%d.\n"
+            "Supported: Ubuntu 24.04+ (and Kubuntu/Xubuntu/Lubuntu), "
+            "Linux Mint 22+, Pop!_OS 24.04+, Debian 13+."
+            % (_ADW_MIN + _ADW_HAVE))
+
 
 class PixoraApp(Adw.Application):
     def __init__(self):
@@ -282,6 +303,16 @@ class PixoraApp(Adw.Application):
             pass
 
     def on_activate(self, app):
+        if _ADW_HAVE < _ADW_MIN:
+            from gi.repository import Gtk
+            print("Pixora: " + _too_old_message(), flush=True)
+            win = Gtk.ApplicationWindow(application=app, title="Pixora")
+            lbl = Gtk.Label(label=_too_old_message(), wrap=True,
+                            margin_top=24, margin_bottom=24,
+                            margin_start=24, margin_end=24)
+            win.set_child(lbl)
+            win.set_visible(True)
+            return
         settings = load_settings()
 
         if not settings:  # None or empty (e.g. after a factory reset)

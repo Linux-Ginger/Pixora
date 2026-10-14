@@ -19,6 +19,7 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_CONFIRM="Weet je zeker dat je Pixora wilt verwijderen? (j/N) "
         LBL_CANCEL="Verwijdering geannuleerd."
         LBL_DONE="✓ Pixora is verwijderd."
+        LBL_KEPT="originelen van bewerkte foto's — bewaard; verwijder zelf als je ze niet meer nodig hebt."
         YES_CHAR="j"
         ;;
     de*|DE*)
@@ -26,6 +27,7 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_CONFIRM="Möchtest du Pixora wirklich deinstallieren? (j/N) "
         LBL_CANCEL="Deinstallation abgebrochen."
         LBL_DONE="✓ Pixora wurde deinstalliert."
+        LBL_KEPT="Originale bearbeiteter Fotos — behalten; lösche den Ordner selbst, wenn du sie nicht mehr brauchst."
         YES_CHAR="j"
         ;;
     fr*|FR*)
@@ -33,6 +35,7 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_CONFIRM="Êtes-vous sûr de vouloir désinstaller Pixora ? (o/N) "
         LBL_CANCEL="Désinstallation annulée."
         LBL_DONE="✓ Pixora a été désinstallé."
+        LBL_KEPT="originaux des photos retouchées — conservés ; supprimez le dossier vous-même si vous n'en avez plus besoin."
         YES_CHAR="o"
         ;;
     *)
@@ -40,6 +43,7 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_CONFIRM="Are you sure you want to uninstall Pixora? (y/N) "
         LBL_CANCEL="Uninstall cancelled."
         LBL_DONE="✓ Pixora has been uninstalled."
+        LBL_KEPT="originals of photos you edited — kept; delete the folder yourself if you no longer need them."
         YES_CHAR="y"
         ;;
 esac
@@ -57,7 +61,9 @@ echo -e "${NC}"
 echo -e "  ${BOLD}${LBL_BY}${NC}"
 echo ""
 
-read -p "${LBL_CONFIRM}" antwoord
+# Read from the terminal, not stdin: with `curl … | bash` stdin is this
+# script itself, so a plain `read` would swallow the next line of code.
+read -r -p "${LBL_CONFIRM}" antwoord < /dev/tty
 
 if [[ "${antwoord,,}" != "${YES_CHAR}" ]]; then
     echo "${LBL_CANCEL}"
@@ -81,6 +87,18 @@ rm -f "$ICONS_DIR/pixora-icon.svg" \
 # Settings and caches (the photo library itself is never touched).
 rm -rf "$HOME/.config/pixora"
 rm -rf "$HOME/.cache/pixora"
+
+# The map's AppArmor profile (system file, needs your password once).
+if [ -e /etc/apparmor.d/pixora ]; then
+    sudo rm -f /etc/apparmor.d/pixora < /dev/tty && \
+        sudo systemctl reload apparmor >/dev/null 2>&1 || true
+fi
+
+# Untouched originals of photos you edited are personal data: kept.
+if [ -d "$HOME/.local/share/pixora-originals" ]; then
+    echo "  $HOME/.local/share/pixora-originals"
+    echo "  ↑ ${LBL_KEPT}"
+fi
 
 if command -v update-desktop-database &> /dev/null; then
     update-desktop-database "$HOME/.local/share/applications"

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Pixora\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-14 15:37+0200\n"
+"POT-Creation-Date: 2026-10-14 15:43+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -2725,6 +2725,9 @@ msgstr ""
 msgid "Select which version to install"
 msgstr ""
 
+msgid "Install"
+msgstr ""
+
 #, python-brace-format
 msgid "Version {v} — up to date"
 msgstr ""
@@ -2739,7 +2742,13 @@ msgstr ""
 msgid "download failed"
 msgstr ""
 
+msgid "pkexec not found. Run the install command in a terminal instead."
+msgstr ""
+
 msgid "apt failed"
+msgstr ""
+
+msgid "Installation was cancelled (no password given)."
 msgstr ""
 
 msgid "pip failed"

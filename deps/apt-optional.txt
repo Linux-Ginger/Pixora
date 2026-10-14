@@ -1,0 +1,7 @@
+# Nice to have; installed when the distro offers them, skipped otherwise.
+# gstreamer1.0-libav: plays iPhone HEVC videos. libgtk-4-media-gstreamer:
+# GTK's video backend (built into GTK on newer releases). pkexec: password
+# prompt for the in-app updater and connection repair.
+gstreamer1.0-libav
+libgtk-4-media-gstreamer
+pkexec

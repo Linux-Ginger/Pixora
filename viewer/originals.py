@@ -16,9 +16,19 @@ from common import INSTALL_DIR
 
 _lock = threading.Lock()
 
+# User data, so it lives next to — not inside — the app's git checkout
+# (~/.local/share/pixora), which installs and updates may replace.
+_DIR = os.path.expanduser("~/.local/share/pixora-originals")
+_OLD_DIR = os.path.join(INSTALL_DIR, "originals")
+
 
 def originals_dir():
-    d = os.path.join(INSTALL_DIR, "originals")
+    d = _DIR
+    if not os.path.isdir(d) and os.path.isdir(_OLD_DIR):
+        try:
+            os.rename(_OLD_DIR, d)  # one-time move from older versions
+        except OSError:
+            return _OLD_DIR
     os.makedirs(d, exist_ok=True)
     try:
         os.chmod(d, 0o700)  # keep originals private to the user

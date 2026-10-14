@@ -48,30 +48,43 @@ fi
 step() { echo "STEP:$1:$2"; }
 step_done() { echo "STEP:$1:DONE"; }
 
-step deps "Installing dependencies"
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-    python3 python3-gi python3-gi-cairo \
-    gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-gudev-1.0 \
-    git ifuse libimobiledevice-utils usbmuxd ffmpeg python3-pip \
-    gettext >/dev/null 2>&1
-apt-get install -y -qq gir1.2-webkit-6.0 >/dev/null 2>&1 || \
-apt-get install -y -qq gir1.2-webkit2-4.1 >/dev/null 2>&1 || true
-runuser -u "$TARGET_USER" -- python3 -m pip install -q \
-    --break-system-packages \
-    Pillow pillow-heif imagehash watchdog >/dev/null 2>&1 || true
-step_done deps
+# Run as the real user, with their own HOME (pkexec's environment points
+# HOME at /root, which made pip silently install nowhere).
+as_user() { runuser -u "$TARGET_USER" -- env HOME="$TARGET_HOME" "$@"; }
 
 step clone "Fetching Pixora from GitHub"
-if [ -d "$INSTALL_DIR/.git" ]; then
-    runuser -u "$TARGET_USER" -- git -C "$INSTALL_DIR" fetch -q origin >/dev/null 2>&1
-    runuser -u "$TARGET_USER" -- git -C "$INSTALL_DIR" reset --hard origin/main -q >/dev/null 2>&1
-else
-    rm -rf "$INSTALL_DIR"
+command -v git >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git >/dev/null 2>&1
+if [ ! -d "$INSTALL_DIR/.git" ]; then
+    # No checkout yet: move any old copy aside instead of deleting it (it may
+    # hold user data, e.g. edit originals from older versions).
+    if [ -e "$INSTALL_DIR" ]; then
+        mv "$INSTALL_DIR" "$INSTALL_DIR.old-$(date +%s)"
+    fi
     mkdir -p "$(dirname "$INSTALL_DIR")"
     chown "$RUN_UID:$TARGET_GID" "$(dirname "$INSTALL_DIR")"
-    runuser -u "$TARGET_USER" -- git clone -q "$REPO_URL" "$INSTALL_DIR" >/dev/null 2>&1
+    as_user git clone -q "$REPO_URL" "$INSTALL_DIR" >/dev/null 2>&1
 fi
+as_user git -C "$INSTALL_DIR" fetch -q --tags --force origin >/dev/null 2>&1
+# Install the newest published release (what "Check for updates" compares
+# against); only fall back to main while no release exists yet.
+TARGET_REF="$(as_user git -C "$INSTALL_DIR" tag -l 'v*' --sort=-v:refname | head -n1)"
+[ -n "$TARGET_REF" ] || TARGET_REF="origin/main"
+as_user git -C "$INSTALL_DIR" reset --hard "$TARGET_REF" -q >/dev/null 2>&1
 step_done clone
+
+step deps "Installing dependencies"
+if [ -f "$INSTALL_DIR/deps/install-system-deps.sh" ]; then
+    bash "$INSTALL_DIR/deps/install-system-deps.sh" >/dev/null 2>&1 || \
+        echo "STEP:deps:some system packages failed to install"
+fi
+PY_PKGS="Pillow pillow-heif imagehash watchdog"
+if [ -f "$INSTALL_DIR/deps/python-packages.txt" ]; then
+    PY_PKGS="$(grep -v '^\s*#' "$INSTALL_DIR/deps/python-packages.txt" | grep -v '^\s*$' | tr '\n' ' ')"
+fi
+# shellcheck disable=SC2086
+as_user python3 -m pip install -q --user --break-system-packages $PY_PKGS \
+    >/dev/null 2>&1 || echo "STEP:deps:pip failed"
+step_done deps
 
 step finalize "Configuration and services"
 mkdir -p "$(dirname "$VERSION_FILE")"
@@ -156,18 +169,4 @@ DESKTOP_EOF
     runuser -u "$TARGET_USER" -- update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
 fi
 
-if [ -d /etc/apparmor.d ]; then
-    cat > /etc/apparmor.d/pixora << 'PROFILE_EOF'
-abi <abi/4.0>,
-include <tunables/global>
-
-profile pixora flags=(unconfined) {
-  userns,
-  include if exists <local/pixora>
-}
-PROFILE_EOF
-    systemctl reload apparmor >/dev/null 2>&1 || true
-fi
-
-systemctl enable --now usbmuxd >/dev/null 2>&1 || true
 step_done finalize

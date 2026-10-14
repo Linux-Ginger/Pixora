@@ -3369,3 +3369,12 @@ msgstr "LIVE"
 
 msgid "Live Photo could not be played: {err}"
 msgstr "Impossible de lire la Live Photo : {err}"
+
+msgid "Install"
+msgstr "Installer"
+
+msgid "pkexec not found. Run the install command in a terminal instead."
+msgstr "pkexec introuvable. Lancez plutôt la commande d’installation dans un terminal."
+
+msgid "Installation was cancelled (no password given)."
+msgstr "Installation annulée (aucun mot de passe saisi)."

@@ -27,6 +27,9 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_PREP="Voorbereiding…"
         LBL_FETCH="Pixora ophalen…"
         LBL_DONE="✓ Klaar — installer openen…"
+        LBL_SYS="Systeempakketten installeren (je wachtwoord wordt gevraagd)…"
+        LBL_PY="Python-pakketten installeren…"
+        LBL_OLD="Fout: Pixora heeft een nieuwere distributie nodig (libadwaita 1.5 of hoger), zoals Ubuntu 24.04, Linux Mint 22 of Debian 13."
         ;;
     de*|DE*)
         LBL_BY="von LinuxGinger"
@@ -34,6 +37,9 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_PREP="Vorbereitung…"
         LBL_FETCH="Pixora wird abgerufen…"
         LBL_DONE="✓ Fertig — Installer wird geöffnet…"
+        LBL_SYS="Systempakete werden installiert (dein Passwort wird abgefragt)…"
+        LBL_PY="Python-Pakete werden installiert…"
+        LBL_OLD="Fehler: Pixora benötigt eine neuere Distribution (libadwaita 1.5 oder neuer), z. B. Ubuntu 24.04, Linux Mint 22 oder Debian 13."
         ;;
     fr*|FR*)
         LBL_BY="par LinuxGinger"
@@ -41,6 +47,9 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_PREP="Préparation…"
         LBL_FETCH="Récupération de Pixora…"
         LBL_DONE="✓ Terminé — ouverture de l'installeur…"
+        LBL_SYS="Installation des paquets système (votre mot de passe sera demandé)…"
+        LBL_PY="Installation des paquets Python…"
+        LBL_OLD="Erreur : Pixora nécessite une distribution plus récente (libadwaita 1.5 ou plus), par ex. Ubuntu 24.04, Linux Mint 22 ou Debian 13."
         ;;
     *)
         LBL_BY="by LinuxGinger"
@@ -48,6 +57,9 @@ case "${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}" in
         LBL_PREP="Preparing…"
         LBL_FETCH="Fetching Pixora…"
         LBL_DONE="✓ Done — opening installer…"
+        LBL_SYS="Installing system packages (you will be asked for your password)…"
+        LBL_PY="Installing Python packages…"
+        LBL_OLD="Error: Pixora needs a newer distribution (libadwaita 1.5 or later), such as Ubuntu 24.04, Linux Mint 22 or Debian 13."
         ;;
 esac
 
@@ -57,6 +69,17 @@ echo ""
 # ── Check Ubuntu/Debian ──
 if ! command -v apt &> /dev/null; then
     echo "${LBL_NEED}"
+    exit 1
+fi
+
+# ── Check the release is new enough ──
+# Pixora uses libadwaita 1.5 widgets: Ubuntu 24.04+ (and its flavours),
+# Linux Mint 22+, Pop!_OS 24.04+, Debian 13+. Older releases would install
+# fine and then fail on start, so stop here with a clear message.
+ADW_VER="$(LC_ALL=C apt-cache policy libadwaita-1-0 2>/dev/null | awk '/Candidate:/{print $2}')"
+if [ -z "$ADW_VER" ] || [ "$ADW_VER" = "(none)" ] \
+        || ! dpkg --compare-versions "$ADW_VER" ge 1.5; then
+    echo "${LBL_OLD}"
     exit 1
 fi
 
@@ -149,22 +172,8 @@ if ! render_real_logo; then
     echo ""
 fi
 
-# ── Main deps ── (sudo credential cached by bootstrap, no reprompt)
-echo -e "  ${ORANGE}${LBL_PREP}${NC}"
-sudo apt-get install -y -qq \
-    python3 \
-    python3-gi \
-    python3-gi-cairo \
-    gir1.2-gtk-4.0 \
-    gir1.2-adw-1 \
-    gir1.2-gudev-1.0 \
-    git \
-    gettext \
-    2>/dev/null
-
-# WebKitGTK typelib: try 6.0 first, fall back to 4.1
-sudo apt-get install -y -qq gir1.2-webkit-6.0 2>/dev/null || \
-sudo apt-get install -y -qq gir1.2-webkit2-4.1 2>/dev/null || true
+# git is needed to fetch Pixora itself.
+command -v git &>/dev/null || sudo apt-get install -y -qq git
 
 # ── Fetch repo (always fresh, no cache) ──
 echo -e "  ${ORANGE}${LBL_FETCH}${NC}"
@@ -175,6 +184,18 @@ else
     rm -rf "$INSTALL_DIR"
     git clone -q "$REPO_URL" "$INSTALL_DIR"
 fi
+
+# ── System + Python packages ──
+# Installed here, in the terminal, where sudo can ask for the password. The
+# graphical installer that opens next has no terminal: it only checks.
+echo -e "  ${ORANGE}${LBL_SYS}${NC}"
+sudo bash "$INSTALL_DIR/deps/install-system-deps.sh"
+
+echo -e "  ${ORANGE}${LBL_PY}${NC}"
+# shellcheck disable=SC2046
+python3 -m pip install -q --user --break-system-packages \
+    $(grep -v '^\s*#' "$INSTALL_DIR/deps/python-packages.txt" | grep -v '^\s*$') \
+    || echo "  ⚠ pip failed — the installer will retry"
 
 # Compile .po -> .mo; remove old .mo first so stale files don't linger.
 if command -v msgfmt >/dev/null 2>&1; then
