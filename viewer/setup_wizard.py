@@ -1175,7 +1175,7 @@ class SetupWizard(Adw.Window):
             )
             self.backup_error.set_visible(True)
             return
-        from main_window import BackupFolderPicker
+        from widgets import BackupFolderPicker
         picker = BackupFolderPicker(
             mountpoint=mountpoint,
             current_path=self.selected_backup_path,

@@ -39,7 +39,7 @@ _TILE_RE = re.compile(r"^/(\d{1,2})/(\d{1,7})/(\d{1,7})\.png$")
 def _log(msg):
     # Lazy import so this module stays standalone-testable.
     try:
-        from main_window import log_info
+        from common import log_info
         log_info(msg)
     except Exception:
         pass

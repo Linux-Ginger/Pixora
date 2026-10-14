@@ -668,7 +668,7 @@ def scan_dcim(mountpoint: Path, progress_cb=None) -> list[Path]:
 
     # Diagnostic: surfaces why the count may differ from the phone's tally.
     try:
-        from main_window import log_info, log_warn
+        from common import log_info, log_warn
         log_info("scan_dcim: %d media across %d dirs"
                  % (len(files), counters.get("dirs", 0)))
         skipped_ext = counters.get("skipped", {})
@@ -696,7 +696,7 @@ def scan_cpl_assets(mountpoint: Path, progress_cb=None) -> list[Path]:
     _walk_media(cpl, files, progress_cb, counters)
 
     try:
-        from main_window import log_info, log_warn
+        from common import log_info, log_warn
         log_info("scan_cpl_assets: %d media across %d dirs"
                  % (len(files), counters.get("dirs", 0)))
         if counters.get("failed"):
@@ -746,14 +746,14 @@ def load_capture_dates(mountpoint: Path) -> dict:
         finally:
             con.close()
         try:
-            from main_window import log_info
+            from common import log_info
             log_info("load_capture_dates: %d dates from Photos.sqlite" % len(dates))
         except Exception:
             pass
         return dates
     except Exception as e:
         try:
-            from main_window import log_warn
+            from common import log_warn
             log_warn("load_capture_dates failed: %r" % (e,))
         except Exception:
             pass
@@ -829,7 +829,7 @@ def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
         # index and re-import as duplicates. (Videos legitimately yield no hash.)
         if failed:
             try:
-                from main_window import log_warn
+                from common import log_warn
                 log_warn("build_library_hashes: %d failed parallel, retry serial"
                          % len(failed))
             except Exception:
@@ -844,7 +844,7 @@ def build_library_hashes(photo_path: Path, progress_cb=None) -> dict:
                     hashes[str(fp)] = ph
                     recovered += 1
             try:
-                from main_window import log_info
+                from common import log_info
                 log_info("build_library_hashes: recovered %d/%d serially"
                          % (recovered, len(failed)))
             except Exception:
@@ -1756,7 +1756,7 @@ class ImporterPage(Gtk.Box):
                 cpl_set = set(cpl_files)
                 total = len(files)
                 try:
-                    from main_window import log_info
+                    from common import log_info
                     log_info("scan: dropped %d CPL Live Photo movie(s) not in DB"
                              % len(drop))
                 except Exception:
@@ -1829,7 +1829,7 @@ class ImporterPage(Gtk.Box):
                 kept.append(f)
             files = kept
             try:
-                from main_window import log_info
+                from common import log_info
                 log_info("scan: %d DCIM + %d CPL → %d after dedup (%d dups)"
                          % (len(dcim_files), len(cpl_files), len(files), dropped))
             except Exception:
@@ -1844,7 +1844,7 @@ class ImporterPage(Gtk.Box):
         self._live_motion = motion_of
         if motion_of:
             try:
-                from main_window import log_info
+                from common import log_info
                 log_info("scan: folded %d Live Photo pairs → %d items"
                          % (len(motion_of), len(files)))
             except Exception:
@@ -1880,7 +1880,7 @@ class ImporterPage(Gtk.Box):
             self._hash_worker(iphone_files)
         except Exception as e:
             try:
-                from main_window import log_warn
+                from common import log_warn
                 log_warn("duplicate check crashed: %r" % (e,))
             except Exception:
                 pass
@@ -1891,7 +1891,7 @@ class ImporterPage(Gtk.Box):
         photo_path = Path(self.settings.get("photo_path") or Path.home() / "Photos")
         threshold_key = self.settings.get("duplicate_threshold", 2)
         try:
-            from main_window import log_info, log_warn
+            from common import log_info, log_warn
         except Exception:
             log_info = log_warn = lambda *a, **k: None
         log_info("dedup: imagehash=%s threshold=%s files=%d path=%s"
@@ -2106,7 +2106,7 @@ class ImporterPage(Gtk.Box):
         selected = [f for f in self.iphone_files if str(f) in self.selected_files]
         if not HAS_IMAGEHASH:
             try:
-                from main_window import log_warn
+                from common import log_warn
                 log_warn("dedup SKIPPED: imagehash not installed — every selected "
                          "file is treated as new (no duplicate detection)")
             except Exception:
@@ -2521,7 +2521,7 @@ class ImporterPage(Gtk.Box):
                 # the import, but do tell the user instead of under-counting.
                 failed.append(src.name)
                 try:
-                    from main_window import log_warn
+                    from common import log_warn
                     log_warn("import failed for %s: %r" % (src, e))
                 except Exception:
                     pass
