@@ -647,21 +647,41 @@ class MainWindow(GridMixin,
                     break
                 time.sleep(1.5)
 
-            # Phase 2 — nothing on the bus: usbmuxd may be wedged. Resetting
-            # needs the admin password, so offer it — never pop a password
-            # prompt the user didn't ask for.
-            log_warn("No device on the bus — offering a usbmuxd reset")
+            # Phase 2 — the phone is on USB but usbmuxd didn't pick it up
+            # (it races the phone's USB setup and never retries). Restart it:
+            # silently where the installer's polkit rule allows that, else
+            # offer it — never pop a password prompt the user didn't ask for.
             self._wait_for_trust = _wait_for_trust
+            log_warn("Device on USB but not seen by usbmuxd — restarting usbmuxd")
+            GLib.idle_add(self._set_iphone_banner,
+                          _("🔧 Connecting to your device…"))
+            if self._restart_usbmuxd_silently():
+                time.sleep(2.5)
+                udid = self._idevice_udid()
+                if udid and _wait_for_trust(udid):
+                    return
+            log_warn("Silent usbmuxd restart not possible — offering repair")
             GLib.idle_add(self._offer_connection_repair)
         except Exception as e:
             log_error("recovery flow error: {}".format(e))
             GLib.idle_add(self._iphone_flow_fail)
 
+    def _restart_usbmuxd_silently(self):
+        """Restart usbmuxd without a password prompt (polkit rule from the
+        installer). False when not allowed or not possible."""
+        try:
+            r = subprocess.run(
+                ["systemctl", "--no-ask-password", "restart", "usbmuxd.service"],
+                capture_output=True, text=True, timeout=20)
+            return r.returncode == 0
+        except Exception:
+            return False
+
     def _offer_connection_repair(self):
         self._recovery_prompt_active = False
         self.iphone_banner.set_title(
-            _("⚠️ Your device isn't showing up. Repair the connection? "
-              "(asks for your password)"))
+            _("⚠️ Your device isn't showing up. Unplug it and plug it back "
+              "in, or repair the connection (asks for your password)."))
         self.iphone_banner.set_button_label(_("Repair"))
         if not getattr(self, "_repair_hid", None):
             self._repair_hid = self.iphone_banner.connect(

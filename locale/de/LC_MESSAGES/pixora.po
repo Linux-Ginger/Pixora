@@ -3367,3 +3367,9 @@ msgstr "Vorabversionen testen"
 
 msgid "For testing only: updates then come from pre-releases, never from normal releases. Off = normal updates."
 msgstr "Nur zum Testen: Updates kommen dann aus Vorabversionen, nie aus normalen Versionen. Aus = normale Updates."
+
+msgid "🔧 Connecting to your device…"
+msgstr "🔧 Verbindung zu deinem Gerät…"
+
+msgid "⚠️ Your device isn't showing up. Unplug it and plug it back in, or repair the connection (asks for your password)."
+msgstr "⚠️ Dein Gerät wird nicht erkannt. Zieh es ab und steck es wieder ein, oder repariere die Verbindung (fragt nach deinem Passwort)."

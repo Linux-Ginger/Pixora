@@ -9,7 +9,15 @@ them as-is in both its light and dark theme.
 import os
 from xml.sax.saxutils import escape
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "readme")
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+OUT = os.path.join(ROOT, "assets", "readme")
+
+
+def app_version():
+    """Version from viewer/version.py, so the banner follows each release."""
+    import re
+    with open(os.path.join(ROOT, "viewer", "version.py")) as f:
+        return re.search(r'__version__\s*=\s*"([^"]+)"', f.read()).group(1)
 
 # ── Palette ────────────────────────────────────────────────────────────
 ORANGE = "#e95420"      # Pixora's accent (same as the app)
@@ -133,9 +141,9 @@ def banner():
          text(282, 168, "kept tidy", 44, ORANGE, 800),
          text(282, 200, "Import from your iPhone, sort, browse and back up — offline, on your own PC.",
               13.5, DIM),
-         pill(282, 218, 132, "Version 1.68", dot="#22c55e"),
-         pill(424, 218, 168, "Free & open source", ic="heart"),
-         pill(602, 218, 190, "Ubuntu 24.04 and newer", dot=ORANGE)]
+         pill(282, 218, 142, "Version " + app_version(), dot="#22c55e"),
+         pill(434, 218, 168, "Free & open source", ic="heart"),
+         pill(612, 218, 190, "Ubuntu 24.04 and newer", dot=ORANGE)]
     return svg(W, H, "".join(b), "Pixora — your photos, kept tidy")
 
 

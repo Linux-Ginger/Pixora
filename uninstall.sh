@@ -88,10 +88,14 @@ rm -f "$ICONS_DIR/pixora-icon.svg" \
 rm -rf "$HOME/.config/pixora"
 rm -rf "$HOME/.cache/pixora"
 
-# The map's AppArmor profile (system file, needs your password once).
+# System files: the map's AppArmor profile and the rule that lets Pixora
+# restart usbmuxd (needs your password once).
 if [ -e /etc/apparmor.d/pixora ]; then
     sudo rm -f /etc/apparmor.d/pixora < /dev/tty && \
         sudo systemctl reload apparmor >/dev/null 2>&1 || true
+fi
+if [ -e /etc/polkit-1/rules.d/50-pixora-usbmuxd.rules ]; then
+    sudo rm -f /etc/polkit-1/rules.d/50-pixora-usbmuxd.rules < /dev/tty || true
 fi
 
 # Untouched originals of photos you edited are personal data: kept.

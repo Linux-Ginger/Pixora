@@ -65,6 +65,27 @@ apt-get install -y -qq gir1.2-webkit-6.0 >/dev/null 2>&1 || \
 # enabling it is harmless where the unit is "static".
 systemctl enable --now usbmuxd >/dev/null 2>&1 || true
 
+# usbmuxd (the iPhone connection service) sometimes misses a phone that is
+# plugged in — a timing race, worse behind USB hubs — and never retries.
+# Restarting it fixes that. Allow exactly that one action for local admin
+# users, so Pixora can do it by itself instead of asking for a password.
+if [ -d /etc/polkit-1/rules.d ]; then
+    cat > /etc/polkit-1/rules.d/50-pixora-usbmuxd.rules << 'POLKIT_EOF'
+// Installed by Pixora. Lets local admin users restart usbmuxd.service (the
+// iPhone/iPad connection service) without a password. Nothing else.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") == "usbmuxd.service" &&
+        action.lookup("verb") == "restart" &&
+        subject.local && subject.active &&
+        (subject.isInGroup("sudo") || subject.isInGroup("wheel"))) {
+        return polkit.Result.YES;
+    }
+});
+POLKIT_EOF
+    chmod 0644 /etc/polkit-1/rules.d/50-pixora-usbmuxd.rules
+fi
+
 # Ubuntu 24.04+ blocks unprivileged user namespaces through AppArmor, which
 # WebKit's sandbox (the map) needs. Grant it to Pixora only — never loosen the
 # global policy. Skipped where AppArmor 4 isn't there (the profile needs it).

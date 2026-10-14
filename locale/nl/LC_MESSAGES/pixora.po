@@ -3357,3 +3357,9 @@ msgstr "Pre-releases testen"
 
 msgid "For testing only: updates then come from pre-releases, never from normal releases. Off = normal updates."
 msgstr "Alleen om te testen: updates komen dan uit pre-releases, nooit uit gewone releases. Uit = gewone updates."
+
+msgid "🔧 Connecting to your device…"
+msgstr "🔧 Verbinden met je toestel…"
+
+msgid "⚠️ Your device isn't showing up. Unplug it and plug it back in, or repair the connection (asks for your password)."
+msgstr "⚠️ Je toestel verschijnt niet. Haal het eruit en steek het opnieuw in, of herstel de verbinding (vraagt om je wachtwoord)."

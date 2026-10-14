@@ -9,7 +9,7 @@
 
 <p align="center">
   <img alt="Licence GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-e95420">
-  <img alt="Version 1.68" src="https://img.shields.io/badge/version-1.68-2a2a2f">
+  <img alt="Latest release" src="https://img.shields.io/github/v/release/Linux-Ginger/Pixora?label=version&color=2a2a2f">
   <img alt="Ubuntu 24.04+" src="https://img.shields.io/badge/Ubuntu-24.04%2B-2a2a2f?logo=ubuntu&logoColor=white">
   <img alt="GTK 4 · libadwaita" src="https://img.shields.io/badge/GTK%204-libadwaita-2a2a2f">
   <img alt="Status: in development" src="https://img.shields.io/badge/status-in%20development-22c55e">
@@ -140,7 +140,7 @@ python3 -m unittest discover tests
 
 **Translations** live in `locale/<lang>/LC_MESSAGES/pixora.po`; Pixora compiles them on start. To refresh the template: `xgettext --language=Python --keyword=_ --keyword=ngettext:1,2 -o locale/pixora.pot viewer/*.py installer.py`.
 
-**Releases**: bump `viewer/version.py`, then publish a GitHub release tagged `v<version>` (e.g. `v1.68.0`). Normal users only ever get these. **Pre-releases** are tagged `v<version>-pre.<n>` (e.g. `v1.69.0-pre.1`) and marked *Pre-release* on GitHub; only Pixora's in developer mode with *Settings → About → Test pre-releases* switched on look at them. Pixora is alpha, so older releases (and their tags) are removed when a new one is published.
+**Releases**: bump `viewer/version.py`, run `python3 tools/readme_art.py` (the banner shows the version), then publish a GitHub release tagged `v<version>` (e.g. `v1.68.0`). Normal users only ever get these. **Pre-releases** are tagged `v<version>-pre.<n>` (e.g. `v1.69.0-pre.1`) and marked *Pre-release* on GitHub; only Pixora's in developer mode with *Settings → About → Test pre-releases* switched on look at them. Pixora is alpha, so older releases (and their tags) are removed when a new one is published.
 
 </details>
 

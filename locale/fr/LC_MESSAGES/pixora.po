@@ -3384,3 +3384,9 @@ msgstr "Tester les préversions"
 
 msgid "For testing only: updates then come from pre-releases, never from normal releases. Off = normal updates."
 msgstr "Pour les tests uniquement : les mises à jour viennent alors des préversions, jamais des versions normales. Désactivé = mises à jour normales."
+
+msgid "🔧 Connecting to your device…"
+msgstr "🔧 Connexion à votre appareil…"
+
+msgid "⚠️ Your device isn't showing up. Unplug it and plug it back in, or repair the connection (asks for your password)."
+msgstr "⚠️ Votre appareil n’apparaît pas. Débranchez-le puis rebranchez-le, ou réparez la connexion (demande votre mot de passe)."
