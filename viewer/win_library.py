@@ -1147,6 +1147,8 @@ class LibraryMixin:
             ))
         else:
             log_info(_("Structure scan done: structure is correct"))
+        if self._importer_open():
+            return False  # don't interrupt an import; the next pass asks
         if had_mismatch and not self._structure_popup_dismissed \
                 and not self._reorganize_active:
             self._reorganize_active = True

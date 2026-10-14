@@ -1140,6 +1140,28 @@ def _cmd_available(cmd: str) -> bool:
     return shutil.which(cmd) is not None
 
 
+class _PickState:
+    """Picked / left-out state of a selection card, shown through CSS
+    classes (round check, accent ring, dimming). Same API as a CheckButton
+    for the code that toggles it."""
+
+    def __init__(self, card):
+        self._card = card
+        self._active = False
+
+    def get_active(self):
+        return self._active
+
+    def set_active(self, active):
+        self._active = bool(active)
+        if self._active:
+            self._card.remove_css_class("unpicked")
+            self._card.add_css_class("picked")
+        else:
+            self._card.remove_css_class("picked")
+            self._card.add_css_class("unpicked")
+
+
 class ImporterPage(Gtk.Box):
     def __init__(self, on_back_cb, on_done_cb):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
@@ -1480,8 +1502,33 @@ class ImporterPage(Gtk.Box):
         self.stack.add_named(clamp, "progress")
 
     def _build_selecting_page(self):
+        # Pick cards: a clear round check top-right, an accent ring and a
+        # small inset when picked; dimmed when left out — readable at a
+        # glance which photos go along.
         thumb_css = Gtk.CssProvider()
-        thumb_css.load_from_string(".thumb-item { border-radius: 8px; }")
+        thumb_css.load_from_string("""
+            .pick-card { border-radius: 12px; }
+            .pick-thumb { border-radius: 12px;
+                          transition: opacity 160ms ease, transform 160ms ease; }
+            .pick-card.picked .pick-thumb { transform: scale(0.93); }
+            .pick-card.unpicked .pick-thumb { opacity: 0.45; }
+            .pick-card.unpicked:hover .pick-thumb { opacity: 0.7; }
+            .pick-card.picked:hover .pick-thumb { transform: scale(0.95); }
+            .pick-ring { border-radius: 12px; border: 3px solid transparent;
+                         transition: border-color 160ms ease; }
+            .pick-card.picked .pick-ring { border-color: @accent_bg_color; }
+            .pick-badge { min-width: 22px; min-height: 22px; border-radius: 999px;
+                          border: 2px solid white; background-color: alpha(black, 0.28);
+                          box-shadow: 0 1px 4px alpha(black, 0.45);
+                          transition: background-color 160ms ease; }
+            .pick-card.picked .pick-badge { background-color: @accent_bg_color; }
+            .pick-badge image { color: white; opacity: 0;
+                                transition: opacity 120ms ease; }
+            .pick-card.picked .pick-badge image { opacity: 1; }
+            .pick-pill { background-color: alpha(black, 0.62); color: white;
+                         border-radius: 999px; padding: 1px 8px;
+                         font-size: 0.8em; font-weight: 700; }
+        """)
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(), thumb_css,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
@@ -1503,6 +1550,8 @@ class ImporterPage(Gtk.Box):
         self.select_subtitle = Gtk.Label()
         self.select_subtitle.add_css_class("dim-label")
         self.select_subtitle.set_halign(Gtk.Align.START)
+        self.select_subtitle.set_xalign(0)
+        self.select_subtitle.set_wrap(True)
         header_box.append(self.select_subtitle)
 
         outer.append(header_box)
@@ -2281,8 +2330,8 @@ class ImporterPage(Gtk.Box):
         while child := self.select_flow.get_first_child():
             self.select_flow.remove(child)
 
-        self._select_cards: dict[str, Gtk.CheckButton] = {}
-        self._select_overlays: dict[str, Gtk.Overlay] = {}
+        self._select_cards: dict[str, _PickState] = {}
+        self._select_overlays: dict[str, Adw.Bin] = {}
         self._video_duration_labels: dict[str, Gtk.Label] = {}
         for fp in files:
             card, check, overlay = self._make_select_card(fp)
@@ -2305,44 +2354,67 @@ class ImporterPage(Gtk.Box):
                 adj.set_value(adj.get_lower())
         return False
 
-    def _make_select_card(self, fp: Path) -> tuple[Gtk.Widget, Gtk.CheckButton, Gtk.Overlay]:
+    def _make_select_card(self, fp: Path):
+        """(card, pick-state, thumb holder) for one item on the selection page."""
         overlay = Gtk.Overlay()
         overlay.set_size_request(SELECT_THUMB, SELECT_THUMB)
         overlay.set_overflow(Gtk.Overflow.HIDDEN)
-        overlay.add_css_class("thumb-item")
+        overlay.add_css_class("pick-card")
+        overlay.set_cursor_from_name("pointer")
 
+        holder = Adw.Bin()
+        holder.add_css_class("pick-thumb")
+        holder.set_overflow(Gtk.Overflow.HIDDEN)
         placeholder = Gtk.Image.new_from_icon_name("image-loading-symbolic")
         placeholder.set_pixel_size(32)
         placeholder.set_size_request(SELECT_THUMB, SELECT_THUMB)
-        overlay.set_child(placeholder)
+        holder.set_child(placeholder)
+        overlay.set_child(holder)
 
         click = Gtk.GestureClick.new()
         click.connect("pressed", lambda g, n, x, y, ip=str(fp): self._on_card_click(ip))
         overlay.add_controller(click)
 
-        # Check icon is visual-only; click handled by GestureClick above.
-        check = Gtk.CheckButton()
-        check.set_active(True)
-        check.set_halign(Gtk.Align.START)
-        check.set_valign(Gtk.Align.START)
-        check.set_margin_top(4)
-        check.set_margin_start(4)
-        check.set_can_target(False)
-        check.set_focusable(False)
-        overlay.add_overlay(check)
+        ring = Gtk.Box()
+        ring.add_css_class("pick-ring")
+        ring.set_can_target(False)
+        overlay.add_overlay(ring)
+
+        badge = Gtk.Box(halign=Gtk.Align.END, valign=Gtk.Align.START,
+                        margin_top=8, margin_end=8)
+        badge.add_css_class("pick-badge")
+        badge.set_can_target(False)
+        tick = Gtk.Image.new_from_icon_name("object-select-symbolic")
+        tick.set_pixel_size(14)
+        tick.set_hexpand(True)
+        tick.set_halign(Gtk.Align.CENTER)
+        badge.append(tick)
+        overlay.add_overlay(badge)
 
         ext = fp.suffix.lower()
         if ext in {".mp4", ".mov", ".m4v", ".3gp"}:
             video_lbl = Gtk.Label(label="▶")
-            video_lbl.add_css_class("caption")
+            video_lbl.add_css_class("pick-pill")
             video_lbl.set_halign(Gtk.Align.END)
             video_lbl.set_valign(Gtk.Align.END)
-            video_lbl.set_margin_end(4)
-            video_lbl.set_margin_bottom(4)
+            video_lbl.set_margin_end(10)
+            video_lbl.set_margin_bottom(10)
+            video_lbl.set_can_target(False)
             overlay.add_overlay(video_lbl)
             self._video_duration_labels[str(fp)] = video_lbl
+        elif fp in getattr(self, "_live_motion", {}):
+            live_lbl = Gtk.Label(label=_("LIVE"))
+            live_lbl.add_css_class("pick-pill")
+            live_lbl.set_halign(Gtk.Align.START)
+            live_lbl.set_valign(Gtk.Align.END)
+            live_lbl.set_margin_start(10)
+            live_lbl.set_margin_bottom(10)
+            live_lbl.set_can_target(False)
+            overlay.add_overlay(live_lbl)
 
-        return overlay, check, overlay
+        state = _PickState(overlay)
+        state.set_active(True)
+        return overlay, state, holder
 
     def _load_select_thumbs(self, files: list[Path]):
         """Sequential thumb load; faster than parallel on USB/FUSE."""
@@ -2361,15 +2433,15 @@ class ImporterPage(Gtk.Box):
     def _set_select_thumb(self, path_str: str, pixbuf, gen: int = 0):
         if gen and gen != self._thumb_load_gen:
             return
-        overlay = self._select_overlays.get(path_str)
-        if overlay is None:
+        holder = self._select_overlays.get(path_str)
+        if holder is None:
             return
         try:
             pic = Gtk.Picture.new_for_pixbuf(pixbuf)
             pic.set_can_shrink(False)
             pic.set_content_fit(Gtk.ContentFit.COVER)
             pic.set_size_request(SELECT_THUMB, SELECT_THUMB)
-            overlay.set_child(pic)
+            holder.set_child(pic)
         except Exception:
             pass
 
