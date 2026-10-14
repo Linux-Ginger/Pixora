@@ -138,6 +138,9 @@ def copy_atomic(src: Path, dst: Path):
     tmp = part_path(dst)
     try:
         shutil.copy2(src, tmp)
+        want, got = os.path.getsize(src), os.path.getsize(tmp)
+        if want != got:
+            raise OSError(f"copy of {src.name} is incomplete ({got} of {want} bytes)")
         os.replace(tmp, dst)
     except BaseException:
         try:
@@ -964,12 +967,18 @@ def find_duplicate(ph_str: str, library_hashes: dict, max_dist: int) -> str | No
     return None
 
 
+# Bumped when thumbnails made the old way (decoded straight off the phone,
+# sometimes garbled into green stripes) must be thrown away and remade.
+_SELECT_THUMB_VERSION = "v2"
+
+
 def _import_cache_path(photo_path: Path) -> Path:
     try:
         stat = photo_path.stat()
-        key = hashlib.md5(f"{photo_path}:{int(stat.st_mtime)}:{stat.st_size}".encode()).hexdigest()
+        key = hashlib.md5(f"{_SELECT_THUMB_VERSION}:{photo_path}:{int(stat.st_mtime)}:"
+                          f"{stat.st_size}".encode()).hexdigest()
     except OSError:
-        key = hashlib.md5(str(photo_path).encode()).hexdigest()
+        key = hashlib.md5(f"{_SELECT_THUMB_VERSION}:{photo_path}".encode()).hexdigest()
     return IMPORT_THUMB_DIR / (key + ".png")
 
 
@@ -997,7 +1006,9 @@ def _square_thumb_to_cache(src: Path, cache: Path) -> bool:
             top = (h - side) // 2
             img = img.crop((left, top, left + side, top + side))
             img = img.resize((SELECT_THUMB, SELECT_THUMB), Image.LANCZOS)
-            img.save(str(cache), "PNG")
+            tmp = cache.with_suffix(".tmp.png")
+            img.save(str(tmp), "PNG")
+            os.replace(tmp, cache)
         return True
     except Exception:
         pass
@@ -1011,6 +1022,14 @@ def _square_thumb_to_cache(src: Path, cache: Path) -> bool:
         thumb.savev(str(cache), "png", [], [])
         return True
     except Exception:
+        return False
+
+
+def _on_phone(path: Path) -> bool:
+    try:
+        Path(path).relative_to(MOUNT_POINT)
+        return True
+    except ValueError:
         return False
 
 
@@ -1047,6 +1066,19 @@ def load_select_thumb(photo_path: Path):
             return None
         ok = _square_thumb_to_cache(tmp, cache)
         tmp.unlink(missing_ok=True)
+    elif _on_phone(photo_path):
+        # Decoding straight off the phone's FUSE mount reads garbage now and
+        # then (HEIC shows it as green stripes) — worst with several reads at
+        # once. A plain copy is reliable, so decode a local copy instead.
+        STAGING_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = STAGING_DIR / ("thumb_" + cache.stem + photo_path.suffix)
+        try:
+            shutil.copy2(photo_path, tmp)
+            ok = _square_thumb_to_cache(tmp, cache)
+        except OSError:
+            ok = False
+        finally:
+            tmp.unlink(missing_ok=True)
     else:
         ok = _square_thumb_to_cache(photo_path, cache)
 
